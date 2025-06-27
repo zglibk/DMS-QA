@@ -1,0 +1,124 @@
+/* 顶部导航栏样式 */
+.home-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 64px;
+  background: #fff;
+  box-shadow: 0 2px 8px #f0f1f2;
+  padding: 0 40px;
+  position: relative;
+  z-index: 10;
+}
+.header-left {
+  display: flex;
+  align-items: center;
+}
+.logo {
+  height: 38px;
+  margin-right: 12px;
+}
+.logo-text {
+  font-size: 22px;
+  font-weight: bold;
+  color: #1677ff;
+  letter-spacing: 2px;
+}
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+}
+.nav-menu-wrap {
+  display: flex;
+  align-items: center;
+  height: 64px;
+}
+.nav-menu {
+  border-bottom: none !important;
+  background: transparent !important;
+  --el-menu-active-color: #1677ff;
+  --el-menu-hover-bg-color: transparent;
+  --el-menu-item-height: 64px;
+}
+.nav-menu .el-menu-item {
+  font-size: 16px;
+  padding: 0 32px;
+  position: relative;
+  background: transparent !important;
+  border-bottom: 2px solid transparent;
+  transition: border-color 0.2s;
+}
+.nav-menu .el-menu-item.is-active,
+.nav-menu .el-menu-item:hover {
+  border-bottom: 2px solid #1677ff;
+  background: transparent !important;
+  color: #1677ff !important;
+}
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.avatar-icon {
+  background: #e6f0ff;
+  color: #1677ff;
+}
+.username {
+  font-size: 15px;
+  color: #333;
+  margin-left: 4px;
+}
+.admin-btn {
+  margin-right: 8px;
+}
+
+/* 表单卡片样式 */
+.form-card {
+  margin-bottom: 32px;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px 0 rgba(22,119,255,0.08);
+  padding: 32px 24px 16px 24px;
+  background: #fff;
+}
+
+/* 右侧卡片、统计卡片等 */
+.stats-card, .query-card {
+  border-radius: 12px;
+  box-shadow: 0 2px 12px 0 rgba(22,119,255,0.08);
+  background: #fff;
+  padding: 24px 20px 16px 20px;
+}
+
+/* 底部footer样式 */
+.home-footer {
+  width: 100%;
+  text-align: center;
+  color: #888;
+  font-size: 15px;
+  background: #fff;
+  padding: 18px 0 12px 0;
+  border-top: 1px solid #f0f0f0;
+  margin-top: 40px;
+}
+
+/* 页面背景、滚动条、全局去margin */
+body, html, #app {
+  margin: 0;
+  padding: 0;
+  background: #f5f7fa;
+  min-height: 100vh;
+  box-sizing: border-box;
+  overflow-x: hidden;
+}
+.form-bg {
+  min-height: 100vh;
+  background: #f5f7fa;
+  padding-bottom: 0;
+}
+
+/* 隐藏滚动条 */
+::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+} 
