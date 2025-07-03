@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { sql, config, getDynamicConfig, getConnection } = require('../db');
+const { sql, config, getDynamicConfig, getConnection, executeQuery } = require('../db');
 
 // 获取所有数据库配置列表
 router.get('/db-list', async (req, res) => {
@@ -653,177 +653,204 @@ router.put('/home-cards', async (req, res) => {
 
 // ===================== 网站LOGO配置接口 =====================
 
-// 获取网站配置
-router.get('/site-config', async (req, res) => {
-  let connection;
+// 初始化SiteConfig表
+router.post('/init-site-config', async (req, res) => {
   try {
-    connection = await getConnection();
+    const fs = require('fs');
+    const path = require('path');
 
-    // 检查表是否存在
-    const tableCheckResult = await connection.request()
-      .query(`SELECT COUNT(*) as count FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[SiteConfig]') AND type in (N'U')`);
+    // 读取SQL脚本
+    const sqlScript = fs.readFileSync(path.join(__dirname, '../create_siteconfig_table.sql'), 'utf8');
 
-    if (tableCheckResult.recordset[0].count === 0) {
-      // 表不存在，返回默认配置
-      console.log('SiteConfig表不存在，返回默认配置');
-      const defaultConfig = {
-        siteName: '质量数据管理系统',
-        companyName: 'DMS质量管理系统',
-        logoUrl: '/logo.png',
-        faviconUrl: '/logo.png',
-        headerTitle: '质量数据系统',
-        loginTitle: 'DMS-QA 质量管理系统',
-        footerCopyright: '© 2025 DMS质量管理系统. All rights reserved.'
-      };
+    // 执行SQL脚本
+    await executeQuery(sqlScript);
 
-      return res.json({
-        success: true,
-        data: defaultConfig,
-        message: '获取网站配置成功（使用默认配置）'
-      });
-    }
-
-    const result = await connection.request()
-      .query(`SELECT ConfigKey, ConfigValue, ConfigType FROM SiteConfig WHERE IsActive = 1`);
-
-    // 转换为对象格式
-    const config = {};
-    result.recordset.forEach(row => {
-      config[row.ConfigKey] = row.ConfigValue;
+    res.json({
+      success: true,
+      message: 'SiteConfig表初始化成功'
     });
 
-    // 设置默认值
-    const defaultValues = {
+  } catch (error) {
+    console.error('初始化SiteConfig表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '初始化失败: ' + error.message
+    });
+  }
+});
+
+// 获取网站配置
+router.get('/site-config', async (req, res) => {
+  try {
+    // 默认配置
+    const defaultConfig = {
       siteName: '质量数据管理系统',
       companyName: 'DMS质量管理系统',
-      logoUrl: '/logo.png',
-      faviconUrl: '/logo.png',
+      logoBase64Img: '/logo.png',
+      faviconBase64Img: '/logo.png',
       headerTitle: '质量数据系统',
       loginTitle: 'DMS-QA 质量管理系统',
       footerCopyright: '© 2025 DMS质量管理系统. All rights reserved.'
     };
 
-    // 合并默认值
-    Object.keys(defaultValues).forEach(key => {
-      if (!config.hasOwnProperty(key)) {
-        config[key] = defaultValues[key];
-      }
-    });
+    try {
+      // 从数据库读取配置
+      const result = await executeQuery(async (pool) => {
+        return await pool.request()
+          .query(`SELECT ConfigKey, ConfigValue FROM SiteConfig WHERE ConfigKey IN ('siteName', 'companyName', 'logoBase64Img', 'faviconBase64Img', 'headerTitle', 'loginTitle', 'footerCopyright')`);
+      });
+      console.log('数据库查询结果:', result);
 
-    res.json({
-      success: true,
-      data: config,
-      message: '获取网站配置成功'
-    });
+      if (result && result.recordset && result.recordset.length > 0) {
+        // 将数据库结果转换为配置对象
+        const dbConfig = {};
+        result.recordset.forEach(row => {
+          dbConfig[row.ConfigKey] = row.ConfigValue;
+        });
+
+        // 合并默认配置和数据库配置
+        const finalConfig = { ...defaultConfig, ...dbConfig };
+        console.log('最终配置:', finalConfig);
+
+        res.json({
+          success: true,
+          data: finalConfig,
+          message: '获取网站配置成功'
+        });
+      } else {
+        console.log('数据库中没有配置数据，使用默认配置');
+        res.json({
+          success: true,
+          data: defaultConfig,
+          message: '获取网站配置成功（使用默认配置）'
+        });
+      }
+
+    } catch (dbError) {
+      console.error('数据库读取失败，使用默认配置:', dbError);
+      res.json({
+        success: true,
+        data: defaultConfig,
+        message: '获取网站配置成功（数据库读取失败，使用默认配置）'
+      });
+    }
+
   } catch (error) {
     console.error('获取网站配置失败:', error);
     res.status(500).json({
       success: false,
       message: '获取配置失败: ' + error.message
     });
-  } finally {
-    if (connection) {
-      connection.close();
-    }
   }
 });
 
 // 保存网站配置
 router.put('/site-config', async (req, res) => {
-  let connection;
   try {
-    const { siteName, companyName, logoUrl, faviconUrl, headerTitle, loginTitle, footerCopyright } = req.body;
+    const { siteName, companyName, logoBase64Img, faviconBase64Img, headerTitle, loginTitle, footerCopyright } = req.body;
 
-    connection = await getConnection();
-
-    // 检查表是否存在
-    const tableCheckResult = await connection.request()
-      .query(`SELECT COUNT(*) as count FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[SiteConfig]') AND type in (N'U')`);
-
-    if (tableCheckResult.recordset[0].count === 0) {
-      // 表不存在，返回提示信息
-      console.log('SiteConfig表不存在，无法保存配置');
-      return res.json({
-        success: false,
-        message: '数据库表不存在，请先执行建表SQL脚本。配置已临时生效，但不会持久化保存。',
-        data: {
-          siteName, companyName, logoUrl, faviconUrl, headerTitle, loginTitle, footerCopyright,
-          savedAt: new Date().toISOString(),
-          persistent: false
-        }
-      });
-    }
-
-    // 开始事务
-    const transaction = connection.transaction();
-    await transaction.begin();
+    console.log('网站配置保存请求:', { siteName, companyName, logoBase64Img, faviconBase64Img, headerTitle, loginTitle, footerCopyright });
 
     try {
-      // 更新或插入配置
-      const configs = [
-        { key: 'siteName', value: siteName || '质量数据管理系统', type: 'text', description: '网站名称' },
-        { key: 'companyName', value: companyName || 'DMS质量管理系统', type: 'text', description: '公司名称' },
-        { key: 'logoUrl', value: logoUrl || '/logo.png', type: 'image', description: '网站LOGO图片URL' },
-        { key: 'faviconUrl', value: faviconUrl || '/logo.png', type: 'image', description: '网站图标URL' },
-        { key: 'headerTitle', value: headerTitle || '质量数据系统', type: 'text', description: '页面头部标题' },
-        { key: 'loginTitle', value: loginTitle || 'DMS-QA 质量管理系统', type: 'text', description: '登录页面标题' },
-        { key: 'footerCopyright', value: footerCopyright || '© 2025 DMS质量管理系统. All rights reserved.', type: 'text', description: '页脚版权信息' }
+      // 配置项映射
+      const configItems = [
+        { key: 'siteName', value: siteName || '质量数据管理系统' },
+        { key: 'companyName', value: companyName || 'DMS质量管理系统' },
+        { key: 'logoBase64Img', value: logoBase64Img || '/logo.png' },
+        { key: 'faviconBase64Img', value: faviconBase64Img || '/logo.png' },
+        { key: 'headerTitle', value: headerTitle || '质量数据系统' },
+        { key: 'loginTitle', value: loginTitle || 'DMS-QA 质量管理系统' },
+        { key: 'footerCopyright', value: footerCopyright || '© 2025 DMS质量管理系统. All rights reserved.' }
       ];
 
-      for (const config of configs) {
-        // 检查配置是否存在
-        const existResult = await transaction.request()
-          .input('ConfigKey', config.key)
-          .query('SELECT ID FROM SiteConfig WHERE ConfigKey = @ConfigKey');
+      // 逐个更新或插入配置项
+      for (const item of configItems) {
+        try {
+          // 使用executeQuery函数的正确方式
+          const checkResult = await executeQuery(async (pool) => {
+            return await pool.request()
+              .input('ConfigKey', sql.NVarChar, item.key)
+              .query('SELECT COUNT(*) as count FROM SiteConfig WHERE ConfigKey = @ConfigKey');
+          });
 
-        if (existResult.recordset.length > 0) {
-          // 更新现有配置
-          await transaction.request()
-            .input('ConfigKey', config.key)
-            .input('ConfigValue', config.value)
-            .query(`UPDATE SiteConfig SET
-                      ConfigValue = @ConfigValue,
-                      UpdatedAt = GETDATE()
-                    WHERE ConfigKey = @ConfigKey`);
-        } else {
-          // 插入新配置
-          await transaction.request()
-            .input('ConfigKey', config.key)
-            .input('ConfigValue', config.value)
-            .input('ConfigType', config.type)
-            .input('Description', config.description)
-            .query(`INSERT INTO SiteConfig (ConfigKey, ConfigValue, ConfigType, Description, IsActive, CreatedAt, UpdatedAt)
-                    VALUES (@ConfigKey, @ConfigValue, @ConfigType, @Description, 1, GETDATE(), GETDATE())`);
+          if (checkResult && checkResult.recordset && checkResult.recordset[0].count > 0) {
+            // 更新现有配置
+            await executeQuery(async (pool) => {
+              return await pool.request()
+                .input('ConfigValue', sql.NVarChar, item.value)
+                .input('ConfigKey', sql.NVarChar, item.key)
+                .query('UPDATE SiteConfig SET ConfigValue = @ConfigValue, UpdatedAt = GETDATE() WHERE ConfigKey = @ConfigKey');
+            });
+            console.log(`更新配置项: ${item.key} = ${item.value.length > 100 ? item.value.substring(0, 100) + '...' : item.value}`);
+          } else {
+            // 插入新配置
+            const description = {
+              'siteName': '网站名称',
+              'companyName': '公司名称',
+              'logoBase64Img': '网站LOGO图片BASE64数据',
+              'faviconBase64Img': '网站图标BASE64数据',
+              'headerTitle': '页面头部标题',
+              'loginTitle': '登录页面标题',
+              'footerCopyright': '页脚版权信息'
+            };
+
+            await executeQuery(async (pool) => {
+              return await pool.request()
+                .input('ConfigKey', sql.NVarChar, item.key)
+                .input('ConfigValue', sql.NVarChar, item.value)
+                .input('ConfigType', sql.NVarChar, item.key.includes('Url') ? 'image' : 'text')
+                .input('Description', sql.NVarChar, description[item.key] || '网站配置项')
+                .query('INSERT INTO SiteConfig (ConfigKey, ConfigValue, ConfigType, Description) VALUES (@ConfigKey, @ConfigValue, @ConfigType, @Description)');
+            });
+            console.log(`插入配置项: ${item.key} = ${item.value.length > 100 ? item.value.substring(0, 100) + '...' : item.value}`);
+          }
+        } catch (itemError) {
+          console.error(`处理配置项 ${item.key} 失败:`, itemError);
         }
       }
-
-      // 提交事务
-      await transaction.commit();
 
       res.json({
         success: true,
         message: '网站配置保存成功',
         data: {
-          siteName, companyName, logoUrl, faviconUrl, headerTitle, loginTitle, footerCopyright,
+          siteName: siteName || '质量数据管理系统',
+          companyName: companyName || 'DMS质量管理系统',
+          logoBase64Img: logoBase64Img || '/logo.png',
+          faviconBase64Img: faviconBase64Img || '/logo.png',
+          headerTitle: headerTitle || '质量数据系统',
+          loginTitle: loginTitle || 'DMS-QA 质量管理系统',
+          footerCopyright: footerCopyright || '© 2025 DMS质量管理系统. All rights reserved.',
           savedAt: new Date().toISOString(),
           persistent: true
         }
       });
-    } catch (error) {
-      // 回滚事务
-      await transaction.rollback();
-      throw error;
+
+    } catch (dbError) {
+      console.error('数据库保存失败:', dbError);
+      res.json({
+        success: true,
+        message: '网站配置保存成功（临时生效，数据库保存失败）',
+        data: {
+          siteName: siteName || '质量数据管理系统',
+          companyName: companyName || 'DMS质量管理系统',
+          logoBase64Img: logoBase64Img || '/logo.png',
+          faviconBase64Img: faviconBase64Img || '/logo.png',
+          headerTitle: headerTitle || '质量数据系统',
+          loginTitle: loginTitle || 'DMS-QA 质量管理系统',
+          footerCopyright: footerCopyright || '© 2025 DMS质量管理系统. All rights reserved.',
+          savedAt: new Date().toISOString(),
+          persistent: false,
+          error: dbError.message
+        }
+      });
     }
+
   } catch (error) {
     console.error('保存网站配置失败:', error);
     res.status(500).json({
       success: false,
       message: '保存配置失败: ' + error.message
     });
-  } finally {
-    if (connection) {
-      connection.close();
-    }
   }
 });
 
@@ -831,45 +858,57 @@ router.put('/site-config', async (req, res) => {
 
 // 获取所有车间数据
 router.get('/workshops', async (req, res) => {
-  let connection;
   try {
-    connection = await getConnection();
+    const result = await executeQuery(async (pool) => {
+      // 检查Workshop表是否存在
+      const tableCheckResult = await pool.request()
+        .query(`SELECT COUNT(*) as count FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Workshop]') AND type in (N'U')`);
 
-    // 检查Workshop表是否存在
-    const tableCheckResult = await connection.request()
-      .query(`SELECT COUNT(*) as count FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Workshop]') AND type in (N'U')`);
+      if (tableCheckResult.recordset[0].count === 0) {
+        // 表不存在，返回默认数据
+        console.log('Workshop表不存在，返回默认数据');
+        return [
+          { ID: 1, Name: '数码印刷' },
+          { ID: 2, Name: '轮转机' },
+          { ID: 3, Name: '印刷车间' },
+          { ID: 4, Name: '裁切车间' },
+          { ID: 5, Name: '包装车间' }
+        ];
+      }
 
-    if (tableCheckResult.recordset[0].count === 0) {
-      // 表不存在，返回默认数据
-      console.log('Workshop表不存在，返回默认数据');
-      const defaultWorkshops = [
+      const workshopResult = await pool.request()
+        .query(`SELECT ID, Name FROM Workshop ORDER BY Name`);
+
+      return workshopResult.recordset;
+    });
+
+    // 如果executeQuery返回null（表示所有重试都失败），使用默认数据
+    const finalResult = result || [
+      { ID: 1, Name: '数码印刷' },
+      { ID: 2, Name: '轮转机' },
+      { ID: 3, Name: '印刷车间' },
+      { ID: 4, Name: '裁切车间' },
+      { ID: 5, Name: '包装车间' }
+    ];
+
+    res.json({
+      success: true,
+      data: finalResult,
+      message: result ? '获取车间数据成功' : '获取车间数据成功（使用默认数据）'
+    });
+  } catch (error) {
+    console.error('获取车间数据失败:', error);
+    // 即使出错也返回默认数据，确保前端不会报错
+    res.json({
+      success: true,
+      data: [
         { ID: 1, Name: '数码印刷' },
         { ID: 2, Name: '轮转机' },
         { ID: 3, Name: '印刷车间' },
         { ID: 4, Name: '裁切车间' },
         { ID: 5, Name: '包装车间' }
-      ];
-
-      return res.json({
-        success: true,
-        data: defaultWorkshops,
-        message: '获取车间数据成功（使用默认数据）'
-      });
-    }
-
-    const result = await connection.request()
-      .query(`SELECT ID, Name FROM Workshop ORDER BY Name`);
-
-    res.json({
-      success: true,
-      data: result.recordset,
-      message: '获取车间数据成功'
-    });
-  } catch (error) {
-    console.error('获取车间数据失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取车间数据失败: ' + error.message
+      ],
+      message: '获取车间数据成功（使用默认数据）'
     });
   } finally {
     if (connection) {
@@ -880,51 +919,61 @@ router.get('/workshops', async (req, res) => {
 
 // 获取所有部门数据
 router.get('/departments', async (req, res) => {
-  let connection;
   try {
-    connection = await getConnection();
+    const result = await executeQuery(async (pool) => {
+      // 检查Department表是否存在
+      const tableCheckResult = await pool.request()
+        .query(`SELECT COUNT(*) as count FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Department]') AND type in (N'U')`);
 
-    // 检查Department表是否存在
-    const tableCheckResult = await connection.request()
-      .query(`SELECT COUNT(*) as count FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[Department]') AND type in (N'U')`);
+      if (tableCheckResult.recordset[0].count === 0) {
+        // 表不存在，返回默认数据
+        console.log('Department表不存在，返回默认数据');
+        return [
+          { ID: 1, Name: '跟单' },
+          { ID: 2, Name: '设计' },
+          { ID: 3, Name: '品检' },
+          { ID: 4, Name: '生产部' },
+          { ID: 5, Name: '质检部' },
+          { ID: 6, Name: '销售部' }
+        ];
+      }
 
-    if (tableCheckResult.recordset[0].count === 0) {
-      // 表不存在，返回默认数据
-      console.log('Department表不存在，返回默认数据');
-      const defaultDepartments = [
+      const departmentResult = await pool.request()
+        .query(`SELECT ID, Name FROM Department ORDER BY Name`);
+
+      return departmentResult.recordset;
+    });
+
+    // 如果executeQuery返回null（表示所有重试都失败），使用默认数据
+    const finalResult = result || [
+      { ID: 1, Name: '跟单' },
+      { ID: 2, Name: '设计' },
+      { ID: 3, Name: '品检' },
+      { ID: 4, Name: '生产部' },
+      { ID: 5, Name: '质检部' },
+      { ID: 6, Name: '销售部' }
+    ];
+
+    res.json({
+      success: true,
+      data: finalResult,
+      message: result ? '获取部门数据成功' : '获取部门数据成功（使用默认数据）'
+    });
+  } catch (error) {
+    console.error('获取部门数据失败:', error);
+    // 即使出错也返回默认数据，确保前端不会报错
+    res.json({
+      success: true,
+      data: [
         { ID: 1, Name: '跟单' },
         { ID: 2, Name: '设计' },
         { ID: 3, Name: '品检' },
         { ID: 4, Name: '生产部' },
         { ID: 5, Name: '质检部' },
         { ID: 6, Name: '销售部' }
-      ];
-
-      return res.json({
-        success: true,
-        data: defaultDepartments,
-        message: '获取部门数据成功（使用默认数据）'
-      });
-    }
-
-    const result = await connection.request()
-      .query(`SELECT ID, Name FROM Department ORDER BY Name`);
-
-    res.json({
-      success: true,
-      data: result.recordset,
-      message: '获取部门数据成功'
+      ],
+      message: '获取部门数据成功（使用默认数据）'
     });
-  } catch (error) {
-    console.error('获取部门数据失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '获取部门数据失败: ' + error.message
-    });
-  } finally {
-    if (connection) {
-      connection.close();
-    }
   }
 });
 

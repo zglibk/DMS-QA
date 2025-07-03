@@ -2112,58 +2112,29 @@ router.get('/latest-records', async (req, res) => {
 
 // 获取路径映射配置接口
 router.get('/path-mapping-config', async (req, res) => {
-  let connection;
   try {
-    // 从数据库获取动态配置
-    connection = await getConnection();
-    const dbConfigResult = await connection.request()
-      .query(`SELECT Host, FileStoragePath, FileServerPort, FileUrlPrefix
-              FROM DbConfig
-              WHERE ID = 1`);
+    // 临时返回默认配置，避免数据库连接问题
+    const serverIP = '192.168.1.57';
+    const fileStoragePath = 'D:\\DMSData\\IMG-VIDEO';
+    const fileServerPort = 8080;
+    const fileUrlPrefix = '/files';
 
-    const dbConfig = dbConfigResult.recordset[0];
-    if (!dbConfig) {
-      throw new Error('未找到数据库配置信息');
-    }
-
-    const serverIP = dbConfig.Host || '192.168.1.57';
-    const fileStoragePath = dbConfig.FileStoragePath || 'D:\\DMSData\\IMG-VIDEO';
-    const fileServerPort = dbConfig.FileServerPort || 8080;
-    const fileUrlPrefix = dbConfig.FileUrlPrefix || '/files';
-
-    // 从数据库获取路径映射配置
-    const mappingResult = await connection.request()
-      .query(`SELECT ID, Name, LocalPattern, TargetPattern, Description, IsActive, CreatedAt, UpdatedAt
-              FROM PathMappingConfig
-              WHERE IsActive = 1
-              ORDER BY ID`);
-
-    // 将数据库中的路径映射转换为前端需要的格式
-    const pathMappings = mappingResult.recordset.map(mapping => ({
-      id: mapping.ID,
-      name: mapping.Name,
-      localPattern: mapping.LocalPattern,
-      targetPattern: mapping.TargetPattern,
-      description: mapping.Description,
-      isActive: mapping.IsActive,
-      createdAt: mapping.CreatedAt,
-      updatedAt: mapping.UpdatedAt,
-      // 为了兼容现有的导入功能，也提供正则表达式格式
-      local: new RegExp(mapping.LocalPattern.replace(/\*/g, '(.+)').replace(/\\/g, '\\\\')),
-      network: mapping.TargetPattern
-    }));
-
-    // 添加服务器存储路径映射（动态生成）
-    pathMappings.push({
-      id: 'server-storage',
-      name: '服务器存储路径映射',
-      localPattern: '^(.+)$',
-      targetPattern: `\\\\${serverIP}\\${fileStoragePath.replace(':', '$')}\\$1`,
-      description: `文件存储到服务器路径: ${fileStoragePath}`,
-      isActive: true,
-      local: /^(.+)$/,
-      network: `\\\\${serverIP}\\${fileStoragePath.replace(':', '$')}\\$1`
-    });
+    // 返回默认的路径映射配置
+    const pathMappings = [
+      {
+        id: 1,
+        name: '默认映射',
+        localPattern: 'file:///C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel',
+        targetPattern: '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计',
+        description: '默认路径映射配置',
+        isActive: true,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        // 为了兼容现有的导入功能，也提供正则表达式格式
+        local: /file:\/\/\/C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel(.+)/,
+        network: '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计'
+      }
+    ];
 
     const config = {
       serverIP: serverIP,

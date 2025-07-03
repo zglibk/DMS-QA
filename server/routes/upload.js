@@ -49,7 +49,7 @@ const upload = multer({
   }
 });
 
-// 网站图片上传接口
+// 网站图片上传接口 - 转换为BASE64存储
 router.post('/site-image', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {
@@ -60,24 +60,35 @@ router.post('/site-image', upload.single('file'), (req, res) => {
     }
 
     const type = req.body.type || 'image';
-    const fileUrl = `/files/site-images/${req.file.filename}`;
+
+    // 读取文件并转换为BASE64
+    const imageBuffer = fs.readFileSync(req.file.path);
+    const base64Image = imageBuffer.toString('base64');
+    const mimeType = req.file.mimetype;
+    const dataUrl = `data:${mimeType};base64,${base64Image}`;
+
+    // 删除临时文件
+    fs.unlinkSync(req.file.path);
 
     console.log(`网站${type}上传成功:`, {
       originalName: req.file.originalname,
       filename: req.file.filename,
       size: req.file.size,
-      url: fileUrl
+      mimeType: mimeType,
+      base64Length: base64Image.length
     });
 
     res.json({
       success: true,
       message: `${type === 'logo' ? 'LOGO' : '网站图标'}上传成功`,
       data: {
-        url: fileUrl,
+        url: dataUrl, // 返回BASE64数据URL
         filename: req.file.filename,
         originalName: req.file.originalname,
         size: req.file.size,
-        type: type
+        type: type,
+        mimeType: mimeType,
+        base64: base64Image // 也返回纯BASE64字符串，以备需要
       }
     });
 

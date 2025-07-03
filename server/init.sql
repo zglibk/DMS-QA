@@ -204,8 +204,8 @@ INSERT INTO [dbo].[HomeCardConfig] ([ConfigKey], [ConfigValue], [Description]) V
 INSERT INTO [dbo].[SiteConfig] ([ConfigKey], [ConfigValue], [ConfigType], [Description]) VALUES
 (N'siteName', N'质量数据管理系统', N'text', N'网站名称'),
 (N'companyName', N'DMS质量管理系统', N'text', N'公司名称'),
-(N'logoUrl', N'/logo.png', N'image', N'网站LOGO图片URL'),
-(N'faviconUrl', N'/logo.png', N'image', N'网站图标URL'),
+(N'logoBase64Img', N'/logo.png', N'image', N'网站LOGO图片BASE64数据'),
+(N'faviconBase64Img', N'/logo.png', N'image', N'网站图标BASE64数据'),
 (N'headerTitle', N'质量数据系统', N'text', N'页面头部标题'),
 (N'loginTitle', N'DMS-QA 质量管理系统', N'text', N'登录页面标题'),
 (N'footerCopyright', N'© 2025 DMS质量管理系统. All rights reserved.', N'text', N'页脚版权信息');
