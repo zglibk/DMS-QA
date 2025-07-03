@@ -340,6 +340,39 @@
                 </div>
               </el-card>
             </div>
+
+            <!-- 步骤4: 导入完成 -->
+            <div v-if="currentStep === 3" class="step-content">
+              <el-card class="success-card">
+                <template #header>
+                  <div class="success-header">
+                    <el-icon class="success-icon"><SuccessFilled /></el-icon>
+                    <h3>导入完成</h3>
+                  </div>
+                </template>
+
+                <div class="success-content">
+                  <el-result
+                    icon="success"
+                    title="数据导入成功！"
+                    sub-title="Excel数据已成功导入到系统中"
+                  >
+                    <template #extra>
+                      <div class="success-actions">
+                        <el-button type="primary" @click="resetImportProcess">
+                          <el-icon><Refresh /></el-icon>
+                          重新导入
+                        </el-button>
+                        <el-button @click="$router.push('/complaint/list')">
+                          <el-icon><Document /></el-icon>
+                          查看数据
+                        </el-button>
+                      </div>
+                    </template>
+                  </el-result>
+                </div>
+              </el-card>
+            </div>
           </div>
         </el-tab-pane>
         
@@ -1004,7 +1037,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { UploadFilled, Download, Warning, InfoFilled, Refresh, Document, Collection, Setting, Delete } from '@element-plus/icons-vue'
+import { UploadFilled, Download, Warning, InfoFilled, Refresh, Document, Collection, Setting, Delete, SuccessFilled } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 
@@ -1203,6 +1236,35 @@ const resetImportData = () => {
   currentStep.value = 0
   sheetSelectionKey.value++ // 强制重新渲染工作表选择组件
   uploadKey.value++ // 强制重新渲染上传组件
+}
+
+// 重置导入流程
+const resetImportProcess = () => {
+  // 重置文件
+  selectedFile.value = null
+
+  // 重置所有数据
+  resetImportData()
+
+  // 重置加载状态
+  previewLoading.value = false
+  importLoading.value = false
+  validationLoading.value = false
+  loadingText.value = ''
+
+  // 重置进度状态
+  importProgress.value = {
+    current: 0,
+    total: 0,
+    percentage: 0,
+    status: 'not_started',
+    message: '准备中...'
+  }
+
+  // 关闭对话框
+  showProgressDialog.value = false
+
+  ElMessage.success('已重置导入流程，可以重新开始')
 }
 
 const previewFile = async () => {
@@ -1641,6 +1703,13 @@ const executeImport = async () => {
 
         if (importProgress.value.status === 'completed' || importProgress.value.status === 'error') {
           clearInterval(progressInterval)
+
+          // 如果导入成功，更新步骤状态
+          if (importProgress.value.status === 'completed') {
+            // 将步骤设置为完成状态（超过最大步骤数表示完成）
+            currentStep.value = 3
+          }
+
           setTimeout(() => {
             showProgressDialog.value = false
           }, 2000) // 2秒后关闭进度对话框
@@ -2377,5 +2446,31 @@ const handleTabChange = (tabName) => {
 /* 初始化结果对话框样式 */
 .initialize-result-content {
   padding: 10px 0;
+}
+
+/* 导入完成样式 */
+.success-card {
+  border: 2px solid #67c23a;
+}
+
+.success-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.success-icon {
+  color: #67c23a;
+  font-size: 24px;
+}
+
+.success-content {
+  padding: 20px 0;
+}
+
+.success-actions {
+  display: flex;
+  gap: 15px;
+  justify-content: center;
 }
 </style>

@@ -1011,17 +1011,20 @@ router.get('/table-list', async (req, res) => {
               ELSE 'business'
             END as tableType,
             CASE
-              WHEN c.COLUMN_NAME IS NOT NULL THEN 1
+              WHEN t.TABLE_NAME IN ('ComplaintRegister', 'MaterialPrice', 'User', 'Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'UserTokens', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig') THEN 1
               ELSE 0
             END as hasIdentity
           FROM INFORMATION_SCHEMA.TABLES t
-          LEFT JOIN INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_NAME = c.TABLE_NAME
-            AND c.COLUMN_NAME = 'ID'
-            AND c.COLUMNPROPERTY(OBJECT_ID(t.TABLE_SCHEMA + '.' + t.TABLE_NAME), c.COLUMN_NAME, 'IsIdentity') = 1
           WHERE t.TABLE_TYPE = 'BASE TABLE'
             AND t.TABLE_SCHEMA = 'dbo'
             AND t.TABLE_NAME NOT LIKE 'sys%'
-          ORDER BY tableType, t.TABLE_NAME
+          ORDER BY
+            CASE
+              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig') THEN 'system'
+              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice') THEN 'basic'
+              ELSE 'business'
+            END,
+            t.TABLE_NAME
         `);
     });
 
@@ -1123,16 +1126,15 @@ router.post('/initialize-table', async (req, res) => {
 
       const originalCount = countResult.recordset[0].recordCount;
 
-      // 检查是否有自增ID列
-      const identityResult = await pool.request()
-        .query(`
-          SELECT COLUMN_NAME
-          FROM INFORMATION_SCHEMA.COLUMNS
-          WHERE TABLE_NAME = '${tableName}'
-            AND COLUMNPROPERTY(OBJECT_ID(TABLE_SCHEMA + '.' + TABLE_NAME), COLUMN_NAME, 'IsIdentity') = 1
-        `);
+      // 检查是否有自增ID列（简化判断，大部分表都有ID自增列）
+      const tablesWithIdentity = [
+        'ComplaintRegister', 'MaterialPrice', 'User', 'Workshop', 'Department',
+        'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory',
+        'DefectiveItem', 'UserTokens', 'DbConfig', 'PathMappingConfig',
+        'HomeCardConfig', 'SiteConfig'
+      ];
 
-      const hasIdentity = identityResult.recordset.length > 0;
+      const hasIdentity = tablesWithIdentity.includes(tableName);
 
       // 清空表数据
       if (hasIdentity) {
