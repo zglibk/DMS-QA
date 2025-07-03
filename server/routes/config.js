@@ -977,4 +977,198 @@ router.get('/departments', async (req, res) => {
   }
 });
 
+// ===================== 数据表初始化接口 =====================
+
+// 获取所有可初始化的表列表
+router.get('/table-list', async (req, res) => {
+  try {
+    const result = await executeQuery(async (pool) => {
+      return await pool.request()
+        .query(`
+          SELECT
+            t.TABLE_NAME as tableName,
+            CASE
+              WHEN t.TABLE_NAME = 'ComplaintRegister' THEN '投诉登记表'
+              WHEN t.TABLE_NAME = 'MaterialPrice' THEN '物料单价表'
+              WHEN t.TABLE_NAME = 'User' THEN '用户管理表'
+              WHEN t.TABLE_NAME = 'Workshop' THEN '车间表'
+              WHEN t.TABLE_NAME = 'Department' THEN '部门表'
+              WHEN t.TABLE_NAME = 'Person' THEN '人员表'
+              WHEN t.TABLE_NAME = 'ComplaintCategory' THEN '投诉类别表'
+              WHEN t.TABLE_NAME = 'CustomerComplaintType' THEN '客诉类型表'
+              WHEN t.TABLE_NAME = 'DefectiveCategory' THEN '不良类别表'
+              WHEN t.TABLE_NAME = 'DefectiveItem' THEN '不良项表'
+              WHEN t.TABLE_NAME = 'UserTokens' THEN '用户令牌表'
+              WHEN t.TABLE_NAME = 'DbConfig' THEN '数据库配置表'
+              WHEN t.TABLE_NAME = 'PathMappingConfig' THEN '路径映射配置表'
+              WHEN t.TABLE_NAME = 'HomeCardConfig' THEN '主页卡片配置表'
+              WHEN t.TABLE_NAME = 'SiteConfig' THEN '网站配置表'
+              ELSE t.TABLE_NAME
+            END as displayName,
+            CASE
+              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig') THEN 'system'
+              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice') THEN 'basic'
+              ELSE 'business'
+            END as tableType,
+            CASE
+              WHEN c.COLUMN_NAME IS NOT NULL THEN 1
+              ELSE 0
+            END as hasIdentity
+          FROM INFORMATION_SCHEMA.TABLES t
+          LEFT JOIN INFORMATION_SCHEMA.COLUMNS c ON t.TABLE_NAME = c.TABLE_NAME
+            AND c.COLUMN_NAME = 'ID'
+            AND c.COLUMNPROPERTY(OBJECT_ID(t.TABLE_SCHEMA + '.' + t.TABLE_NAME), c.COLUMN_NAME, 'IsIdentity') = 1
+          WHERE t.TABLE_TYPE = 'BASE TABLE'
+            AND t.TABLE_SCHEMA = 'dbo'
+            AND t.TABLE_NAME NOT LIKE 'sys%'
+          ORDER BY tableType, t.TABLE_NAME
+        `);
+    });
+
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+  } catch (error) {
+    console.error('获取表列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取表列表失败: ' + error.message
+    });
+  }
+});
+
+// 获取表的记录数统计
+router.get('/table-stats/:tableName', async (req, res) => {
+  try {
+    const { tableName } = req.params;
+
+    // 验证表名，防止SQL注入
+    const validTables = [
+      'ComplaintRegister', 'MaterialPrice', 'User', 'Workshop', 'Department',
+      'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory',
+      'DefectiveItem', 'UserTokens', 'DbConfig', 'PathMappingConfig',
+      'HomeCardConfig', 'SiteConfig'
+    ];
+
+    if (!validTables.includes(tableName)) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的表名'
+      });
+    }
+
+    const result = await executeQuery(async (pool) => {
+      return await pool.request()
+        .query(`SELECT COUNT(*) as recordCount FROM [${tableName}]`);
+    });
+
+    res.json({
+      success: true,
+      data: {
+        tableName,
+        recordCount: result.recordset[0].recordCount
+      }
+    });
+  } catch (error) {
+    console.error('获取表统计失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取表统计失败: ' + error.message
+    });
+  }
+});
+
+// 初始化数据表（清空数据并重置自增ID）
+router.post('/initialize-table', async (req, res) => {
+  try {
+    const { tableName, confirmPassword } = req.body;
+
+    // 验证表名
+    const validTables = [
+      'ComplaintRegister', 'MaterialPrice', 'User', 'Workshop', 'Department',
+      'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory',
+      'DefectiveItem', 'UserTokens', 'DbConfig', 'PathMappingConfig',
+      'HomeCardConfig', 'SiteConfig'
+    ];
+
+    if (!validTables.includes(tableName)) {
+      return res.status(400).json({
+        success: false,
+        message: '无效的表名'
+      });
+    }
+
+    // 验证确认密码（简单的安全措施）
+    if (confirmPassword !== 'RESET_TABLE_DATA') {
+      return res.status(400).json({
+        success: false,
+        message: '确认密码错误'
+      });
+    }
+
+    // 特殊处理：不允许清空系统关键表
+    const protectedTables = ['User', 'DbConfig'];
+    if (protectedTables.includes(tableName)) {
+      return res.status(400).json({
+        success: false,
+        message: `${tableName} 是系统关键表，不允许清空`
+      });
+    }
+
+    const result = await executeQuery(async (pool) => {
+      // 先获取当前记录数
+      const countResult = await pool.request()
+        .query(`SELECT COUNT(*) as recordCount FROM [${tableName}]`);
+
+      const originalCount = countResult.recordset[0].recordCount;
+
+      // 检查是否有自增ID列
+      const identityResult = await pool.request()
+        .query(`
+          SELECT COLUMN_NAME
+          FROM INFORMATION_SCHEMA.COLUMNS
+          WHERE TABLE_NAME = '${tableName}'
+            AND COLUMNPROPERTY(OBJECT_ID(TABLE_SCHEMA + '.' + TABLE_NAME), COLUMN_NAME, 'IsIdentity') = 1
+        `);
+
+      const hasIdentity = identityResult.recordset.length > 0;
+
+      // 清空表数据
+      if (hasIdentity) {
+        // 有自增ID的表使用 TRUNCATE（会自动重置自增ID）
+        await pool.request().query(`TRUNCATE TABLE [${tableName}]`);
+      } else {
+        // 没有自增ID的表使用 DELETE
+        await pool.request().query(`DELETE FROM [${tableName}]`);
+      }
+
+      return {
+        originalCount,
+        hasIdentity,
+        tableName
+      };
+    });
+
+    res.json({
+      success: true,
+      message: `表 ${tableName} 初始化成功`,
+      data: {
+        tableName: result.tableName,
+        originalCount: result.originalCount,
+        hasIdentity: result.hasIdentity,
+        message: result.hasIdentity ?
+          `已清空 ${result.originalCount} 条记录，自增ID已重置为1` :
+          `已清空 ${result.originalCount} 条记录`
+      }
+    });
+  } catch (error) {
+    console.error('初始化表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '初始化表失败: ' + error.message
+    });
+  }
+});
+
 module.exports = router;

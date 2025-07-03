@@ -8,7 +8,7 @@
         </div>
       </template>
       
-      <el-tabs v-model="activeTab" class="data-tabs">
+      <el-tabs v-model="activeTab" class="data-tabs" @tab-change="handleTabChange">
         <!-- 质量异常数据导入 -->
         <el-tab-pane label="质量异常数据导入" name="import">
           <div class="import-section">
@@ -343,13 +343,204 @@
           </div>
         </el-tab-pane>
         
+        <!-- 数据表初始化 -->
+        <el-tab-pane label="数据表初始化" name="initialize">
+          <div class="initialize-section">
+            <el-alert
+              title="⚠️ 危险操作警告"
+              type="warning"
+              :closable="false"
+              show-icon
+              class="warning-alert"
+            >
+              <template #default>
+                <p><strong>此功能将完全清空选定表的所有数据并重置自增ID！</strong></p>
+                <p>• 适用于开发环境或生产环境初次部署</p>
+                <p>• 操作不可撤销，请谨慎使用</p>
+                <p>• 系统关键表（User、DbConfig）受保护，不允许清空</p>
+              </template>
+            </el-alert>
+
+            <el-card class="table-list-card" v-loading="tableListLoading">
+              <template #header>
+                <div class="card-header">
+                  <h3>数据表列表</h3>
+                  <el-button type="primary" @click="refreshTableList" :loading="tableListLoading">
+                    <el-icon><Refresh /></el-icon>
+                    刷新列表
+                  </el-button>
+                </div>
+              </template>
+
+              <div class="table-categories">
+                <!-- 业务数据表 -->
+                <div class="table-category">
+                  <h4 class="category-title">
+                    <el-icon><Document /></el-icon>
+                    业务数据表
+                  </h4>
+                  <div class="table-grid">
+                    <div
+                      v-for="table in businessTables"
+                      :key="table.tableName"
+                      class="table-item"
+                      :class="{ 'selected': selectedTable?.tableName === table.tableName }"
+                      @click="selectTable(table)"
+                    >
+                      <div class="table-info">
+                        <div class="table-name">{{ table.displayName }}</div>
+                        <div class="table-details">
+                          <span class="table-code">{{ table.tableName }}</span>
+                          <span class="record-count" v-if="tableStats[table.tableName]">
+                            {{ tableStats[table.tableName].recordCount }} 条记录
+                          </span>
+                        </div>
+                      </div>
+                      <div class="table-actions">
+                        <el-tag v-if="table.hasIdentity" type="info" size="small">自增ID</el-tag>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 基础数据表 -->
+                <div class="table-category">
+                  <h4 class="category-title">
+                    <el-icon><Collection /></el-icon>
+                    基础数据表
+                  </h4>
+                  <div class="table-grid">
+                    <div
+                      v-for="table in basicTables"
+                      :key="table.tableName"
+                      class="table-item"
+                      :class="{ 'selected': selectedTable?.tableName === table.tableName }"
+                      @click="selectTable(table)"
+                    >
+                      <div class="table-info">
+                        <div class="table-name">{{ table.displayName }}</div>
+                        <div class="table-details">
+                          <span class="table-code">{{ table.tableName }}</span>
+                          <span class="record-count" v-if="tableStats[table.tableName]">
+                            {{ tableStats[table.tableName].recordCount }} 条记录
+                          </span>
+                        </div>
+                      </div>
+                      <div class="table-actions">
+                        <el-tag v-if="table.hasIdentity" type="info" size="small">自增ID</el-tag>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 系统配置表 -->
+                <div class="table-category">
+                  <h4 class="category-title">
+                    <el-icon><Setting /></el-icon>
+                    系统配置表
+                  </h4>
+                  <div class="table-grid">
+                    <div
+                      v-for="table in systemTables"
+                      :key="table.tableName"
+                      class="table-item"
+                      :class="{
+                        'selected': selectedTable?.tableName === table.tableName,
+                        'protected': ['User', 'DbConfig'].includes(table.tableName)
+                      }"
+                      @click="selectTable(table)"
+                    >
+                      <div class="table-info">
+                        <div class="table-name">{{ table.displayName }}</div>
+                        <div class="table-details">
+                          <span class="table-code">{{ table.tableName }}</span>
+                          <span class="record-count" v-if="tableStats[table.tableName]">
+                            {{ tableStats[table.tableName].recordCount }} 条记录
+                          </span>
+                        </div>
+                      </div>
+                      <div class="table-actions">
+                        <el-tag v-if="table.hasIdentity" type="info" size="small">自增ID</el-tag>
+                        <el-tag v-if="['User', 'DbConfig'].includes(table.tableName)" type="danger" size="small">受保护</el-tag>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 操作区域 -->
+              <div class="operation-area" v-if="selectedTable">
+                <el-card class="operation-card">
+                  <template #header>
+                    <div class="operation-header">
+                      <h4>初始化操作</h4>
+                      <el-tag type="warning">已选择: {{ selectedTable.displayName }}</el-tag>
+                    </div>
+                  </template>
+
+                  <div class="operation-content">
+                    <div class="operation-info">
+                      <el-descriptions :column="2" border>
+                        <el-descriptions-item label="表名">{{ selectedTable.tableName }}</el-descriptions-item>
+                        <el-descriptions-item label="显示名">{{ selectedTable.displayName }}</el-descriptions-item>
+                        <el-descriptions-item label="表类型">
+                          <el-tag :type="getTableTypeColor(selectedTable.tableType)">
+                            {{ getTableTypeText(selectedTable.tableType) }}
+                          </el-tag>
+                        </el-descriptions-item>
+                        <el-descriptions-item label="当前记录数">
+                          <span class="record-count-large">
+                            {{ tableStats[selectedTable.tableName]?.recordCount || 0 }} 条
+                          </span>
+                        </el-descriptions-item>
+                        <el-descriptions-item label="自增ID">
+                          {{ selectedTable.hasIdentity ? '是' : '否' }}
+                        </el-descriptions-item>
+                        <el-descriptions-item label="操作结果">
+                          {{ selectedTable.hasIdentity ? '清空数据 + 重置自增ID为1' : '清空所有数据' }}
+                        </el-descriptions-item>
+                      </el-descriptions>
+                    </div>
+
+                    <div class="operation-buttons">
+                      <el-button
+                        type="danger"
+                        size="large"
+                        @click="showInitializeDialog"
+                        :disabled="['User', 'DbConfig'].includes(selectedTable.tableName)"
+                        :loading="initializeLoading"
+                      >
+                        <el-icon><Delete /></el-icon>
+                        初始化此表
+                      </el-button>
+
+                      <el-button @click="selectedTable = null">
+                        取消选择
+                      </el-button>
+                    </div>
+
+                    <div v-if="['User', 'DbConfig'].includes(selectedTable.tableName)" class="protected-notice">
+                      <el-alert
+                        title="此表受系统保护，不允许清空"
+                        type="error"
+                        :closable="false"
+                        show-icon
+                      />
+                    </div>
+                  </div>
+                </el-card>
+              </div>
+            </el-card>
+          </div>
+        </el-tab-pane>
+
         <!-- 其他数据管理功能 -->
         <el-tab-pane label="数据导出" name="export">
           <div class="export-section">
             <el-empty description="数据导出功能开发中..." />
           </div>
         </el-tab-pane>
-        
+
         <el-tab-pane label="数据备份" name="backup">
           <div class="backup-section">
             <el-empty description="数据备份功能开发中..." />
@@ -705,14 +896,115 @@
       </template>
     </el-dialog>
 
+    <!-- 初始化确认对话框 -->
+  <el-dialog
+    v-model="showInitializeConfirmDialog"
+    title="数据表初始化确认"
+    width="600px"
+    :close-on-click-modal="false"
+    :close-on-press-escape="false"
+  >
+    <div class="initialize-confirm-content">
+      <el-alert
+        title="⚠️ 最后确认"
+        type="error"
+        :closable="false"
+        show-icon
+        class="final-warning"
+      >
+        <template #default>
+          <p><strong>您即将执行不可逆的数据清空操作！</strong></p>
+          <p>表名: <code>{{ selectedTable?.tableName }}</code></p>
+          <p>显示名: <strong>{{ selectedTable?.displayName }}</strong></p>
+          <p>当前记录数: <strong>{{ tableStats[selectedTable?.tableName]?.recordCount || 0 }} 条</strong></p>
+        </template>
+      </el-alert>
 
+      <div class="confirm-steps">
+        <h4>请按以下步骤确认:</h4>
+        <ol>
+          <li>
+            <el-checkbox v-model="confirmStep1">
+              我已确认这是开发环境或生产环境初次部署
+            </el-checkbox>
+          </li>
+          <li>
+            <el-checkbox v-model="confirmStep2">
+              我已备份重要数据（如有需要）
+            </el-checkbox>
+          </li>
+          <li>
+            <el-checkbox v-model="confirmStep3">
+              我理解此操作将永久删除表中所有数据
+            </el-checkbox>
+          </li>
+          <li>
+            <div class="password-confirm">
+              <span>请输入确认密码: </span>
+              <el-input
+                v-model="confirmPassword"
+                type="password"
+                placeholder="输入 RESET_TABLE_DATA"
+                style="width: 200px; margin-left: 10px;"
+                show-password
+              />
+            </div>
+          </li>
+        </ol>
+      </div>
+    </div>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="cancelInitialize">取消</el-button>
+        <el-button
+          type="danger"
+          @click="executeInitialize"
+          :disabled="!canExecuteInitialize"
+          :loading="initializeLoading"
+        >
+          <el-icon><Delete /></el-icon>
+          确认初始化
+        </el-button>
+      </div>
+    </template>
+  </el-dialog>
+
+  <!-- 初始化结果对话框 -->
+  <el-dialog
+    v-model="showInitializeResultDialog"
+    title="初始化结果"
+    width="500px"
+  >
+    <div class="initialize-result-content">
+      <el-result
+        :icon="initializeResult.success ? 'success' : 'error'"
+        :title="initializeResult.success ? '初始化成功' : '初始化失败'"
+        :sub-title="initializeResult.message"
+      >
+        <template #extra v-if="initializeResult.success && initializeResult.data">
+          <el-descriptions :column="1" border>
+            <el-descriptions-item label="表名">{{ initializeResult.data.tableName }}</el-descriptions-item>
+            <el-descriptions-item label="原记录数">{{ initializeResult.data.originalCount }} 条</el-descriptions-item>
+            <el-descriptions-item label="操作结果">{{ initializeResult.data.message }}</el-descriptions-item>
+          </el-descriptions>
+        </template>
+      </el-result>
+    </div>
+
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button type="primary" @click="closeResultDialog">确定</el-button>
+      </div>
+    </template>
+  </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { UploadFilled, Download, Warning, InfoFilled } from '@element-plus/icons-vue'
+import { UploadFilled, Download, Warning, InfoFilled, Refresh, Document, Collection, Setting, Delete } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 
@@ -769,6 +1061,22 @@ const importProgress = ref({
   status: 'not_started',
   message: '准备中...'
 })
+
+// 数据表初始化相关
+const tableList = ref([])
+const tableStats = ref({})
+const selectedTable = ref(null)
+const tableListLoading = ref(false)
+const initializeLoading = ref(false)
+const showInitializeConfirmDialog = ref(false)
+const showInitializeResultDialog = ref(false)
+const initializeResult = ref({})
+
+// 确认步骤
+const confirmStep1 = ref(false)
+const confirmStep2 = ref(false)
+const confirmStep3 = ref(false)
+const confirmPassword = ref('')
 const sessionId = ref('')
 
 // 文件上传相关
@@ -792,6 +1100,19 @@ const isIndeterminate = computed(() => {
   const total = Object.keys(fieldMapping.value).length
   const selected = selectedFields.value.length
   return selected > 0 && selected < total
+})
+
+// 数据表分类计算属性
+const businessTables = computed(() => tableList.value.filter(table => table.tableType === 'business'))
+const basicTables = computed(() => tableList.value.filter(table => table.tableType === 'basic'))
+const systemTables = computed(() => tableList.value.filter(table => table.tableType === 'system'))
+
+// 是否可以执行初始化
+const canExecuteInitialize = computed(() => {
+  return confirmStep1.value &&
+         confirmStep2.value &&
+         confirmStep3.value &&
+         confirmPassword.value === 'RESET_TABLE_DATA'
 })
 
 const mappingTableData = computed(() => {
@@ -1439,10 +1760,161 @@ const downloadTemplate = async () => {
   }
 }
 
+// ===================== 数据表初始化相关方法 =====================
+
+// 获取表列表
+const fetchTableList = async () => {
+  tableListLoading.value = true
+  try {
+    const response = await axios.get('/api/config/table-list')
+    if (response.data.success) {
+      tableList.value = response.data.data
+      // 获取每个表的统计信息
+      await fetchAllTableStats()
+    } else {
+      ElMessage.error('获取表列表失败: ' + response.data.message)
+    }
+  } catch (error) {
+    console.error('获取表列表失败:', error)
+    ElMessage.error('获取表列表失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    tableListLoading.value = false
+  }
+}
+
+// 获取所有表的统计信息
+const fetchAllTableStats = async () => {
+  const promises = tableList.value.map(table => fetchTableStats(table.tableName))
+  await Promise.all(promises)
+}
+
+// 获取单个表的统计信息
+const fetchTableStats = async (tableName) => {
+  try {
+    const response = await axios.get(`/api/config/table-stats/${tableName}`)
+    if (response.data.success) {
+      tableStats.value[tableName] = response.data.data
+    }
+  } catch (error) {
+    console.error(`获取表 ${tableName} 统计失败:`, error)
+  }
+}
+
+// 刷新表列表
+const refreshTableList = async () => {
+  await fetchTableList()
+  ElMessage.success('表列表已刷新')
+}
+
+// 选择表
+const selectTable = (table) => {
+  selectedTable.value = table
+}
+
+// 获取表类型颜色
+const getTableTypeColor = (type) => {
+  switch (type) {
+    case 'business': return 'primary'
+    case 'basic': return 'success'
+    case 'system': return 'warning'
+    default: return 'info'
+  }
+}
+
+// 获取表类型文本
+const getTableTypeText = (type) => {
+  switch (type) {
+    case 'business': return '业务数据表'
+    case 'basic': return '基础数据表'
+    case 'system': return '系统配置表'
+    default: return '未知类型'
+  }
+}
+
+// 显示初始化确认对话框
+const showInitializeDialog = () => {
+  // 重置确认状态
+  confirmStep1.value = false
+  confirmStep2.value = false
+  confirmStep3.value = false
+  confirmPassword.value = ''
+
+  showInitializeConfirmDialog.value = true
+}
+
+// 取消初始化
+const cancelInitialize = () => {
+  showInitializeConfirmDialog.value = false
+}
+
+// 执行初始化
+const executeInitialize = async () => {
+  if (!selectedTable.value) {
+    ElMessage.error('请选择要初始化的表')
+    return
+  }
+
+  initializeLoading.value = true
+  try {
+    const response = await axios.post('/api/config/initialize-table', {
+      tableName: selectedTable.value.tableName,
+      confirmPassword: confirmPassword.value
+    })
+
+    if (response.data.success) {
+      initializeResult.value = {
+        success: true,
+        message: response.data.message,
+        data: response.data.data
+      }
+
+      // 刷新表统计
+      await fetchTableStats(selectedTable.value.tableName)
+
+      ElMessage.success('表初始化成功')
+    } else {
+      initializeResult.value = {
+        success: false,
+        message: response.data.message
+      }
+      ElMessage.error('初始化失败: ' + response.data.message)
+    }
+  } catch (error) {
+    console.error('初始化表失败:', error)
+    const errorMessage = error.response?.data?.message || error.message
+    initializeResult.value = {
+      success: false,
+      message: errorMessage
+    }
+    ElMessage.error('初始化失败: ' + errorMessage)
+  } finally {
+    initializeLoading.value = false
+    showInitializeConfirmDialog.value = false
+    showInitializeResultDialog.value = true
+  }
+}
+
+// 关闭结果对话框
+const closeResultDialog = () => {
+  showInitializeResultDialog.value = false
+  selectedTable.value = null
+}
+
 // 生命周期
 onMounted(() => {
   fetchFieldMapping()
+  // 如果当前标签是初始化标签，则加载表列表
+  if (activeTab.value === 'initialize') {
+    fetchTableList()
+  }
 })
+
+// 监听标签切换
+const handleTabChange = (tabName) => {
+  if (tabName === 'initialize' && tableList.value.length === 0) {
+    fetchTableList()
+  }
+}
 </script>
 
 <style scoped>
@@ -1718,5 +2190,192 @@ onMounted(() => {
   color: #303133;
   font-size: 16px;
   font-weight: 600;
+}
+
+/* 数据表初始化样式 */
+.initialize-section {
+  padding: 20px 0;
+}
+
+.warning-alert {
+  margin-bottom: 20px;
+}
+
+.table-list-card {
+  margin-top: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.table-categories {
+  margin-top: 20px;
+}
+
+.table-category {
+  margin-bottom: 30px;
+}
+
+.category-title {
+  display: flex;
+  align-items: center;
+  margin-bottom: 15px;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.category-title .el-icon {
+  margin-right: 8px;
+}
+
+.table-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
+}
+
+.table-item {
+  border: 2px solid #e4e7ed;
+  border-radius: 8px;
+  padding: 15px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  background: #fff;
+}
+
+.table-item:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+}
+
+.table-item.selected {
+  border-color: #409eff;
+  background: #f0f9ff;
+}
+
+.table-item.protected {
+  border-color: #f56c6c;
+  background: #fef0f0;
+}
+
+.table-item.protected:hover {
+  border-color: #f56c6c;
+  box-shadow: 0 2px 8px rgba(245, 108, 108, 0.2);
+}
+
+.table-info {
+  flex: 1;
+}
+
+.table-name {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 8px;
+}
+
+.table-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12px;
+  color: #909399;
+}
+
+.table-code {
+  font-family: 'Courier New', monospace;
+  background: #f5f7fa;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.record-count {
+  font-weight: 500;
+}
+
+.table-actions {
+  display: flex;
+  gap: 5px;
+  margin-top: 10px;
+}
+
+.operation-area {
+  margin-top: 30px;
+}
+
+.operation-card {
+  border: 2px solid #e6a23c;
+}
+
+.operation-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.operation-content {
+  padding: 20px 0;
+}
+
+.operation-info {
+  margin-bottom: 20px;
+}
+
+.record-count-large {
+  font-size: 18px;
+  font-weight: 600;
+  color: #e6a23c;
+}
+
+.operation-buttons {
+  display: flex;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.protected-notice {
+  margin-top: 15px;
+}
+
+/* 初始化确认对话框样式 */
+.initialize-confirm-content {
+  padding: 10px 0;
+}
+
+.final-warning {
+  margin-bottom: 20px;
+}
+
+.confirm-steps {
+  margin-top: 20px;
+}
+
+.confirm-steps h4 {
+  margin-bottom: 15px;
+  color: #303133;
+}
+
+.confirm-steps ol {
+  padding-left: 20px;
+}
+
+.confirm-steps li {
+  margin-bottom: 15px;
+  line-height: 1.6;
+}
+
+.password-confirm {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+}
+
+/* 初始化结果对话框样式 */
+.initialize-result-content {
+  padding: 10px 0;
 }
 </style>
