@@ -3,7 +3,7 @@
     <!-- 侧边栏 -->
     <el-aside :width="collapsed ? '64px' : '220px'" class="admin-aside">
       <div class="logo-wrap">
-        <img :src="siteConfig.logoUrl" class="logo-img" @error="handleLogoError" />
+        <img :src="siteConfig.logoBase64Img" class="logo-img" />
         <span class="logo-text" v-show="!collapsed">{{ siteConfig.headerTitle }}</span>
       </div>
       <el-menu
@@ -177,11 +177,15 @@ import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, B
 import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import Profile from '../Profile.vue'
+import { useSiteConfig } from '../../composables/useSiteConfig'
 
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
 const { user } = storeToRefs(userStore)
+
+// 使用网站配置
+const { siteConfig } = useSiteConfig()
 
 const collapsed = ref(false)
 const activeMenu = computed(() => route.path.startsWith('/admin/user') ? '/admin/user/list' : route.path)
@@ -236,6 +240,12 @@ const toggleFullscreen = () => {
 document.addEventListener('fullscreenchange', () => {
   isFullscreen.value = !!document.fullscreenElement
 })
+
+// 图片加载错误处理
+const handleLogoError = (event) => {
+  console.warn('LOGO图片加载失败，使用默认图片')
+  event.target.src = '/logo.png'
+}
 
 onMounted(() => {
   userStore.fetchProfile()

@@ -3,8 +3,8 @@
     <!-- 顶部导航栏 -->
     <el-header class="home-header">
       <div class="header-left">
-        <img src="/logo.png" alt="logo" class="logo" />
-        <span class="logo-text">质量数据管理系统</span>
+        <img :src="siteConfig?.logoBase64Img || '/logo.png'" alt="logo" class="logo" @error="handleLogoError" />
+        <span class="logo-text">{{ siteConfig?.siteName || '质量数据管理系统' }}</span>
       </div>
       <div class="header-center">
         <div class="nav-menu-wrap">
@@ -392,6 +392,15 @@ import { ArrowDown, User, CircleClose } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
+import { useSiteConfig } from '../composables/useSiteConfig'
+
+// 网站配置
+const { siteConfig, loadSiteConfig } = useSiteConfig()
+
+// 图片加载错误处理
+const handleLogoError = (event) => {
+  event.target.src = '/logo.png' // 回退到默认图片
+}
 
 const formRef = ref()
 const form = ref({
@@ -554,6 +563,7 @@ const resetForm = () => {
 }
 
 onMounted(() => {
+  loadSiteConfig()
   fetchOptions()
   userStore.fetchProfile()
 })

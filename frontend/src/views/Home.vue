@@ -21,8 +21,8 @@
     <div class="home-header">
         <!-- 左侧logo及系统名 -->
         <div class="header-left">
-          <img :src="siteConfig.logoUrl" alt="logo" class="logo" @error="handleLogoError" />
-          <span class="logo-text">{{ siteConfig.siteName }}</span>
+          <img :src="siteConfig?.logoBase64Img || '/logo.png'" alt="logo" class="logo" @error="handleLogoError" />
+          <span class="logo-text">{{ siteConfig?.siteName || '质量数据管理系统' }}</span>
         </div>
         <!-- 中间菜单栏 -->
         <div class="header-center">
@@ -332,7 +332,7 @@
                     type="primary"
                     size="small"
                     @click="handleAdvancedQuery"
-                    :loading="loading"
+                    :loading="tableLoading"
                   >
                     <el-icon><Search /></el-icon>
                     查询
@@ -553,15 +553,13 @@ import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
+import { useSiteConfig } from '../composables/useSiteConfig'
 
 const router = useRouter()
 const activeMenu = ref('home')
 
 // 网站配置
-const siteConfig = reactive({
-  logoUrl: '/logo.png',
-  siteName: '质量数据管理系统'
-})
+const { siteConfig, loadSiteConfig } = useSiteConfig()
 const tableData = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -648,19 +646,7 @@ const goAdmin = () => {
   }
 }
 
-// 加载网站配置
-const loadSiteConfig = async () => {
-  try {
-    const response = await axios.get('/api/config/site-config')
-    if (response.data.success) {
-      Object.assign(siteConfig, response.data.data)
-      // 更新页面标题
-      document.title = siteConfig.siteName
-    }
-  } catch (error) {
-    console.error('加载网站配置失败:', error)
-  }
-}
+// 删除原有的 loadSiteConfig 函数，现在使用 composable 中的
 
 // LOGO加载错误处理
 const handleLogoError = (event) => {

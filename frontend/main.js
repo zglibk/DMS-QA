@@ -7,6 +7,7 @@ import { createPinia } from 'pinia'
 import router from './src/router/index.js'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { useSiteConfig } from './src/composables/useSiteConfig.js'
 
 const app = createApp(App)
 app.use(ElementPlus, { locale: zhCn })
@@ -48,4 +49,17 @@ window.setApiBase = (url) => {
   ElMessage.success('API基础地址已切换为：' + url);
 };
 
-app.mount('#app') 
+// 应用启动时加载网站配置
+const initApp = async () => {
+  try {
+    const { loadSiteConfig } = useSiteConfig();
+    await loadSiteConfig();
+  } catch (error) {
+    console.warn('初始化网站配置失败:', error);
+  }
+
+  app.mount('#app');
+};
+
+// 启动应用
+initApp();

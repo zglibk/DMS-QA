@@ -1,0 +1,10 @@
+# 图片目录占位文件
+
+此文件用于确保 docs/images 目录被 Git 跟踪。
+
+请将以下系统截图文件放置在此目录中：
+- login.png - 登录界面截图
+- home.png - 首页仪表盘截图  
+- admin-dashboard.png - 管理后台截图
+- system-config.png - 系统配置页面截图
+- homepage-config.png - 主页卡片配置截图

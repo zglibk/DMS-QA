@@ -16,23 +16,8 @@
     <div class="login-center-wrap">
       <div class="login-box">
         <div class="logo-container">
-          <img src="/logo.png" alt="Vue Logo" class="logo" />
+          <img :src="siteConfig?.logoBase64Img || '/logo.png'" alt="Logo" class="logo" @error="handleLogoError" />
         </div>
-
-        <!-- 登录提示 -->
-        <el-alert
-          title="测试账号"
-          type="info"
-          :closable="false"
-          style="margin-bottom: 20px;"
-        >
-          <template #default>
-            <div style="font-size: 13px;">
-              <div>用户名: admin</div>
-              <div>密码: admin123</div>
-            </div>
-          </template>
-        </el-alert>
         <!-- 登录表单 -->
         <el-form ref="formRef" :model="form" :rules="rules" @submit.prevent="login">
           <el-form-item prop="username">
@@ -65,7 +50,20 @@
             </div>
           </el-form-item>
         </el-form>
-
+        <!-- 登录提示 -->
+        <el-alert
+          title="测试账号"
+          type="info"
+          :closable="false"
+          style="margin-bottom: 20px;"
+        >
+          <template #default>
+            <div style="font-size: 13px;">
+              <div>用户名: admin</div>
+              <div>密&nbsp;&nbsp;&nbsp;码: 123456</div>
+            </div>
+          </template>
+        </el-alert>
       </div>
 
 
@@ -80,12 +78,16 @@ import { useRouter } from 'vue-router'
 import { User, Lock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
+import { useSiteConfig } from '../composables/useSiteConfig'
 
 const formRef = ref()
 
 const form = ref({ username: 'admin', password: '', rememberMe: false })
 const router = useRouter()
 const userStore = useUserStore()
+
+// 网站配置
+const { siteConfig, loadSiteConfig } = useSiteConfig()
 
 const rules = reactive({
   username: [
@@ -143,7 +145,15 @@ const reset = () => {
   formRef.value.resetFields()
   localStorage.removeItem('login-info')
 }
+// 图片加载错误处理
+const handleLogoError = (event) => {
+  event.target.src = '/logo.png' // 回退到默认图片
+}
+
 onMounted(() => {
+  // 加载网站配置
+  loadSiteConfig()
+
   const loginInfo = localStorage.getItem('login-info')
   if (loginInfo) {
     const { username, password, rememberMe } = JSON.parse(loginInfo)

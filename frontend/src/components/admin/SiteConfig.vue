@@ -55,10 +55,10 @@
                 <el-form-item label="网站LOGO">
                   <div class="logo-upload-section">
                     <div class="logo-preview">
-                      <img :src="config.logoUrl" alt="LOGO预览" class="logo-img" @error="handleImageError" />
+                      <img :src="config.logoBase64Img" alt="LOGO预览" class="logo-img" :key="'logo-' + imageRefreshKey" @error="handleImageError" />
                     </div>
                     <div class="logo-controls">
-                      <el-input v-model="config.logoUrl" placeholder="LOGO图片URL" class="logo-input">
+                      <el-input v-model="config.logoBase64Img" placeholder="LOGO图片BASE64数据" class="logo-input">
                         <template #append>
                           <el-upload
                             :show-file-list="false"
@@ -86,10 +86,10 @@
                 <el-form-item label="网站图标">
                   <div class="favicon-upload-section">
                     <div class="favicon-preview">
-                      <img :src="config.faviconUrl" alt="图标预览" class="favicon-img" @error="handleImageError" />
+                      <img :src="config.faviconBase64Img" alt="图标预览" class="favicon-img" :key="'favicon-' + imageRefreshKey" @error="handleImageError" />
                     </div>
                     <div class="favicon-controls">
-                      <el-input v-model="config.faviconUrl" placeholder="网站图标URL" class="favicon-input">
+                      <el-input v-model="config.faviconBase64Img" placeholder="网站图标BASE64数据" class="favicon-input">
                         <template #append>
                           <el-upload
                             :show-file-list="false"
@@ -122,7 +122,7 @@
             <div class="preview-section">
               <div class="preview-header">
                 <div class="preview-logo-area">
-                  <img :src="config.logoUrl" alt="LOGO" class="preview-logo" @error="handleImageError" />
+                  <img :src="config.logoBase64Img" alt="LOGO" class="preview-logo" :key="'preview-logo-' + imageRefreshKey" @error="handleImageError" />
                   <span class="preview-title">{{ config.headerTitle }}</span>
                 </div>
                 <div class="preview-company">{{ config.companyName }}</div>
@@ -155,7 +155,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Picture, Upload, Check, RefreshLeft, Refresh } from '@element-plus/icons-vue'
 import axios from 'axios'
@@ -165,13 +165,14 @@ const isLoading = ref(false)
 const isSubmitting = ref(false)
 const logoUploading = ref(false)
 const faviconUploading = ref(false)
+const imageRefreshKey = ref(0) // 用于强制刷新图片
 
 // 配置数据
 const config = reactive({
   siteName: '质量数据管理系统',
   companyName: 'DMS质量管理系统',
-  logoUrl: '/logo.png',
-  faviconUrl: '/logo.png',
+  logoBase64Img: '/logo.png',
+  faviconBase64Img: '/logo.png',
   headerTitle: '质量数据系统',
   loginTitle: 'DMS-QA 质量管理系统',
   footerCopyright: '© 2025 DMS质量管理系统. All rights reserved.'
@@ -208,10 +209,13 @@ const saveConfig = async () => {
 
     if (response.data.success) {
       ElMessage.success('网站配置保存成功')
-      
+
       // 更新页面标题和图标
       updatePageMeta()
-      
+
+      // 强制刷新图片组件
+      imageRefreshKey.value++
+
       // 通知其他组件更新
       window.dispatchEvent(new CustomEvent('siteConfigUpdated', {
         detail: config
@@ -232,8 +236,8 @@ const resetConfig = () => {
   Object.assign(config, {
     siteName: '质量数据管理系统',
     companyName: 'DMS质量管理系统',
-    logoUrl: '/logo.png',
-    faviconUrl: '/logo.png',
+    logoBase64Img: '/logo.png',
+    faviconBase64Img: '/logo.png',
     headerTitle: '质量数据系统',
     loginTitle: 'DMS-QA 质量管理系统',
     footerCopyright: '© 2025 DMS质量管理系统. All rights reserved.'
@@ -253,7 +257,7 @@ const updatePageMeta = () => {
     favicon.rel = 'icon'
     document.head.appendChild(favicon)
   }
-  favicon.href = config.faviconUrl
+  favicon.href = config.faviconBase64Img
 }
 
 // 图片上传前验证
@@ -302,8 +306,16 @@ const uploadLogo = async (options) => {
     })
 
     if (response.data.success) {
-      config.logoUrl = response.data.data.url
+      // 直接使用返回的BASE64数据URL
+      config.logoBase64Img = response.data.data.url
+
+      // 强制刷新图片组件
+      imageRefreshKey.value++
+
       ElMessage.success('LOGO上传成功')
+
+      // 强制更新预览
+      await nextTick()
     } else {
       ElMessage.error(response.data.message || 'LOGO上传失败')
     }
@@ -330,8 +342,16 @@ const uploadFavicon = async (options) => {
     })
 
     if (response.data.success) {
-      config.faviconUrl = response.data.data.url
+      // 直接使用返回的BASE64数据URL
+      config.faviconBase64Img = response.data.data.url
+
+      // 强制刷新图片组件
+      imageRefreshKey.value++
+
       ElMessage.success('网站图标上传成功')
+
+      // 强制更新预览
+      await nextTick()
     } else {
       ElMessage.error(response.data.message || '网站图标上传失败')
     }
