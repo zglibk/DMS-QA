@@ -15,7 +15,7 @@ CREATE TABLE [dbo].[ComplaintRegister] (
     [DefectiveCategory] NVARCHAR(50),
     [DefectiveItem] NVARCHAR(100),
     [DefectiveDescription] NVARCHAR(500),
-    [AttachmentFile] NVARCHAR(200),
+    [AttachmentFile] NVARCHAR(500),
     [DefectiveReason] NVARCHAR(500),
     [Disposition] NVARCHAR(500),
     [ReturnGoods] BIT,
@@ -166,10 +166,27 @@ CREATE TABLE [dbo].[PathMappingConfig] (
     [UpdatedAt] DATETIME DEFAULT GETDATE()
 );
 
+-- 主页卡片配置表
+CREATE TABLE [dbo].[HomeCardConfig] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,
+    [ConfigKey] NVARCHAR(50) NOT NULL,
+    [ConfigValue] NVARCHAR(MAX),
+    [Description] NVARCHAR(200),
+    [IsActive] BIT DEFAULT 1,
+    [CreatedAt] DATETIME DEFAULT GETDATE(),
+    [UpdatedAt] DATETIME DEFAULT GETDATE()
+);
+
 -- 插入默认路径映射规则
 INSERT INTO [dbo].[PathMappingConfig] ([Name], [LocalPattern], [TargetPattern], [Description]) VALUES
 (N'Excel临时文件映射', N'C:\Users\*\AppData\Roaming\Microsoft\Excel\*', N'\\tj_server\工作\品质部\生产异常周报考核统计\*', N'Excel临时文件映射到tj_server共享盘'),
 (N'2025年异常汇总映射', N'*2025年异常汇总\*', N'\\tj_server\工作\品质部\生产异常周报考核统计\2025年异常汇总\不良图片&资料\*', N'2025年异常汇总文件映射');
+
+-- 插入默认主页卡片配置
+INSERT INTO [dbo].[HomeCardConfig] ([ConfigKey], [ConfigValue], [Description]) VALUES
+(N'showTodayCount', N'true', N'是否显示今日投诉统计卡片'),
+(N'showMonthCount', N'true', N'是否显示本月投诉统计卡片'),
+(N'displayUnits', N'[{"name":"数码印刷","type":"workshop","enabled":true},{"name":"轮转机","type":"workshop","enabled":true},{"name":"跟单","type":"department","enabled":true},{"name":"设计","type":"department","enabled":true},{"name":"品检","type":"department","enabled":true}]', N'显示的部门/车间单位配置');
 
 -- 插入下拉列表的初始数据
 -- 车间
