@@ -572,8 +572,18 @@ const selectFile = async () => {
   input.click()
 }
 const isImage = (path) => {
-  if (path && path.startsWith('blob:')) return true;
-  return path && path.match(/\.(jpg|jpeg|png|gif)$/i);
+  if (!path) return false;
+
+  // 支持blob URL
+  if (path.startsWith('blob:')) return true;
+
+  // 支持HTTP URL（新的网络路径格式）
+  if (path.startsWith('http://') || path.startsWith('https://')) {
+    return path.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
+  }
+
+  // 支持本地文件路径
+  return path.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
 }
 
 const showPreview = ref(false)

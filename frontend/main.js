@@ -13,6 +13,18 @@ app.use(ElementPlus, { locale: zhCn })
 app.use(createPinia())
 app.use(router)
 
+// 全局请求拦截器，自动添加token
+axios.interceptors.request.use(
+  config => {
+    const token = localStorage.getItem('token')
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  error => Promise.reject(error)
+)
+
 // 全局响应拦截器，token过期自动跳转登录
 axios.interceptors.response.use(
   response => response,

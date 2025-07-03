@@ -117,8 +117,19 @@ body, html, #app {
   padding-bottom: 0;
 }
 
-/* 隐藏滚动条 */
+/* 自定义滚动条样式 */
 ::-webkit-scrollbar {
-  width: 0 !important;
-  height: 0 !important;
-} 
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}

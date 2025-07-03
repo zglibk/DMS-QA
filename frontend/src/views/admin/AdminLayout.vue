@@ -48,6 +48,32 @@
             <span v-show="!collapsed">权限列表</span>
           </el-menu-item>
         </el-sub-menu>
+        <el-sub-menu index="/admin/settings">
+          <template #title>
+            <el-icon><Tools /></el-icon>
+            <span v-show="!collapsed">设置</span>
+          </template>
+          <el-menu-item index="/admin/data-management">
+            <el-icon><Upload /></el-icon>
+            <span v-show="!collapsed">数据管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/path-analysis">
+            <el-icon><FolderOpened /></el-icon>
+            <span v-show="!collapsed">路径格式分析</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/file-copy-test">
+            <el-icon><CopyDocument /></el-icon>
+            <span v-show="!collapsed">文件拷贝测试</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/system-config">
+            <el-icon><Setting /></el-icon>
+            <span v-show="!collapsed">系统配置</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/home-card-config">
+            <el-icon><Grid /></el-icon>
+            <span v-show="!collapsed">主页卡片配置</span>
+          </el-menu-item>
+        </el-sub-menu>
       </el-menu>
     </el-aside>
     <!-- 主内容区 -->
@@ -64,6 +90,11 @@
             <el-breadcrumb-item v-if="route.path === '/admin/user/list'">用户列表</el-breadcrumb-item>
             <el-breadcrumb-item v-else-if="route.path === '/admin/dashboard'">仪表盘</el-breadcrumb-item>
             <el-breadcrumb-item v-else-if="route.path === '/admin/supplier'">供应商管理</el-breadcrumb-item>
+            <el-breadcrumb-item v-else-if="route.path.startsWith('/admin/data-management') || route.path.startsWith('/admin/path-analysis') || route.path.startsWith('/admin/file-copy-test') || route.path.startsWith('/admin/system-config')">设置</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="route.path === '/admin/data-management'">数据管理</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="route.path === '/admin/path-analysis'">路径格式分析</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="route.path === '/admin/file-copy-test'">文件拷贝测试</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="route.path === '/admin/system-config'">系统配置</el-breadcrumb-item>
             <el-breadcrumb-item v-if="route.path === '/admin/profile'">用户中心</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
@@ -142,7 +173,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting } from '@element-plus/icons-vue'
+import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import Profile from '../Profile.vue'

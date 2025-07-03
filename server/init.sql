@@ -135,8 +135,41 @@ CREATE TABLE [dbo].[DbConfig] (
     [ConfigName] NVARCHAR(50),
     [IsCurrent] BIT,
     [IsValid] BIT,
-    [Remark] NVARCHAR(200)
+    [Remark] NVARCHAR(200),
+    [FileStoragePath] NVARCHAR(500),
+    [FileServerPort] INT,
+    [FileUrlPrefix] NVARCHAR(100),
+    [ExcelTempPath] NVARCHAR(500),
+    [NetworkSharePath] NVARCHAR(500)
 );
+
+-- 如果表已存在，添加缺少的字段
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[DbConfig]') AND name = 'ExcelTempPath')
+BEGIN
+    ALTER TABLE [dbo].[DbConfig] ADD [ExcelTempPath] NVARCHAR(500);
+END
+
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('[dbo].[DbConfig]') AND name = 'NetworkSharePath')
+BEGIN
+    ALTER TABLE [dbo].[DbConfig] ADD [NetworkSharePath] NVARCHAR(500);
+END
+
+-- 路径映射配置表
+CREATE TABLE [dbo].[PathMappingConfig] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,
+    [Name] NVARCHAR(100) NOT NULL,
+    [LocalPattern] NVARCHAR(500) NOT NULL,
+    [TargetPattern] NVARCHAR(500) NOT NULL,
+    [Description] NVARCHAR(200),
+    [IsActive] BIT DEFAULT 1,
+    [CreatedAt] DATETIME DEFAULT GETDATE(),
+    [UpdatedAt] DATETIME DEFAULT GETDATE()
+);
+
+-- 插入默认路径映射规则
+INSERT INTO [dbo].[PathMappingConfig] ([Name], [LocalPattern], [TargetPattern], [Description]) VALUES
+(N'Excel临时文件映射', N'C:\Users\*\AppData\Roaming\Microsoft\Excel\*', N'\\tj_server\工作\品质部\生产异常周报考核统计\*', N'Excel临时文件映射到tj_server共享盘'),
+(N'2025年异常汇总映射', N'*2025年异常汇总\*', N'\\tj_server\工作\品质部\生产异常周报考核统计\2025年异常汇总\不良图片&资料\*', N'2025年异常汇总文件映射');
 
 -- 插入下拉列表的初始数据
 -- 车间
@@ -154,4 +187,15 @@ INSERT INTO [dbo].[DefectiveCategory] (Name) VALUES (N'印刷类'), (N'裁切类
 
 PRINT '不良项和基础下拉选项已成功插入或更新。';
 
-ALTER TABLE [User] ALTER COLUMN [Avatar] NVARCHAR(MAX); 
+ALTER TABLE [User] ALTER COLUMN [Avatar] NVARCHAR(MAX);
+
+-- 为DbConfig表的文件存储字段设置默认值
+-- 注意：这个UPDATE语句只在有记录时执行，新建数据库时可能没有记录
+-- 如果需要为新插入的记录设置默认值，请在应用程序中处理
+UPDATE [dbo].[DbConfig]
+SET
+    [FileServerPort] = 8080,
+    [FileUrlPrefix] = '/files'
+WHERE [FileServerPort] IS NULL OR [FileUrlPrefix] IS NULL;
+
+PRINT '数据库初始化完成，包含文件存储配置字段。';

@@ -27,7 +27,12 @@ const routes = [
       { path: 'user/list', component: UserList },
       { path: 'profile', component: () => import('../views/Profile.vue') },
       { path: 'role-list', component: () => import('../views/admin/RoleList.vue'), meta: { requiresAuth: true } },
-      { path: 'permission-list', component: () => import('../views/admin/PermissionList.vue'), meta: { requiresAuth: true } }
+      { path: 'permission-list', component: () => import('../views/admin/PermissionList.vue'), meta: { requiresAuth: true } },
+      { path: 'data-management', component: () => import('../views/admin/DataManagement.vue'), meta: { requiresAuth: true } },
+      { path: 'path-analysis', component: () => import('../views/admin/PathAnalysis.vue'), meta: { requiresAuth: true } },
+      { path: 'file-copy-test', component: () => import('../views/admin/FileCopyTest.vue'), meta: { requiresAuth: true } },
+      { path: 'system-config', component: () => import('../views/admin/SystemConfig.vue'), meta: { requiresAuth: true } },
+      { path: 'home-card-config', component: () => import('../components/admin/HomeCardConfig.vue'), meta: { requiresAuth: true } }
     ]
   }
 ]

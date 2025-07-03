@@ -1,5 +1,5 @@
 <template>
-  <div :class="['login-container-flex', showConfig ? 'config-open' : '']">
+  <div class="login-container-flex">
     <div class="api-base-switch">
       <el-popover placement="bottom" width="320" trigger="click">
         <template #reference>
@@ -10,13 +10,29 @@
           <el-button size="small" type="primary" @click="saveApiBase">保存</el-button>
         </div>
         <div style="margin-top:8px;font-size:12px;color:#888;">当前：{{ apiBaseCurrent }}</div>
+        <div style="margin-top:4px;font-size:11px;color:#666;">默认端口：3001</div>
       </el-popover>
     </div>
-    <div :class="['login-center-wrap', showConfig ? 'config-open' : '']">
+    <div class="login-center-wrap">
       <div class="login-box">
         <div class="logo-container">
           <img src="/logo.png" alt="Vue Logo" class="logo" />
         </div>
+
+        <!-- 登录提示 -->
+        <el-alert
+          title="测试账号"
+          type="info"
+          :closable="false"
+          style="margin-bottom: 20px;"
+        >
+          <template #default>
+            <div style="font-size: 13px;">
+              <div>用户名: admin</div>
+              <div>密码: admin123</div>
+            </div>
+          </template>
+        </el-alert>
         <!-- 登录表单 -->
         <el-form ref="formRef" :model="form" :rules="rules" @submit.prevent="login">
           <el-form-item prop="username">
@@ -49,86 +65,10 @@
             </div>
           </el-form-item>
         </el-form>
-        <!-- 展开/折叠连接配置按钮 -->
-        <div class="config-toggle-btn" @click="toggleConfig">
-          <div class="config-toggle-text">
-            <span v-for="(c, i) in configBtnTextArr" :key="i">{{c}}</span>
-          </div>
-          <el-icon v-if="!showConfig"><ArrowRightBold /></el-icon>
-          <el-icon v-else><ArrowLeftBold /></el-icon>
-        </div>
+
       </div>
-      <!-- 连接配置抽屉 -->
-      <transition name="slide-config">
-        <div v-if="showConfig" class="config-drawer">
-          <div class="config-box">
-            <div class="config-title">连接配置</div>
-            <el-form :model="dbConfig" :rules="dbRules" ref="dbFormRef" label-width="5.5rem" style="margin-top:1.5rem" @keydown.enter.prevent="saveConfig">
-              <el-form-item label="选择配置">
-                <div class="config-select-row">
-                  <el-select v-model="selectedConfigId" placeholder="请选择配置" style="width:100%" @change="onConfigSelect">
-                    <el-option v-for="item in configList" :key="item.ID" :label="getConfigDisplayName(item)" :value="item.ID" />
-                  </el-select>
-                  <el-button class="btn-refresh" circle @click="() => fetchConfigList(true)" :title="'刷新配置列表'" :loading="isRefreshing">
-                    <el-icon v-if="!isRefreshing"><RefreshRight /></el-icon>
-                  </el-button>
-                </div>
-              </el-form-item>
-              <el-form-item label="IP地址" prop="Host">
-                <el-input v-model="dbConfig.Host" placeholder="数据库IP地址" />
-              </el-form-item>
-              <el-form-item label="数据库名" prop="DatabaseName">
-                <el-input v-model="dbConfig.DatabaseName" placeholder="数据库名" />
-              </el-form-item>
-              <el-form-item label="用户名" prop="DbUser">
-                <el-input v-model="dbConfig.DbUser" placeholder="数据库用户名" />
-              </el-form-item>
-              <el-form-item label="密码" prop="DbPassword">
-                <el-input v-model="dbConfig.DbPassword" type="password" placeholder="数据库密码" show-password />
-              </el-form-item>
-              <el-form-item label="配置名称">
-                <el-input v-model="dbConfig.ConfigName" placeholder="自定义配置名" />
-              </el-form-item>
-              <el-form-item label="备注">
-                <el-input v-model="dbConfig.Remark" placeholder="备注" />
-              </el-form-item>
-              <el-form-item>
-                <div class="config-btn-row-col">
-                  <el-button class="btn-confirm" type="primary" @click="saveConfig" :loading="isSubmitting" :disabled="isSubmitting">
-                    {{ isSubmitting ? '保存中...' : '确认' }}
-                  </el-button>
-                  <div class="config-btn-row">
-                    <el-button @click="testDb" type="info">连接测试</el-button>
-                    <el-button @click="resetConfig">重置</el-button>
-                    <el-button type="success" @click="setCurrentConfig" :disabled="!selectedConfigId">设为当前</el-button>
-                    <el-button type="warning" @click="rollbackConfig">回滚</el-button>
-                  </div>
-                </div>
-              </el-form-item>
-            </el-form>
-            <el-table :data="configList" border size="small" style="margin-top:1.5rem;width:100%" height="180">
-              <el-table-column label="配置名" width="120">
-                <template #default="scope">
-                  {{ getCleanConfigName(scope.row.ConfigName, scope.row.ID) }}
-                </template>
-              </el-table-column>
-              <el-table-column prop="Host" label="IP" width="110" />
-              <el-table-column prop="DatabaseName" label="库名" width="110" />
-              <el-table-column prop="DbUser" label="用户" width="90" />
-              <el-table-column prop="IsCurrent" label="当前" width="60">
-                <template #default="scope">
-                  <el-tag v-if="scope.row.IsCurrent" type="success">当前</el-tag>
-                </template>
-              </el-table-column>
-              <el-table-column prop="IsValid" label="有效" width="60">
-                <template #default="scope">
-                  <el-tag :type="scope.row.IsValid ? 'success' : 'danger'">{{scope.row.IsValid ? '是' : '否'}}</el-tag>
-                </template>
-              </el-table-column>
-            </el-table>
-          </div>
-        </div>
-      </transition>
+
+
     </div>
   </div>
 </template>
@@ -137,12 +77,12 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
-import { User, Lock, ArrowRightBold, ArrowLeftBold, RefreshRight } from '@element-plus/icons-vue'
+import { User, Lock } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 
 const formRef = ref()
-const dbFormRef = ref()
+
 const form = ref({ username: 'admin', password: '', rememberMe: false })
 const router = useRouter()
 const userStore = useUserStore()
@@ -158,247 +98,13 @@ const rules = reactive({
   ],
 })
 
-const dbConfig = ref({ Host: '', DatabaseName: '', DbUser: '', DbPassword: '' })
-const dbRules = reactive({
-  Host: [
-    { required: true, message: '请输入IP地址', trigger: 'blur' },
-    { pattern: /^(\d{1,3}\.){3}\d{1,3}$/, message: 'IP地址格式不正确', trigger: 'blur' }
-  ],
-  DatabaseName: [
-    { required: true, message: '请输入数据库名', trigger: 'blur' }
-  ],
-  DbUser: [
-    { required: true, message: '请输入数据库用户名', trigger: 'blur' }
-  ],
-  DbPassword: [
-    { required: true, message: '请输入数据库密码', trigger: 'blur' }
-  ]
-})
 
-const configList = ref([])
-const selectedConfigId = ref(null)
-const showConfig = ref(false)
-const configBtnTextArr = ['连', '接', '配', '置']
-const toggleConfig = async () => {
-  showConfig.value = !showConfig.value
-  // 展开配置时加载配置列表
-  if (showConfig.value) {
-    await fetchConfigList()
-  }
-}
 
-// 添加提交状态控制
-const isSubmitting = ref(false)
 
-// 添加刷新按钮加载状态
-const isRefreshing = ref(false)
 
-// 添加请求防抖
-let fetchConfigListTimer = null;
-const fetchConfigList = async (showLoading = false) => {
-  // 清除之前的定时器
-  if (fetchConfigListTimer) {
-    clearTimeout(fetchConfigListTimer);
-  }
 
-  // 设置防抖延迟
-  return new Promise((resolve) => {
-    fetchConfigListTimer = setTimeout(async () => {
-      const startTime = Date.now(); // 记录开始时间
 
-      if (showLoading) {
-        isRefreshing.value = true;
-      }
 
-      try {
-        const response = await axios.get('/api/config/db-list')
-        if (response.data && response.data.success) {
-          configList.value = response.data.data
-          // 找到当前配置并设置为选中
-          const currentConfig = configList.value.find(item => item.IsCurrent === 1 || item.IsCurrent === true)
-          if (currentConfig) {
-            selectedConfigId.value = currentConfig.ID
-            // 加载当前配置到表单
-            dbConfig.value = {
-              Host: currentConfig.Host,
-              DatabaseName: currentConfig.DatabaseName,
-              DbUser: currentConfig.DbUser,
-              DbPassword: currentConfig.DbPassword,
-              ConfigName: getCleanConfigNameForInput(currentConfig.ConfigName),
-              Remark: getCleanRemark(currentConfig.Remark)
-            }
-            console.log('已加载当前配置:', currentConfig)
-          } else {
-            console.log('未找到当前配置，配置列表:', configList.value)
-          }
-        }
-
-        // 计算请求耗时，确保最少显示500ms的加载动画
-        const endTime = Date.now();
-        const duration = endTime - startTime;
-        const minDuration = 500; // 最少显示500ms
-
-        if (showLoading) {
-          if (duration < minDuration) {
-            // 如果请求太快，延迟一下再隐藏加载状态
-            setTimeout(() => {
-              isRefreshing.value = false;
-            }, minDuration - duration);
-          } else {
-            isRefreshing.value = false;
-          }
-        }
-
-        resolve();
-      } catch (e) {
-        ElMessage.error('获取配置列表失败')
-        console.error('获取配置列表失败:', e)
-
-        if (showLoading) {
-          // 错误时也要确保加载状态被重置
-          setTimeout(() => {
-            isRefreshing.value = false;
-          }, 500);
-        }
-
-        resolve();
-      }
-    }, showLoading ? 0 : 300); // 如果显示加载动画，不使用防抖延迟
-  });
-}
-
-const onConfigSelect = (id) => {
-  const selectedConfig = configList.value.find(item => item.ID === id)
-  if (selectedConfig) {
-    dbConfig.value = {
-      Host: selectedConfig.Host,
-      DatabaseName: selectedConfig.DatabaseName,
-      DbUser: selectedConfig.DbUser,
-      DbPassword: selectedConfig.DbPassword,
-      ConfigName: getCleanConfigNameForInput(selectedConfig.ConfigName),
-      Remark: getCleanRemark(selectedConfig.Remark)
-    }
-  }
-}
-
-const setCurrentConfig = async () => {
-  if (!selectedConfigId.value) {
-    ElMessage.warning('请先选择一个配置')
-    return
-  }
-  try {
-    const response = await axios.post('/api/config/set-current', {
-      configId: selectedConfigId.value
-    })
-    if (response.data && response.data.success) {
-      ElMessage.success('当前配置已更新')
-      await fetchConfigList() // 重新加载配置列表
-    }
-  } catch (e) {
-    ElMessage.error('设置当前配置失败')
-    console.error('设置当前配置失败:', e)
-  }
-}
-
-const rollbackConfig = async () => {
-  // 重新加载当前配置
-  await fetchConfigList()
-  ElMessage.info('已回滚到当前配置')
-}
-
-const fetchDbConfig = async () => {
-  await fetchConfigList()
-}
-
-// 获取配置显示名称
-const getConfigDisplayName = (item) => {
-  let name = item.ConfigName || '未命名'
-
-  // 检查是否为乱码（包含特殊字符）
-  if (/[^\u4e00-\u9fa5\w\s\-_()（）]/.test(name)) {
-    name = `配置${item.ID}`
-  }
-
-  const currentText = (item.IsCurrent === 1 || item.IsCurrent === true) ? '（当前）' : ''
-  const validText = item.IsValid ? '' : '（无效）'
-
-  return `${name}${currentText}${validText}`
-}
-
-// 获取清理后的配置名称（用于表格显示）
-const getCleanConfigName = (configName, id) => {
-  if (!configName) return '未命名'
-
-  // 检查是否为乱码（包含特殊字符）
-  if (/[^\u4e00-\u9fa5\w\s\-_()（）]/.test(configName)) {
-    return `配置${id}`
-  }
-
-  return configName
-}
-
-// 获取清理后的配置名称（用于输入框显示）
-const getCleanConfigNameForInput = (configName) => {
-  if (!configName) return ''
-
-  // 检查是否为乱码（包含特殊字符），如果是乱码则返回空字符串让用户重新输入
-  if (/[^\u4e00-\u9fa5\w\s\-_()（）]/.test(configName)) {
-    return ''
-  }
-
-  return configName
-}
-
-// 获取清理后的备注（用于输入框显示）
-const getCleanRemark = (remark) => {
-  if (!remark) return ''
-
-  // 检查是否为乱码（包含特殊字符），如果是乱码则返回空字符串让用户重新输入
-  if (/[^\u4e00-\u9fa5\w\s\-_()（）.,，。！!？?]/.test(remark)) {
-    return ''
-  }
-
-  return remark
-}
-const testDb = async () => {
-  await dbFormRef.value.validate(async (valid) => {
-    if (!valid) return
-    try {
-      await axios.post('/api/config/test-db', dbConfig.value)
-      ElMessage.success('连接成功')
-    } catch (e) {
-      let msg = '连接失败';
-      if (e.response && e.response.data && e.response.data.error) {
-        msg += '：' + e.response.data.error
-      }
-      ElMessage.error(msg)
-    }
-  })
-}
-const saveConfig = async () => {
-  if (isSubmitting.value) return // 防止重复提交
-
-  await dbFormRef.value.validate(async (valid) => {
-    if (!valid) return
-
-    isSubmitting.value = true // 开始提交
-    try {
-      await axios.post('/api/config/db', dbConfig.value)
-      ElMessage.success('数据库配置已保存')
-    } catch (e) {
-      let msg = '保存失败';
-      if (e.response && e.response.data && e.response.data.message) {
-        msg += '：' + e.response.data.message
-      }
-      ElMessage.error(msg)
-    } finally {
-      isSubmitting.value = false // 结束提交
-    }
-  })
-}
-const resetConfig = () => {
-  dbConfig.value = { Host: '', DatabaseName: '', DbUser: '', DbPassword: '' }
-}
 
 const login = async () => {
   if (!formRef.value) return
@@ -438,7 +144,6 @@ const reset = () => {
   localStorage.removeItem('login-info')
 }
 onMounted(() => {
-  fetchConfigList() // 只需要调用一次
   const loginInfo = localStorage.getItem('login-info')
   if (loginInfo) {
     const { username, password, rememberMe } = JSON.parse(loginInfo)
@@ -485,17 +190,7 @@ const saveApiBase = () => {
   min-height: 0;
   transition: min-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
-/* 展开配置时整体居中 */
-.login-container-flex.config-open {
-  min-height: 100vh;
-  justify-content: center;
-}
-.login-center-wrap.config-open {
-  align-items: center;
-  justify-content: center;
-  min-height: 0;
-  height: auto;
-}
+
 .login-box {
   background-color: white;
   padding: 2.5rem 2.5rem 2.5rem 2.5rem;
@@ -534,109 +229,18 @@ const saveApiBase = () => {
   max-width: 100%;
   max-height: 100%;
 }
-.config-toggle-btn {
-  position: absolute;
-  right: -2.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  background: linear-gradient(135deg, #1677ff 0%, #4096ff 100%);
-  border-radius: 1.5rem;
-  box-shadow: 0 8px 32px rgba(22, 119, 255, 0.3);
-  width: 2.4rem;
-  height: 8.8rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  z-index: 3;
-  transition: all 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  backdrop-filter: blur(10px);
-  overflow: hidden;
-}
 
-.config-toggle-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0.05) 100%);
-  border-radius: inherit;
-  opacity: 0;
-  transition: opacity 0.3s ease;
-}
 
-.config-toggle-btn::after {
-  content: '';
-  position: absolute;
-  top: 1rem;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 0.3rem;
-  height: 0.3rem;
-  background: rgba(255, 255, 255, 0.6);
-  border-radius: 50%;
-  box-shadow:
-    0 1.2rem 0 rgba(255, 255, 255, 0.4),
-    0 2.4rem 0 rgba(255, 255, 255, 0.3),
-    0 3.6rem 0 rgba(255, 255, 255, 0.2),
-    0 4.8rem 0 rgba(255, 255, 255, 0.1);
-}
-.config-toggle-btn:hover {
-  background: linear-gradient(135deg, #4096ff 0%, #1677ff 100%);
-  box-shadow: 0 12px 40px rgba(22, 119, 255, 0.4);
-  transform: translateY(-50%) scale(1.08) rotateY(5deg);
-  border-color: rgba(255, 255, 255, 0.4);
-}
 
-.config-toggle-btn:hover::before {
-  opacity: 1;
-}
-
-.config-toggle-btn:hover::after {
-  animation: pulse 1.5s infinite;
-}
-
-.config-toggle-btn:active {
-  transform: translateY(-50%) scale(1.02);
-  transition: all 0.1s ease-out;
-  box-shadow: 0 4px 20px rgba(22, 119, 255, 0.5);
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
-.config-toggle-text {
-  writing-mode: vertical-rl;
-  font-size: 1rem;
-  color: #ffffff;
-  font-weight: 600;
-  letter-spacing: 0.15rem;
-  margin-bottom: 0.5rem;
-  user-select: none;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
-  position: relative;
-  z-index: 1;
-  transition: all 0.3s ease;
-}
-
-.config-toggle-btn:hover .config-toggle-text {
-  color: #ffffff;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-  transform: scale(1.05);
-}
 .config-drawer {
   background: #fff;
   border-radius: 0.3rem;
   box-shadow: 0 0 1.2rem #d0d6e1;
-  width: 26rem;
-  min-height: 32rem;
-  margin-left: 2.5rem;
-  padding: 2.5rem 1.5rem 2rem 2.5rem;
+  width: 36rem;
+  min-height: 35rem;
+  max-height: 95vh;
+  margin-left: 2rem;
+  padding: 1rem 1.5rem 1rem 1.5rem;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -645,6 +249,71 @@ const saveApiBase = () => {
   top: 0;
   backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
+}
+
+.config-fixed-section {
+  flex-shrink: 0;
+  width: 100%;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e4e7ed;
+  margin-bottom: 1rem;
+}
+
+.config-scrollable-section {
+  flex: 1;
+  width: 100%;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+  max-height: calc(95vh - 280px);
+  min-height: 250px;
+}
+
+/* 优化表单间距 */
+.config-drawer .el-form-item {
+  margin-bottom: 12px;
+}
+
+.config-drawer .el-form-item__label {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.config-drawer .el-divider {
+  margin: 12px 0 8px 0;
+}
+
+.config-drawer .el-divider__text {
+  font-size: 13px;
+}
+
+/* 增加配置对话框中按钮的高度 */
+.config-drawer .el-button--small {
+  height: 40px; /* 原来约30px，增加1/3约为40px */
+  line-height: 38px;
+  font-size: 13px;
+}
+
+.config-drawer .btn-confirm {
+  height: 45px; /* 主要按钮稍微高一些 */
+  line-height: 43px;
+  font-size: 14px;
+}
+
+/* 调整输入框高度与按钮协调 */
+.config-drawer .el-input--small .el-input__inner {
+  height: 36px;
+  line-height: 36px;
+}
+
+.config-drawer .el-input-number--small .el-input__inner {
+  height: 36px;
+  line-height: 36px;
+}
+
+.config-drawer .el-select--small .el-input__inner {
+  height: 36px;
+  line-height: 36px;
 }
 .config-title {
   font-size: 1.2rem;

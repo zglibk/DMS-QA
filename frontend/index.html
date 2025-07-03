@@ -12,12 +12,14 @@
       
       html, body {
         height: 100%;
-        overflow: hidden;
+        overflow-x: hidden; /* 只隐藏水平滚动条 */
+        overflow-y: auto;   /* 允许垂直滚动 */
       }
-      
+
       #app {
-        height: 100%;
-        overflow: hidden;
+        min-height: 100%;   /* 改为最小高度，允许内容增长 */
+        overflow-x: hidden; /* 只隐藏水平滚动条 */
+        overflow-y: auto;   /* 允许垂直滚动 */
       }
     </style>
   </head>

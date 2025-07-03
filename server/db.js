@@ -35,7 +35,7 @@ async function getDynamicConfig() {
     // 首先尝试从数据库获取配置
     pool = await sql.connect(config);
     const result = await pool.request()
-      .query('SELECT TOP 1 Host, DatabaseName, DbUser, DbPassword FROM DbConfig WHERE IsCurrent = 1 ORDER BY ID DESC');
+      .query('SELECT TOP 1 Host, DatabaseName, DbUser, DbPassword, FileStoragePath, FileServerPort, FileUrlPrefix, ExcelTempPath, NetworkSharePath FROM DbConfig WHERE IsCurrent = 1 ORDER BY ID DESC');
 
     if (result.recordset.length > 0) {
       const dbConfig = result.recordset[0];
@@ -44,6 +44,11 @@ async function getDynamicConfig() {
         password: dbConfig.DbPassword,
         server: dbConfig.Host,
         database: dbConfig.DatabaseName,
+        FileStoragePath: dbConfig.FileStoragePath,
+        FileServerPort: dbConfig.FileServerPort,
+        FileUrlPrefix: dbConfig.FileUrlPrefix,
+        ExcelTempPath: dbConfig.ExcelTempPath,
+        NetworkSharePath: dbConfig.NetworkSharePath,
         options: {
           encrypt: false,
           trustServerCertificate: true,
@@ -81,8 +86,21 @@ async function getDynamicConfig() {
   }
 }
 
+// 获取数据库连接
+async function getConnection() {
+  try {
+    const dynamicConfig = await getDynamicConfig();
+    const pool = await sql.connect(dynamicConfig);
+    return pool;
+  } catch (error) {
+    console.error('数据库连接失败:', error);
+    throw error;
+  }
+}
+
 module.exports = {
   sql,
   config,
-  getDynamicConfig
+  getDynamicConfig,
+  getConnection
 };
