@@ -239,6 +239,13 @@ document.addEventListener('fullscreenchange', () => {
 
 onMounted(() => {
   userStore.fetchProfile()
+  loadSiteConfig()
+
+  // 监听网站配置更新事件
+  window.addEventListener('siteConfigUpdated', (event) => {
+    Object.assign(siteConfig, event.detail)
+    document.title = siteConfig.siteName
+  })
 })
 </script>
 

@@ -651,6 +651,182 @@ router.put('/home-cards', async (req, res) => {
   }
 });
 
+// ===================== 网站LOGO配置接口 =====================
+
+// 获取网站配置
+router.get('/site-config', async (req, res) => {
+  let connection;
+  try {
+    connection = await getConnection();
+
+    // 检查表是否存在
+    const tableCheckResult = await connection.request()
+      .query(`SELECT COUNT(*) as count FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[SiteConfig]') AND type in (N'U')`);
+
+    if (tableCheckResult.recordset[0].count === 0) {
+      // 表不存在，返回默认配置
+      console.log('SiteConfig表不存在，返回默认配置');
+      const defaultConfig = {
+        siteName: '质量数据管理系统',
+        companyName: 'DMS质量管理系统',
+        logoUrl: '/logo.png',
+        faviconUrl: '/logo.png',
+        headerTitle: '质量数据系统',
+        loginTitle: 'DMS-QA 质量管理系统',
+        footerCopyright: '© 2025 DMS质量管理系统. All rights reserved.'
+      };
+
+      return res.json({
+        success: true,
+        data: defaultConfig,
+        message: '获取网站配置成功（使用默认配置）'
+      });
+    }
+
+    const result = await connection.request()
+      .query(`SELECT ConfigKey, ConfigValue, ConfigType FROM SiteConfig WHERE IsActive = 1`);
+
+    // 转换为对象格式
+    const config = {};
+    result.recordset.forEach(row => {
+      config[row.ConfigKey] = row.ConfigValue;
+    });
+
+    // 设置默认值
+    const defaultValues = {
+      siteName: '质量数据管理系统',
+      companyName: 'DMS质量管理系统',
+      logoUrl: '/logo.png',
+      faviconUrl: '/logo.png',
+      headerTitle: '质量数据系统',
+      loginTitle: 'DMS-QA 质量管理系统',
+      footerCopyright: '© 2025 DMS质量管理系统. All rights reserved.'
+    };
+
+    // 合并默认值
+    Object.keys(defaultValues).forEach(key => {
+      if (!config.hasOwnProperty(key)) {
+        config[key] = defaultValues[key];
+      }
+    });
+
+    res.json({
+      success: true,
+      data: config,
+      message: '获取网站配置成功'
+    });
+  } catch (error) {
+    console.error('获取网站配置失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取配置失败: ' + error.message
+    });
+  } finally {
+    if (connection) {
+      connection.close();
+    }
+  }
+});
+
+// 保存网站配置
+router.put('/site-config', async (req, res) => {
+  let connection;
+  try {
+    const { siteName, companyName, logoUrl, faviconUrl, headerTitle, loginTitle, footerCopyright } = req.body;
+
+    connection = await getConnection();
+
+    // 检查表是否存在
+    const tableCheckResult = await connection.request()
+      .query(`SELECT COUNT(*) as count FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[SiteConfig]') AND type in (N'U')`);
+
+    if (tableCheckResult.recordset[0].count === 0) {
+      // 表不存在，返回提示信息
+      console.log('SiteConfig表不存在，无法保存配置');
+      return res.json({
+        success: false,
+        message: '数据库表不存在，请先执行建表SQL脚本。配置已临时生效，但不会持久化保存。',
+        data: {
+          siteName, companyName, logoUrl, faviconUrl, headerTitle, loginTitle, footerCopyright,
+          savedAt: new Date().toISOString(),
+          persistent: false
+        }
+      });
+    }
+
+    // 开始事务
+    const transaction = connection.transaction();
+    await transaction.begin();
+
+    try {
+      // 更新或插入配置
+      const configs = [
+        { key: 'siteName', value: siteName || '质量数据管理系统', type: 'text', description: '网站名称' },
+        { key: 'companyName', value: companyName || 'DMS质量管理系统', type: 'text', description: '公司名称' },
+        { key: 'logoUrl', value: logoUrl || '/logo.png', type: 'image', description: '网站LOGO图片URL' },
+        { key: 'faviconUrl', value: faviconUrl || '/logo.png', type: 'image', description: '网站图标URL' },
+        { key: 'headerTitle', value: headerTitle || '质量数据系统', type: 'text', description: '页面头部标题' },
+        { key: 'loginTitle', value: loginTitle || 'DMS-QA 质量管理系统', type: 'text', description: '登录页面标题' },
+        { key: 'footerCopyright', value: footerCopyright || '© 2025 DMS质量管理系统. All rights reserved.', type: 'text', description: '页脚版权信息' }
+      ];
+
+      for (const config of configs) {
+        // 检查配置是否存在
+        const existResult = await transaction.request()
+          .input('ConfigKey', config.key)
+          .query('SELECT ID FROM SiteConfig WHERE ConfigKey = @ConfigKey');
+
+        if (existResult.recordset.length > 0) {
+          // 更新现有配置
+          await transaction.request()
+            .input('ConfigKey', config.key)
+            .input('ConfigValue', config.value)
+            .query(`UPDATE SiteConfig SET
+                      ConfigValue = @ConfigValue,
+                      UpdatedAt = GETDATE()
+                    WHERE ConfigKey = @ConfigKey`);
+        } else {
+          // 插入新配置
+          await transaction.request()
+            .input('ConfigKey', config.key)
+            .input('ConfigValue', config.value)
+            .input('ConfigType', config.type)
+            .input('Description', config.description)
+            .query(`INSERT INTO SiteConfig (ConfigKey, ConfigValue, ConfigType, Description, IsActive, CreatedAt, UpdatedAt)
+                    VALUES (@ConfigKey, @ConfigValue, @ConfigType, @Description, 1, GETDATE(), GETDATE())`);
+        }
+      }
+
+      // 提交事务
+      await transaction.commit();
+
+      res.json({
+        success: true,
+        message: '网站配置保存成功',
+        data: {
+          siteName, companyName, logoUrl, faviconUrl, headerTitle, loginTitle, footerCopyright,
+          savedAt: new Date().toISOString(),
+          persistent: true
+        }
+      });
+    } catch (error) {
+      // 回滚事务
+      await transaction.rollback();
+      throw error;
+    }
+  } catch (error) {
+    console.error('保存网站配置失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '保存配置失败: ' + error.message
+    });
+  } finally {
+    if (connection) {
+      connection.close();
+    }
+  }
+});
+
 // ===================== 获取车间和部门数据接口 =====================
 
 // 获取所有车间数据

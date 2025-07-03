@@ -24,6 +24,7 @@ const complaintRouter = require('./routes/complaint');
 const authRouter = require('./routes/auth');
 const configRouter = require('./routes/config');
 const importRouter = require('./routes/import');
+const uploadRouter = require('./routes/upload');
 
 const app = express();
 app.use(cors());
@@ -54,9 +55,12 @@ app.use('/api/complaint', complaintRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/config', configRouter);
 app.use('/api/import', importRouter);
+app.use('/api/upload', uploadRouter);
 
 // 静态文件服务 - 提供拷贝的附件文件访问
 app.use('/files/attachments', express.static(path.join(__dirname, 'uploads/attachments')));
+// 静态文件服务 - 提供网站图片访问
+app.use('/files/site-images', express.static(path.join(__dirname, 'uploads/site-images')));
 
 // 全局错误处理
 process.on('uncaughtException', (error) => {

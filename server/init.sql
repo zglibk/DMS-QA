@@ -177,6 +177,18 @@ CREATE TABLE [dbo].[HomeCardConfig] (
     [UpdatedAt] DATETIME DEFAULT GETDATE()
 );
 
+-- 网站LOGO配置表
+CREATE TABLE [dbo].[SiteConfig] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,
+    [ConfigKey] NVARCHAR(50) NOT NULL UNIQUE,
+    [ConfigValue] NVARCHAR(MAX),
+    [ConfigType] NVARCHAR(20) DEFAULT 'text', -- text, image, json
+    [Description] NVARCHAR(200),
+    [IsActive] BIT DEFAULT 1,
+    [CreatedAt] DATETIME DEFAULT GETDATE(),
+    [UpdatedAt] DATETIME DEFAULT GETDATE()
+);
+
 -- 插入默认路径映射规则
 INSERT INTO [dbo].[PathMappingConfig] ([Name], [LocalPattern], [TargetPattern], [Description]) VALUES
 (N'Excel临时文件映射', N'C:\Users\*\AppData\Roaming\Microsoft\Excel\*', N'\\tj_server\工作\品质部\生产异常周报考核统计\*', N'Excel临时文件映射到tj_server共享盘'),
@@ -187,6 +199,16 @@ INSERT INTO [dbo].[HomeCardConfig] ([ConfigKey], [ConfigValue], [Description]) V
 (N'showTodayCount', N'true', N'是否显示今日投诉统计卡片'),
 (N'showMonthCount', N'true', N'是否显示本月投诉统计卡片'),
 (N'displayUnits', N'[{"name":"数码印刷","type":"workshop","enabled":true},{"name":"轮转机","type":"workshop","enabled":true},{"name":"跟单","type":"department","enabled":true},{"name":"设计","type":"department","enabled":true},{"name":"品检","type":"department","enabled":true}]', N'显示的部门/车间单位配置');
+
+-- 插入默认网站LOGO配置
+INSERT INTO [dbo].[SiteConfig] ([ConfigKey], [ConfigValue], [ConfigType], [Description]) VALUES
+(N'siteName', N'质量数据管理系统', N'text', N'网站名称'),
+(N'companyName', N'DMS质量管理系统', N'text', N'公司名称'),
+(N'logoUrl', N'/logo.png', N'image', N'网站LOGO图片URL'),
+(N'faviconUrl', N'/logo.png', N'image', N'网站图标URL'),
+(N'headerTitle', N'质量数据系统', N'text', N'页面头部标题'),
+(N'loginTitle', N'DMS-QA 质量管理系统', N'text', N'登录页面标题'),
+(N'footerCopyright', N'© 2025 DMS质量管理系统. All rights reserved.', N'text', N'页脚版权信息');
 
 -- 插入下拉列表的初始数据
 -- 车间

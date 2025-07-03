@@ -21,8 +21,8 @@
     <div class="home-header">
         <!-- 左侧logo及系统名 -->
         <div class="header-left">
-          <img src="/logo.png" alt="logo" class="logo" />
-          <span class="logo-text">质量数据管理系统</span>
+          <img :src="siteConfig.logoUrl" alt="logo" class="logo" @error="handleLogoError" />
+          <span class="logo-text">{{ siteConfig.siteName }}</span>
         </div>
         <!-- 中间菜单栏 -->
         <div class="header-center">
@@ -544,7 +544,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, watch, nextTick } from 'vue'
+import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
 import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
@@ -556,6 +556,12 @@ import { storeToRefs } from 'pinia'
 
 const router = useRouter()
 const activeMenu = ref('home')
+
+// 网站配置
+const siteConfig = reactive({
+  logoUrl: '/logo.png',
+  siteName: '质量数据管理系统'
+})
 const tableData = ref([])
 const total = ref(0)
 const page = ref(1)
@@ -640,6 +646,25 @@ const goAdmin = () => {
   } else {
     ElMessage.error('无后台权限')
   }
+}
+
+// 加载网站配置
+const loadSiteConfig = async () => {
+  try {
+    const response = await axios.get('/api/config/site-config')
+    if (response.data.success) {
+      Object.assign(siteConfig, response.data.data)
+      // 更新页面标题
+      document.title = siteConfig.siteName
+    }
+  } catch (error) {
+    console.error('加载网站配置失败:', error)
+  }
+}
+
+// LOGO加载错误处理
+const handleLogoError = (event) => {
+  event.target.src = '/logo.png' // 回退到默认LOGO
 }
 
 const fetchTableData = async () => {
@@ -966,6 +991,7 @@ onMounted(() => {
   fetchChartOptions()
   fetchProfile()
   fetchWorkshopOptions() // 获取车间选项
+  loadSiteConfig() // 加载网站配置
   nextTick(() => {
     renderCharts()
     // 初始化查询卡片位置
@@ -974,6 +1000,12 @@ onMounted(() => {
 
   // 添加配置更新监听器
   window.addEventListener('homeConfigUpdated', handleConfigUpdate)
+
+  // 添加网站配置更新监听器
+  window.addEventListener('siteConfigUpdated', (event) => {
+    Object.assign(siteConfig, event.detail)
+    document.title = siteConfig.siteName
+  })
 
   // 添加滚动监听，动态调整查询卡片位置
   window.addEventListener('scroll', handleScroll)

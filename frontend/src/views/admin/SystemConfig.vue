@@ -26,6 +26,13 @@
           <PathMappingConfig />
         </div>
       </el-tab-pane>
+
+      <!-- 网站LOGO配置标签页 -->
+      <el-tab-pane label="网站LOGO配置" name="site">
+        <div class="tab-content">
+          <SiteConfig />
+        </div>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -35,6 +42,7 @@ import { ref } from 'vue'
 import ConnectionConfig from '@/components/admin/ConnectionConfig.vue'
 import StorageConfig from '@/components/admin/StorageConfig.vue'
 import PathMappingConfig from '@/components/admin/PathMappingConfig.vue'
+import SiteConfig from '@/components/admin/SiteConfig.vue'
 
 const activeTab = ref('connection')
 </script>
