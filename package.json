@@ -1,5 +1,33 @@
 {
+  "name": "dms-qa",
+  "version": "2.1.0",
+  "description": "DMS质量管理系统 - 生产异常管理与数据分析平台",
+  "main": "index.js",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "scripts": {
+    "check-env": "node scripts/check-environment.js",
+    "test-version": "node scripts/version-compatibility-test.js",
+    "setup": "npm run check-env && cd frontend && npm install && cd ../server && npm install",
+    "dev": "npm run check-env && concurrently \"cd frontend && npm run dev\" \"cd server && npm start\"",
+    "build": "cd frontend && npm run build",
+    "start": "cd server && npm start",
+    "clean": "rm -rf frontend/node_modules frontend/package-lock.json server/node_modules server/package-lock.json",
+    "reinstall": "npm run clean && npm run setup"
+  },
+  "keywords": ["dms", "quality-management", "production", "vue3", "nodejs"],
+  "author": "David Lee (zglibk) <1039297691@qq.com>",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://gitee.com/zglibk/dms-qa.git"
+  },
   "dependencies": {
     "uuid": "^11.1.0"
+  },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
   }
 }

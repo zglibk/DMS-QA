@@ -1,7 +1,14 @@
 {
   "name": "dms-qa-server",
-  "version": "1.0.0",
+  "version": "2.1.0",
   "main": "app.js",
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "keywords": ["dms", "quality-management", "nodejs", "express", "mssql"],
+  "author": "David Lee (zglibk) <1039297691@qq.com>",
+  "license": "Apache-2.0",
   "scripts": {
     "start": "node app.js"
   },
