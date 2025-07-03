@@ -171,12 +171,13 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, reactive } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import Profile from '../Profile.vue'
+import axios from 'axios'
 
 const route = useRoute()
 const router = useRouter()
@@ -185,6 +186,13 @@ const { user } = storeToRefs(userStore)
 
 const collapsed = ref(false)
 const activeMenu = computed(() => route.path.startsWith('/admin/user') ? '/admin/user/list' : route.path)
+
+// 网站配置
+const siteConfig = reactive({
+  logoUrl: '/logo.png',
+  headerTitle: '质量数据系统',
+  siteName: '质量数据管理系统'
+})
 const pageTitle = computed(() => {
   switch (route.path) {
     case '/admin/dashboard': return '仪表盘'
@@ -236,6 +244,25 @@ const toggleFullscreen = () => {
 document.addEventListener('fullscreenchange', () => {
   isFullscreen.value = !!document.fullscreenElement
 })
+
+// 加载网站配置
+const loadSiteConfig = async () => {
+  try {
+    const response = await axios.get('/api/config/site-config')
+    if (response.data.success) {
+      Object.assign(siteConfig, response.data.data)
+      // 更新页面标题
+      document.title = siteConfig.siteName
+    }
+  } catch (error) {
+    console.error('加载网站配置失败:', error)
+  }
+}
+
+// LOGO加载错误处理
+const handleLogoError = (event) => {
+  event.target.src = '/logo.png' // 回退到默认LOGO
+}
 
 onMounted(() => {
   userStore.fetchProfile()
