@@ -11,7 +11,12 @@
     "build": "vite build",
     "serve": "vite preview"
   },
-  "keywords": ["dms", "quality-management", "vue3", "element-plus"],
+  "keywords": [
+    "dms",
+    "quality-management",
+    "vue3",
+    "element-plus"
+  ],
   "author": "David Lee (zglibk) <1039297691@qq.com>",
   "license": "Apache-2.0",
   "description": "",
@@ -20,14 +25,18 @@
     "cropperjs": "^1.5.13",
     "echarts": "^5.6.0",
     "element-plus": "^2.0.0",
+    "file-saver": "^2.0.5",
     "pinia": "^2.0.0",
     "sortablejs": "^1.15.6",
     "vue": "^3.0.0",
     "vue-advanced-cropper": "^2.8.9",
     "vue-router": "^4.0.0",
-    "vuedraggable": "^4.1.0"
+    "vuedraggable": "^4.1.0",
+    "xlsx": "^0.18.5",
+    "xlsx-js-style": "^1.2.0"
   },
   "devDependencies": {
+    "@types/file-saver": "^2.0.7",
     "@vitejs/plugin-vue": "^4.0.0",
     "vite": "^4.0.0"
   }

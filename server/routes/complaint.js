@@ -95,33 +95,6 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ===================== 下拉选项数据接口 =====================
-// GET /api/complaint/options
-// 返回: 各类下拉选项数据
-router.get('/options', async (req, res) => {
-  try {
-    let pool = await sql.connect(await getDynamicConfig());
-    const [workshops, depts, persons, complaintCats, customerTypes, defectiveCats] = await Promise.all([
-      pool.request().query('SELECT Name FROM Workshop'),
-      pool.request().query('SELECT Name FROM Department'),
-      pool.request().query('SELECT Name FROM Person'),
-      pool.request().query('SELECT Name FROM ComplaintCategory'),
-      pool.request().query('SELECT Name FROM CustomerComplaintType'),
-      pool.request().query('SELECT ID, Name FROM DefectiveCategory')
-    ]);
-    res.json({
-      workshops: workshops.recordset.map(r => r.Name),
-      departments: depts.recordset.map(r => r.Name),
-      persons: persons.recordset.map(r => r.Name),
-      complaintCategories: complaintCats.recordset.map(r => r.Name),
-      customerComplaintTypes: customerTypes.recordset.map(r => r.Name),
-      defectiveCategories: defectiveCats.recordset,
-      defectiveItems: []
-    });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
 
 // ===================== 获取不良项（级联） =====================
 // GET /api/complaint/defective-items/:categoryId
@@ -129,12 +102,27 @@ router.get('/options', async (req, res) => {
 router.get('/defective-items/:categoryId', async (req, res) => {
   try {
     const { categoryId } = req.params;
+    console.log('获取不良项请求 - CategoryID:', categoryId);
+
     let pool = await sql.connect(await getDynamicConfig());
+
+    // 先查询所有不良项以便调试
+    const allItemsResult = await pool.request()
+      .query('SELECT ID, Name, CategoryID FROM DefectiveItem');
+    console.log('所有不良项:', allItemsResult.recordset);
+
+    // 查询指定类别的不良项
     const result = await pool.request()
       .input('CategoryID', sql.Int, categoryId)
       .query('SELECT Name FROM DefectiveItem WHERE CategoryID = @CategoryID');
-    res.json(result.recordset.map(r => r.Name));
+
+    console.log('匹配的不良项:', result.recordset);
+    const items = result.recordset.map(r => r.Name);
+    console.log('返回的不良项数组:', items);
+
+    res.json(items);
   } catch (err) {
+    console.error('获取不良项失败:', err);
     res.status(500).json({ message: err.message });
   }
 });
@@ -157,12 +145,19 @@ router.get('/list', async (req, res) => {
       search,           // 简单搜索
       customer,         // 客户名称
       orderNo,          // 工单号
+      productName,      // 产品名称
       workshop,         // 车间
       complaintCategory, // 投诉类别
+      customerComplaintType, // 客诉类型
+      defectiveCategory, // 不良类别
+      mainDept,         // 主责部门
+      mainPerson,       // 主责人
       startDate,        // 开始日期
       endDate,          // 结束日期
       defectiveRateMin, // 最小不良率
-      defectiveRateMax  // 最大不良率
+      defectiveRateMax, // 最大不良率
+      returnGoods,      // 退货状态
+      isReprint         // 补印状态
     } = req.query;
 
     let pool = await sql.connect(await getDynamicConfig());
@@ -171,8 +166,10 @@ router.get('/list', async (req, res) => {
     let whereClause = 'WHERE Date >= DATEADD(year, -1, GETDATE()) AND Date <= GETDATE()';
 
     // 如果有高级查询参数，则使用高级查询
-    if (customer || orderNo || workshop || complaintCategory || startDate || endDate ||
-        defectiveRateMin !== undefined || defectiveRateMax !== undefined) {
+    if (customer || orderNo || productName || workshop || complaintCategory || customerComplaintType ||
+        defectiveCategory || mainDept || mainPerson || startDate || endDate ||
+        defectiveRateMin !== undefined || defectiveRateMax !== undefined ||
+        returnGoods !== undefined || isReprint !== undefined) {
 
       // 客户查询
       if (customer) {
@@ -184,6 +181,11 @@ router.get('/list', async (req, res) => {
         whereClause += ` AND OrderNo LIKE N'%${orderNo}%'`;
       }
 
+      // 产品名称查询
+      if (productName) {
+        whereClause += ` AND ProductName LIKE N'%${productName}%'`;
+      }
+
       // 车间查询
       if (workshop) {
         whereClause += ` AND Workshop = N'${workshop}'`;
@@ -192,6 +194,26 @@ router.get('/list', async (req, res) => {
       // 投诉类别查询
       if (complaintCategory) {
         whereClause += ` AND ComplaintCategory = N'${complaintCategory}'`;
+      }
+
+      // 客诉类型查询
+      if (customerComplaintType) {
+        whereClause += ` AND CustomerComplaintType = N'${customerComplaintType}'`;
+      }
+
+      // 不良类别查询
+      if (defectiveCategory) {
+        whereClause += ` AND DefectiveCategory = N'${defectiveCategory}'`;
+      }
+
+      // 主责部门查询
+      if (mainDept) {
+        whereClause += ` AND MainDept = N'${mainDept}'`;
+      }
+
+      // 主责人查询
+      if (mainPerson) {
+        whereClause += ` AND MainPerson = N'${mainPerson}'`;
       }
 
       // 日期范围查询
@@ -210,6 +232,16 @@ router.get('/list', async (req, res) => {
         whereClause += ` AND DefectiveRate >= ${defectiveRateMin}`;
       } else if (defectiveRateMax !== undefined) {
         whereClause += ` AND DefectiveRate <= ${defectiveRateMax}`;
+      }
+
+      // 退货状态查询
+      if (returnGoods !== undefined && returnGoods !== '') {
+        whereClause += ` AND ReturnGoods = ${returnGoods === '1' ? 1 : 0}`;
+      }
+
+      // 补印状态查询
+      if (isReprint !== undefined && isReprint !== '') {
+        whereClause += ` AND IsReprint = ${isReprint === '1' ? 1 : 0}`;
       }
 
     } else if (search) {
@@ -297,10 +329,31 @@ router.get('/detail/:id', async (req, res) => {
 
 // ===================== 首页统计卡片数据接口 =====================
 // GET /api/complaint/month-stats
-// 返回: 今日投诉数、本月投诉数、各单位统计
+// 参数: month (可选，格式: YYYY-MM，默认当前月份)
+// 返回: 今日投诉数、指定月份投诉数、各单位统计
 router.get('/month-stats', async (req, res) => {
   try {
     let pool = await sql.connect(await getDynamicConfig());
+
+    // 获取月份参数，默认为当前月份
+    const { month } = req.query;
+    let targetYear, targetMonth;
+
+    console.log('收到统计请求，月份参数:', month);
+
+    if (month && /^\d{4}-\d{2}$/.test(month)) {
+      // 使用指定月份
+      [targetYear, targetMonth] = month.split('-').map(Number);
+      console.log('使用指定月份:', targetYear, targetMonth);
+    } else {
+      // 使用当前月份
+      const now = new Date();
+      targetYear = now.getFullYear();
+      targetMonth = now.getMonth() + 1;
+      console.log('使用当前月份:', targetYear, targetMonth);
+    }
+
+    console.log(`获取统计数据 - 目标月份: ${targetYear}年${targetMonth}月`);
 
     // 获取主页卡片配置
     let config = {};
@@ -361,7 +414,10 @@ router.get('/month-stats', async (req, res) => {
     }
 
     if (showMonthCount) {
-      const monthResult = await pool.request().query(`SELECT COUNT(*) AS cnt FROM ComplaintRegister WHERE YEAR(Date) = YEAR(GETDATE()) AND MONTH(Date) = MONTH(GETDATE())`);
+      const monthResult = await pool.request()
+        .input('TargetYear', sql.Int, targetYear)
+        .input('TargetMonth', sql.Int, targetMonth)
+        .query(`SELECT COUNT(*) AS cnt FROM ComplaintRegister WHERE YEAR(Date) = @TargetYear AND MONTH(Date) = @TargetMonth`);
       monthCount = monthResult.recordset[0].cnt;
     }
 
@@ -375,24 +431,32 @@ router.get('/month-stats', async (req, res) => {
       const fieldName = 'Workshop';
 
       // 内诉
-      const innerRes = await pool.request().query(`
-        SELECT COUNT(*) AS cnt
-        FROM ComplaintRegister
-        WHERE YEAR(Date) = YEAR(GETDATE())
-          AND MONTH(Date) = MONTH(GETDATE())
-          AND ${fieldName} = N'${unit.name}'
-          AND ComplaintCategory = N'内诉'
-      `);
+      const innerRes = await pool.request()
+        .input('TargetYear', sql.Int, targetYear)
+        .input('TargetMonth', sql.Int, targetMonth)
+        .input('UnitName', sql.NVarChar, unit.name)
+        .query(`
+          SELECT COUNT(*) AS cnt
+          FROM ComplaintRegister
+          WHERE YEAR(Date) = @TargetYear
+            AND MONTH(Date) = @TargetMonth
+            AND ${fieldName} = @UnitName
+            AND ComplaintCategory = N'内诉'
+        `);
 
       // 客诉
-      const outerRes = await pool.request().query(`
-        SELECT COUNT(*) AS cnt
-        FROM ComplaintRegister
-        WHERE YEAR(Date) = YEAR(GETDATE())
-          AND MONTH(Date) = MONTH(GETDATE())
-          AND ${fieldName} = N'${unit.name}'
-          AND ComplaintCategory = N'客诉'
-      `);
+      const outerRes = await pool.request()
+        .input('TargetYear', sql.Int, targetYear)
+        .input('TargetMonth', sql.Int, targetMonth)
+        .input('UnitName', sql.NVarChar, unit.name)
+        .query(`
+          SELECT COUNT(*) AS cnt
+          FROM ComplaintRegister
+          WHERE YEAR(Date) = @TargetYear
+            AND MONTH(Date) = @TargetMonth
+            AND ${fieldName} = @UnitName
+            AND ComplaintCategory = N'客诉'
+        `);
 
       unitStats.push({
         unit: unit.name,
@@ -409,6 +473,7 @@ router.get('/month-stats', async (req, res) => {
       todayCount,
       monthCount,
       units: unitStats,
+      targetMonth: `${targetYear}-${targetMonth.toString().padStart(2, '0')}`, // 返回目标月份
       config: {
         displayUnits: enabledUnits
       }
@@ -501,5 +566,177 @@ router.post('/truncate-table', async (req, res) => {
     });
   }
 });
+
+// 获取所有下拉选项
+router.get('/options', async (req, res) => {
+  console.log('=== 开始获取下拉选项 ===');
+  try {
+    const pool = await sql.connect(await getDynamicConfig());
+    console.log('数据库连接成功');
+
+    // 获取车间选项
+    console.log('正在获取车间选项...');
+    const workshopResult = await pool.request()
+      .query('SELECT Name FROM Workshop ORDER BY Name');
+    console.log('车间选项结果:', workshopResult.recordset);
+
+    // 获取投诉类别选项 - 从ComplaintRegister表中获取不重复的值
+    console.log('正在获取投诉类别选项...');
+    const complaintCategoryResult = await pool.request()
+      .query('SELECT DISTINCT ComplaintCategory as Name FROM ComplaintRegister WHERE ComplaintCategory IS NOT NULL AND ComplaintCategory != \'\' ORDER BY ComplaintCategory');
+    console.log('投诉类别选项结果:', complaintCategoryResult.recordset);
+
+    // 获取客诉类型选项 - 从CustomerComplaintType表获取
+    console.log('正在获取客诉类型选项...');
+    const customerComplaintTypeResult = await pool.request()
+      .query('SELECT Name FROM CustomerComplaintType ORDER BY Name');
+    console.log('客诉类型选项结果:', customerComplaintTypeResult.recordset);
+
+    // 获取不良类别选项 - 从DefectiveCategory表获取（包含ID）
+    console.log('正在获取不良类别选项...');
+    const defectiveCategoryResult = await pool.request()
+      .query('SELECT ID, Name FROM DefectiveCategory ORDER BY Name');
+    console.log('不良类别选项结果:', defectiveCategoryResult.recordset);
+
+    // 获取部门选项 - 从Department表获取
+    console.log('正在获取部门选项...');
+    const departmentResult = await pool.request()
+      .query('SELECT Name FROM Department ORDER BY Name');
+    console.log('部门选项结果:', departmentResult.recordset);
+
+    // 获取人员选项 - 从Person表获取
+    console.log('正在获取人员选项...');
+    const personResult = await pool.request()
+      .query('SELECT Name FROM Person ORDER BY Name');
+    console.log('人员选项结果:', personResult.recordset);
+
+    const result = {
+      workshops: workshopResult.recordset || [],
+      complaintCategories: complaintCategoryResult.recordset || [],
+      customerComplaintTypes: customerComplaintTypeResult.recordset || [],
+      defectiveCategories: defectiveCategoryResult.recordset || [],
+      departments: departmentResult.recordset || [],
+      persons: personResult.recordset || []
+    };
+
+    console.log('=== 最终返回结果 ===:', {
+      workshops: result.workshops.length,
+      complaintCategories: result.complaintCategories.length,
+      customerComplaintTypes: result.customerComplaintTypes.length,
+      defectiveCategories: result.defectiveCategories.length,
+      departments: result.departments.length,
+      persons: result.persons.length
+    });
+    console.log('完整结果数据:', JSON.stringify(result, null, 2));
+
+    res.json(result);
+  } catch (error) {
+    console.error('=== 获取下拉选项失败 ===:', error);
+    res.status(500).json({ error: '获取下拉选项失败', details: error.message });
+  }
+});
+
+// ===================== 获取表字段信息 =====================
+// GET /api/complaint/fields
+// 返回: { success, data: [{ key, label, type, required }] }
+router.get('/fields', async (req, res) => {
+  try {
+    // 定义字段映射，包含中文标签和属性
+    const fieldMapping = {
+      'ID': { label: 'ID', type: 'number', required: false, exportable: false },
+      'Date': { label: '日期', type: 'date', required: true, exportable: true },
+      'Customer': { label: '客户编号', type: 'string', required: true, exportable: true },
+      'OrderNo': { label: '工单号', type: 'string', required: true, exportable: true },
+      'ProductName': { label: '产品名称', type: 'string', required: true, exportable: true },
+      'Specification': { label: '规格', type: 'string', required: false, exportable: true },
+      'Workshop': { label: '车间', type: 'string', required: false, exportable: true },
+      'ProductionQty': { label: '生产数量', type: 'number', required: true, exportable: true },
+      'DefectiveQty': { label: '不良数量', type: 'number', required: false, exportable: true },
+      'DefectiveRate': { label: '不良率(%)', type: 'decimal', required: false, exportable: true },
+      'ComplaintCategory': { label: '投诉类别', type: 'string', required: false, exportable: true },
+      'CustomerComplaintType': { label: '客诉类型', type: 'string', required: false, exportable: true },
+      'DefectiveCategory': { label: '不良类别', type: 'string', required: false, exportable: true },
+      'DefectiveItem': { label: '不良项', type: 'string', required: false, exportable: true },
+      'DefectiveDescription': { label: '不良描述', type: 'string', required: false, exportable: true },
+      'AttachmentFile': { label: '附件文件', type: 'string', required: false, exportable: true },
+      'DefectiveReason': { label: '不良原因', type: 'string', required: false, exportable: true },
+      'Disposition': { label: '处置措施', type: 'string', required: false, exportable: true },
+      'ReturnGoods': { label: '退货', type: 'boolean', required: false, exportable: true },
+      'IsReprint': { label: '补印', type: 'boolean', required: false, exportable: true },
+      'ReprintQty': { label: '补印数量', type: 'number', required: false, exportable: true },
+      'Paper': { label: '纸张', type: 'string', required: false, exportable: true },
+      'PaperSpecification': { label: '纸张规格', type: 'string', required: false, exportable: true },
+      'PaperQty': { label: '纸张数量', type: 'number', required: false, exportable: true },
+      'PaperUnitPrice': { label: '纸张单价', type: 'decimal', required: false, exportable: true },
+      'MaterialA': { label: '材料A', type: 'string', required: false, exportable: true },
+      'MaterialASpec': { label: '材料A规格', type: 'string', required: false, exportable: true },
+      'MaterialAQty': { label: '材料A数量', type: 'number', required: false, exportable: true },
+      'MaterialAUnitPrice': { label: '材料A单价', type: 'decimal', required: false, exportable: true },
+      'MaterialB': { label: '材料B', type: 'string', required: false, exportable: true },
+      'MaterialBSpec': { label: '材料B规格', type: 'string', required: false, exportable: true },
+      'MaterialBQty': { label: '材料B数量', type: 'number', required: false, exportable: true },
+      'MaterialBUnitPrice': { label: '材料B单价', type: 'decimal', required: false, exportable: true },
+      'MaterialC': { label: '材料C', type: 'string', required: false, exportable: true },
+      'MaterialCSpec': { label: '材料C规格', type: 'string', required: false, exportable: true },
+      'MaterialCQty': { label: '材料C数量', type: 'number', required: false, exportable: true },
+      'MaterialCUnitPrice': { label: '材料C单价', type: 'decimal', required: false, exportable: true },
+      'LaborCost': { label: '人工成本', type: 'decimal', required: false, exportable: true },
+      'TotalCost': { label: '总成本', type: 'decimal', required: false, exportable: true },
+      'MainDept': { label: '主责部门', type: 'string', required: false, exportable: true },
+      'MainPerson': { label: '主责人', type: 'string', required: false, exportable: true },
+      'MainPersonAssessment': { label: '主责人考核', type: 'decimal', required: false, exportable: true },
+      'SecondPerson': { label: '次责人', type: 'string', required: false, exportable: true },
+      'SecondPersonAssessment': { label: '次责人考核', type: 'decimal', required: false, exportable: true },
+      'Manager': { label: '经理', type: 'string', required: false, exportable: true },
+      'ManagerAssessment': { label: '经理考核', type: 'decimal', required: false, exportable: true },
+      'AssessmentDescription': { label: '考核说明', type: 'string', required: false, exportable: true }
+    };
+
+    // 转换为前端需要的格式
+    const fields = Object.keys(fieldMapping)
+      .filter(key => fieldMapping[key].exportable)
+      .map(key => ({
+        key,
+        label: fieldMapping[key].label,
+        type: fieldMapping[key].type,
+        required: fieldMapping[key].required,
+        // 设置默认选中状态
+        checked: getDefaultCheckedStatus(key)
+      }));
+
+    // 添加序号字段（前端特有）
+    fields.unshift({
+      key: 'index',
+      label: '序号',
+      type: 'number',
+      required: true,
+      checked: true
+    });
+
+    res.json({
+      success: true,
+      data: fields
+    });
+  } catch (error) {
+    console.error('获取字段信息失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取字段信息失败: ' + error.message
+    });
+  }
+});
+
+// 获取字段默认选中状态的辅助函数
+function getDefaultCheckedStatus(key) {
+  // 默认选中的核心字段
+  const defaultSelectedFields = [
+    'Date', 'Customer', 'OrderNo', 'ProductName', 'Specification', 'Workshop',
+    'ProductionQty', 'DefectiveQty', 'DefectiveRate', 'ComplaintCategory',
+    'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem',
+    'ReturnGoods', 'IsReprint', 'MainDept', 'MainPerson'
+  ];
+
+  return defaultSelectedFields.includes(key);
+}
 
 module.exports = router;

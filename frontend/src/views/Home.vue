@@ -35,8 +35,8 @@
           </div>
         </div>
         <!-- 右侧用户区 -->
-        <div class="header-right">
-          <el-button type="primary" size="small" class="admin-btn" @click="goAdmin">登录后台</el-button>
+        <div class="header-right">  
+          <el-button type="primary" text class="admin-btn" @click="goAdmin">登录后台</el-button>
           <el-avatar :size="32" :src="user.Avatar" class="avatar-icon" @click="goProfile">
             <template v-if="!user.Avatar">
               <el-icon><User /></el-icon>
@@ -59,42 +59,77 @@
 
     <!-- 内容区 -->
     <div class="home-main">
+        <!-- 统计控制区 -->
+        <div class="stats-control">
+          <div class="stats-control-left">
+            <el-date-picker
+              v-model="selectedMonth"
+              type="month"
+              placeholder="选择月份"
+              format="YYYY年MM月"
+              value-format="YYYY-MM"
+              size="default"
+              @change="handleMonthChange"
+              :clearable="false"
+              style="width: 160px;"
+            />
+          </div>
+          <div class="stats-control-right">
+            <el-switch
+              v-model="showTodayStats"
+              :active-text="isCurrentMonth ? '显示今日统计' : '仅当前月份可用'"
+              :inactive-text="isCurrentMonth ? '隐藏今日统计' : '仅当前月份可用'"
+              @change="handleTodayStatsToggle"
+              :disabled="!isCurrentMonth"
+            />
+          </div>
+        </div>
+
         <!-- 上部统计卡片区 -->
       <div class="stat-row-flex">
-        <!-- 今日投诉卡片 -->
-        <div v-if="showTodayCount" class="stat-card card-today">
-          <div class="stat-title">今日投诉</div>
-          <div class="stat-value"><b>{{ todayCount }}</b></div>
+        <!-- 加载状态 -->
+        <div v-if="statsLoading" class="stat-card loading-card">
+          <div class="stat-title">加载中...</div>
+          <div class="stat-value"><el-icon class="is-loading"><Loading /></el-icon></div>
         </div>
 
-        <!-- 本月总投诉卡片 -->
-        <div v-if="showMonthCount" class="stat-card card-month">
-          <div class="stat-title">本月总投诉</div>
-          <div class="stat-value"><b>{{ monthCount }}</b></div>
-        </div>
+        <!-- 统计卡片（数据加载完成后显示） -->
+        <template v-else>
+          <!-- 今日投诉卡片 -->
+          <div v-if="shouldShowTodayCard" class="stat-card card-today">
+            <div class="stat-title">今日投诉</div>
+            <div class="stat-value"><b>{{ todayCount }}</b></div>
+          </div>
 
-        <!-- 各单位统计卡片 -->
-        <div
-          v-for="(item, idx) in statUnits"
-          :key="item.unit + idx"
-          :class="['stat-card', 'unit-card', getUnitCardClass(item.type, idx)]"
-        >
-          <div class="stat-title">
-            {{ item.unit }}
-            <el-tag
-              size="small"
-              :type="item.type === 'workshop' ? 'primary' : 'success'"
-              style="margin-left: 4px; font-size: 10px;"
-            >
-              {{ item.type === 'workshop' ? '车间' : '部门' }}
-            </el-tag>
+          <!-- 选定月份总投诉卡片 -->
+          <div v-if="showMonthCount" class="stat-card card-month">
+            <div class="stat-title">{{ selectedMonthText }}总投诉</div>
+            <div class="stat-value"><b>{{ monthCount }}</b></div>
           </div>
-          <div class="stat-value" style="display: flex; justify-content: center; align-items: center; gap: 8px;">
-            <span>内诉: <b>{{ item.inner }}</b></span>
-            <span>|</span>
-            <span>客诉: <b>{{ item.outer }}</b></span>
+
+          <!-- 各单位统计卡片 -->
+          <div
+            v-for="(item, idx) in statUnits"
+            :key="item.unit + idx"
+            :class="['stat-card', 'unit-card', getUnitCardClass(item.type, idx)]"
+          >
+            <div class="stat-title">
+              {{ item.unit }}
+              <el-tag
+                size="small"
+                :type="item.type === 'workshop' ? 'primary' : 'success'"
+                style="margin-left: 4px; font-size: 10px;"
+              >
+                {{ item.type === 'workshop' ? '车间' : '部门' }}
+              </el-tag>
+            </div>
+            <div class="stat-value" style="display: flex; justify-content: center; align-items: center; gap: 8px;">
+              <span>内诉: <b>{{ item.inner }}</b></span>
+              <span>|</span>
+              <span>客诉: <b>{{ item.outer }}</b></span>
+            </div>
           </div>
-        </div>
+        </template>
       </div>
 
       <!-- 中部左右结构 -->
@@ -124,6 +159,10 @@
                   <el-button type="primary" @click="router.push('/add')" style="margin-left: 12px;">
                     <el-icon><Plus /></el-icon>
                     新增投诉
+                  </el-button>
+                  <el-button type="success" @click="showExportDialog = true" style="margin-left: 8px;">
+                    <el-icon><ArrowDown /></el-icon>
+                    导出Excel
                   </el-button>
                 </div>
               </div>
@@ -252,12 +291,24 @@
                 />
               </el-form-item>
 
+              <!-- 产品名称查询 -->
+              <el-form-item label="产品名称">
+                <el-input
+                  v-model="advancedQuery.productName"
+                  placeholder="输入产品名称"
+                  clearable
+                />
+              </el-form-item>
+
               <!-- 车间查询 -->
               <el-form-item label="车间">
                 <el-select
                   v-model="advancedQuery.workshop"
-                  placeholder="选择车间"
+                  placeholder="选择或输入车间"
                   clearable
+                  filterable
+                  allow-create
+                  default-first-option
                   style="width: 100%"
                 >
                   <el-option label="全部" value="" />
@@ -271,16 +322,107 @@
               </el-form-item>
 
               <!-- 投诉类别 -->
-              <el-form-item label="类别">
+              <el-form-item label="投诉类别">
                 <el-select
                   v-model="advancedQuery.complaintCategory"
-                  placeholder="选择类别"
+                  placeholder="选择或输入投诉类别"
                   clearable
+                  filterable
+                  allow-create
+                  default-first-option
                   style="width: 100%"
                 >
                   <el-option label="全部" value="" />
-                  <el-option label="内诉" value="内诉" />
-                  <el-option label="客诉" value="客诉" />
+                  <el-option
+                    v-for="category in complaintCategoryOptions"
+                    :key="category"
+                    :label="category"
+                    :value="category"
+                  />
+                </el-select>
+              </el-form-item>
+
+              <!-- 客诉类型 -->
+              <el-form-item label="客诉类型">
+                <el-select
+                  v-model="advancedQuery.customerComplaintType"
+                  placeholder="选择或输入客诉类型"
+                  clearable
+                  filterable
+                  allow-create
+                  default-first-option
+                  style="width: 100%"
+                >
+                  <el-option label="全部" value="" />
+                  <el-option
+                    v-for="type in customerComplaintTypeOptions"
+                    :key="type"
+                    :label="type"
+                    :value="type"
+                  />
+                </el-select>
+              </el-form-item>
+
+              <!-- 不良类别 -->
+              <el-form-item label="不良类别">
+                <el-select
+                  v-model="advancedQuery.defectiveCategory"
+                  placeholder="选择或输入不良类别"
+                  clearable
+                  filterable
+                  allow-create
+                  default-first-option
+                  style="width: 100%"
+                >
+                  <el-option label="全部" value="" />
+                  <el-option
+                    v-for="category in defectiveCategoryOptions"
+                    :key="category"
+                    :label="category"
+                    :value="category"
+                  />
+                </el-select>
+              </el-form-item>
+
+              <!-- 主责部门 -->
+              <el-form-item label="主责部门">
+                <el-select
+                  v-model="advancedQuery.mainDept"
+                  placeholder="选择或输入主责部门"
+                  clearable
+                  filterable
+                  allow-create
+                  default-first-option
+                  style="width: 100%"
+                >
+                  <el-option label="全部" value="" />
+                  <el-option
+                    v-for="dept in departmentOptions"
+                    :key="dept"
+                    :label="dept"
+                    :value="dept"
+                  />
+                </el-select>
+              </el-form-item>
+
+              <!-- 主责人 -->
+              <el-form-item label="主责人">
+                <el-select
+                  v-model="advancedQuery.mainPerson"
+                  placeholder="选择或输入主责人"
+                  clearable
+                  filterable
+                  allow-create
+                  default-first-option
+                  style="width: 100%"
+                >
+                  <el-option label="全部" value="" />
+                  <el-option
+                    v-for="person in personOptions"
+                    :key="person"
+                    :label="person"
+                    :value="person"
+                  />
                 </el-select>
               </el-form-item>
 
@@ -325,6 +467,34 @@
                 </div>
               </el-form-item>
 
+              <!-- 退货状态 -->
+              <el-form-item label="退货状态">
+                <el-select
+                  v-model="advancedQuery.returnGoods"
+                  placeholder="选择退货状态"
+                  clearable
+                  style="width: 100%"
+                >
+                  <el-option label="全部" value="" />
+                  <el-option label="已退货" value="1" />
+                  <el-option label="未退货" value="0" />
+                </el-select>
+              </el-form-item>
+
+              <!-- 补印状态 -->
+              <el-form-item label="补印状态">
+                <el-select
+                  v-model="advancedQuery.isReprint"
+                  placeholder="选择补印状态"
+                  clearable
+                  style="width: 100%"
+                >
+                  <el-option label="全部" value="" />
+                  <el-option label="已补印" value="1" />
+                  <el-option label="未补印" value="0" />
+                </el-select>
+              </el-form-item>
+
               <!-- 操作按钮 -->
               <el-form-item>
                 <div class="query-actions">
@@ -361,182 +531,258 @@
     <el-dialog
       v-model="showDetailDialog"
       title="投诉记录详情"
-      width="85%"
+      width="90%"
       :close-on-click-modal="false"
       :modal="true"
-      :lock-scroll="true"
+      :append-to-body="true"
+      :lock-scroll="false"
       class="detail-dialog"
-      top="5vh"
+      center
+      top="10vh"
+      :style="{ height: '80vh' }"
     >
       <div v-if="detailData" class="detail-content">
         <!-- 基本信息 -->
-        <el-card class="detail-card" shadow="never">
-          <template #header>
-            <div class="detail-card-header">
-              <el-icon><InfoFilled /></el-icon>
-              <span>基本信息</span>
+        <div class="detail-section">
+          <div class="section-header">
+            <el-icon class="section-icon"><InfoFilled /></el-icon>
+            <span class="section-title">基本信息</span>
+          </div>
+          <div class="section-content">
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">记录ID</span>
+                <span class="info-value">{{ detailData.ID }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">投诉日期</span>
+                <span class="info-value">{{ formatDate(detailData.Date) }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">客户编号</span>
+                <span class="info-value">{{ detailData.Customer }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">工单号</span>
+                <span class="info-value">{{ detailData.OrderNo }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">产品名称</span>
+                <span class="info-value">{{ detailData.ProductName }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">规格</span>
+                <span class="info-value">{{ detailData.Specification || '-' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">车间</span>
+                <span class="info-value">{{ detailData.Workshop }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">生产数量</span>
+                <span class="info-value highlight-number">{{ detailData.ProductionQty }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">不良数量</span>
+                <span class="info-value highlight-error">{{ detailData.DefectiveQty }}</span>
+              </div>
             </div>
-          </template>
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>记录ID：</label>
-                <span>{{ detailData.ID }}</span>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>投诉日期：</label>
-                <span>{{ formatDate(detailData.Date) }}</span>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>客户编号：</label>
-                <span>{{ detailData.Customer }}</span>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>工单号：</label>
-                <span>{{ detailData.OrderNo }}</span>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>产品名称：</label>
-                <span>{{ detailData.ProductName }}</span>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>规格：</label>
-                <span>{{ detailData.Specification || '-' }}</span>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>车间：</label>
-                <span>{{ detailData.Workshop }}</span>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>生产数量：</label>
-                <span>{{ detailData.ProductionQty }}</span>
-              </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>不良数量：</label>
-                <span>{{ detailData.DefectiveQty }}</span>
-              </div>
-            </el-col>
-          </el-row>
-        </el-card>
+          </div>
+        </div>
 
         <!-- 投诉信息 -->
-        <el-card class="detail-card" shadow="never">
-          <template #header>
-            <div class="detail-card-header">
-              <el-icon><WarningFilled /></el-icon>
-              <span>投诉信息</span>
+        <div class="detail-section">
+          <div class="section-header">
+            <el-icon class="section-icon warning"><WarningFilled /></el-icon>
+            <span class="section-title">投诉信息</span>
+          </div>
+          <div class="section-content">
+            <div class="info-grid">
+              <div class="info-item">
+                <span class="info-label">投诉类别</span>
+                <el-tag type="warning" size="small">{{ detailData.ComplaintCategory }}</el-tag>
+              </div>
+              <div class="info-item">
+                <span class="info-label">客户投诉类型</span>
+                <span class="info-value">{{ detailData.CustomerComplaintType || '-' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">不良率</span>
+                <span class="info-value highlight-error">{{ detailData.DefectiveRate }}%</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">不良类别</span>
+                <span class="info-value">{{ detailData.DefectiveCategory || '-' }}</span>
+              </div>
+              <div class="info-item">
+                <span class="info-label">不良项目</span>
+                <el-tag type="danger" size="small">{{ detailData.DefectiveItem }}</el-tag>
+              </div>
             </div>
-          </template>
-          <el-row :gutter="20">
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>投诉类别：</label>
-                <span>{{ detailData.ComplaintCategory }}</span>
+
+            <div class="text-fields">
+              <div class="text-field">
+                <div class="text-label">
+                  <el-icon><Document /></el-icon>
+                  <span>不良描述</span>
+                </div>
+                <div class="text-content">{{ detailData.DefectiveDescription }}</div>
               </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>客户投诉类型：</label>
-                <span>{{ detailData.CustomerComplaintType || '-' }}</span>
+
+              <div class="text-field" v-if="detailData.DefectiveReason">
+                <div class="text-label">
+                  <el-icon><QuestionFilled /></el-icon>
+                  <span>不良原因</span>
+                </div>
+                <div class="text-content">{{ detailData.DefectiveReason }}</div>
               </div>
-            </el-col>
-            <el-col :span="8">
-              <div class="detail-item">
-                <label>不良率：</label>
-                <span>{{ detailData.DefectiveRate }}%</span>
+
+              <div class="text-field">
+                <div class="text-label">
+                  <el-icon><Tools /></el-icon>
+                  <span>处置措施</span>
+                </div>
+                <div class="text-content">{{ detailData.Disposition }}</div>
               </div>
-            </el-col>
-            <el-col :span="12">
-              <div class="detail-item">
-                <label>不良类别：</label>
-                <span>{{ detailData.DefectiveCategory || '-' }}</span>
-              </div>
-            </el-col>
-            <el-col :span="12">
-              <div class="detail-item">
-                <label>不良项目：</label>
-                <span>{{ detailData.DefectiveItem }}</span>
-              </div>
-            </el-col>
-            <el-col :span="24">
-              <div class="detail-item">
-                <label>不良描述：</label>
-                <div class="detail-text">{{ detailData.DefectiveDescription }}</div>
-              </div>
-            </el-col>
-            <el-col :span="24">
-              <div class="detail-item">
-                <label>不良原因：</label>
-                <div class="detail-text">{{ detailData.DefectiveReason || '-' }}</div>
-              </div>
-            </el-col>
-            <el-col :span="24">
-              <div class="detail-item">
-                <label>处置措施：</label>
-                <div class="detail-text">{{ detailData.Disposition }}</div>
-              </div>
-            </el-col>
-          </el-row>
-        </el-card>
+            </div>
+          </div>
+        </div>
 
         <!-- 责任信息 -->
-        <el-card class="detail-card" shadow="never">
-          <template #header>
-            <div class="detail-card-header">
-              <el-icon><UserFilled /></el-icon>
-              <span>责任信息</span>
+        <div class="detail-section">
+          <div class="section-header">
+            <el-icon class="section-icon success"><UserFilled /></el-icon>
+            <span class="section-title">责任信息</span>
+          </div>
+          <div class="section-content">
+            <div class="responsibility-info">
+              <div class="resp-item">
+                <div class="resp-label">
+                  <el-icon><OfficeBuilding /></el-icon>
+                  <span>主责部门</span>
+                </div>
+                <el-tag type="primary" size="default">{{ detailData.MainDept }}</el-tag>
+              </div>
+              <div class="resp-item">
+                <div class="resp-label">
+                  <el-icon><User /></el-icon>
+                  <span>主责人</span>
+                </div>
+                <el-tag type="success" size="default">{{ detailData.MainPerson }}</el-tag>
+              </div>
             </div>
-          </template>
-          <el-row :gutter="20">
-            <el-col :span="12">
-              <div class="detail-item">
-                <label>主责部门：</label>
-                <span>{{ detailData.MainDept }}</span>
-              </div>
-            </el-col>
-            <el-col :span="12">
-              <div class="detail-item">
-                <label>主责人：</label>
-                <span>{{ detailData.MainPerson }}</span>
-              </div>
-            </el-col>
-          </el-row>
-        </el-card>
+          </div>
+        </div>
 
         <!-- 附件信息 -->
-        <el-card v-if="detailData.AttachmentFile" class="detail-card" shadow="never">
-          <template #header>
-            <div class="detail-card-header">
-              <el-icon><Paperclip /></el-icon>
-              <span>附件信息</span>
-            </div>
-          </template>
-          <div class="detail-item">
-            <label>附件文件：</label>
-            <span>{{ detailData.AttachmentFile }}</span>
+        <div v-if="detailData.AttachmentFile" class="detail-section">
+          <div class="section-header">
+            <el-icon class="section-icon info"><Paperclip /></el-icon>
+            <span class="section-title">附件信息</span>
           </div>
-        </el-card>
+          <div class="section-content">
+            <div class="attachment-info">
+              <el-icon class="file-icon"><Document /></el-icon>
+              <span class="file-name">{{ detailData.AttachmentFile }}</span>
+              <el-button type="primary" size="small" link>
+                <el-icon><Download /></el-icon>
+                下载
+              </el-button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="showDetailDialog = false">关闭</el-button>
+          <el-button type="primary" @click="showDetailDialog = false">
+            <el-icon><Close /></el-icon>
+            关闭
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
+    <!-- Excel导出字段选择对话框 -->
+    <el-dialog
+      v-model="showExportDialog"
+      title="选择导出字段"
+      width="600px"
+      :close-on-click-modal="false"
+      :modal="true"
+      :append-to-body="true"
+      :lock-scroll="false"
+    >
+      <div class="export-field-selection">
+        <div class="field-selection-header">
+          <el-button
+            size="small"
+            @click="selectAllFields"
+            :type="activeSelectionButton === 'all' ? 'primary' : ''"
+            :class="{ 'active-selection-btn': activeSelectionButton === 'all' }"
+          >
+            全选
+          </el-button>
+          <el-button
+            size="small"
+            @click="selectNoneFields"
+            :type="activeSelectionButton === 'none' ? 'primary' : ''"
+            :class="{ 'active-selection-btn': activeSelectionButton === 'none' }"
+          >
+            全不选
+          </el-button>
+          <el-button
+            size="small"
+            @click="selectDefaultFields"
+            :type="activeSelectionButton === 'default' ? 'primary' : ''"
+            :class="{ 'active-selection-btn': activeSelectionButton === 'default' }"
+          >
+            默认选择
+          </el-button>
+        </div>
+
+        <div class="field-selection-content">
+          <el-row :gutter="20">
+            <el-col :span="12" v-for="field in exportFields" :key="field.key">
+              <el-checkbox
+                v-model="field.checked"
+                :disabled="field.required"
+                class="field-checkbox"
+              >
+                {{ field.label }}
+                <span v-if="field.required" class="required-mark">(必选)</span>
+              </el-checkbox>
+            </el-col>
+          </el-row>
+        </div>
+
+        <div class="field-selection-info">
+          <el-alert
+            title="提示"
+            type="info"
+            :closable="false"
+            show-icon
+          >
+            <template #default>
+              已选择 <strong>{{ selectedFieldsCount }}</strong> 个字段进行导出。
+              序号字段为必选项，无法取消。
+            </template>
+          </el-alert>
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="showExportDialog = false">取消</el-button>
+          <el-button
+            type="primary"
+            @click="confirmExport"
+            :loading="exportLoading"
+            :disabled="selectedFieldsCount === 0"
+          >
+            <el-icon><ArrowDown /></el-icon>
+            确认导出
+          </el-button>
         </div>
       </template>
     </el-dialog>
@@ -545,15 +791,16 @@
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
-import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip } from '@element-plus/icons-vue'
+import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
-import { ElPagination } from 'element-plus'
-import { ElMessage } from 'element-plus'
+import { ElPagination, ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
 import { useSiteConfig } from '../composables/useSiteConfig'
+import * as XLSX from 'xlsx-js-style'
+import { saveAs } from 'file-saver'
 
 const router = useRouter()
 const activeMenu = ref('home')
@@ -563,7 +810,7 @@ const { siteConfig, loadSiteConfig } = useSiteConfig()
 const tableData = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(5)
 const pageSizes = ref([5, 10, 20, 50, 100])
 const gotoPage = ref(1)
 const pageCount = computed(() => Math.ceil(total.value / pageSize.value))
@@ -579,22 +826,137 @@ const detailLoading = ref(false)
 const advancedQuery = ref({
   customer: '',
   orderNo: '',
+  productName: '',
   workshop: '',
   complaintCategory: '',
+  customerComplaintType: '',
+  defectiveCategory: '',
+  mainDept: '',
+  mainPerson: '',
   dateRange: null,
   defectiveRateMin: null,
-  defectiveRateMax: null
+  defectiveRateMax: null,
+  returnGoods: '',
+  isReprint: ''
 })
 
-// 车间选项数据
+// 下拉选项数据
 const workshopOptions = ref([])
+const complaintCategoryOptions = ref([])
+const customerComplaintTypeOptions = ref([])
+const defectiveCategoryOptions = ref([])
+const departmentOptions = ref([])
+const personOptions = ref([])
 
 // 是否使用高级查询
 const isAdvancedQuery = ref(false)
 const todayCount = ref(0)
 const monthCount = ref(0)
-const showTodayCount = ref(true)
-const showMonthCount = ref(true)
+const showTodayCount = ref(false) // 初始为false，等待数据加载
+const showMonthCount = ref(false) // 初始为false，等待数据加载
+
+// 月份选择和今日统计控制
+const selectedMonth = ref(new Date().toISOString().slice(0, 7)) // 默认当前月份 YYYY-MM
+const showTodayStats = ref(true) // 今日统计开关
+
+// 添加统计数据加载状态
+const statsLoading = ref(true)
+
+// 计算属性：选定月份的显示文本
+const selectedMonthText = computed(() => {
+  if (!selectedMonth.value) return '本月'
+  const [year, month] = selectedMonth.value.split('-')
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+
+  if (parseInt(year) === currentYear && parseInt(month) === currentMonth) {
+    return '本月'
+  }
+  return `${year}年${month}月`
+})
+
+// 计算属性：是否为当前月份
+const isCurrentMonth = computed(() => {
+  if (!selectedMonth.value) return true
+  const [year, month] = selectedMonth.value.split('-')
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+
+  return parseInt(year) === currentYear && parseInt(month) === currentMonth
+})
+
+// 计算属性：是否显示今日投诉卡片（只有当前月份且开关开启时才显示）
+const shouldShowTodayCard = computed(() => {
+  return showTodayCount.value && showTodayStats.value && isCurrentMonth.value
+})
+
+// 导出功能
+const exportLoading = ref(false)
+const showExportDialog = ref(false)
+const activeSelectionButton = ref('')
+
+// 可导出的字段定义（动态从后端获取）
+const exportFields = ref([])
+
+// 获取字段信息
+const fetchExportFields = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.get('/api/complaint/fields', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (res.data.success) {
+      exportFields.value = res.data.data
+      console.log('获取到字段信息:', exportFields.value.length, '个字段')
+    } else {
+      ElMessage.error('获取字段信息失败')
+    }
+  } catch (error) {
+    console.error('获取字段信息失败:', error)
+    ElMessage.error('获取字段信息失败: ' + (error.response?.data?.message || error.message))
+  }
+}
+
+// 计算属性：已选择的字段数量
+const selectedFieldsCount = computed(() => {
+  return exportFields.value.filter(field => field.checked).length
+})
+
+// 字段选择方法
+const selectAllFields = () => {
+  exportFields.value.forEach(field => {
+    field.checked = true
+  })
+  activeSelectionButton.value = 'all'
+  // 2秒后清除高亮
+  setTimeout(() => {
+    activeSelectionButton.value = ''
+  }, 2000)
+}
+
+const selectNoneFields = () => {
+  exportFields.value.forEach(field => {
+    if (!field.required) {
+      field.checked = false
+    }
+  })
+  activeSelectionButton.value = 'none'
+  // 2秒后清除高亮
+  setTimeout(() => {
+    activeSelectionButton.value = ''
+  }, 2000)
+}
+
+const selectDefaultFields = async () => {
+  // 重新获取字段信息以恢复默认状态
+  await fetchExportFields()
+  activeSelectionButton.value = 'default'
+  // 2秒后清除高亮
+  setTimeout(() => {
+    activeSelectionButton.value = ''
+  }, 2000)
+}
 const statUnits = ref([])
 
 const chartFilter = ref({
@@ -670,14 +1032,21 @@ const fetchTableData = async () => {
       // 高级查询参数
       if (advancedQuery.value.customer) params.customer = advancedQuery.value.customer
       if (advancedQuery.value.orderNo) params.orderNo = advancedQuery.value.orderNo
+      if (advancedQuery.value.productName) params.productName = advancedQuery.value.productName
       if (advancedQuery.value.workshop) params.workshop = advancedQuery.value.workshop
       if (advancedQuery.value.complaintCategory) params.complaintCategory = advancedQuery.value.complaintCategory
+      if (advancedQuery.value.customerComplaintType) params.customerComplaintType = advancedQuery.value.customerComplaintType
+      if (advancedQuery.value.defectiveCategory) params.defectiveCategory = advancedQuery.value.defectiveCategory
+      if (advancedQuery.value.mainDept) params.mainDept = advancedQuery.value.mainDept
+      if (advancedQuery.value.mainPerson) params.mainPerson = advancedQuery.value.mainPerson
       if (advancedQuery.value.dateRange && advancedQuery.value.dateRange.length === 2) {
         params.startDate = advancedQuery.value.dateRange[0]
         params.endDate = advancedQuery.value.dateRange[1]
       }
       if (advancedQuery.value.defectiveRateMin !== null) params.defectiveRateMin = advancedQuery.value.defectiveRateMin
       if (advancedQuery.value.defectiveRateMax !== null) params.defectiveRateMax = advancedQuery.value.defectiveRateMax
+      if (advancedQuery.value.returnGoods !== '') params.returnGoods = advancedQuery.value.returnGoods
+      if (advancedQuery.value.isReprint !== '') params.isReprint = advancedQuery.value.isReprint
     } else {
       // 简单搜索参数
       if (searchKeyword.value) params.search = searchKeyword.value
@@ -708,8 +1077,44 @@ const fetchTableData = async () => {
   }
 }
 
+// 处理月份变化
+const handleMonthChange = (value) => {
+  console.log('月份变化:', value, '当前selectedMonth:', selectedMonth.value)
+  // 强制更新selectedMonth值
+  selectedMonth.value = value
+
+  // 智能控制今日统计开关：非当前月份时自动关闭，当前月份时自动开启
+  const [year, month] = value.split('-')
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+  const isCurrentMonthSelected = parseInt(year) === currentYear && parseInt(month) === currentMonth
+
+  if (!isCurrentMonthSelected) {
+    // 非当前月份，关闭今日统计显示
+    showTodayStats.value = false
+    console.log('非当前月份，自动关闭今日统计显示')
+  } else {
+    // 当前月份，开启今日统计显示
+    showTodayStats.value = true
+    console.log('当前月份，自动开启今日统计显示')
+  }
+
+  // 确保使用最新的月份值
+  nextTick(() => {
+    console.log('准备获取统计数据，月份:', selectedMonth.value)
+    fetchStats()
+  })
+}
+
+// 处理今日统计开关
+const handleTodayStatsToggle = (value) => {
+  console.log('今日统计开关:', value)
+  // 不需要重新获取数据，只是控制显示
+}
+
 const fetchStats = async () => {
   try {
+    statsLoading.value = true // 开始加载
     const token = localStorage.getItem('token')
     if (!token) {
       console.warn('未找到token，跳转到登录页')
@@ -717,8 +1122,16 @@ const fetchStats = async () => {
       return
     }
 
+    // 添加月份参数
+    const params = {
+      month: selectedMonth.value
+    }
+
+    console.log('发送统计请求，参数:', params)
+
     const res = await axios.get('/api/complaint/month-stats', {
-      headers: { Authorization: `Bearer ${token}` }
+      headers: { Authorization: `Bearer ${token}` },
+      params: params
     })
 
     if (res.data.success) {
@@ -728,11 +1141,14 @@ const fetchStats = async () => {
       todayCount.value = res.data.todayCount || 0
       monthCount.value = res.data.monthCount || 0
       statUnits.value = res.data.units || []
-      // console.log('统计数据获取成功:', {
-      //   todayCount: todayCount.value,
-      //   monthCount: monthCount.value,
-      //   unitsCount: statUnits.value.length
-      // })
+
+      console.log('统计数据获取成功:', {
+        targetMonth: res.data.targetMonth,
+        selectedMonth: selectedMonth.value,
+        todayCount: todayCount.value,
+        monthCount: monthCount.value,
+        unitsCount: statUnits.value.length
+      })
     } else {
       console.error('统计数据获取失败:', res.data.message)
     }
@@ -743,6 +1159,8 @@ const fetchStats = async () => {
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
+  } finally {
+    statsLoading.value = false // 加载完成
   }
 }
 
@@ -852,29 +1270,40 @@ const resetAdvancedQuery = () => {
   advancedQuery.value = {
     customer: '',
     orderNo: '',
+    productName: '',
     workshop: '',
     complaintCategory: '',
+    customerComplaintType: '',
+    defectiveCategory: '',
+    mainDept: '',
+    mainPerson: '',
     dateRange: null,
     defectiveRateMin: null,
-    defectiveRateMax: null
+    defectiveRateMax: null,
+    returnGoods: '',
+    isReprint: ''
   }
   isAdvancedQuery.value = false
   page.value = 1
   fetchTableData()
 }
 
-// 获取车间选项
-const fetchWorkshopOptions = async () => {
+// 获取下拉选项数据
+const fetchOptions = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/api/complaint/workshop-options', {
+    const res = await axios.get('/api/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     })
-    if (res.data.success) {
-      workshopOptions.value = res.data.data
-    }
-  } catch (e) {
-    console.error('获取车间选项失败:', e)
+
+    workshopOptions.value = res.data.workshops.map(item => item.Name)
+    complaintCategoryOptions.value = res.data.complaintCategories.map(item => item.Name)
+    customerComplaintTypeOptions.value = res.data.customerComplaintTypes.map(item => item.Name)
+    defectiveCategoryOptions.value = res.data.defectiveCategories.map(item => item.Name)
+    departmentOptions.value = res.data.departments.map(item => item.Name)
+    personOptions.value = res.data.persons.map(item => item.Name)
+  } catch (error) {
+    console.error('获取下拉选项失败:', error)
   }
 }
 
@@ -966,9 +1395,241 @@ function getChartTitle(type) {
 
 // 监听配置更新事件
 const handleConfigUpdate = (event) => {
-  // console.log('收到配置更新事件:', event.detail)
-  // 重新获取统计数据
-  fetchStats()
+  console.log('收到配置更新事件:', event.detail)
+  // 重新获取统计数据，保持当前选择的月份
+  nextTick(() => {
+    fetchStats()
+  })
+}
+
+// 确认导出方法
+const confirmExport = () => {
+  showExportDialog.value = false
+  exportToExcel()
+}
+
+// Excel导出功能
+const exportToExcel = async () => {
+  exportLoading.value = true
+  try {
+    const token = localStorage.getItem('token')
+
+    // 构建查询参数（不包含分页，获取所有数据）
+    const params = {}
+
+    // 如果使用高级查询，则使用高级查询参数，否则使用简单搜索
+    if (isAdvancedQuery.value) {
+      // 高级查询参数
+      if (advancedQuery.value.customer) params.customer = advancedQuery.value.customer
+      if (advancedQuery.value.orderNo) params.orderNo = advancedQuery.value.orderNo
+      if (advancedQuery.value.productName) params.productName = advancedQuery.value.productName
+      if (advancedQuery.value.workshop) params.workshop = advancedQuery.value.workshop
+      if (advancedQuery.value.complaintCategory) params.complaintCategory = advancedQuery.value.complaintCategory
+      if (advancedQuery.value.customerComplaintType) params.customerComplaintType = advancedQuery.value.customerComplaintType
+      if (advancedQuery.value.defectiveCategory) params.defectiveCategory = advancedQuery.value.defectiveCategory
+      if (advancedQuery.value.mainDept) params.mainDept = advancedQuery.value.mainDept
+      if (advancedQuery.value.mainPerson) params.mainPerson = advancedQuery.value.mainPerson
+      if (advancedQuery.value.dateRange && advancedQuery.value.dateRange.length === 2) {
+        params.startDate = advancedQuery.value.dateRange[0]
+        params.endDate = advancedQuery.value.dateRange[1]
+      }
+      if (advancedQuery.value.defectiveRateMin !== null) params.defectiveRateMin = advancedQuery.value.defectiveRateMin
+      if (advancedQuery.value.defectiveRateMax !== null) params.defectiveRateMax = advancedQuery.value.defectiveRateMax
+      if (advancedQuery.value.returnGoods !== '') params.returnGoods = advancedQuery.value.returnGoods
+      if (advancedQuery.value.isReprint !== '') params.isReprint = advancedQuery.value.isReprint
+    } else {
+      // 简单搜索参数
+      if (searchKeyword.value) params.search = searchKeyword.value
+    }
+
+    // 设置大的页面大小以获取所有数据
+    params.page = 1
+    params.pageSize = 10000
+
+    const res = await axios.get('/api/complaint/list', {
+      params,
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (res.data.success && res.data.data.length > 0) {
+      // 获取选中的字段
+      const selectedFields = exportFields.value.filter(field => field.checked)
+
+      // 准备Excel数据 - 只包含选中的字段
+      const excelData = res.data.data.map((item, index) => {
+        const rowData = {}
+
+        selectedFields.forEach(field => {
+          if (field.key === 'index') {
+            rowData[field.label] = index + 1
+          } else {
+            // 动态处理字段值
+            let value = item[field.key]
+
+            // 根据字段类型进行格式化
+            switch (field.type) {
+              case 'date':
+                value = value ? value.slice(0, 10) : ''
+                break
+              case 'boolean':
+                value = value ? '是' : '否'
+                break
+              case 'number':
+              case 'decimal':
+                value = value || 0
+                break
+              default:
+                value = value || ''
+            }
+
+            rowData[field.label] = value
+          }
+        })
+
+        return rowData
+      })
+
+      // 创建工作簿
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(excelData)
+
+      // 动态设置列宽 - 根据字段类型和内容
+      const getColumnWidth = (field) => {
+        // 根据字段类型和标签长度设置列宽
+        if (field.key === 'index') return { wch: 6 }
+
+        switch (field.type) {
+          case 'date':
+            return { wch: 12 }
+          case 'boolean':
+            return { wch: 8 }
+          case 'number':
+          case 'decimal':
+            return { wch: 10 }
+          case 'string':
+            // 根据字段名称判断内容长度
+            if (field.label.includes('描述') || field.label.includes('原因') || field.label.includes('措施') || field.label.includes('说明')) {
+              return { wch: 25 }
+            } else if (field.label.includes('规格') || field.label.includes('名称')) {
+              return { wch: 20 }
+            } else if (field.label.includes('编号') || field.label.includes('工单')) {
+              return { wch: 15 }
+            } else {
+              return { wch: 12 }
+            }
+          default:
+            return { wch: 15 }
+        }
+      }
+
+      // 根据选中的字段设置列宽
+      const colWidths = selectedFields.map(field => getColumnWidth(field))
+      ws['!cols'] = colWidths
+
+      // 设置行高
+      const rowHeights = []
+      // 标题行高度
+      rowHeights[0] = { hpt: 25 }
+      // 数据行高度
+      for (let i = 1; i <= excelData.length; i++) {
+        rowHeights[i] = { hpt: 20 }
+      }
+      ws['!rows'] = rowHeights
+
+      // 美化表格样式
+      const range = XLSX.utils.decode_range(ws['!ref'])
+
+      // 定义样式
+      const headerStyle = {
+        font: { name: 'Microsoft YaHei', sz: 11, bold: true, color: { rgb: '000000' } },
+        fill: { fgColor: { rgb: 'D9D9D9' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      }
+
+      const dataStyle = {
+        font: { name: 'Microsoft YaHei', sz: 10 },
+        alignment: { horizontal: 'left', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D0D0D0' } },
+          bottom: { style: 'thin', color: { rgb: 'D0D0D0' } },
+          left: { style: 'thin', color: { rgb: 'D0D0D0' } },
+          right: { style: 'thin', color: { rgb: 'D0D0D0' } }
+        }
+      }
+
+      const evenRowStyle = {
+        ...dataStyle,
+        fill: { fgColor: { rgb: 'F8F9FA' } }
+      }
+
+      const oddRowStyle = {
+        ...dataStyle,
+        fill: { fgColor: { rgb: 'FFFFFF' } }
+      }
+
+      // 应用样式
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+          if (!ws[cellAddress]) continue
+
+          if (R === 0) {
+            // 标题行样式
+            ws[cellAddress].s = headerStyle
+          } else {
+            // 数据行样式 - 隔行变色
+            ws[cellAddress].s = R % 2 === 0 ? evenRowStyle : oddRowStyle
+          }
+        }
+      }
+
+      // 添加工作表到工作簿
+      XLSX.utils.book_append_sheet(wb, ws, '投诉记录')
+
+      // 生成文件名 - 格式：投诉记录_YYMMDD+时间戳
+      const now = new Date()
+      const year = now.getFullYear().toString().slice(-2) // 取年份后两位
+      const month = (now.getMonth() + 1).toString().padStart(2, '0')
+      const day = now.getDate().toString().padStart(2, '0')
+      const hours = now.getHours().toString().padStart(2, '0')
+      const minutes = now.getMinutes().toString().padStart(2, '0')
+      const seconds = now.getSeconds().toString().padStart(2, '0')
+
+      const dateStr = `${year}${month}${day}`
+      const timeStamp = `${hours}${minutes}${seconds}`
+      let fileName = `投诉记录_${dateStr}${timeStamp}.xlsx`
+
+      // 如果有查询条件，添加到文件名
+      const selectedFieldsText = `${selectedFieldsCount.value}字段`
+      if (isAdvancedQuery.value) {
+        fileName = `投诉记录_高级查询_${selectedFieldsText}_${dateStr}${timeStamp}.xlsx`
+      } else if (searchKeyword.value) {
+        fileName = `投诉记录_搜索结果_${selectedFieldsText}_${dateStr}${timeStamp}.xlsx`
+      } else {
+        fileName = `投诉记录_${selectedFieldsText}_${dateStr}${timeStamp}.xlsx`
+      }
+
+      // 导出文件
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([wbout], { type: 'application/octet-stream' })
+      saveAs(blob, fileName)
+
+      ElMessage.success(`成功导出 ${res.data.data.length} 条记录`)
+    } else {
+      ElMessage.warning('没有数据可导出')
+    }
+  } catch (error) {
+    console.error('导出Excel失败:', error)
+    ElMessage.error('导出失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    exportLoading.value = false
+  }
 }
 
 onMounted(() => {
@@ -976,7 +1637,8 @@ onMounted(() => {
   fetchTableData()
   fetchChartOptions()
   fetchProfile()
-  fetchWorkshopOptions() // 获取车间选项
+  fetchOptions() // 获取下拉选项
+  fetchExportFields() // 获取导出字段信息
   loadSiteConfig() // 加载网站配置
   nextTick(() => {
     renderCharts()
@@ -1000,42 +1662,34 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
 })
 
-// 滚动处理函数
+// 滚动处理函数（带防抖）
+let scrollTimeout = null
 const handleScroll = () => {
   // 在小屏幕下不执行固定定位
   if (window.innerWidth <= 1200) return
 
-  const queryCard = document.querySelector('.query-card')
-  const tableCard = document.querySelector('.table-card')
-  const statsCards = document.querySelector('.stats-cards')
-
-  if (!queryCard || !tableCard || !statsCards) return
-
-  const statsCardsRect = statsCards.getBoundingClientRect()
-  const tableCardRect = tableCard.getBoundingClientRect()
-  const viewportHeight = window.innerHeight
-  const cardHeight = queryCard.offsetHeight
-  const headerHeight = 120 // 导航栏高度
-
-  // 计算统计卡片区域的底部位置
-  const statsBottom = statsCardsRect.bottom
-
-  // 如果统计卡片还在视窗内，查询卡片应该与表格顶部对齐
-  if (statsBottom > headerHeight && tableCardRect.top > headerHeight) {
-    // 计算查询卡片应该的位置（与表格卡片顶部对齐，但不能超过导航栏）
-    const targetTop = Math.max(headerHeight + 20, tableCardRect.top)
-    queryCard.style.top = `${targetTop}px`
-  } else {
-    // 如果统计卡片已经滚动出视窗，让查询卡片居中显示
-    const centerPosition = Math.max(
-      headerHeight + 20,
-      Math.min(
-        (viewportHeight - cardHeight) / 2,
-        viewportHeight - cardHeight - 20
-      )
-    )
-    queryCard.style.top = `${centerPosition}px`
+  // 清除之前的定时器
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout)
   }
+
+  // 设置新的定时器，防抖处理
+  scrollTimeout = setTimeout(() => {
+    const queryCard = document.querySelector('.query-card')
+    const tableCard = document.querySelector('.table-card')
+
+    if (!queryCard || !tableCard) return
+
+    const tableCardRect = tableCard.getBoundingClientRect()
+    const headerHeight = 80 // 导航栏实际高度
+    const padding = 20 // 与导航栏的间距
+
+    // 计算查询卡片应该的位置（始终与表格卡片顶部对齐）
+    const targetTop = Math.max(headerHeight + padding, tableCardRect.top)
+
+    // 设置查询卡片位置
+    queryCard.style.top = `${targetTop}px`
+  }, 10) // 10ms防抖延迟，保持响应性
 }
 
 // 完全重置查询卡片到初始状态
@@ -1045,37 +1699,20 @@ const resetQueryCardToInitialState = () => {
 
   if (!queryCard || !tableCard) return
 
-  // 记录当前滚动位置
-  const currentScrollTop = window.pageYOffset || document.documentElement.scrollTop
+  // 完全重置样式
+  queryCard.style.position = 'fixed'
+  queryCard.style.right = '2.5rem'
+  queryCard.style.width = '300px'
+  queryCard.style.transform = 'none'
 
-  // 临时滚动到顶部以获取表格的真实初始位置
-  window.scrollTo(0, 0)
+  // 获取表格当前位置
+  const tableCardRect = tableCard.getBoundingClientRect()
+  const headerHeight = 80 // 导航栏实际高度
+  const padding = 20 // 与导航栏的间距
 
-  // 等待滚动完成
-  setTimeout(() => {
-    // 完全重置样式
-    queryCard.style.position = 'fixed'
-    queryCard.style.right = '2.5rem'
-    queryCard.style.width = '300px'
-    queryCard.style.transform = 'none'
-
-    // 获取表格在页面顶部时的位置
-    const tableCardRect = tableCard.getBoundingClientRect()
-    const headerHeight = 120
-
-    // 计算正确的初始位置
-    const initialTop = Math.max(headerHeight + 20, tableCardRect.top)
-    queryCard.style.top = `${initialTop}px`
-
-    // 恢复原来的滚动位置
-    window.scrollTo(0, currentScrollTop)
-
-    console.log('查询卡片重置完成:', {
-      tableTop: tableCardRect.top,
-      initialTop: initialTop,
-      scrollRestored: currentScrollTop
-    })
-  }, 50)
+  // 设置查询卡片位置（与表格顶部对齐）
+  const initialTop = Math.max(headerHeight + padding, tableCardRect.top)
+  queryCard.style.top = `${initialTop}px`
 }
 
 // 初始化查询卡片位置
@@ -1085,6 +1722,8 @@ const initQueryCardPosition = () => {
     if (window.innerWidth <= 1200) return
 
     resetQueryCardToInitialState()
+    // 立即执行一次滚动处理，确保位置正确
+    handleScroll()
   }, 100) // 延迟100ms确保DOM完全渲染
 }
 
@@ -1130,6 +1769,14 @@ onUnmounted(() => {
   window.removeEventListener('homeConfigUpdated', handleConfigUpdate)
   window.removeEventListener('scroll', handleScroll)
   window.removeEventListener('resize', handleResize)
+
+  // 清理定时器
+  if (scrollTimeout) {
+    clearTimeout(scrollTimeout)
+  }
+  if (resizeTimeout) {
+    clearTimeout(resizeTimeout)
+  }
 })
 </script>
 
@@ -1155,6 +1802,65 @@ body::-webkit-scrollbar-thumb {
 }
 body::-webkit-scrollbar-thumb:hover {
   background: #a8a8a8;
+}
+
+/* 全局样式 - 详情对话框标题栏美化 */
+.el-dialog.detail-dialog .el-dialog__header {
+  flex-shrink: 0 !important;
+  padding: 24px 24px 16px 24px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.el-dialog.detail-dialog .el-dialog__title {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  letter-spacing: 0.025em !important;
+  position: relative !important;
+  padding-left: 32px !important;
+  line-height: 1.5 !important;
+}
+
+.el-dialog.detail-dialog .el-dialog__title::before {
+  content: '📋' !important;
+  font-size: 18px !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)) !important;
+}
+
+.el-dialog.detail-dialog .el-dialog__headerbtn {
+  top: 20px !important;
+  right: 20px !important;
+  width: 36px !important;
+  height: 36px !important;
+  background: rgba(107, 114, 128, 0.1) !important;
+  border-radius: 8px !important;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+
+.el-dialog.detail-dialog .el-dialog__headerbtn:hover {
+  background: rgba(239, 68, 68, 0.1) !important;
+  transform: scale(1.05) !important;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.15) !important;
+}
+
+.el-dialog.detail-dialog .el-dialog__close {
+  color: #6b7280 !important;
+  font-size: 18px !important;
+  font-weight: 500 !important;
+  transition: color 0.2s ease !important;
+}
+
+.el-dialog.detail-dialog .el-dialog__headerbtn:hover .el-dialog__close {
+  color: #ef4444 !important;
 }
 </style>
 
@@ -1261,10 +1967,34 @@ body::-webkit-scrollbar-thumb:hover {
 }
 .home-main {
   flex: 1;
-  padding: 2rem 2.5rem 4rem 2.5rem; /* 增加底部边距避免被footer遮挡 */
+  padding: 1.5rem 2.5rem 4rem 2.5rem; /* 减少顶部内边距，增加底部边距避免被footer遮挡 */
   margin-top: 4rem; /* 为固定导航栏留出空间 */
   /* 移除overflow限制，让页面自然滚动 */
   overflow: visible; /* 确保内容可见 */
+}
+
+/* 统计控制区样式 */
+.stats-control {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  background: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #f0f0f0;
+}
+
+.stats-control-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.stats-control-right {
+  display: flex;
+  align-items: center;
 }
 .stat-row-flex {
   display: flex;
@@ -1314,7 +2044,7 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .table-container {
-  margin-right: 320px; /* 为固定定位的查询卡片留出空间 */
+  margin-right: 320px; /* 为固定定位的查询卡片留出空间：300px宽度 + 20px间距 */
 }
 .table-card {
   background: #fff;
@@ -1336,12 +2066,12 @@ body::-webkit-scrollbar-thumb:hover {
   min-height: unset;
   display: block;
   position: fixed; /* 使用fixed定位以便精确控制 */
-  top: 140px; /* 初始位置，避免与导航栏重叠 */
+  top: 120px; /* 初始位置，避免与导航栏重叠 */
   right: 2.5rem; /* 与页面右边距保持一致 */
   width: 300px; /* 固定宽度 */
   margin-top: 0 !important; /* 确保与左侧卡片顶部对齐 */
   z-index: 1000; /* 确保在其他元素之上 */
-  transition: top 0.3s ease-out; /* 平滑过渡效果 */
+  transition: top 0.2s ease-out; /* 平滑过渡效果 */
 }
 
 .query-header {
@@ -1398,9 +2128,34 @@ body::-webkit-scrollbar-thumb:hover {
   font-size: 12px;
   border-radius: 4px;
   width: 100% !important;
+  height: 36px !important;
   margin: 0 !important;
   flex: 1;
   box-sizing: border-box;
+}
+
+/* 针对小尺寸按钮的特殊样式 */
+.query-actions .el-button--small {
+  height: 36px !important;
+  padding: 8px 15px !important;
+  font-size: 12px !important;
+  line-height: 1 !important;
+}
+
+/* 更具体的选择器确保样式生效 */
+.query-actions .el-button.el-button--small {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
+.query-actions .el-button.el-button--small.el-button--primary {
+  height: 36px !important;
+  min-height: 36px !important;
+}
+
+.query-actions .el-button.el-button--small.el-button--default {
+  height: 36px !important;
+  min-height: 36px !important;
 }
 
 .query-actions .el-button--primary {
@@ -1413,6 +2168,19 @@ body::-webkit-scrollbar-thumb:hover {
   background: linear-gradient(135deg, #337ecc 0%, #5aa3e6 100%);
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+}
+
+.query-actions .el-button--default {
+  height: 36px !important;
+  border: 1px solid #dcdfe6;
+  background: #ffffff;
+  color: #606266;
+}
+
+.query-actions .el-button--default:hover {
+  border-color: #c0c4cc;
+  background: #f5f7fa;
+  color: #409eff;
 }
 
 .query-title {
@@ -1457,6 +2225,17 @@ body::-webkit-scrollbar-thumb:hover {
   color: #2c3e50 !important;
   border: none !important;
   box-shadow: 0 8px 32px rgba(252, 182, 159, 0.3) !important;
+}
+
+.loading-card {
+  background: linear-gradient(135deg, #f0f2f5 0%, #e6e8eb 100%) !important;
+  color: #666 !important;
+  border: none !important;
+  box-shadow: 0 8px 32px rgba(240, 242, 245, 0.3) !important;
+}
+
+.loading-card .stat-value {
+  font-size: 1.5rem !important;
 }
 
 .card-unit0 {
@@ -1601,91 +2380,259 @@ body::-webkit-scrollbar-thumb:hover {
   flex-direction: column;
 }
 
-/* 详情弹窗样式 */
-.detail-dialog .el-dialog {
-  margin: 0 !important;
-  height: 90vh;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
+/* 详情弹窗样式 - 使用深度选择器 */
+.detail-dialog :deep(.el-dialog) {
+  height: 80vh !important;
+  max-height: 80vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 auto !important;
+  top: 10vh !important;
+  transform: translateY(0) !important;
 }
 
-.detail-dialog .el-dialog__header {
-  flex-shrink: 0;
-  padding: 20px 20px 10px 20px;
-  border-bottom: 1px solid #ebeef5;
+/* 详情对话框标题栏美化样式已移至全局样式 */
+
+.detail-dialog :deep(.el-dialog__body) {
+  flex: 1 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  height: calc(80vh - 120px) !important;
 }
 
-.detail-dialog .el-dialog__body {
-  flex: 1;
-  padding: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
+.detail-dialog :deep(.el-dialog__footer) {
+  flex-shrink: 0 !important;
 }
 
 .detail-dialog .detail-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 20px;
+  flex: 1 !important;
+  overflow-y: auto !important;
+  overflow-x: hidden !important;
+  padding: 16px 24px !important;
+  background: #fafbfc !important;
+  height: 100% !important;
+  max-height: calc(80vh - 160px) !important;
 }
 
-.detail-content .detail-card {
-  margin-bottom: 20px;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+/* 详情区块样式 */
+.detail-section {
+  background: #ffffff;
+  border-radius: 12px;
+  margin-bottom: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e4e7ed;
+  overflow: hidden;
 }
 
-.detail-content .detail-card:last-child {
+.detail-section:last-child {
   margin-bottom: 0;
 }
 
-.detail-content .detail-card-header {
+/* 区块头部 */
+.section-header {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 1px solid #e4e7ed;
   font-weight: 600;
-  color: #303133;
+  font-size: 15px;
 }
 
-.detail-content .detail-card-header .el-icon {
+.section-icon {
+  font-size: 18px;
   color: #409eff;
 }
 
-.detail-content .detail-item {
+.section-icon.warning {
+  color: #e6a23c;
+}
+
+.section-icon.success {
+  color: #67c23a;
+}
+
+.section-icon.info {
+  color: #909399;
+}
+
+.section-title {
+  color: #303133;
+  font-weight: 600;
+}
+
+/* 区块内容 */
+.section-content {
+  padding: 20px;
+}
+
+/* 信息网格布局 */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px 24px;
+}
+
+.info-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 3px solid #e4e7ed;
+  transition: all 0.3s ease;
+  min-height: 44px;
+  overflow: hidden;
+}
+
+.info-item:hover {
+  background: #f0f2f5;
+  border-left-color: #409eff;
+}
+
+.info-label {
+  font-weight: 600;
+  color: #606266;
+  font-size: 13px;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+
+.info-value {
+  color: #1f2937;
+  font-size: 14px;
+  font-weight: 500;
+  flex: 1;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  line-height: 1.4;
+}
+
+.info-value.highlight-number {
+  color: #2563eb;
+  font-weight: 600;
+}
+
+.info-value.highlight-error {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+/* 文本字段样式 */
+.text-fields {
+  margin-top: 20px;
+}
+
+.text-field {
   margin-bottom: 16px;
 }
 
-.detail-content .detail-item:last-child {
+.text-field:last-child {
   margin-bottom: 0;
 }
 
-.detail-content .detail-item label {
+.text-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
   font-weight: 600;
   color: #606266;
-  margin-right: 8px;
-  min-width: 100px;
-  display: inline-block;
+  font-size: 14px;
 }
 
-.detail-content .detail-item span {
-  color: #303133;
+.text-label .el-icon {
+  color: #909399;
+  font-size: 16px;
 }
 
-.detail-content .detail-item .detail-text {
-  margin-top: 8px;
-  padding: 12px;
-  background-color: #f5f7fa;
-  border-radius: 4px;
-  color: #303133;
+.text-content {
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  color: #1f2937;
   line-height: 1.6;
-  min-height: 40px;
+  min-height: 60px;
   white-space: pre-wrap;
-  word-break: break-all;
+  word-break: break-word;
+  font-size: 14px;
+  overflow-wrap: break-word;
+}
+
+/* 责任信息样式 */
+.responsibility-info {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.resp-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 10px;
+  border: 1px solid #e4e7ed;
+  flex: 1;
+  min-width: 200px;
+  overflow: hidden;
+}
+
+.resp-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #606266;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.resp-label .el-icon {
+  color: #909399;
+  font-size: 16px;
+}
+
+/* 附件信息样式 */
+.attachment-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 10px;
+  border: 1px solid #bae6fd;
+  overflow: hidden;
+}
+
+.file-icon {
+  color: #0ea5e9;
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.file-name {
+  flex: 1;
+  color: #1f2937;
+  font-weight: 500;
+  font-size: 14px;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .dialog-footer {
   text-align: center;
+  padding: 16px 24px;
+  background: #f8f9fa;
+  border-top: 1px solid #e4e7ed;
+  flex-shrink: 0;
 }
 
 .complaint-table-card :deep(.el-card__body) {
@@ -1788,7 +2735,7 @@ body::-webkit-scrollbar-thumb:hover {
   }
 
   .home-main {
-    margin-top: 1rem; /* 为导航菜单留出额外空间 */
+    margin-top: 5rem; /* 为导航菜单留出额外空间 */
     padding: 1rem 1rem 3rem 1rem; /* 增加底部边距避免被footer遮挡 */
   }
 
@@ -1796,6 +2743,24 @@ body::-webkit-scrollbar-thumb:hover {
     grid-template-columns: 1fr;
     gap: 1rem;
     margin-bottom: 1rem;
+  }
+
+  /* 平板设备下统计控制区调整 */
+  .stats-control {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+    padding: 1rem;
+  }
+
+  .stats-control-left,
+  .stats-control-right {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .stats-control-left .el-date-picker {
+    width: 200px;
   }
 
   /* 平板设备下统计卡片调整 */
@@ -1893,8 +2858,46 @@ body::-webkit-scrollbar-thumb:hover {
   }
 
   .home-main {
-    margin-top: 0.5rem; /* 手机设备减少上边距 */
+    margin-top: 6rem; /* 手机设备需要更多上边距，因为导航栏高度约90px */
     padding: 1rem 1rem 3rem 1rem; /* 增加底部边距避免被footer遮挡 */
+  }
+
+  /* 手机设备下统计控制区调整 */
+  .stats-control {
+    flex-direction: column;
+    gap: 1rem;
+    padding: 0.75rem;
+    margin-bottom: 1rem;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .stats-control-left {
+    justify-content: center;
+    width: 100%;
+  }
+
+  .stats-control-left .el-date-picker {
+    width: 100% !important;
+    max-width: 250px;
+  }
+
+  .stats-control-right {
+    justify-content: center;
+    width: 100%;
+  }
+
+  /* 确保开关文字在小屏幕下完整显示 */
+  .stats-control-right .el-switch {
+    width: 100%;
+    max-width: 280px;
+  }
+
+  .stats-control-right .el-switch .el-switch__label {
+    font-size: 0.8rem;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .stat-row-flex {
@@ -1989,4 +2992,87 @@ body::-webkit-scrollbar-thumb:hover {
     min-height: 200px;
   }
 }
-</style> 
+
+/* Excel导出字段选择对话框样式 */
+.export-field-selection {
+  padding: 10px 0;
+}
+
+/* 确保对话框不影响页面布局 */
+:deep(.el-dialog) {
+  position: fixed !important;
+}
+
+:deep(.el-overlay) {
+  position: fixed !important;
+}
+
+.field-selection-header {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.field-selection-header .el-button {
+  margin: 0 5px;
+}
+
+.field-selection-content {
+  max-height: 400px;
+  overflow-y: auto;
+  margin-bottom: 20px;
+  padding: 10px;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+.field-checkbox {
+  margin-bottom: 12px;
+  width: 100%;
+  display: block;
+}
+
+.field-checkbox .el-checkbox__label {
+  font-size: 14px;
+  color: #606266;
+}
+
+.required-mark {
+  color: #f56c6c;
+  font-size: 12px;
+  margin-left: 4px;
+}
+
+.field-selection-info {
+  margin-top: 15px;
+}
+
+.field-selection-info .el-alert {
+  border-radius: 4px;
+}
+
+.dialog-footer {
+  text-align: right;
+}
+
+.dialog-footer .el-button {
+  margin-left: 10px;
+}
+
+/* 按钮高亮效果 */
+.active-selection-btn {
+  animation: buttonHighlight 2s ease-in-out;
+}
+
+@keyframes buttonHighlight {
+  0% {
+    box-shadow: 0 0 0 0 rgba(64, 158, 255, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 8px rgba(64, 158, 255, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(64, 158, 255, 0);
+  }
+}
+</style>

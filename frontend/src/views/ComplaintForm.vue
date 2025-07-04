@@ -15,8 +15,8 @@
           </el-menu>
         </div>
       </div>
-      <div class="header-right">
-        <el-button type="primary" size="small" class="admin-btn" @click="goAdmin">登录后台</el-button>
+      <div class="header-right">        
+        <el-button type="primary" text class="admin-btn" @click="goAdmin">登录后台</el-button>
         <el-avatar :size="32" :src="user.Avatar" class="avatar-icon" @click="goProfile">
           <template v-if="!user.Avatar">
             <el-icon><User /></el-icon>
@@ -504,25 +504,45 @@ const fetchOptions = async () => {
     const res = await axios.get('/api/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     });
-    Object.assign(options, res.data);
+
+    // 转换数据格式：从 [{Name: "xxx"}] 转换为 ["xxx"]
+    const data = res.data;
+    options.workshops = data.workshops?.map(item => item.Name) || [];
+    options.departments = data.departments?.map(item => item.Name) || [];
+    options.persons = data.persons?.map(item => item.Name) || [];
+    options.complaintCategories = data.complaintCategories?.map(item => item.Name) || [];
+    options.customerComplaintTypes = data.customerComplaintTypes?.map(item => item.Name) || [];
+    // 不良类别需要保持对象格式，因为需要ID来获取不良项
+    options.defectiveCategories = data.defectiveCategories || [];
+    options.defectiveItems = []; // 初始为空，根据不良类别动态加载
+
+    console.log('获取下拉选项成功:', options);
   } catch (error) {
     console.error('获取下拉选项失败:', error);
+    ElMessage.error('获取下拉选项失败: ' + (error.response?.data?.message || error.message));
   }
 }
 
 const handleCategoryChange = async (selectedCategory) => {
+  console.log('不良类别变化:', selectedCategory);
   form.value.DefectiveItem = '';
   options.defectiveItems = [];
   if (selectedCategory && selectedCategory.ID) {
     try {
       const token = localStorage.getItem('token');
+      console.log('请求不良项 - CategoryID:', selectedCategory.ID);
       const res = await axios.get(`/api/complaint/defective-items/${selectedCategory.ID}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      options.defectiveItems = res.data;
+      // 后端直接返回字符串数组，无需转换
+      options.defectiveItems = res.data || [];
+      console.log('获取不良项成功:', options.defectiveItems);
     } catch (error) {
       console.error('获取不良项失败:', error);
+      ElMessage.error('获取不良项失败: ' + (error.response?.data?.message || error.message));
     }
+  } else {
+    console.log('没有选择有效的不良类别或缺少ID');
   }
 }
 
@@ -624,10 +644,116 @@ watch([
   display: flex;
   flex-direction: column;
 }
+
+/* 头部样式 */
+.home-header {
+  background: #fff;
+  box-shadow: 0 0.125rem 0.5rem 0 rgba(0,0,0,0.04);
+  display: flex;
+  align-items: center;
+  height: 4rem;
+  padding: 0 2.5rem;
+  justify-content: space-between;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  width: 100%;
+  z-index: 100;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.logo {
+  height: 2.25rem;
+  margin-right: 0.625rem;
+}
+
+.logo-text {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #b0b4ba;
+}
+
+.header-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-width: 0;
+}
+
+.nav-menu-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.nav-menu {
+  background: transparent;
+  border-bottom: none;
+  display: inline-block;
+  min-width: 0;
+  flex-shrink: 0;
+}
+
+.nav-menu :deep(.el-menu-item) {
+  background: transparent !important;
+  position: relative;
+}
+
+.nav-menu :deep(.el-menu-item.is-active) {
+  color: #409eff;
+  background: transparent !important;
+}
+
+.nav-menu :deep(.el-menu-item.is-active::after) {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 2px;
+  background: #409eff;
+  border-radius: 1px;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.admin-btn {
+  font-size: 0.875rem;
+  padding: 0.375rem 0.75rem;
+}
+
+.avatar-icon {
+  cursor: pointer;
+}
+
+.username {
+  font-size: 0.875rem;
+  color: #606266;
+  cursor: pointer;
+}
+
+.el-dropdown-link {
+  cursor: pointer;
+  color: #606266;
+  display: flex;
+  align-items: center;
+}
 .form-content {
   flex-grow: 1;
   overflow-y: auto;
   padding: 1.25rem;
+  padding-top: 5.25rem; /* 为固定头部留出空间 */
   background-color: #f0f2f5;
 }
 .form-card {
@@ -681,9 +807,71 @@ watch([
   box-shadow: 0 0.125rem 1rem #0003;
   background: #fff;
 }
+/* 平板设备 */
+@media (max-width: 768px) {
+  .home-header {
+    padding: 0.5rem 1rem;
+    flex-wrap: wrap;
+    min-height: 100px;
+    align-items: flex-start;
+  }
+
+  .logo-text {
+    display: none;
+  }
+
+  .header-left {
+    flex-shrink: 0;
+    min-width: auto;
+  }
+
+  .header-right {
+    flex-shrink: 0;
+    gap: 0.5rem;
+  }
+
+  .home-header .nav-menu {
+    order: 3;
+    width: 100%;
+    margin-top: 0.5rem;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.9);
+    border-radius: 0.5rem;
+    padding: 0.25rem 0;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+
+  .form-content {
+    padding-top: 6.25rem; /* 为导航菜单留出额外空间 */
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+/* 手机设备 */
 @media (max-width: 600px) {
-  .form-content { padding: 0.5rem; }
-  .form-card { padding: 1rem 0.5rem 0.5rem 0.5rem; }
-  .img-preview-large { max-width: 98vw; max-height: 70vh; }
+  .home-header {
+    padding: 0.5rem 1rem;
+    min-height: 90px;
+  }
+
+  .logo {
+    height: 2rem;
+    margin-right: 0;
+  }
+
+  .form-content {
+    padding: 0.5rem;
+    padding-top: 6.5rem; /* 手机设备需要更多上边距 */
+  }
+
+  .form-card {
+    padding: 1rem 0.5rem 0.5rem 0.5rem;
+  }
+
+  .img-preview-large {
+    max-width: 98vw;
+    max-height: 70vh;
+  }
 }
 </style> 
