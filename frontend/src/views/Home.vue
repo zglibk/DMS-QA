@@ -1293,8 +1293,8 @@ const formatFieldValue = (value, field) => {
 
 // 判断是否为全宽字段
 const isFullWidthField = (field) => {
-  const fullWidthKeys = ['DefectiveDescription', 'DefectiveReason', 'Disposition', 'ProcessingMeasures', 'ProblemDescription', 'AssessmentDescription']
-  return fullWidthKeys.includes(field.key) || field.key.includes('Description') || field.key.includes('Measures')
+  const fullWidthKeys = ['DefectiveDescription', 'DefectiveReason', 'Disposition', 'AssessmentDescription']
+  return fullWidthKeys.includes(field.key) || field.key.includes('Description') || field.key.includes('Reason')
 }
 
 // 获取字段值的CSS类
@@ -1320,31 +1320,43 @@ const organizeDetailFields = () => {
     return []
   }
 
-  // 定义字段分组
+  // 定义字段分组 - 根据实际数据库字段
   const fieldGroups = {
     basic: {
       title: '基本信息',
       icon: 'InfoFilled',
       iconClass: '',
-      fields: ['ID', 'Date', 'Customer', 'OrderNo', 'ProductName', 'Specification', 'Workshop', 'ProductionQty', 'DefectiveQty']
+      fields: ['Date', 'Customer', 'OrderNo', 'ProductName', 'Specification', 'Workshop', 'ProductionQty', 'DefectiveQty', 'DefectiveRate']
     },
     complaint: {
       title: '投诉信息',
       icon: 'WarningFilled',
       iconClass: 'warning',
-      fields: ['ComplaintCategory', 'CustomerComplaintType', 'DefectiveRate', 'DefectiveCategory', 'DefectiveItem', 'DefectiveDescription', 'DefectiveReason']
+      fields: ['ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'DefectiveDescription', 'DefectiveReason']
     },
     processing: {
       title: '处理信息',
       icon: 'Tools',
       iconClass: 'success',
-      fields: ['Disposition', 'ProcessingMeasures', 'ProcessingStatus', 'MainDept', 'MainPerson']
+      fields: ['Disposition', 'ReturnGoods', 'IsReprint', 'ReprintQty']
+    },
+    materials: {
+      title: '物料信息',
+      icon: 'Document',
+      iconClass: 'info',
+      fields: ['Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice', 'MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice', 'MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice', 'MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice', 'LaborCost', 'TotalCost']
+    },
+    responsibility: {
+      title: '责任信息',
+      icon: 'UserFilled',
+      iconClass: 'success',
+      fields: ['MainDept', 'MainPerson', 'MainPersonAssessment', 'SecondPerson', 'SecondPersonAssessment', 'Manager', 'ManagerAssessment']
     },
     assessment: {
       title: '考核信息',
-      icon: 'UserFilled',
-      iconClass: 'info',
-      fields: ['AssessmentAmount', 'AssessmentDescription']
+      icon: 'QuestionFilled',
+      iconClass: 'warning',
+      fields: ['AssessmentDescription']
     }
   }
 
