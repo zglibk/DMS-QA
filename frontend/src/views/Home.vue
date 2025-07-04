@@ -541,141 +541,34 @@
       top="10vh"
       :style="{ height: '80vh' }"
     >
-      <div v-if="detailData" class="detail-content">
-        <!-- 基本信息 -->
-        <div class="detail-section">
+      <div v-if="detailData" class="detail-content" v-loading="detailFieldsLoading" element-loading-text="加载字段信息中...">
+        <!-- 动态显示所有字段 -->
+        <div v-for="section in detailSections" :key="section.title" class="detail-section">
           <div class="section-header">
-            <el-icon class="section-icon"><InfoFilled /></el-icon>
-            <span class="section-title">基本信息</span>
+            <el-icon class="section-icon" :class="section.iconClass">
+              <component :is="section.icon" />
+            </el-icon>
+            <span class="section-title">{{ section.title }}</span>
           </div>
           <div class="section-content">
             <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">记录ID</span>
-                <span class="info-value">{{ detailData.ID }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">投诉日期</span>
-                <span class="info-value">{{ formatDate(detailData.Date) }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">客户编号</span>
-                <span class="info-value">{{ detailData.Customer }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">工单号</span>
-                <span class="info-value">{{ detailData.OrderNo }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">产品名称</span>
-                <span class="info-value">{{ detailData.ProductName }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">规格</span>
-                <span class="info-value">{{ detailData.Specification || '-' }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">车间</span>
-                <span class="info-value">{{ detailData.Workshop }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">生产数量</span>
-                <span class="info-value highlight-number">{{ detailData.ProductionQty }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">不良数量</span>
-                <span class="info-value highlight-error">{{ detailData.DefectiveQty }}</span>
+              <div
+                v-for="field in section.fields"
+                :key="field.key"
+                class="info-item"
+                :class="{ 'full-width': isFullWidthField(field) }"
+              >
+                <span class="info-label">{{ field.label }}</span>
+                <span class="info-value" :class="getFieldValueClass(field)">
+                  {{ formatFieldValue(detailData[field.key], field) }}
+                </span>
               </div>
             </div>
           </div>
         </div>
 
-        <!-- 投诉信息 -->
-        <div class="detail-section">
-          <div class="section-header">
-            <el-icon class="section-icon warning"><WarningFilled /></el-icon>
-            <span class="section-title">投诉信息</span>
-          </div>
-          <div class="section-content">
-            <div class="info-grid">
-              <div class="info-item">
-                <span class="info-label">投诉类别</span>
-                <el-tag type="warning" size="small">{{ detailData.ComplaintCategory }}</el-tag>
-              </div>
-              <div class="info-item">
-                <span class="info-label">客户投诉类型</span>
-                <span class="info-value">{{ detailData.CustomerComplaintType || '-' }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">不良率</span>
-                <span class="info-value highlight-error">{{ detailData.DefectiveRate }}%</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">不良类别</span>
-                <span class="info-value">{{ detailData.DefectiveCategory || '-' }}</span>
-              </div>
-              <div class="info-item">
-                <span class="info-label">不良项目</span>
-                <el-tag type="danger" size="small">{{ detailData.DefectiveItem }}</el-tag>
-              </div>
-            </div>
-
-            <div class="text-fields">
-              <div class="text-field">
-                <div class="text-label">
-                  <el-icon><Document /></el-icon>
-                  <span>不良描述</span>
-                </div>
-                <div class="text-content">{{ detailData.DefectiveDescription }}</div>
-              </div>
-
-              <div class="text-field" v-if="detailData.DefectiveReason">
-                <div class="text-label">
-                  <el-icon><QuestionFilled /></el-icon>
-                  <span>不良原因</span>
-                </div>
-                <div class="text-content">{{ detailData.DefectiveReason }}</div>
-              </div>
-
-              <div class="text-field">
-                <div class="text-label">
-                  <el-icon><Tools /></el-icon>
-                  <span>处置措施</span>
-                </div>
-                <div class="text-content">{{ detailData.Disposition }}</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 责任信息 -->
-        <div class="detail-section">
-          <div class="section-header">
-            <el-icon class="section-icon success"><UserFilled /></el-icon>
-            <span class="section-title">责任信息</span>
-          </div>
-          <div class="section-content">
-            <div class="responsibility-info">
-              <div class="resp-item">
-                <div class="resp-label">
-                  <el-icon><OfficeBuilding /></el-icon>
-                  <span>主责部门</span>
-                </div>
-                <el-tag type="primary" size="default">{{ detailData.MainDept }}</el-tag>
-              </div>
-              <div class="resp-item">
-                <div class="resp-label">
-                  <el-icon><User /></el-icon>
-                  <span>主责人</span>
-                </div>
-                <el-tag type="success" size="default">{{ detailData.MainPerson }}</el-tag>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 附件信息 -->
-        <div v-if="detailData.AttachmentFile" class="detail-section">
+        <!-- 附件信息（如果存在） -->
+        <div class="detail-section" v-if="detailData.AttachmentFile">
           <div class="section-header">
             <el-icon class="section-icon info"><Paperclip /></el-icon>
             <span class="section-title">附件信息</span>
@@ -821,6 +714,8 @@ const tableLoading = ref(false)
 const showDetailDialog = ref(false)
 const detailData = ref(null)
 const detailLoading = ref(false)
+const detailFieldsLoading = ref(false)
+const detailSections = ref([])
 
 // 高级查询数据
 const advancedQuery = ref({
@@ -1348,6 +1243,16 @@ const viewDetail = async (row) => {
 
     if (response.data.success) {
       detailData.value = response.data.data
+
+      // 确保字段信息已加载，如果没有则先加载
+      if (exportFields.value.length === 0) {
+        detailFieldsLoading.value = true
+        await fetchExportFields()
+        detailFieldsLoading.value = false
+      }
+
+      // 组织详情字段显示
+      detailSections.value = organizeDetailFields()
       showDetailDialog.value = true
     } else {
       ElMessage.error(response.data.message || '获取详情失败')
@@ -1365,6 +1270,108 @@ const formatDate = (dateStr) => {
   if (!dateStr) return '-'
   const date = new Date(dateStr)
   return date.toLocaleDateString('zh-CN')
+}
+
+// 格式化字段值
+const formatFieldValue = (value, field) => {
+  if (value === null || value === undefined || value === '') {
+    return '-'
+  }
+
+  switch (field.type) {
+    case 'date':
+      return formatDate(value)
+    case 'boolean':
+      return value ? '是' : '否'
+    case 'number':
+    case 'decimal':
+      return value || 0
+    default:
+      return value
+  }
+}
+
+// 判断是否为全宽字段
+const isFullWidthField = (field) => {
+  const fullWidthKeys = ['DefectiveDescription', 'DefectiveReason', 'Disposition', 'ProcessingMeasures', 'ProblemDescription', 'AssessmentDescription']
+  return fullWidthKeys.includes(field.key) || field.key.includes('Description') || field.key.includes('Measures')
+}
+
+// 获取字段值的CSS类
+const getFieldValueClass = (field) => {
+  const classes = []
+
+  if (isFullWidthField(field)) {
+    classes.push('text-content')
+  }
+
+  if (field.key.includes('Qty') && field.key !== 'ProductionQty') {
+    classes.push('highlight-error')
+  } else if (field.key === 'ProductionQty') {
+    classes.push('highlight-number')
+  }
+
+  return classes.join(' ')
+}
+
+// 组织详情字段为分组显示
+const organizeDetailFields = () => {
+  if (!exportFields.value || exportFields.value.length === 0) {
+    return []
+  }
+
+  // 定义字段分组
+  const fieldGroups = {
+    basic: {
+      title: '基本信息',
+      icon: 'InfoFilled',
+      iconClass: '',
+      fields: ['ID', 'Date', 'Customer', 'OrderNo', 'ProductName', 'Specification', 'Workshop', 'ProductionQty', 'DefectiveQty']
+    },
+    complaint: {
+      title: '投诉信息',
+      icon: 'WarningFilled',
+      iconClass: 'warning',
+      fields: ['ComplaintCategory', 'CustomerComplaintType', 'DefectiveRate', 'DefectiveCategory', 'DefectiveItem', 'DefectiveDescription', 'DefectiveReason']
+    },
+    processing: {
+      title: '处理信息',
+      icon: 'Tools',
+      iconClass: 'success',
+      fields: ['Disposition', 'ProcessingMeasures', 'ProcessingStatus', 'MainDept', 'MainPerson']
+    },
+    assessment: {
+      title: '考核信息',
+      icon: 'UserFilled',
+      iconClass: 'info',
+      fields: ['AssessmentAmount', 'AssessmentDescription']
+    }
+  }
+
+  const sections = []
+
+  Object.keys(fieldGroups).forEach(groupKey => {
+    const group = fieldGroups[groupKey]
+    const groupFields = []
+
+    group.fields.forEach(fieldKey => {
+      const field = exportFields.value.find(f => f.key === fieldKey)
+      if (field) {
+        groupFields.push(field)
+      }
+    })
+
+    if (groupFields.length > 0) {
+      sections.push({
+        title: group.title,
+        icon: group.icon,
+        iconClass: group.iconClass,
+        fields: groupFields
+      })
+    }
+  })
+
+  return sections
 }
 
 watch(pageCount, (val) => {
@@ -2488,6 +2495,30 @@ body::-webkit-scrollbar-thumb:hover {
   transition: all 0.3s ease;
   min-height: 44px;
   overflow: hidden;
+}
+
+.info-item.full-width {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
+  min-height: auto;
+}
+
+.info-item.full-width .info-label {
+  font-weight: 600;
+  color: #606266;
+  margin-bottom: 4px;
+}
+
+.info-item.full-width .info-value {
+  width: 100%;
+  text-align: left;
+  line-height: 1.6;
+  padding: 8px 12px;
+  background: #ffffff;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  min-height: 60px;
 }
 
 .info-item:hover {
