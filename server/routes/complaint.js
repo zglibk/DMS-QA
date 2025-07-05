@@ -327,6 +327,200 @@ router.get('/detail/:id', async (req, res) => {
   }
 });
 
+// ===================== 更新投诉记录 =====================
+// PUT /api/complaint/:id
+// 参数: id (投诉记录ID), 投诉表单所有字段
+// 返回: { success, message }
+router.put('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    const data = req.body;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ success: false, message: '无效的记录ID' });
+    }
+
+    // 必填字段校验
+    const requiredFields = [
+      'Date', 'Customer', 'OrderNo', 'ProductName', 'Workshop', 'ProductionQty',
+      'ComplaintCategory', 'DefectiveCategory', 'DefectiveDescription', 'DefectiveItem',
+      'Disposition', 'MainDept', 'MainPerson'
+    ];
+
+    for (const field of requiredFields) {
+      if (!data[field] && data[field] !== 0) {
+        return res.status(400).json({ success: false, message: `${field}为必填项` });
+      }
+    }
+
+    let pool = await sql.connect(await getDynamicConfig());
+
+    // 先检查记录是否存在
+    const checkResult = await pool.request()
+      .input('ID', sql.Int, parseInt(id))
+      .query('SELECT ID FROM ComplaintRegister WHERE ID = @ID');
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '记录不存在' });
+    }
+
+    // 更新记录
+    const result = await pool.request()
+      .input('ID', sql.Int, parseInt(id))
+      .input('Date', sql.Date, data.Date)
+      .input('Customer', sql.NVarChar, data.Customer)
+      .input('OrderNo', sql.NVarChar, data.OrderNo)
+      .input('ProductName', sql.NVarChar, data.ProductName)
+      .input('Specification', sql.NVarChar, data.Specification)
+      .input('Workshop', sql.NVarChar, data.Workshop)
+      .input('ProductionQty', sql.Int, data.ProductionQty)
+      .input('DefectiveQty', sql.Int, data.DefectiveQty)
+      .input('DefectiveRate', sql.Decimal(5,2), data.DefectiveRate)
+      .input('ComplaintCategory', sql.NVarChar, data.ComplaintCategory)
+      .input('CustomerComplaintType', sql.NVarChar, data.CustomerComplaintType)
+      .input('DefectiveCategory', sql.NVarChar, data.DefectiveCategory)
+      .input('DefectiveItem', sql.NVarChar, data.DefectiveItem)
+      .input('DefectiveDescription', sql.NVarChar, data.DefectiveDescription)
+      .input('AttachmentFile', sql.NVarChar, data.AttachmentFile)
+      .input('DefectiveReason', sql.NVarChar, data.DefectiveReason)
+      .input('Disposition', sql.NVarChar, data.Disposition)
+      .input('ReturnGoods', sql.NVarChar, data.ReturnGoods)
+      .input('IsReprint', sql.NVarChar, data.IsReprint)
+      .input('ReprintQty', sql.Int, data.ReprintQty)
+      .input('Paper', sql.NVarChar, data.Paper)
+      .input('PaperSpecification', sql.NVarChar, data.PaperSpecification)
+      .input('PaperQty', sql.Int, data.PaperQty)
+      .input('PaperUnitPrice', sql.Decimal(10,2), data.PaperUnitPrice)
+      .input('MaterialA', sql.NVarChar, data.MaterialA)
+      .input('MaterialASpec', sql.NVarChar, data.MaterialASpec)
+      .input('MaterialAQty', sql.Int, data.MaterialAQty)
+      .input('MaterialAUnitPrice', sql.Decimal(10,2), data.MaterialAUnitPrice)
+      .input('MaterialB', sql.NVarChar, data.MaterialB)
+      .input('MaterialBSpec', sql.NVarChar, data.MaterialBSpec)
+      .input('MaterialBQty', sql.Int, data.MaterialBQty)
+      .input('MaterialBUnitPrice', sql.Decimal(10,2), data.MaterialBUnitPrice)
+      .input('MaterialC', sql.NVarChar, data.MaterialC)
+      .input('MaterialCSpec', sql.NVarChar, data.MaterialCSpec)
+      .input('MaterialCQty', sql.Int, data.MaterialCQty)
+      .input('MaterialCUnitPrice', sql.Decimal(10,2), data.MaterialCUnitPrice)
+      .input('LaborCost', sql.Decimal(10,2), data.LaborCost)
+      .input('TotalCost', sql.Decimal(10,2), data.TotalCost)
+      .input('MainDept', sql.NVarChar, data.MainDept)
+      .input('MainPerson', sql.NVarChar, data.MainPerson)
+      .input('MainPersonAssessment', sql.Decimal(10,2), data.MainPersonAssessment)
+      .input('SecondPerson', sql.NVarChar, data.SecondPerson)
+      .input('SecondPersonAssessment', sql.Decimal(10,2), data.SecondPersonAssessment)
+      .input('Manager', sql.NVarChar, data.Manager)
+      .input('ManagerAssessment', sql.Decimal(10,2), data.ManagerAssessment)
+      .input('AssessmentDescription', sql.NVarChar, data.AssessmentDescription)
+      .query(`
+        UPDATE ComplaintRegister SET
+          Date = @Date,
+          Customer = @Customer,
+          OrderNo = @OrderNo,
+          ProductName = @ProductName,
+          Specification = @Specification,
+          Workshop = @Workshop,
+          ProductionQty = @ProductionQty,
+          DefectiveQty = @DefectiveQty,
+          DefectiveRate = @DefectiveRate,
+          ComplaintCategory = @ComplaintCategory,
+          CustomerComplaintType = @CustomerComplaintType,
+          DefectiveCategory = @DefectiveCategory,
+          DefectiveItem = @DefectiveItem,
+          DefectiveDescription = @DefectiveDescription,
+          AttachmentFile = @AttachmentFile,
+          DefectiveReason = @DefectiveReason,
+          Disposition = @Disposition,
+          ReturnGoods = @ReturnGoods,
+          IsReprint = @IsReprint,
+          ReprintQty = @ReprintQty,
+          Paper = @Paper,
+          PaperSpecification = @PaperSpecification,
+          PaperQty = @PaperQty,
+          PaperUnitPrice = @PaperUnitPrice,
+          MaterialA = @MaterialA,
+          MaterialASpec = @MaterialASpec,
+          MaterialAQty = @MaterialAQty,
+          MaterialAUnitPrice = @MaterialAUnitPrice,
+          MaterialB = @MaterialB,
+          MaterialBSpec = @MaterialBSpec,
+          MaterialBQty = @MaterialBQty,
+          MaterialBUnitPrice = @MaterialBUnitPrice,
+          MaterialC = @MaterialC,
+          MaterialCSpec = @MaterialCSpec,
+          MaterialCQty = @MaterialCQty,
+          MaterialCUnitPrice = @MaterialCUnitPrice,
+          LaborCost = @LaborCost,
+          TotalCost = @TotalCost,
+          MainDept = @MainDept,
+          MainPerson = @MainPerson,
+          MainPersonAssessment = @MainPersonAssessment,
+          SecondPerson = @SecondPerson,
+          SecondPersonAssessment = @SecondPersonAssessment,
+          Manager = @Manager,
+          ManagerAssessment = @ManagerAssessment,
+          AssessmentDescription = @AssessmentDescription
+        WHERE ID = @ID
+      `);
+
+    res.json({
+      success: true,
+      message: '投诉记录更新成功',
+      id: parseInt(id)
+    });
+  } catch (err) {
+    console.error('更新投诉记录失败:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ===================== 删除投诉记录 =====================
+// DELETE /api/complaint/:id
+// 参数: id (投诉记录ID)
+// 返回: { success, message }
+router.delete('/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ success: false, message: '无效的记录ID' });
+    }
+
+    let pool = await sql.connect(await getDynamicConfig());
+
+    // 先检查记录是否存在
+    const checkResult = await pool.request()
+      .input('ID', sql.Int, parseInt(id))
+      .query('SELECT ID, Customer, OrderNo, ProductName FROM ComplaintRegister WHERE ID = @ID');
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '记录不存在' });
+    }
+
+    const record = checkResult.recordset[0];
+
+    // 删除记录
+    await pool.request()
+      .input('ID', sql.Int, parseInt(id))
+      .query('DELETE FROM ComplaintRegister WHERE ID = @ID');
+
+    res.json({
+      success: true,
+      message: `投诉记录删除成功 (客户: ${record.Customer}, 工单: ${record.OrderNo})`,
+      deletedRecord: {
+        id: parseInt(id),
+        customer: record.Customer,
+        orderNo: record.OrderNo,
+        productName: record.ProductName
+      }
+    });
+  } catch (err) {
+    console.error('删除投诉记录失败:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // ===================== 首页统计卡片数据接口 =====================
 // GET /api/complaint/month-stats
 // 参数: month (可选，格式: YYYY-MM，默认当前月份)

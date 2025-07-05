@@ -208,9 +208,9 @@
               <el-table-column prop="MainPerson" label="主责人" width="100" show-overflow-tooltip resizable />
               <el-table-column label="操作" width="120" fixed="right">
                 <template #default="scope">
-                  <el-button type="primary" :icon="View" size="small" @click="viewDetail(scope.row)">
-                    详情
-                  </el-button>
+                  <el-button type="primary" :icon="View" size="small" @click="viewDetail(scope.row)" title="查看详情" />
+                  <el-button type="warning" :icon="Edit" size="small" @click="editRecord(scope.row)" title="修改记录" />
+                  <el-button type="danger" :icon="Delete" size="small" @click="deleteRecord(scope.row)" title="删除记录" />
                 </template>
               </el-table-column>
             </el-table>
@@ -531,7 +531,7 @@
     <!-- 详情查看弹窗 -->
     <el-dialog
       v-model="showDetailDialog"
-      title="投诉记录详情"
+      :title="isEditing ? '编辑投诉记录' : '投诉记录详情'"
       width="90%"
       :close-on-click-modal="false"
       :modal="true"
@@ -691,10 +691,10 @@
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
-import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close } from '@element-plus/icons-vue'
+import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
-import { ElPagination, ElMessage } from 'element-plus'
+import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
 import * as echarts from 'echarts'
 import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
@@ -723,6 +723,9 @@ const detailData = ref(null)
 const detailLoading = ref(false)
 const detailFieldsLoading = ref(false)
 const detailSections = ref([])
+const isEditing = ref(false)
+const editFormData = ref({})
+const editFormLoading = ref(false)
 
 // 高级查询数据
 const advancedQuery = ref({
@@ -1270,6 +1273,57 @@ const viewDetail = async (row) => {
     ElMessage.error('获取详情失败')
   } finally {
     detailLoading.value = false
+  }
+}
+
+// 编辑记录
+const editRecord = async (row) => {
+  try {
+    // 使用路由跳转到投诉登记页面，并传递记录ID进行编辑
+    router.push({
+      path: '/add',
+      query: {
+        mode: 'edit',
+        id: row.ID
+      }
+    })
+  } catch (error) {
+    console.error('跳转编辑页面失败:', error)
+    ElMessage.error('跳转编辑页面失败')
+  }
+}
+
+// 删除记录
+const deleteRecord = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除这条投诉记录吗？\n\n客户编号：${row.Customer}\n工单号：${row.OrderNo}\n产品名称：${row.ProductName}\n\n此操作不可恢复！`,
+      '删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        dangerouslyUseHTMLString: false
+      }
+    )
+
+    const token = localStorage.getItem('token')
+    const response = await axios.delete(`/api/complaint/${row.ID}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (response.data.success) {
+      ElMessage.success('删除成功')
+      // 刷新表格数据
+      await fetchData()
+    } else {
+      ElMessage.error(response.data.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除记录失败:', error)
+      ElMessage.error('删除记录失败')
+    }
   }
 }
 

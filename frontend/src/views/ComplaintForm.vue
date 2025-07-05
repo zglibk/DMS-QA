@@ -361,7 +361,9 @@
         </el-card>
 
         <div style="text-align:center;margin-top:30px;">
-          <el-button type="primary" @click="submitForm" style="width: 220px; font-size: 18px; height: 48px;">提交</el-button>
+          <el-button type="primary" @click="submitForm" :loading="loading" style="width: 220px; font-size: 18px; height: 48px;">
+            {{ isEditMode ? '更新记录' : '提交' }}
+          </el-button>
         </div>
         <div style="text-align:center;margin-top:16px;">
           <el-button @click="resetForm" style="width: 220px; font-size: 18px; height: 48px;">重置</el-button>
@@ -478,6 +480,9 @@ const options = reactive({
 })
 const username = ref('admin')
 const activeMenu = ref('complaint')
+const isEditMode = ref(false)
+const editId = ref(null)
+const loading = ref(false)
 const handleMenuSelect = (index) => {
   activeMenu.value = index
   if (index === 'home') router.push('/')
@@ -560,18 +565,32 @@ const submitForm = () => {
         submissionData.DefectiveCategory = submissionData.DefectiveCategory.Name;
       }
       try {
+        loading.value = true
         const token = localStorage.getItem('token');
-        const res = await axios.post('/api/complaint', submissionData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+
+        let res
+        if (isEditMode.value) {
+          // 编辑模式：使用PUT请求更新
+          res = await axios.put(`/api/complaint/${editId.value}`, submissionData, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } else {
+          // 新增模式：使用POST请求创建
+          res = await axios.post('/api/complaint', submissionData, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
+
         if (res.data && res.data.success) {
-          ElMessage.success(res.data.message || '投诉登记成功');
+          ElMessage.success(res.data.message || (isEditMode.value ? '投诉记录更新成功' : '投诉登记成功'));
           router.push('/');
         } else {
-          ElMessage.error(res.data.message || '投诉登记失败');
+          ElMessage.error(res.data.message || (isEditMode.value ? '投诉记录更新失败' : '投诉登记失败'));
         }
       } catch (error) {
-        ElMessage.error(error.response?.data?.message || '投诉登记失败');
+        ElMessage.error(error.response?.data?.message || (isEditMode.value ? '投诉记录更新失败' : '投诉登记失败'));
+      } finally {
+        loading.value = false
       }
     }
   });
@@ -582,10 +601,70 @@ const resetForm = () => {
   options.defectiveItems = [];
 }
 
-onMounted(() => {
+// 加载编辑数据
+const loadEditData = async (id) => {
+  try {
+    loading.value = true
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`/api/complaint/detail/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (response.data.success) {
+      const data = response.data.data
+
+      // 填充表单数据
+      Object.keys(form.value).forEach(key => {
+        if (data[key] !== undefined && data[key] !== null) {
+          // 处理日期格式
+          if (key === 'Date' && data[key]) {
+            form.value[key] = data[key].split('T')[0] // 转换为YYYY-MM-DD格式
+          }
+          // 处理布尔值
+          else if (key === 'ReturnGoods' || key === 'IsReprint') {
+            form.value[key] = data[key] === '是' || data[key] === true || data[key] === 1
+          }
+          // 处理不良类别（需要找到对应的对象）
+          else if (key === 'DefectiveCategory' && data[key]) {
+            const category = options.defectiveCategories.find(cat => cat.Name === data[key])
+            if (category) {
+              form.value[key] = category
+              // 加载对应的不良项
+              handleCategoryChange(category)
+            }
+          }
+          else {
+            form.value[key] = data[key]
+          }
+        }
+      })
+
+      ElMessage.success('数据加载成功')
+    } else {
+      ElMessage.error(response.data.message || '加载数据失败')
+      router.push('/')
+    }
+  } catch (error) {
+    console.error('加载编辑数据失败:', error)
+    ElMessage.error('加载数据失败')
+    router.push('/')
+  } finally {
+    loading.value = false
+  }
+}
+
+onMounted(async () => {
   loadSiteConfig()
-  fetchOptions()
+  await fetchOptions()
   userStore.fetchProfile()
+
+  // 检查是否为编辑模式
+  const route = router.currentRoute.value
+  if (route.query.mode === 'edit' && route.query.id) {
+    isEditMode.value = true
+    editId.value = route.query.id
+    await loadEditData(route.query.id)
+  }
 })
 
 // 附件选择与图片预览
