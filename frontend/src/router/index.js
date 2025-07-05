@@ -3,6 +3,7 @@ import Login from '../views/Login.vue'
 import Home from '../views/Home.vue'
 import ComplaintForm from '../views/ComplaintForm.vue'
 import ComplaintList from '../views/ComplaintList.vue'
+import DataVisualization from '../views/DataVisualization.vue'
 import AdminLayout from '../views/admin/AdminLayout.vue'
 import Dashboard from '../views/admin/Dashboard.vue'
 import PurchaseList from '../views/admin/PurchaseList.vue'
@@ -14,6 +15,7 @@ const routes = [
   { path: '/', component: Home },
   { path: '/add', component: ComplaintForm },
   { path: '/complaint/list', component: ComplaintList },
+  { path: '/data-visualization', component: DataVisualization },
   {
     path: '/profile',
     name: 'Profile',

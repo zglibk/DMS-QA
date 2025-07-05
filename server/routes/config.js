@@ -1239,10 +1239,6 @@ router.get('/workshops', async (req, res) => {
       ],
       message: '获取车间数据成功（使用默认数据）'
     });
-  } finally {
-    if (connection) {
-      connection.close();
-    }
   }
 });
 

@@ -418,6 +418,10 @@ const convertValue = (value, type, fieldKey = null, worksheet = null, cellAddres
     if (fieldKey === 'OrderNo') {
       return generateTempOrderNo();
     }
+    // 特殊处理：布尔值字段空值转换为0
+    if (type === 'boolean') {
+      return 0;
+    }
     return null;
   }
 
@@ -472,7 +476,15 @@ const convertValue = (value, type, fieldKey = null, worksheet = null, cellAddres
     case 'decimal':
       return parseFloat(value) || 0;
     case 'boolean':
-      return value === true || value === 1 || value === '是' || value === 'true';
+      // 处理中文"是"/"否"和其他布尔值格式，返回数值类型以适配数据库bit字段
+      if (value === '是' || value === true || value === 1 || value === '1' || value === 'true') {
+        return 1; // 返回数值1
+      }
+      if (value === '否' || value === false || value === 0 || value === '0' || value === 'false') {
+        return 0; // 返回数值0
+      }
+      // 默认情况下返回0
+      return 0;
     case 'string':
     default:
       result = String(value).trim();
@@ -819,6 +831,8 @@ function validateAndSuggestConversion(value, field, rowNumber, columnName, field
       if (!isValidBoolean(value)) {
         const convertedBoolean = tryConvertToBoolean(value);
         if (convertedBoolean !== null) {
+          // 显示用户友好的文本
+          const displayValue = convertedBoolean === 1 ? '是' : '否';
           result.conversion = {
             row: rowNumber,
             column: columnName,
@@ -826,7 +840,7 @@ function validateAndSuggestConversion(value, field, rowNumber, columnName, field
             originalValue: value,
             convertedValue: convertedBoolean,
             type: 'boolean',
-            message: `将 "${value}" 转换为布尔值 "${convertedBoolean}"`
+            message: `将 "${value}" 转换为布尔值 "${displayValue}"`
           };
         } else {
           result.error = {
@@ -1400,16 +1414,25 @@ function tryConvertToDecimal(value) {
 }
 
 function isValidBoolean(value) {
+  // 空值也被认为是有效的布尔值（将转换为0）
+  if (value === null || value === undefined || value === '') {
+    return true;
+  }
   const booleanValues = ['是', '否', 'true', 'false', '1', '0', 1, 0, true, false];
   return booleanValues.includes(value);
 }
 
 function tryConvertToBoolean(value) {
+  // 处理空值：空值转换为0（否）
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+
   const trueValues = ['是', 'true', '1', 1, true];
   const falseValues = ['否', 'false', '0', 0, false];
 
-  if (trueValues.includes(value)) return '是';
-  if (falseValues.includes(value)) return '否';
+  if (trueValues.includes(value)) return 1; // 返回数值1（是）
+  if (falseValues.includes(value)) return 0; // 返回数值0（否）
   return null;
 }
 

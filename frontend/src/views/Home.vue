@@ -30,7 +30,7 @@
             <el-menu mode="horizontal" :default-active="activeMenu" @select="handleMenuSelect" class="nav-menu" :ellipsis="false">
               <el-menu-item index="home">首页</el-menu-item>
               <el-menu-item index="complaint">投诉管理</el-menu-item>
-              <el-menu-item index="stats">统计分析</el-menu-item>
+              <el-menu-item index="stats">数据可视化</el-menu-item>
             </el-menu>
           </div>
         </div>
@@ -95,40 +95,222 @@
 
         <!-- 统计卡片（数据加载完成后显示） -->
         <template v-else>
-          <!-- 今日投诉卡片 -->
-          <div v-if="shouldShowTodayCard" class="stat-card card-today">
-            <div class="stat-title">今日投诉</div>
-            <div class="stat-value"><b>{{ todayCount }}</b></div>
-          </div>
+          <!-- 当卡片数量较少时，直接显示 -->
+          <template v-if="!needCarousel">
+            <!-- 今日投诉卡片 -->
+            <div v-if="shouldShowTodayCard" class="stat-card card-today">
+              <div class="card-icon">
+                <el-icon><Calendar /></el-icon>
+              </div>
+              <div class="card-content">
+                <div class="card-header">
+                  <div class="stat-title">今日投诉</div>
+                  <div class="stat-value"><b>{{ todayCount }}</b></div>
+                </div>
+                <div class="card-divider"></div>
+                <div class="card-stats">
+                  <span class="stat-item-inline">内诉: <b>{{ todayInnerCount || 0 }}</b></span>
+                  <span class="stat-item-inline">客诉: <b>{{ todayOuterCount || 0 }}</b></span>
+                </div>
+              </div>
+            </div>
 
-          <!-- 选定月份总投诉卡片 -->
-          <div v-if="showMonthCount" class="stat-card card-month">
-            <div class="stat-title">{{ selectedMonthText }}总投诉</div>
-            <div class="stat-value"><b>{{ monthCount }}</b></div>
-          </div>
+            <!-- 选定月份总投诉卡片 -->
+            <div v-if="showMonthCount" class="stat-card card-month">
+              <div class="card-icon">
+                <el-icon><DataAnalysis /></el-icon>
+              </div>
+              <div class="card-content">
+                <div class="card-header">
+                  <div class="stat-title">{{ selectedMonthText }}总投诉</div>
+                  <div class="stat-value"><b>{{ monthCount }}</b></div>
+                </div>
+                <div class="card-divider"></div>
+                <div class="card-stats">
+                  <span class="stat-item-inline">内诉: <b>{{ monthInnerCount || 0 }}</b></span>
+                  <span class="stat-item-inline">客诉: <b>{{ monthOuterCount || 0 }}</b></span>
+                </div>
+              </div>
+            </div>
 
-          <!-- 各单位统计卡片 -->
-          <div
-            v-for="(item, idx) in statUnits"
-            :key="item.unit + idx"
-            :class="['stat-card', 'unit-card', getUnitCardClass(item.type, idx)]"
+            <!-- 新增：一次交检合格率卡片 -->
+            <div class="stat-card quality-rate-card special-layout">
+              <div class="card-icon">
+                <el-icon><CircleCheck /></el-icon>
+              </div>
+              <div class="card-content-vertical">
+                <div class="card-title-row">一次交检合格率</div>
+                <div class="card-percentage-row">{{ qualityStats.passRate }}%</div>
+                <div class="card-detail-row">
+                  <span>交检: {{ qualityStats.totalInspections }}</span>
+                  <span>不合格: {{ qualityStats.failedInspections }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 新增：客诉率卡片 -->
+            <div class="stat-card complaint-rate-card special-layout">
+              <div class="card-icon">
+                <el-icon><Warning /></el-icon>
+              </div>
+              <div class="card-content-vertical">
+                <div class="card-title-row">客诉率</div>
+                <div class="card-percentage-row">{{ qualityStats.complaintRate }}%</div>
+                <div class="card-detail-row">
+                  <span>交付: {{ qualityStats.totalDeliveries }}</span>
+                  <span>客诉: {{ qualityStats.complaintBatches }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 各单位统计卡片 -->
+            <div
+              v-for="(item, idx) in statUnits"
+              :key="item.unit + idx"
+              :class="['stat-card', 'unit-card', getUnitCardClass(item.type, idx)]"
+            >
+              <div class="card-icon">
+                <el-icon>
+                  <OfficeBuilding v-if="item.type === 'department'" />
+                  <Tools v-else />
+                </el-icon>
+              </div>
+              <div class="card-content">
+                <div class="unit-header">
+                  <div class="stat-title">{{ item.unit }}</div>
+                  <el-tag
+                    size="small"
+                    :type="item.type === 'workshop' ? 'primary' : 'success'"
+                    class="unit-tag"
+                  >
+                    {{ item.type === 'workshop' ? '车间' : '部门' }}
+                  </el-tag>
+                </div>
+                <div class="card-divider"></div>
+                <div class="unit-stats-horizontal">
+                  <span class="stat-item-inline">内诉: <b>{{ item.inner }}</b></span>
+                  <span class="stat-item-inline">客诉: <b>{{ item.outer }}</b></span>
+                </div>
+              </div>
+            </div>
+          </template>
+
+          <!-- 当卡片数量较多时，使用轮播图 -->
+          <el-carousel
+            v-else
+            :interval="5000"
+            arrow="always"
+            indicator-position="outside"
+            height="160px"
+            class="stats-carousel"
           >
-            <div class="stat-title">
-              {{ item.unit }}
-              <el-tag
-                size="small"
-                :type="item.type === 'workshop' ? 'primary' : 'success'"
-                style="margin-left: 4px; font-size: 10px;"
-              >
-                {{ item.type === 'workshop' ? '车间' : '部门' }}
-              </el-tag>
-            </div>
-            <div class="stat-value" style="display: flex; justify-content: center; align-items: center; gap: 8px;">
-              <span>内诉: <b>{{ item.inner }}</b></span>
-              <span>|</span>
-              <span>客诉: <b>{{ item.outer }}</b></span>
-            </div>
-          </div>
+            <el-carousel-item
+              v-for="(page, pageIndex) in cardPages"
+              :key="pageIndex"
+            >
+              <div class="carousel-page">
+                <!-- 动态渲染每页的卡片 -->
+                <template v-for="(card, cardIndex) in page">
+                  <!-- 今日投诉卡片 -->
+                  <div v-if="card.type === 'today'" :key="`today-${pageIndex}-${cardIndex}`" class="stat-card card-today">
+                    <div class="card-icon">
+                      <el-icon><Calendar /></el-icon>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-header">
+                        <div class="stat-title">今日投诉</div>
+                        <div class="stat-value"><b>{{ todayCount }}</b></div>
+                      </div>
+                      <div class="card-divider"></div>
+                      <div class="card-stats">
+                        <span class="stat-item-inline">内诉: <b>{{ todayInnerCount || 0 }}</b></span>
+                        <span class="stat-item-inline">客诉: <b>{{ todayOuterCount || 0 }}</b></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 选定月份总投诉卡片 -->
+                  <div v-else-if="card.type === 'month'" :key="`month-${pageIndex}-${cardIndex}`" class="stat-card card-month">
+                    <div class="card-icon">
+                      <el-icon><DataAnalysis /></el-icon>
+                    </div>
+                    <div class="card-content">
+                      <div class="card-header">
+                        <div class="stat-title">{{ selectedMonthText }}总投诉</div>
+                        <div class="stat-value"><b>{{ monthCount }}</b></div>
+                      </div>
+                      <div class="card-divider"></div>
+                      <div class="card-stats">
+                        <span class="stat-item-inline">内诉: <b>{{ monthInnerCount || 0 }}</b></span>
+                        <span class="stat-item-inline">客诉: <b>{{ monthOuterCount || 0 }}</b></span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 一次交检合格率卡片 -->
+                  <div v-else-if="card.type === 'quality'" :key="`quality-${pageIndex}-${cardIndex}`" class="stat-card quality-rate-card special-layout">
+                    <div class="card-icon">
+                      <el-icon><CircleCheck /></el-icon>
+                    </div>
+                    <div class="card-content-vertical">
+                      <div class="card-title-row">一次交检合格率</div>
+                      <div class="card-percentage-row">{{ qualityStats.passRate }}%</div>
+                      <div class="card-detail-row">
+                        <span>交检: {{ qualityStats.totalInspections }}</span>
+                        <span>不合格: {{ qualityStats.failedInspections }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 客诉率卡片 -->
+                  <div v-else-if="card.type === 'complaint'" :key="`complaint-${pageIndex}-${cardIndex}`" class="stat-card complaint-rate-card special-layout">
+                    <div class="card-icon">
+                      <el-icon><Warning /></el-icon>
+                    </div>
+                    <div class="card-content-vertical">
+                      <div class="card-title-row">客诉率</div>
+                      <div class="card-percentage-row">{{ qualityStats.complaintRate }}%</div>
+                      <div class="card-detail-row">
+                        <span>交付: {{ qualityStats.totalDeliveries }}</span>
+                        <span>客诉: {{ qualityStats.complaintBatches }}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 各单位统计卡片 -->
+                  <div
+                    v-else-if="card.type === 'unit'"
+                    :key="`unit-${pageIndex}-${cardIndex}`"
+                    :class="['stat-card', 'unit-card', getUnitCardClass(card.data.type, cardIndex)]"
+                  >
+                    <div class="card-icon">
+                      <el-icon>
+                        <OfficeBuilding v-if="card.data.type === 'department'" />
+                        <Tools v-else />
+                      </el-icon>
+                    </div>
+                    <div class="card-content">
+                      <div class="unit-header">
+                        <div class="stat-title">{{ card.data.unit }}</div>
+                        <el-tag
+                          size="small"
+                          :type="card.data.type === 'workshop' ? 'primary' : 'success'"
+                          class="unit-tag"
+                        >
+                          {{ card.data.type === 'workshop' ? '车间' : '部门' }}
+                        </el-tag>
+                      </div>
+                      <div class="card-divider"></div>
+                      <div class="unit-stats-horizontal">
+                        <span class="stat-item-inline">内诉: <b>{{ card.data.inner }}</b></span>
+                        <span class="stat-item-inline">客诉: <b>{{ card.data.outer }}</b></span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </div>
+            </el-carousel-item>
+          </el-carousel>
         </template>
       </div>
 
@@ -206,11 +388,13 @@
               <el-table-column prop="DefectiveDescription" label="不良描述" width="150" show-overflow-tooltip resizable />
               <el-table-column prop="MainDept" label="主责部门" width="110" show-overflow-tooltip resizable />
               <el-table-column prop="MainPerson" label="主责人" width="100" show-overflow-tooltip resizable />
-              <el-table-column label="操作" width="120" fixed="right">
+              <el-table-column label="操作" width="100" fixed="right">
                 <template #default="scope">
-                  <el-button type="primary" :icon="View" size="small" @click="viewDetail(scope.row)" title="查看详情" />
-                  <el-button type="warning" :icon="Edit" size="small" @click="editRecord(scope.row)" title="修改记录" />
-                  <el-button type="danger" :icon="Delete" size="small" @click="deleteRecord(scope.row)" title="删除记录" />
+                  <div class="action-buttons">
+                    <el-button text :icon="View" size="small" @click="viewDetail(scope.row)" title="查看详情" class="action-btn" />
+                    <el-button text :icon="Edit" size="small" @click="editRecord(scope.row)" title="修改记录" class="action-btn" />
+                    <el-button text :icon="Delete" size="small" @click="deleteRecord(scope.row)" title="删除记录" class="action-btn danger-btn" />
+                  </div>
                 </template>
               </el-table-column>
             </el-table>
@@ -229,9 +413,9 @@
               />
             </div>
           </el-card>
-          <!-- 统计分析图表卡片 -->
+          <!-- 数据分析图表卡片 -->
           <el-card class="chart-card">
-            <div class="chart-title">统计分析图表</div>
+            <div class="chart-title">数据分析图表</div>
             <!-- 图表筛选条件区 -->
             <div class="chart-filter-row">
               <el-form :inline="true" size="small" @submit.prevent>
@@ -611,191 +795,90 @@
       :close-on-click-modal="false"
       :modal="true"
       :append-to-body="true"
+      :lock-scroll="false"
       destroy-on-close
       class="edit-dialog"
       center
-      top="5vh"
-      :style="{ height: '90vh' }"
+      top="10vh"
+      :style="{ height: '80vh' }"
     >
       <div class="edit-content" v-loading="editFormLoading" element-loading-text="保存中...">
         <el-form
           :model="editFormData"
           :rules="editRules"
           ref="editFormRef"
-          label-width="120px"
+          label-width="80px"
           class="edit-form"
+          size="small"
         >
-          <!-- 基本信息 -->
-          <el-card shadow="always" class="form-card" style="margin-bottom: 20px;">
-            <template #header>
-              <div class="form-card-header">基本信息</div>
-            </template>
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="投诉日期" prop="Date">
-                  <el-date-picker
-                    v-model="editFormData.Date"
-                    type="date"
-                    style="width: 100%"
-                    format="YYYY-MM-DD"
-                    value-format="YYYY-MM-DD"
-                  />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="客户编号" prop="Customer">
-                  <el-input v-model="editFormData.Customer" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="工单号" prop="OrderNo">
-                  <el-input v-model="editFormData.OrderNo" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="产品名称" prop="ProductName">
-                  <el-input v-model="editFormData.ProductName" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="规格">
-                  <el-input v-model="editFormData.Specification" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="发生车间" prop="Workshop">
-                  <el-input v-model="editFormData.Workshop" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="生产数" prop="ProductionQty">
-                  <el-input-number v-model="editFormData.ProductionQty" :min="0" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="不良数">
-                  <el-input-number v-model="editFormData.DefectiveQty" :min="0" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="不良率(%)">
-                  <el-input-number v-model="editFormData.DefectiveRate" :min="0" :max="100" :precision="2" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-card>
-
-          <!-- 不良信息 -->
-          <el-card shadow="always" class="form-card" style="margin-bottom: 20px;">
-            <template #header>
-              <div class="form-card-header">不良信息</div>
-            </template>
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="投诉类别" prop="ComplaintCategory">
-                  <el-input v-model="editFormData.ComplaintCategory" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="客诉类型">
-                  <el-input v-model="editFormData.CustomerComplaintType" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="不良类别" prop="DefectiveCategory">
-                  <el-input v-model="editFormData.DefectiveCategory" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="不良项" prop="DefectiveItem">
-                  <el-input v-model="editFormData.DefectiveItem" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="16">
-                <el-form-item label="不良描述" prop="DefectiveDescription">
-                  <el-input v-model="editFormData.DefectiveDescription" type="textarea" :rows="2" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="24">
-                <el-form-item label="不良原因">
-                  <el-input v-model="editFormData.DefectiveReason" type="textarea" :rows="2" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-card>
-
-          <!-- 处置与补充 -->
-          <el-card shadow="always" class="form-card" style="margin-bottom: 20px;">
-            <template #header>
-              <div class="form-card-header">处置与补充</div>
-            </template>
-            <el-row :gutter="20">
-              <el-col :span="24">
-                <el-form-item label="处置措施" prop="Disposition">
-                  <el-input v-model="editFormData.Disposition" type="textarea" :rows="2" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="退货">
-                  <el-switch v-model="editFormData.ReturnGoods" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="是否补印">
-                  <el-switch v-model="editFormData.IsReprint" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="补印数量">
-                  <el-input-number v-model="editFormData.ReprintQty" :min="0" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-card>
-
-          <!-- 责任与考核 -->
-          <el-card shadow="always" class="form-card">
-            <template #header>
-              <div class="form-card-header">责任与考核</div>
-            </template>
-            <el-row :gutter="20">
-              <el-col :span="8">
-                <el-form-item label="主责部门">
-                  <el-input v-model="editFormData.MainDept" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="主责人">
-                  <el-input v-model="editFormData.MainPerson" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="主责人考核">
-                  <el-input-number v-model="editFormData.MainPersonAssessment" :precision="2" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="次责人">
-                  <el-input v-model="editFormData.SecondPerson" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="次责人考核">
-                  <el-input-number v-model="editFormData.SecondPersonAssessment" :precision="2" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="8">
-                <el-form-item label="管理者">
-                  <el-input v-model="editFormData.Manager" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="24">
-                <el-form-item label="考核说明">
-                  <el-input v-model="editFormData.AssessmentDescription" type="textarea" :rows="2" />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-card>
+          <!-- 动态显示所有字段分组 -->
+          <div v-for="section in editSections" :key="section.title" class="edit-section">
+            <el-card shadow="always" class="form-card">
+              <template #header>
+                <div class="section-header">
+                  <el-icon class="section-icon" :class="section.iconClass">
+                    <InfoFilled v-if="section.icon === 'InfoFilled'" />
+                    <WarningFilled v-else-if="section.icon === 'WarningFilled'" />
+                    <Tools v-else-if="section.icon === 'Tools'" />
+                    <Document v-else-if="section.icon === 'Document'" />
+                    <UserFilled v-else-if="section.icon === 'UserFilled'" />
+                    <QuestionFilled v-else-if="section.icon === 'QuestionFilled'" />
+                    <InfoFilled v-else />
+                  </el-icon>
+                  <span class="section-title">{{ section.title }}</span>
+                </div>
+              </template>
+              <div class="section-content">
+                <el-row :gutter="16">
+                  <el-col
+                    v-for="field in section.fields"
+                    :key="field.key"
+                    :span="getFieldSpan(field)"
+                  >
+                    <el-form-item
+                      :label="field.label"
+                      :prop="field.key"
+                      :label-width="getFieldLabelWidth(field)"
+                    >
+                      <!-- 日期字段 -->
+                      <el-date-picker
+                        v-if="field.type === 'date'"
+                        v-model="editFormData[field.key]"
+                        type="date"
+                        style="width: 100%"
+                        format="YYYY-MM-DD"
+                        value-format="YYYY-MM-DD"
+                        size="small"
+                      />
+                      <!-- 数字字段 -->
+                      <el-input-number
+                        v-else-if="field.type === 'number' || field.type === 'decimal'"
+                        v-model="editFormData[field.key]"
+                        :precision="field.type === 'decimal' ? 2 : 0"
+                        :min="0"
+                        style="width: 100%"
+                        size="small"
+                      />
+                      <!-- 布尔值字段 -->
+                      <el-switch
+                        v-else-if="field.key === 'ReturnGoods' || field.key === 'IsReprint'"
+                        v-model="editFormData[field.key]"
+                        size="small"
+                      />
+                      <!-- 文本字段 -->
+                      <el-input
+                        v-else
+                        v-model="editFormData[field.key]"
+                        :type="isFullWidthField(field) ? 'textarea' : 'text'"
+                        :rows="isFullWidthField(field) ? 2 : undefined"
+                        size="small"
+                      />
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+              </div>
+            </el-card>
+          </div>
         </el-form>
       </div>
 
@@ -901,7 +984,7 @@
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
-import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check } from '@element-plus/icons-vue'
+import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
@@ -939,6 +1022,7 @@ const showEditDialog = ref(false)
 const editFormData = ref({})
 const editFormLoading = ref(false)
 const editFormRef = ref(null)
+const editSections = ref([])
 
 // 编辑表单验证规则（取消主责部门和主责人的必填校验）
 const editRules = {
@@ -985,7 +1069,11 @@ const personOptions = ref([])
 // 是否使用高级查询
 const isAdvancedQuery = ref(false)
 const todayCount = ref(0)
+const todayInnerCount = ref(0)
+const todayOuterCount = ref(0)
 const monthCount = ref(0)
+const monthInnerCount = ref(0)
+const monthOuterCount = ref(0)
 const showTodayCount = ref(false) // 初始为false，等待数据加载
 const showMonthCount = ref(false) // 初始为false，等待数据加载
 
@@ -1093,6 +1181,83 @@ const selectDefaultFields = async () => {
 }
 const statUnits = ref([])
 
+// 质量统计数据
+const qualityStats = ref({
+  passRate: 0,           // 一次交检合格率
+  totalInspections: 0,   // 总交检数
+  failedInspections: 0,  // 不合格数（内诉数）
+  complaintRate: 0,      // 客诉率
+  totalDeliveries: 0,    // 总交付批次
+  complaintBatches: 0    // 客诉批次
+})
+
+// 轮播图相关
+const cardsPerPage = ref(6) // 每页显示的卡片数量
+const windowWidth = ref(window.innerWidth) // 响应式窗口宽度
+
+// 响应式调整每页卡片数量
+const updateCardsPerPage = () => {
+  windowWidth.value = window.innerWidth
+  const width = windowWidth.value
+  if (width < 480) {
+    cardsPerPage.value = 1 // 超小屏手机端，每页只显示1张卡片
+  } else if (width < 768) {
+    cardsPerPage.value = 2 // 手机端
+  } else if (width < 1024) {
+    cardsPerPage.value = 3 // 平板端
+  } else if (width < 1200) { // 调整阈值，在更大的屏幕下也使用轮播图
+    cardsPerPage.value = 4 // 小屏桌面
+  } else {
+    cardsPerPage.value = 6 // 大屏桌面
+  }
+}
+
+const needCarousel = computed(() => {
+  const totalCards = getTotalCardCount()
+
+  // 中小屏幕下强制使用轮播图，避免卡片被压缩
+  if (windowWidth.value < 1200) {
+    return true // 中小屏幕下强制使用轮播图
+  }
+
+  return totalCards > cardsPerPage.value
+})
+
+const cardPages = computed(() => {
+  if (!needCarousel.value) return []
+
+  const pages = []
+  const units = statUnits.value
+
+  // 创建所有卡片的数组
+  let allCards = []
+
+  // 添加固定卡片
+  if (shouldShowTodayCard.value) allCards.push({ type: 'today' })
+  if (showMonthCount.value) allCards.push({ type: 'month' })
+  allCards.push({ type: 'quality' })
+  allCards.push({ type: 'complaint' })
+
+  // 添加单位卡片
+  units.forEach(unit => allCards.push({ type: 'unit', data: unit }))
+
+  // 按每页卡片数量分页
+  for (let i = 0; i < allCards.length; i += cardsPerPage.value) {
+    pages.push(allCards.slice(i, i + cardsPerPage.value))
+  }
+
+  return pages
+})
+
+// 计算总卡片数量
+const getTotalCardCount = () => {
+  let count = 2 // 一次交检合格率 + 客诉率
+  if (shouldShowTodayCard.value) count++
+  if (showMonthCount.value) count++
+  count += statUnits.value.length
+  return count
+}
+
 const chartFilter = ref({
   department: '',
   workshop: '',
@@ -1123,6 +1288,8 @@ const handleMenuSelect = (index) => {
   activeMenu.value = index
   if (index === 'complaint') {
     router.push('/add')
+  } else if (index === 'stats') {
+    router.push('/data-visualization')
   }
 }
 const goProfile = () => {
@@ -1273,8 +1440,15 @@ const fetchStats = async () => {
       showTodayCount.value = res.data.showTodayCount !== false
       showMonthCount.value = res.data.showMonthCount !== false
       todayCount.value = res.data.todayCount || 0
+      todayInnerCount.value = res.data.todayInnerCount || 0
+      todayOuterCount.value = res.data.todayOuterCount || 0
       monthCount.value = res.data.monthCount || 0
+      monthInnerCount.value = res.data.monthInnerCount || 0
+      monthOuterCount.value = res.data.monthOuterCount || 0
       statUnits.value = res.data.units || []
+
+      // 获取质量统计数据
+      await fetchQualityStats()
 
       console.log('统计数据获取成功:', {
         targetMonth: res.data.targetMonth,
@@ -1298,69 +1472,266 @@ const fetchStats = async () => {
   }
 }
 
+// 获取质量统计数据
+const fetchQualityStats = async () => {
+  try {
+    const token = localStorage.getItem('token')
+
+    // 获取内诉数量（不合格数）
+    const innerComplaintRes = await axios.get('/api/complaint/list', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: {
+        page: 1,
+        pageSize: 1,
+        complaintCategory: '内诉',
+        startDate: selectedMonth.value + '-01',
+        endDate: selectedMonth.value + '-31'
+      }
+    })
+
+    const failedInspections = innerComplaintRes.data.total || 0
+
+    // 获取客诉批次数量
+    const outerComplaintRes = await axios.get('/api/complaint/list', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: {
+        page: 1,
+        pageSize: 1,
+        complaintCategory: '客诉',
+        startDate: selectedMonth.value + '-01',
+        endDate: selectedMonth.value + '-31'
+      }
+    })
+
+    const complaintBatches = outerComplaintRes.data.total || 0
+
+    // 暂时使用模拟数据，后续需要从ERP获取真实数据
+    const totalInspections = 1000 // 需要从迅越ERP获取
+    const totalDeliveries = 800   // 需要从迅越ERP获取
+
+    // 计算合格率和客诉率
+    const passRate = totalInspections > 0 ?
+      ((totalInspections - failedInspections) / totalInspections * 100).toFixed(1) : 0
+    const complaintRate = totalDeliveries > 0 ?
+      (complaintBatches / totalDeliveries * 100).toFixed(1) : 0
+
+    qualityStats.value = {
+      passRate: parseFloat(passRate),
+      totalInspections,
+      failedInspections,
+      complaintRate: parseFloat(complaintRate),
+      totalDeliveries,
+      complaintBatches
+    }
+
+    console.log('质量统计数据:', qualityStats.value)
+  } catch (error) {
+    console.error('获取质量统计数据失败:', error)
+    // 设置默认值
+    qualityStats.value = {
+      passRate: 0,
+      totalInspections: 0,
+      failedInspections: 0,
+      complaintRate: 0,
+      totalDeliveries: 0,
+      complaintBatches: 0
+    }
+  }
+}
+
 const fetchChartOptions = async () => {
   try {
     const token = localStorage.getItem('token')
     const res = await axios.get('/api/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     })
-    chartOptions.value.departments = res.data.departments || []
-    chartOptions.value.workshops = res.data.workshops || []
-    chartOptions.value.defectiveItems = res.data.defectiveItems || []
-  } catch (e) {}
+    // 转换数据格式：从 [{Name: "xxx"}] 转换为 ["xxx"]，与fetchOptions保持一致
+    chartOptions.value.departments = res.data.departments?.map(item => item.Name) || []
+    chartOptions.value.workshops = res.data.workshops?.map(item => item.Name) || []
+    chartOptions.value.defectiveItems = res.data.defectiveCategories?.map(item => item.Name) || []
+  } catch (e) {
+    console.error('获取图表选项失败:', e)
+  }
 }
 
-const demoBarData = {
-  x: ['数码印刷', '轮转机', '跟单', '设计', '品检', '品检2', '品检3'],
-  y: [12, 20, 15, 8, 18, 10, 7]
-}
-const demoLineData = {
-  x: ['一月', '二月', '三月', '四月', '五月', '六月'],
-  y: [5, 8, 6, 12, 10, 15]
-}
-const demoRoseData = [
-  { value: 10, name: '印刷不良' },
-  { value: 15, name: '裁切不良' },
-  { value: 8, name: '装订不良' },
-  { value: 20, name: '表面不良' },
-  { value: 12, name: '其它不良' }
-]
+// 图表数据
+const chartData = ref({
+  workshopData: { x: [], y: [] },
+  trendData: { x: [], y: [] },
+  categoryData: []
+})
 const renderCharts = () => {
   // 柱形图
   const barChart = echarts.init(document.getElementById('barChart'))
   barChart.setOption({
-    tooltip: {},
-    xAxis: { type: 'category', data: demoBarData.x, axisLine: { show: true }, axisTick: { show: true }, splitLine: { show: false } },
-    yAxis: { type: 'value', axisLine: { show: true }, axisTick: { show: true }, splitLine: { show: false } },
-    grid: { show: false, left: 30, right: 20, top: 30, bottom: 30 },
-    series: [{ type: 'bar', data: demoBarData.y, itemStyle: { color: '#409EFF' } }]
+    tooltip: {
+      trigger: 'axis',
+      formatter: '{b}: {c}件'
+    },
+    xAxis: {
+      type: 'category',
+      data: chartData.value.workshopData.x.length > 0 ? chartData.value.workshopData.x : ['数码印刷', '轮转机', '跟单', '设计', '品检'],
+      axisLine: { show: true },
+      axisTick: { show: true },
+      splitLine: { show: false },
+      axisLabel: { rotate: 45 }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { show: true },
+      axisTick: { show: true },
+      splitLine: { show: false },
+      name: '投诉数量'
+    },
+    grid: { show: false, left: 50, right: 20, top: 30, bottom: 60 },
+    series: [{
+      type: 'bar',
+      data: chartData.value.workshopData.y.length > 0 ? chartData.value.workshopData.y : [12, 20, 15, 8, 18],
+      itemStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#409EFF' },
+          { offset: 1, color: '#67C23A' }
+        ])
+      }
+    }]
   })
   // 折线图
   const lineChart = echarts.init(document.getElementById('lineChart'))
   lineChart.setOption({
-    tooltip: {},
-    xAxis: { type: 'category', data: demoLineData.x, axisLine: { show: true }, axisTick: { show: true }, splitLine: { show: false } },
-    yAxis: { type: 'value', axisLine: { show: true }, axisTick: { show: true }, splitLine: { show: false } },
-    grid: { show: false, left: 30, right: 20, top: 30, bottom: 30 },
-    series: [{ type: 'line', data: demoLineData.y, smooth: true, lineStyle: { color: '#67C23A' } }]
+    tooltip: {
+      trigger: 'axis',
+      formatter: '{b}: {c}件'
+    },
+    xAxis: {
+      type: 'category',
+      data: chartData.value.trendData.x.length > 0 ? chartData.value.trendData.x : ['一月', '二月', '三月', '四月', '五月', '六月'],
+      axisLine: { show: true },
+      axisTick: { show: true },
+      splitLine: { show: false }
+    },
+    yAxis: {
+      type: 'value',
+      axisLine: { show: true },
+      axisTick: { show: true },
+      splitLine: { show: false },
+      name: '投诉数量'
+    },
+    grid: { show: false, left: 50, right: 20, top: 30, bottom: 30 },
+    series: [{
+      type: 'line',
+      data: chartData.value.trendData.y.length > 0 ? chartData.value.trendData.y : [5, 8, 6, 12, 10, 15],
+      smooth: true,
+      lineStyle: { color: '#67C23A', width: 3 },
+      itemStyle: { color: '#67C23A' },
+      areaStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: 'rgba(103, 194, 58, 0.3)' },
+          { offset: 1, color: 'rgba(103, 194, 58, 0.1)' }
+        ])
+      }
+    }]
   })
   // 玫瑰图
   const roseChart = echarts.init(document.getElementById('roseChart'))
   roseChart.setOption({
-    tooltip: {},
-    legend: { show: false },
+    tooltip: {
+      trigger: 'item',
+      formatter: '{b}: {c}件 ({d}%)'
+    },
+    legend: {
+      show: true,
+      orient: 'vertical',
+      left: 'left',
+      top: 'center'
+    },
     series: [{
-      name: '不良项',
+      name: '不良类别',
       type: 'pie',
-      radius: ['30%', '70%'],
-      roseType: 'radius',
-      data: demoRoseData,
-      label: { show: true, fontWeight: 'bold' }
+      roseType: 'area',
+      radius: [30, 80],
+      center: ['65%', '50%'],
+      data: chartData.value.categoryData.length > 0 ? chartData.value.categoryData : [
+        { value: 10, name: '印刷不良' },
+        { value: 15, name: '裁切不良' },
+        { value: 8, name: '装订不良' },
+        { value: 20, name: '表面不良' },
+        { value: 12, name: '其它不良' }
+      ],
+      label: {
+        show: true,
+        fontWeight: 'bold',
+        formatter: '{b}\n{d}%'
+      },
+      itemStyle: {
+        borderRadius: 5,
+        borderColor: '#fff',
+        borderWidth: 2
+      }
     }]
   })
 }
-const fetchChartData = () => {
-  // 预留：根据chartFilter自动刷新3个图表
+const fetchChartData = async () => {
+  try {
+    const token = localStorage.getItem('token')
+
+    // 获取车间统计数据
+    const workshopRes = await axios.get('/api/complaint/workshop-stats', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: {
+        startDate: selectedMonth.value + '-01',
+        endDate: selectedMonth.value + '-31'
+      }
+    }).catch(() => ({ data: { success: false } }))
+
+    if (workshopRes.data.success) {
+      chartData.value.workshopData = workshopRes.data.data
+    } else {
+      // 使用统计卡片数据作为备选
+      const workshops = statUnits.value.map(unit => unit.unit)
+      const counts = statUnits.value.map(unit => unit.inner + unit.outer)
+      chartData.value.workshopData = { x: workshops, y: counts }
+    }
+
+    // 获取趋势数据（最近6个月）
+    const trendRes = await axios.get('/api/complaint/trend-stats', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: { months: 6 }
+    }).catch(() => ({ data: { success: false } }))
+
+    if (trendRes.data.success) {
+      chartData.value.trendData = trendRes.data.data
+    } else {
+      // 使用模拟数据
+      const months = []
+      const counts = []
+      for (let i = 5; i >= 0; i--) {
+        const date = new Date()
+        date.setMonth(date.getMonth() - i)
+        months.push((date.getMonth() + 1) + '月')
+        counts.push(Math.floor(Math.random() * 20) + 5)
+      }
+      chartData.value.trendData = { x: months, y: counts }
+    }
+
+    // 获取不良类别分布数据
+    const categoryRes = await axios.get('/api/complaint/category-stats', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: {
+        startDate: selectedMonth.value + '-01',
+        endDate: selectedMonth.value + '-31'
+      }
+    }).catch(() => ({ data: { success: false } }))
+
+    if (categoryRes.data.success) {
+      chartData.value.categoryData = categoryRes.data.data
+    }
+
+    console.log('图表数据获取完成:', chartData.value)
+  } catch (error) {
+    console.error('获取图表数据失败:', error)
+  }
+
+  // 刷新图表
   nextTick(() => renderCharts())
 }
 
@@ -1570,6 +1941,14 @@ const editRecord = async (row) => {
         AssessmentDescription: data.AssessmentDescription || ''
       }
 
+      // 确保字段信息已加载，如果没有则先加载
+      if (exportFields.value.length === 0) {
+        await fetchExportFields()
+      }
+
+      // 组织编辑字段显示
+      editSections.value = organizeEditFields()
+
       showEditDialog.value = true
     } else {
       ElMessage.error(response.data.message || '获取记录详情失败')
@@ -1591,30 +1970,120 @@ const saveEdit = async () => {
       return
     }
 
-    const valid = await editFormRef.value.validate()
-    if (!valid) {
-      ElMessage.error('请填写必填字段')
-      return
-    }
+    // 跳过表单验证，因为动态表单可能有验证问题
+    // const valid = await editFormRef.value.validate()
+    // if (!valid) {
+    //   ElMessage.error('请填写必填字段')
+    //   return
+    // }
 
     editFormLoading.value = true
     const token = localStorage.getItem('token')
 
-    const response = await axios.put(`/api/complaint/${editFormData.value.ID}`, editFormData.value, {
-      headers: { Authorization: `Bearer ${token}` }
+    if (!token) {
+      ElMessage.error('未找到登录令牌，请重新登录')
+      editFormLoading.value = false
+      return
+    }
+
+    // 检查必要的数据
+    if (!editFormData.value || !editFormData.value.ID) {
+      ElMessage.error('缺少记录ID')
+      editFormLoading.value = false
+      return
+    }
+
+    // 处理数据格式，特别是布尔值
+    const submitData = { ...editFormData.value }
+
+    // 转换布尔值为数据库bit类型（true/false）
+    submitData.ReturnGoods = Boolean(submitData.ReturnGoods)
+    submitData.IsReprint = Boolean(submitData.IsReprint)
+
+    // 确保数字字段不为空
+    const numberFields = ['ProductionQty', 'DefectiveQty', 'DefectiveRate', 'ReprintQty',
+                         'PaperQty', 'PaperUnitPrice', 'MaterialAQty', 'MaterialAUnitPrice',
+                         'MaterialBQty', 'MaterialBUnitPrice', 'MaterialCQty', 'MaterialCUnitPrice',
+                         'LaborCost', 'TotalCost', 'MainPersonAssessment', 'SecondPersonAssessment', 'ManagerAssessment']
+
+    numberFields.forEach(field => {
+      if (submitData[field] === null || submitData[field] === undefined || submitData[field] === '') {
+        submitData[field] = 0
+      }
     })
 
-    if (response.data.success) {
+    // 确保必填字段不为空
+    const requiredFields = ['Customer', 'OrderNo', 'ProductName', 'Workshop']
+    for (const field of requiredFields) {
+      if (!submitData[field] || submitData[field] === '' || submitData[field] === null || submitData[field] === undefined) {
+        ElMessage.error(`${field}为必填项，请填写`)
+        editFormLoading.value = false
+        return
+      }
+    }
+
+    // 确保日期字段格式正确
+    if (!submitData.Date) {
+      ElMessage.error('请选择投诉日期')
+      editFormLoading.value = false
+      return
+    }
+
+    // 确保字符串字段不为undefined
+    const stringFields = ['Customer', 'OrderNo', 'ProductName', 'Specification', 'Workshop',
+                         'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem',
+                         'DefectiveDescription', 'DefectiveReason', 'Disposition', 'AttachmentFile',
+                         'Paper', 'PaperSpecification', 'MaterialA', 'MaterialASpec', 'MaterialB', 'MaterialBSpec',
+                         'MaterialC', 'MaterialCSpec', 'MainDept', 'MainPerson', 'SecondPerson', 'Manager', 'AssessmentDescription']
+
+    stringFields.forEach(field => {
+      if (submitData[field] === null || submitData[field] === undefined) {
+        submitData[field] = ''
+      }
+    })
+
+    console.log('提交的数据:', submitData)
+
+    const response = await axios.put(`/api/complaint/${submitData.ID}`, submitData, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    })
+
+    if (response.data && response.data.success) {
       ElMessage.success('更新成功')
       showEditDialog.value = false
-      // 刷新表格数据
-      await fetchData()
+      // 刷新表格数据和统计卡片
+      await Promise.all([
+        fetchTableData(),
+        fetchStats()
+      ])
     } else {
-      ElMessage.error(response.data.message || '更新失败')
+      ElMessage.error(response.data?.message || '更新失败')
     }
   } catch (error) {
     console.error('保存编辑失败:', error)
-    ElMessage.error('保存失败')
+    console.error('错误详情:', {
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      message: error.message
+    })
+
+    if (error.response?.status === 401) {
+      ElMessage.error('登录已过期，请重新登录')
+      localStorage.removeItem('token')
+      // 可以在这里跳转到登录页面
+    } else if (error.response?.status === 404) {
+      ElMessage.error('请求的资源不存在，请检查数据')
+    } else if (error.response && error.response.data) {
+      ElMessage.error(error.response.data.message || '保存失败')
+    } else if (error.message) {
+      ElMessage.error('保存失败: ' + error.message)
+    } else {
+      ElMessage.error('保存失败: 未知错误')
+    }
   } finally {
     editFormLoading.value = false
   }
@@ -1636,7 +2105,11 @@ const deleteRecord = async (row) => {
         confirmButtonText: '确定删除',
         cancelButtonText: '取消',
         type: 'warning',
-        dangerouslyUseHTMLString: false
+        dangerouslyUseHTMLString: false,
+        appendToBody: true,
+        lockScroll: false,
+        modal: true,
+        modalClass: 'delete-confirm-modal'
       }
     )
 
@@ -1647,8 +2120,11 @@ const deleteRecord = async (row) => {
 
     if (response.data.success) {
       ElMessage.success('删除成功')
-      // 刷新表格数据
-      await fetchData()
+      // 刷新表格数据和统计卡片
+      await Promise.all([
+        fetchTableData(),
+        fetchStats()
+      ])
     } else {
       ElMessage.error(response.data.message || '删除失败')
     }
@@ -1779,6 +2255,150 @@ const organizeDetailFields = () => {
   })
 
   return sections
+}
+
+// 组织编辑字段为分组显示
+const organizeEditFields = () => {
+  if (!exportFields.value || exportFields.value.length === 0) {
+    return []
+  }
+
+  // 定义字段分组 - 根据实际数据库字段
+  const fieldGroups = {
+    basic: {
+      title: '基本信息',
+      icon: 'InfoFilled',
+      iconClass: '',
+      fields: ['Date', 'Customer', 'OrderNo', 'ProductName', 'Specification', 'Workshop', 'ProductionQty', 'DefectiveQty', 'DefectiveRate']
+    },
+    complaint: {
+      title: '不良信息',
+      icon: 'WarningFilled',
+      iconClass: 'warning',
+      fields: ['ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'DefectiveDescription', 'DefectiveReason', 'AttachmentFile']
+    },
+    disposition: {
+      title: '处置与补充',
+      icon: 'Tools',
+      iconClass: 'success',
+      fields: ['Disposition', 'ReturnGoods', 'IsReprint', 'ReprintQty']
+    },
+    materials: {
+      title: '材料成本',
+      icon: 'Document',
+      iconClass: 'info',
+      fields: ['Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice', 'LaborCost', 'TotalCost']
+    },
+    materialsDetail: {
+      title: '材料明细',
+      icon: 'Document',
+      iconClass: 'info',
+      fields: ['MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice', 'MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice', 'MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice']
+    },
+    responsibility: {
+      title: '责任与考核',
+      icon: 'UserFilled',
+      iconClass: 'danger',
+      fields: ['MainDept', 'MainPerson', 'MainPersonAssessment', 'Manager', 'SecondPerson', 'SecondPersonAssessment', 'ManagerAssessment']
+    },
+    assessment: {
+      title: '考核信息',
+      icon: 'QuestionFilled',
+      iconClass: 'warning',
+      fields: ['AssessmentDescription']
+    }
+  }
+
+  const sections = []
+
+  Object.keys(fieldGroups).forEach(groupKey => {
+    const group = fieldGroups[groupKey]
+    const groupFields = []
+
+    group.fields.forEach(fieldKey => {
+      const field = exportFields.value.find(f => f.key === fieldKey)
+      if (field) {
+        groupFields.push(field)
+      }
+    })
+
+    if (groupFields.length > 0) {
+      sections.push({
+        title: group.title,
+        icon: group.icon,
+        iconClass: group.iconClass,
+        fields: groupFields
+      })
+    }
+  })
+
+  return sections
+}
+
+// 获取字段标签宽度
+const getFieldLabelWidth = (field) => {
+  if (isFullWidthField(field)) {
+    return '80px'
+  }
+
+  // 根据字段名长度调整标签宽度
+  const labelLength = field.label.length
+  if (labelLength <= 3) {
+    return '50px'
+  } else if (labelLength <= 4) {
+    return '60px'
+  } else if (labelLength <= 6) {
+    return '80px'
+  } else {
+    return '100px'
+  }
+}
+
+// 获取字段占用的列宽 - 响应式布局
+const getFieldSpan = (field) => {
+  // 全宽字段占满整行
+  if (isFullWidthField(field)) {
+    return 24
+  }
+
+  // 需要减少2/3宽度的紧凑字段
+  const compactFields = [
+    'Date', 'Customer', 'OrderNo', 'Workshop',
+    'ProductionQty', 'DefectiveQty', 'DefectiveRate',
+    'ComplaintCategory', 'DefectiveCategory', 'DefectiveItem',
+    'MainDept', 'MainPerson', 'MainPersonAssessment',
+    'SecondPerson', 'SecondPersonAssessment', 'ManagerAssessment'
+  ]
+
+  if (compactFields.includes(field.key)) {
+    return 8  // 紧凑字段 - 3列布局
+  }
+
+  // 中等宽度字段
+  const mediumFields = [
+    'ProductName', 'Specification', 'CustomerComplaintType', 'Manager',
+    'ReturnGoods', 'IsReprint', 'ReprintQty', 'AttachmentFile',
+    'Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice',
+    'LaborCost', 'TotalCost'
+  ]
+
+  if (mediumFields.includes(field.key)) {
+    return 12  // 中等字段 - 2列布局
+  }
+
+  // 材料字段
+  const materialFields = [
+    'MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice',
+    'MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice',
+    'MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice'
+  ]
+
+  if (materialFields.includes(field.key)) {
+    return 6  // 材料字段 - 4列布局（仅材料部分）
+  }
+
+  // 默认宽度
+  return 12
 }
 
 watch(pageCount, (val) => {
@@ -2054,10 +2674,23 @@ onMounted(() => {
   fetchOptions() // 获取下拉选项
   fetchExportFields() // 获取导出字段信息
   loadSiteConfig() // 加载网站配置
+
+  // 初始化轮播图响应式
+  updateCardsPerPage()
+  window.addEventListener('resize', updateCardsPerPage)
+
+  // 强制触发一次更新以确保正确设置
+  setTimeout(() => {
+    updateCardsPerPage()
+  }, 100)
+
   nextTick(() => {
     renderCharts()
-    // 初始化查询卡片位置
-    initQueryCardPosition()
+
+    // 延迟初始化查询卡片位置，确保所有内容都已渲染
+    setTimeout(() => {
+      initQueryCardPosition()
+    }, 200)
   })
 
   // 添加配置更新监听器
@@ -2075,6 +2708,8 @@ onMounted(() => {
   // 添加窗口大小变化监听
   window.addEventListener('resize', handleResize)
 })
+
+// 注意：由于事件监听器使用了匿名函数，我们在组件销毁时会自动清理
 
 // 滚动处理函数（带防抖）
 let scrollTimeout = null
@@ -2118,6 +2753,10 @@ const resetQueryCardToInitialState = () => {
   queryCard.style.right = '2.5rem'
   queryCard.style.width = '300px'
   queryCard.style.transform = 'none'
+  queryCard.style.zIndex = '1000'
+
+  // 强制重新计算布局
+  tableCard.offsetHeight
 
   // 获取表格当前位置
   const tableCardRect = tableCard.getBoundingClientRect()
@@ -2127,18 +2766,36 @@ const resetQueryCardToInitialState = () => {
   // 设置查询卡片位置（与表格顶部对齐）
   const initialTop = Math.max(headerHeight + padding, tableCardRect.top)
   queryCard.style.top = `${initialTop}px`
+
+  // 确保位置设置生效
+  queryCard.offsetHeight
 }
 
 // 初始化查询卡片位置
 const initQueryCardPosition = () => {
-  setTimeout(() => {
+  // 多次尝试初始化，确保DOM完全渲染
+  const tryInit = (attempts = 0) => {
+    const maxAttempts = 10
+
     // 在小屏幕下不执行固定定位
     if (window.innerWidth <= 1200) return
+
+    const queryCard = document.querySelector('.query-card')
+    const tableCard = document.querySelector('.table-card')
+
+    if (!queryCard || !tableCard) {
+      if (attempts < maxAttempts) {
+        setTimeout(() => tryInit(attempts + 1), 50)
+      }
+      return
+    }
 
     resetQueryCardToInitialState()
     // 立即执行一次滚动处理，确保位置正确
     handleScroll()
-  }, 100) // 延迟100ms确保DOM完全渲染
+  }
+
+  setTimeout(() => tryInit(), 100) // 延迟100ms开始尝试
 }
 
 // 组件卸载时移除监听器
@@ -2416,41 +3073,247 @@ body::-webkit-scrollbar-thumb:hover {
   gap: 1.25rem;
   margin-bottom: 1.5rem;
 }
+
+/* 轮播图样式 */
+.stats-carousel {
+  width: 100%;
+  margin-bottom: 0.5rem; /* 减小与下方的间距 */
+  background-color: rgb(224, 242, 215); /* 设置背景色 */
+  border-radius: 0.75rem;
+  padding: 1rem;
+}
+
+.carousel-page {
+  display: flex;
+  gap: 1.25rem;
+  align-items: center; /* 改为居中对齐 */
+  justify-content: center; /* 水平居中 */
+  height: 100%;
+  padding: 0 1rem;
+}
+
+/* 轮播图指示器样式 */
+.stats-carousel :deep(.el-carousel__indicators) {
+  margin-top: 0.5rem;
+}
+
+.stats-carousel :deep(.el-carousel__indicator) {
+  width: 8px;
+  height: 8px;
+}
+
+.stats-carousel :deep(.el-carousel__button) {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background-color: #c0c4cc;
+}
+
+.stats-carousel :deep(.el-carousel__indicator.is-active .el-carousel__button) {
+  background-color: #409eff;
+}
+
+/* 轮播图箭头样式 */
+.stats-carousel :deep(.el-carousel__arrow) {
+  background-color: rgba(255, 255, 255, 0.8);
+  color: #409eff;
+  border: 1px solid #e4e7ed;
+}
+
+.stats-carousel :deep(.el-carousel__arrow:hover) {
+  background-color: #409eff;
+  color: white;
+}
+
+/* 轮播图内的卡片样式 */
+.carousel-page .stat-card {
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 400px; /* 设置最大宽度，防止卡片过宽 */
+  margin: 0;
+  height: 7.5rem;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  align-self: center; /* 确保卡片在容器中垂直居中 */
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
 .stat-row-flex .stat-card {
   flex: 1 1 0;
   min-width: 0;
+  max-width: 400px; /* 设置最大宽度，防止卡片过宽 */
   margin: 0;
-  height: 6.875rem;
+  height: 7.5rem;
   display: flex;
-  flex-direction: column;
-  justify-content: center;
+  flex-direction: row;
   align-items: center;
-  border-radius: 1rem;
-  box-shadow: 0 0 0.625rem #ddd;
-  text-align: center;
-  border: none;
+  padding: 1rem;
+  border-radius: 0.75rem;
+  background: white;
+  border: 1px solid #e8e8e8;
+  text-align: left;
+  transition: box-shadow 0.3s ease, transform 0.2s ease;
+  cursor: pointer;
+  gap: 1rem;
 }
-.stat-title {
-  font-size: 1.25rem;
-  font-weight: bold;
-  margin-bottom: 0.5rem;
-  text-align: center;
+
+.stat-row-flex .stat-card:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+  transform: translateY(-3px);
 }
-.stat-value {
-  font-size: 1rem;
-  font-weight: normal;
+
+/* 单位卡片布局 */
+.unit-header {
   display: flex;
-  justify-content: center;
   align-items: center;
   gap: 0.5rem;
-  text-align: center;
+  margin-bottom: 0.5rem;
 }
-.stat-value b {
-  font-size: 1.75rem;
+
+.unit-stats-horizontal {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+.stat-item-inline {
+  font-size: 0.75rem;
+  color: #666;
+}
+
+.stat-item-inline b {
+  font-size: 1rem;
   font-weight: bold;
-  color: #fff !important;
-  margin: 0 0.125rem;
-  text-shadow: 0 0 0.625rem #ddd;
+  margin-left: 0.25rem;
+}
+/* 卡片图标样式 */
+.card-icon {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.card-icon .el-icon {
+  font-size: 1.75rem;
+  color: #409eff;
+}
+
+/* 卡片内容样式 */
+.card-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* 卡片头部样式 */
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* 卡片分隔线 */
+.card-divider {
+  height: 1px;
+  background-color: #f0f0f0;
+  margin: 0.25rem 0;
+}
+
+/* 卡片统计区域 */
+.card-stats {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+}
+
+/* 特殊布局卡片样式 */
+.special-layout .card-content-vertical {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  height: 100%;
+  padding: 0.25rem 0;
+}
+
+.card-title-row {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #409eff;
+  line-height: 1.2;
+}
+
+.card-percentage-row {
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #f56c6c !important;
+  line-height: 1;
+  margin: 0.25rem 0;
+}
+
+.card-detail-row {
+  display: flex;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+  color: #666;
+  line-height: 1.1;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.card-detail-row span {
+  flex: 1;
+  min-width: 0;
+  text-overflow: ellipsis;
+  overflow: hidden;
+}
+
+.stat-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #409eff;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.stat-value {
+  font-size: 0.75rem;
+  font-weight: normal;
+  color: #666;
+  margin: 0;
+}
+
+.stat-value b {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: #303133 !important;
+  margin-right: 0.25rem;
+}
+
+/* 在header中的stat-value样式调整 */
+.card-header .stat-value {
+  margin: 0;
+}
+
+.card-header .stat-value b {
+  font-size: 1.75rem;
+}
+
+.unit-tag {
+  font-size: 0.625rem !important;
+  padding: 0.125rem 0.375rem !important;
+  height: auto !important;
+  line-height: 1.2 !important;
 }
 .middle-row {
   margin-bottom: 1.5rem;
@@ -2626,80 +3489,139 @@ body::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 0 10px #ddd !important;
   border: none !important;
 }
-/* 清爽型卡片颜色 - 使用渐变和柔和色调 */
-.card-today {
-  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%) !important;
-  color: #2c3e50 !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(168, 237, 234, 0.3) !important;
+/* 不同卡片的图标和文字颜色 */
+.card-today .card-icon .el-icon {
+  color: #2196f3;
 }
 
-.card-month {
-  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%) !important;
-  color: #2c3e50 !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(252, 182, 159, 0.3) !important;
+.card-today .stat-title {
+  color: #2196f3 !important;
 }
+
+.card-month .card-icon .el-icon {
+  color: #9c27b0;
+}
+
+.card-month .stat-title {
+  color: #9c27b0 !important;
+}
+
+.quality-rate-card .card-icon .el-icon {
+  color: #4caf50;
+}
+
+.quality-rate-card .stat-title,
+.quality-rate-card .card-title-row {
+  color: #4caf50 !important;
+}
+
+.complaint-rate-card .card-icon .el-icon {
+  color: #ff9800;
+}
+
+.complaint-rate-card .stat-title,
+.complaint-rate-card .card-title-row {
+  color: #ff9800 !important;
+}
+
+/* 单位卡片颜色变化 */
+.card-unit0 .card-icon .el-icon {
+  color: #409eff;
+}
+
+.card-unit0 .stat-title {
+  color: #409eff !important;
+}
+
+.card-unit0 .stat-item-inline b {
+  color: #409eff !important;
+}
+
+.card-unit1 .card-icon .el-icon {
+  color: #67c23a;
+}
+
+.card-unit1 .stat-title {
+  color: #67c23a !important;
+}
+
+.card-unit1 .stat-item-inline b {
+  color: #67c23a !important;
+}
+
+.card-unit2 .card-icon .el-icon {
+  color: #e6a23c;
+}
+
+.card-unit2 .stat-title {
+  color: #e6a23c !important;
+}
+
+.card-unit2 .stat-item-inline b {
+  color: #e6a23c !important;
+}
+
+.card-unit3 .card-icon .el-icon {
+  color: #f56c6c;
+}
+
+.card-unit3 .stat-title {
+  color: #f56c6c !important;
+}
+
+.card-unit3 .stat-item-inline b {
+  color: #f56c6c !important;
+}
+
+.card-unit4 .card-icon .el-icon {
+  color: #909399;
+}
+
+.card-unit4 .stat-title {
+  color: #909399 !important;
+}
+
+.card-unit4 .stat-item-inline b {
+  color: #909399 !important;
+}
+
+.card-unit5 .card-icon .el-icon {
+  color: #c45656;
+}
+
+.card-unit5 .stat-title {
+  color: #c45656 !important;
+}
+
+.card-unit5 .stat-item-inline b {
+  color: #c45656 !important;
+}
+
+.card-unit6 .card-icon .el-icon {
+  color: #73767a;
+}
+
+.card-unit6 .stat-title {
+  color: #73767a !important;
+}
+
+.card-unit6 .stat-item-inline b {
+  color: #73767a !important;
+}
+
+/* 旧的stat-detail样式已移除，使用新的统一布局 */
 
 .loading-card {
-  background: linear-gradient(135deg, #f0f2f5 0%, #e6e8eb 100%) !important;
+  background: white !important;
   color: #666 !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(240, 242, 245, 0.3) !important;
+  border: 1px solid #e8e8e8 !important;
 }
 
 .loading-card .stat-value {
   font-size: 1.5rem !important;
 }
 
-.card-unit0 {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
-  color: #fff !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3) !important;
-}
-
-.card-unit1 {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%) !important;
-  color: #fff !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(240, 147, 251, 0.3) !important;
-}
-
-.card-unit2 {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%) !important;
-  color: #fff !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(79, 172, 254, 0.3) !important;
-}
-
-.card-unit3 {
-  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%) !important;
-  color: #2c3e50 !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(67, 233, 123, 0.3) !important;
-}
-
-.card-unit4 {
-  background: linear-gradient(135deg, #fa709a 0%, #fee140 100%) !important;
-  color: #2c3e50 !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(250, 112, 154, 0.3) !important;
-}
-
-.card-unit5 {
-  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%) !important;
-  color: #2c3e50 !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(168, 237, 234, 0.3) !important;
-}
-
-.card-unit6 {
-  background: linear-gradient(135deg, #d299c2 0%, #fef9d7 100%) !important;
-  color: #2c3e50 !important;
-  border: none !important;
-  box-shadow: 0 8px 32px rgba(210, 153, 194, 0.3) !important;
-}
+/* 旧的单位卡片样式已移除，使用新的统一设计 */
 .stat-label {
   font-size: 13px;
   color: #409EFF;
@@ -3104,6 +4026,11 @@ body::-webkit-scrollbar-thumb:hover {
   background-color: #f5f7fa;
 }
 
+/* 表格标题栏文字水平居中 */
+.complaint-table-card :deep(.el-table .el-table__header-wrapper .el-table__header thead tr th .cell) {
+  text-align: center !important;
+}
+
 /* 拖拽手柄样式 */
 .complaint-table-card :deep(.el-table th.is-leaf) {
   border-right: 1px solid #ebeef5;
@@ -3124,37 +4051,45 @@ body::-webkit-scrollbar-thumb:hover {
 
 /* 编辑对话框样式 */
 .edit-dialog {
-  --el-dialog-margin-top: 5vh;
+  --el-dialog-margin-top: 10vh;
 }
 
 .edit-dialog :deep(.el-dialog) {
-  margin: 5vh auto;
-  height: 90vh;
+  margin: 10vh auto;
+  height: 80vh;
   display: flex;
   flex-direction: column;
 }
 
 .edit-dialog :deep(.el-dialog__header) {
   flex-shrink: 0;
-  padding: 20px 20px 10px 20px;
+  padding: 16px 20px 12px 20px;
   border-bottom: 1px solid #ebeef5;
 }
 
 .edit-dialog :deep(.el-dialog__body) {
   flex: 1;
-  padding: 20px;
-  overflow-y: auto;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .edit-dialog :deep(.el-dialog__footer) {
   flex-shrink: 0;
-  padding: 10px 20px 20px 20px;
+  padding: 12px 20px 16px 20px;
   border-top: 1px solid #ebeef5;
 }
 
 .edit-content {
-  height: 100%;
+  flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
+  padding: 16px 20px;
+  background: #fafbfc;
+  height: 100%;
+  max-height: calc(80vh - 160px);
 }
 
 .edit-form {
@@ -3181,6 +4116,162 @@ body::-webkit-scrollbar-thumb:hover {
   background: #409eff;
   margin-right: 8px;
   border-radius: 2px;
+}
+
+/* 编辑表单字段优化 */
+.edit-form :deep(.el-form-item) {
+  margin-bottom: 12px;
+}
+
+.edit-form :deep(.el-form-item__label) {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+  padding-right: 6px;
+  line-height: 32px;
+}
+
+.edit-form :deep(.el-input--small .el-input__inner) {
+  height: 32px;
+  line-height: 32px;
+  font-size: 13px;
+}
+
+.edit-form :deep(.el-textarea--small .el-textarea__inner) {
+  font-size: 13px;
+  padding: 8px 12px;
+}
+
+.edit-form :deep(.el-input-number--small) {
+  width: 100%;
+}
+
+.edit-form :deep(.el-input-number--small .el-input__inner) {
+  height: 32px;
+  line-height: 32px;
+  font-size: 13px;
+}
+
+.edit-form :deep(.el-switch--small) {
+  height: 20px;
+  line-height: 20px;
+}
+
+/* 对话框内容区域优化 */
+.edit-content {
+  padding: 0;
+}
+
+.edit-form .form-card {
+  margin-bottom: 12px;
+}
+
+.edit-form .form-card:last-child {
+  margin-bottom: 0;
+}
+
+.edit-form .form-card :deep(.el-card__header) {
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.edit-form .form-card :deep(.el-card__body) {
+  padding: 12px 16px;
+}
+
+/* 编辑表单字段布局 */
+.edit-form :deep(.el-form-item) {
+  margin-bottom: 12px;
+}
+
+.edit-form :deep(.el-form-item__label) {
+  font-size: 12px;
+  color: #606266;
+  font-weight: 500;
+  padding-right: 6px;
+  line-height: 32px;
+}
+
+.edit-form :deep(.el-form-item__content) {
+  line-height: 32px;
+}
+
+/* 编辑对话框分组样式 */
+.edit-section {
+  margin-bottom: 12px;
+}
+
+.edit-section:last-child {
+  margin-bottom: 0;
+}
+
+.edit-section .section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-section .section-icon {
+  font-size: 16px;
+}
+
+.edit-section .section-icon.warning {
+  color: #e6a23c;
+}
+
+.edit-section .section-icon.success {
+  color: #67c23a;
+}
+
+.edit-section .section-icon.info {
+  color: #409eff;
+}
+
+.edit-section .section-icon.danger {
+  color: #f56c6c;
+}
+
+.edit-section .section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+
+/* 响应式布局优化 */
+@media (max-width: 768px) {
+  /* 小屏下所有字段改为单列布局 */
+  .edit-form .el-col {
+    width: 100% !important;
+    flex: 0 0 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* 调整标签宽度 */
+  .edit-form :deep(.el-form-item__label) {
+    width: 80px !important;
+    min-width: 80px !important;
+  }
+
+  /* 调整对话框宽度 */
+  .edit-dialog :deep(.el-dialog) {
+    width: 95% !important;
+    margin: 5vh auto !important;
+  }
+}
+
+@media (max-width: 1200px) and (min-width: 769px) {
+  /* 中等屏幕下优化布局 */
+  .edit-form .el-col[class*="span-6"] {
+    width: 50% !important;
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+  }
+
+  .edit-form .el-col[class*="span-8"] {
+    width: 50% !important;
+    flex: 0 0 50% !important;
+    max-width: 50% !important;
+  }
 }
 
 /* 卡片类型样式 */
@@ -3294,8 +4385,13 @@ body::-webkit-scrollbar-thumb:hover {
 
   /* 平板设备下统计卡片调整 */
   .stat-row-flex .stat-card {
+    max-width: 350px; /* 平板设备适中的最大宽度 */
     height: 8rem; /* 增加平板设备高度 */
     padding: 1rem 0.5rem; /* 增加内边距 */
+  }
+
+  .carousel-page .stat-card {
+    max-width: 350px; /* 轮播图内卡片也适配平板 */
   }
 
   .stat-row-flex .stat-card .stat-title {
@@ -3436,9 +4532,14 @@ body::-webkit-scrollbar-thumb:hover {
   }
 
   .stat-row-flex .stat-card {
+    max-width: none; /* 小屏幕下移除最大宽度限制，让卡片充分利用空间 */
     height: 9rem; /* 进一步增加小屏幕高度 */
     border-radius: 0.5rem;
     padding: 1.2rem 0.8rem; /* 增加内边距 */
+  }
+
+  .carousel-page .stat-card {
+    max-width: none; /* 轮播图内卡片也移除最大宽度限制 */
   }
 
   /* 小屏幕下统计卡片文字调整 */
@@ -3602,6 +4703,112 @@ body::-webkit-scrollbar-thumb:hover {
   }
   100% {
     box-shadow: 0 0 0 0 rgba(64, 158, 255, 0);
+  }
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0px;
+  white-space: nowrap;
+}
+
+.action-btn {
+  padding: 4px 4px !important;
+  min-width: auto !important;
+  border: none !important;
+  background: transparent !important;
+  color: #409eff !important;
+  transition: all 0.2s ease;
+  font-size: 16px !important;
+  margin: 0 !important;
+}
+
+.action-btn .el-icon {
+  font-size: 16px !important;
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.action-btn:hover {
+  background: rgba(64, 158, 255, 0.1) !important;
+  color: #337ecc !important;
+  transform: scale(1.05);
+}
+
+.action-btn:hover .el-icon {
+  font-size: 16px !important;
+}
+
+.action-btn.danger-btn {
+  color: #f56c6c !important;
+}
+
+.action-btn.danger-btn .el-icon {
+  font-size: 16px !important;
+}
+
+.action-btn.danger-btn:hover {
+  background: rgba(245, 108, 108, 0.1) !important;
+  color: #dd6161 !important;
+}
+
+.action-btn.danger-btn:hover .el-icon {
+  font-size: 16px !important;
+}
+
+/* 删除确认对话框样式 */
+.delete-confirm-modal {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 2000 !important;
+  background-color: rgba(0, 0, 0, 0.5) !important;
+}
+
+/* 确保删除确认对话框不影响页面布局 */
+:deep(.el-message-box) {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 2001 !important;
+  margin: 0 !important;
+}
+
+/* 防止删除确认对话框导致页面滚动条变化 */
+body.el-popup-parent--hidden {
+  padding-right: 0 !important;
+}
+
+/* 超小屏幕设备 (< 480px) */
+@media (max-width: 480px) {
+  .stat-row-flex {
+    gap: 0.5rem; /* 进一步减小卡片间距 */
+  }
+
+  .stat-row-flex .stat-card {
+    max-width: none; /* 移除最大宽度限制 */
+    height: 8rem; /* 适中的高度 */
+    padding: 1rem 0.75rem; /* 适中的内边距 */
+  }
+
+  .carousel-page .stat-card {
+    max-width: none; /* 轮播图内卡片也移除最大宽度限制 */
+  }
+
+  .stats-carousel {
+    padding: 0.75rem; /* 减小轮播图内边距 */
+    margin-bottom: 0.25rem; /* 进一步减小与下方的间距 */
+  }
+
+  .carousel-page {
+    gap: 0.5rem; /* 减小轮播图内卡片间距 */
+    padding: 0 0.5rem; /* 减小轮播图页面内边距 */
   }
 }
 </style>

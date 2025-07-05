@@ -3,6 +3,15 @@ const router = express.Router();
 const { sql, config, getDynamicConfig } = require('../db');
 const auth = require('../middleware/auth');
 
+// 添加请求日志中间件
+router.use((req, res, next) => {
+  console.log(`=== Complaint路由收到请求 ===`);
+  console.log(`方法: ${req.method}`);
+  console.log(`路径: ${req.path}`);
+  console.log(`完整URL: ${req.originalUrl}`);
+  next();
+});
+
 router.use(auth);
 
 // ===================== 新增投诉登记 =====================
@@ -42,8 +51,8 @@ router.post('/', async (req, res) => {
       .input('AttachmentFile', sql.NVarChar, data.AttachmentFile)
       .input('DefectiveReason', sql.NVarChar, data.DefectiveReason)
       .input('Disposition', sql.NVarChar, data.Disposition)
-      .input('ReturnGoods', sql.Bit, data.ReturnGoods)
-      .input('IsReprint', sql.Bit, data.IsReprint)
+      .input('ReturnGoods', sql.Bit, data.ReturnGoods === true ? 1 : 0)
+      .input('IsReprint', sql.Bit, data.IsReprint === true ? 1 : 0)
       .input('ReprintQty', sql.Int, data.ReprintQty)
       .input('Paper', sql.NVarChar, data.Paper)
       .input('PaperSpecification', sql.NVarChar, data.PaperSpecification)
@@ -332,25 +341,36 @@ router.get('/detail/:id', async (req, res) => {
 // 参数: id (投诉记录ID), 投诉表单所有字段
 // 返回: { success, message }
 router.put('/:id', async (req, res) => {
+  console.log('=== PUT路由被调用 ===');
+  console.log('请求方法:', req.method);
+  console.log('请求路径:', req.path);
+  console.log('请求参数:', req.params);
+
   try {
     const { id } = req.params;
     const data = req.body;
+
+    console.log('更新投诉记录 - ID:', id);
+    console.log('更新投诉记录 - 数据:', JSON.stringify(data, null, 2));
 
     if (!id || isNaN(id)) {
       return res.status(400).json({ success: false, message: '无效的记录ID' });
     }
 
-    // 必填字段校验（取消主责部门和主责人的必填校验）
+    // 必填字段校验（更宽松的验证）
     const requiredFields = [
-      'Date', 'Customer', 'OrderNo', 'ProductName', 'Workshop', 'ProductionQty',
-      'ComplaintCategory', 'DefectiveCategory', 'DefectiveDescription', 'DefectiveItem',
-      'Disposition'
+      'Date', 'Customer', 'OrderNo', 'ProductName', 'Workshop'
     ];
 
     for (const field of requiredFields) {
-      if (!data[field] && data[field] !== 0) {
-        return res.status(400).json({ success: false, message: `${field}为必填项` });
+      if (!data[field] || data[field] === '' || data[field] === null || data[field] === undefined) {
+        return res.status(400).json({ success: false, message: `${field}为必填项，当前值: ${data[field]}` });
       }
+    }
+
+    // 数字字段的特殊处理
+    if (data.ProductionQty === null || data.ProductionQty === undefined || data.ProductionQty === '') {
+      data.ProductionQty = 0;
     }
 
     let pool = await sql.connect(await getDynamicConfig());
@@ -384,8 +404,8 @@ router.put('/:id', async (req, res) => {
       .input('AttachmentFile', sql.NVarChar, data.AttachmentFile)
       .input('DefectiveReason', sql.NVarChar, data.DefectiveReason)
       .input('Disposition', sql.NVarChar, data.Disposition)
-      .input('ReturnGoods', sql.NVarChar, data.ReturnGoods)
-      .input('IsReprint', sql.NVarChar, data.IsReprint)
+      .input('ReturnGoods', sql.Bit, data.ReturnGoods === true ? 1 : 0)
+      .input('IsReprint', sql.Bit, data.IsReprint === true ? 1 : 0)
       .input('ReprintQty', sql.Int, data.ReprintQty)
       .input('Paper', sql.NVarChar, data.Paper)
       .input('PaperSpecification', sql.NVarChar, data.PaperSpecification)
@@ -471,7 +491,12 @@ router.put('/:id', async (req, res) => {
     });
   } catch (err) {
     console.error('更新投诉记录失败:', err);
-    res.status(500).json({ success: false, message: err.message });
+    console.error('错误堆栈:', err.stack);
+    res.status(500).json({
+      success: false,
+      message: '更新投诉记录失败: ' + err.message,
+      error: err.toString()
+    });
   }
 });
 
@@ -552,14 +577,20 @@ router.get('/month-stats', async (req, res) => {
     // 获取主页卡片配置
     let config = {};
     try {
+      console.log('开始检查HomeCardConfig表是否存在...');
       // 检查表是否存在
       const tableCheckResult = await pool.request()
         .query(`SELECT COUNT(*) as count FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[HomeCardConfig]') AND type in (N'U')`);
 
+      console.log('HomeCardConfig表检查结果:', tableCheckResult.recordset[0]);
+
       if (tableCheckResult.recordset[0].count > 0) {
         // 表存在，获取配置
+        console.log('HomeCardConfig表存在，开始获取配置...');
         const configResult = await pool.request()
           .query(`SELECT ConfigKey, ConfigValue FROM HomeCardConfig WHERE IsActive = 1`);
+
+        console.log('HomeCardConfig配置查询结果:', configResult.recordset);
 
         configResult.recordset.forEach(row => {
           const key = row.ConfigKey;
@@ -580,6 +611,7 @@ router.get('/month-stats', async (req, res) => {
 
           config[key] = value;
         });
+        console.log('解析后的配置:', config);
       } else {
         console.log('HomeCardConfig表不存在，使用默认配置');
       }
@@ -599,12 +631,24 @@ router.get('/month-stats', async (req, res) => {
     ];
 
     let todayCount = 0;
+    let todayInnerCount = 0;
+    let todayOuterCount = 0;
     let monthCount = 0;
+    let monthInnerCount = 0;
+    let monthOuterCount = 0;
 
     // 根据配置获取统计数据
     if (showTodayCount) {
       const todayResult = await pool.request().query(`SELECT COUNT(*) AS cnt FROM ComplaintRegister WHERE Date = CONVERT(date, GETDATE())`);
       todayCount = todayResult.recordset[0].cnt;
+
+      // 今日内诉统计
+      const todayInnerResult = await pool.request().query(`SELECT COUNT(*) AS cnt FROM ComplaintRegister WHERE Date = CONVERT(date, GETDATE()) AND ComplaintCategory = N'内诉'`);
+      todayInnerCount = todayInnerResult.recordset[0].cnt;
+
+      // 今日客诉统计
+      const todayOuterResult = await pool.request().query(`SELECT COUNT(*) AS cnt FROM ComplaintRegister WHERE Date = CONVERT(date, GETDATE()) AND ComplaintCategory = N'客诉'`);
+      todayOuterCount = todayOuterResult.recordset[0].cnt;
     }
 
     if (showMonthCount) {
@@ -613,6 +657,20 @@ router.get('/month-stats', async (req, res) => {
         .input('TargetMonth', sql.Int, targetMonth)
         .query(`SELECT COUNT(*) AS cnt FROM ComplaintRegister WHERE YEAR(Date) = @TargetYear AND MONTH(Date) = @TargetMonth`);
       monthCount = monthResult.recordset[0].cnt;
+
+      // 月份内诉统计
+      const monthInnerResult = await pool.request()
+        .input('TargetYear', sql.Int, targetYear)
+        .input('TargetMonth', sql.Int, targetMonth)
+        .query(`SELECT COUNT(*) AS cnt FROM ComplaintRegister WHERE YEAR(Date) = @TargetYear AND MONTH(Date) = @TargetMonth AND ComplaintCategory = N'内诉'`);
+      monthInnerCount = monthInnerResult.recordset[0].cnt;
+
+      // 月份客诉统计
+      const monthOuterResult = await pool.request()
+        .input('TargetYear', sql.Int, targetYear)
+        .input('TargetMonth', sql.Int, targetMonth)
+        .query(`SELECT COUNT(*) AS cnt FROM ComplaintRegister WHERE YEAR(Date) = @TargetYear AND MONTH(Date) = @TargetMonth AND ComplaintCategory = N'客诉'`);
+      monthOuterCount = monthOuterResult.recordset[0].cnt;
     }
 
     // 统计启用的单位的内诉/客诉
@@ -665,7 +723,11 @@ router.get('/month-stats', async (req, res) => {
       showTodayCount,
       showMonthCount,
       todayCount,
+      todayInnerCount,
+      todayOuterCount,
       monthCount,
+      monthInnerCount,
+      monthOuterCount,
       units: unitStats,
       targetMonth: `${targetYear}-${targetMonth.toString().padStart(2, '0')}`, // 返回目标月份
       config: {
