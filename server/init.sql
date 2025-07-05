@@ -238,3 +238,87 @@ SET
 WHERE [FileServerPort] IS NULL OR [FileUrlPrefix] IS NULL;
 
 PRINT '数据库初始化完成，包含文件存储配置字段。';
+
+-- =============================================
+-- 数据备份功能相关表结构
+-- =============================================
+
+-- 创建备份记录表
+CREATE TABLE [dbo].[BackupRecord] (
+    [ID] [int] IDENTITY(1,1) NOT NULL,
+    [BackupName] [nvarchar](255) NOT NULL,
+    [BackupType] [nvarchar](20) NOT NULL DEFAULT 'FULL',
+    [BackupPath] [nvarchar](500) NOT NULL,
+    [BackupSize] [bigint] NULL,
+    [DatabaseName] [nvarchar](128) NOT NULL,
+    [BackupStartTime] [datetime] NOT NULL,
+    [BackupEndTime] [datetime] NULL,
+    [BackupStatus] [nvarchar](20) NOT NULL DEFAULT 'PENDING',
+    [ErrorMessage] [nvarchar](max) NULL,
+    [CreatedBy] [nvarchar](50) NOT NULL,
+    [CreatedAt] [datetime] NOT NULL DEFAULT GETDATE(),
+    [UpdatedAt] [datetime] NOT NULL DEFAULT GETDATE(),
+    [Description] [nvarchar](500) NULL,
+    CONSTRAINT [PK_BackupRecord] PRIMARY KEY CLUSTERED ([ID] ASC)
+);
+
+-- 创建索引
+CREATE NONCLUSTERED INDEX [IX_BackupRecord_BackupStartTime] ON [dbo].[BackupRecord] ([BackupStartTime] DESC);
+CREATE NONCLUSTERED INDEX [IX_BackupRecord_BackupStatus] ON [dbo].[BackupRecord] ([BackupStatus]);
+CREATE NONCLUSTERED INDEX [IX_BackupRecord_DatabaseName] ON [dbo].[BackupRecord] ([DatabaseName]);
+
+-- 为DbConfig表添加备份相关字段（如果不存在）
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE TABLE_NAME = 'DbConfig' AND COLUMN_NAME = 'BackupPath')
+BEGIN
+    ALTER TABLE [dbo].[DbConfig] ADD [BackupPath] [nvarchar](500) NULL;
+END
+
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE TABLE_NAME = 'DbConfig' AND COLUMN_NAME = 'BackupRetentionDays')
+BEGIN
+    ALTER TABLE [dbo].[DbConfig] ADD [BackupRetentionDays] [int] NULL DEFAULT 30;
+END
+
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE TABLE_NAME = 'DbConfig' AND COLUMN_NAME = 'AutoBackupEnabled')
+BEGIN
+    ALTER TABLE [dbo].[DbConfig] ADD [AutoBackupEnabled] [bit] NULL DEFAULT 0;
+END
+
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE TABLE_NAME = 'DbConfig' AND COLUMN_NAME = 'AutoBackupTime')
+BEGIN
+    ALTER TABLE [dbo].[DbConfig] ADD [AutoBackupTime] [nvarchar](10) NULL DEFAULT '02:00';
+END
+
+-- 为DbConfig表添加新的备份方案字段（如果不存在）
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE TABLE_NAME = 'DbConfig' AND COLUMN_NAME = 'DefaultBackupPath')
+BEGIN
+    ALTER TABLE [dbo].[DbConfig] ADD [DefaultBackupPath] [nvarchar](500) NULL;
+END
+
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE TABLE_NAME = 'DbConfig' AND COLUMN_NAME = 'AlternativeBackupPath')
+BEGIN
+    ALTER TABLE [dbo].[DbConfig] ADD [AlternativeBackupPath] [nvarchar](500) NULL;
+END
+
+IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS
+               WHERE TABLE_NAME = 'DbConfig' AND COLUMN_NAME = 'PreferredBackupScheme')
+BEGIN
+    ALTER TABLE [dbo].[DbConfig] ADD [PreferredBackupScheme] [nvarchar](20) NULL DEFAULT 'default';
+END
+
+-- 更新DbConfig表的备份配置默认值
+UPDATE [dbo].[DbConfig]
+SET [BackupPath] = ISNULL([BackupPath], '\\tj_server\公共\杂七杂八\品质部临时文件'),
+    [BackupRetentionDays] = ISNULL([BackupRetentionDays], 30),
+    [AutoBackupEnabled] = ISNULL([AutoBackupEnabled], 0),
+    [AutoBackupTime] = ISNULL([AutoBackupTime], '02:00'),
+    [DefaultBackupPath] = ISNULL([DefaultBackupPath], ''),
+    [AlternativeBackupPath] = ISNULL([AlternativeBackupPath], '\\tj_server\公共\杂七杂八\品质部临时文件'),
+    [PreferredBackupScheme] = ISNULL([PreferredBackupScheme], 'default');
+
+PRINT '数据备份功能表结构和配置已初始化完成。';

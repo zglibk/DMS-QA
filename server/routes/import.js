@@ -2112,6 +2112,7 @@ router.get('/latest-records', async (req, res) => {
 
 // 获取路径映射配置接口
 router.get('/path-mapping-config', async (req, res) => {
+  let connection;
   try {
     // 临时返回默认配置，避免数据库连接问题
     const serverIP = '192.168.1.57';

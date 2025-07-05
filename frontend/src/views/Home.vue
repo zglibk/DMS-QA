@@ -566,7 +566,7 @@
               >
                 <span class="info-label">{{ field.label }}</span>
                 <span class="info-value" :class="getFieldValueClass(field)">
-                  {{ formatFieldValue(detailData[field.key], field) }}
+                  {{ formatFieldValue(detailData?.[field.key], field) }}
                 </span>
               </div>
             </div>
@@ -1327,7 +1327,7 @@ const organizeDetailFields = () => {
     return []
   }
 
-  // 定义字段分组 - 根据实际数据库字段，只显示重要字段
+  // 定义字段分组 - 根据实际数据库字段
   const fieldGroups = {
     basic: {
       title: '基本信息',
@@ -1341,11 +1341,29 @@ const organizeDetailFields = () => {
       iconClass: 'warning',
       fields: ['ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'DefectiveDescription', 'DefectiveReason', 'Disposition']
     },
+    materials: {
+      title: '物料信息',
+      icon: 'Document',
+      iconClass: 'info',
+      fields: ['Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice', 'MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice', 'MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice', 'MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice', 'LaborCost', 'TotalCost']
+    },
+    processing: {
+      title: '处理信息',
+      icon: 'Tools',
+      iconClass: 'success',
+      fields: ['ReturnGoods', 'IsReprint', 'ReprintQty']
+    },
     responsibility: {
       title: '责任信息',
       icon: 'UserFilled',
       iconClass: 'success',
       fields: ['MainDept', 'MainPerson', 'MainPersonAssessment', 'SecondPerson', 'SecondPersonAssessment', 'Manager', 'ManagerAssessment']
+    },
+    assessment: {
+      title: '考核信息',
+      icon: 'QuestionFilled',
+      iconClass: 'warning',
+      fields: ['AssessmentDescription']
     }
   }
 
@@ -1358,13 +1376,7 @@ const organizeDetailFields = () => {
     group.fields.forEach(fieldKey => {
       const field = exportFields.value.find(f => f.key === fieldKey)
       if (field) {
-        // 只添加有实际数据的字段（除了一些重要的基础字段）
-        const value = detailData.value?.[field.key]
-        const isImportantField = ['Date', 'Customer', 'OrderNo', 'ProductName', 'Workshop', 'ProductionQty', 'DefectiveQty', 'ComplaintCategory', 'DefectiveItem', 'MainDept', 'MainPerson'].includes(field.key)
-
-        if (isImportantField || (value !== null && value !== undefined && value !== '' && value !== 0)) {
-          groupFields.push(field)
-        }
+        groupFields.push(field)
       }
     })
 
@@ -2414,11 +2426,13 @@ body::-webkit-scrollbar-thumb:hover {
   display: flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
-  height: calc(80vh - 120px) !important;
 }
 
 .detail-dialog :deep(.el-dialog__footer) {
   flex-shrink: 0 !important;
+  padding: 16px 24px !important;
+  border-top: 1px solid #e4e7ed !important;
+  background: #f8f9fa !important;
 }
 
 .detail-dialog .detail-content {
@@ -2667,9 +2681,6 @@ body::-webkit-scrollbar-thumb:hover {
 
 .dialog-footer {
   text-align: center;
-  padding: 16px 24px;
-  background: #f8f9fa;
-  border-top: 1px solid #e4e7ed;
   flex-shrink: 0;
 }
 

@@ -17,7 +17,13 @@
     "clean": "rm -rf frontend/node_modules frontend/package-lock.json server/node_modules server/package-lock.json",
     "reinstall": "npm run clean && npm run setup"
   },
-  "keywords": ["dms", "quality-management", "production", "vue3", "nodejs"],
+  "keywords": [
+    "dms",
+    "quality-management",
+    "production",
+    "vue3",
+    "nodejs"
+  ],
   "author": "David Lee (zglibk) <1039297691@qq.com>",
   "license": "Apache-2.0",
   "repository": {
@@ -25,6 +31,7 @@
     "url": "https://gitee.com/zglibk/dms-qa.git"
   },
   "dependencies": {
+    "node-cron": "^4.2.0",
     "uuid": "^11.1.0"
   },
   "devDependencies": {

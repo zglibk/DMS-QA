@@ -50,13 +50,13 @@
                 </el-button>
                 <template #dropdown>
                   <el-dropdown-menu>
-                    <el-dropdown-item command="workshop" :disabled="workshops.length === 0">
+                    <el-dropdown-item command="workshop" :disabled="getAvailableWorkshopsCount() === 0">
                       <el-icon><Tools /></el-icon>
-                      添加车间 ({{ workshops.length }}个可选)
+                      添加车间 ({{ getAvailableWorkshopsCount() }}个可选)
                     </el-dropdown-item>
-                    <el-dropdown-item command="department" :disabled="departments.length === 0">
+                    <el-dropdown-item command="department" :disabled="getAvailableDepartmentsCount() === 0">
                       <el-icon><OfficeBuilding /></el-icon>
-                      添加部门 ({{ departments.length }}个可选)
+                      添加部门 ({{ getAvailableDepartmentsCount() }}个可选)
                     </el-dropdown-item>
                   </el-dropdown-menu>
                 </template>
@@ -269,41 +269,89 @@ const getUnitOptions = (type) => {
 
 // 处理添加单位
 const handleAddUnit = (type) => {
+  // 检查是否还有可用的选项
+  const availableCount = type === 'workshop' ? getAvailableWorkshopsCount() : getAvailableDepartmentsCount()
+
+  if (availableCount === 0) {
+    ElMessage.warning(`所有${type === 'workshop' ? '车间' : '部门'}都已添加`)
+    return
+  }
+
   const options = getUnitOptions(type)
   if (options.length === 0) {
     ElMessage.warning(`暂无可选的${type === 'workshop' ? '车间' : '部门'}数据`)
     return
   }
 
-  // 查找第一个未添加的选项
+  // 遍历已创建并选择的项，获取所有已使用的名称（车间+部门）
   const existingNames = config.displayUnits
-    .filter(unit => unit.type === type)
     .map(unit => unit.name)
+    .filter(name => name && name.trim() !== '') // 过滤空值
 
-  const availableOption = options.find(option => !existingNames.includes(option.Name))
+  // 查找第一个未添加的选项作为默认值
+  const availableOptions = options.filter(option => !existingNames.includes(option.Name))
 
-  if (!availableOption) {
+  if (availableOptions.length === 0) {
     ElMessage.warning(`所有${type === 'workshop' ? '车间' : '部门'}都已添加`)
     return
   }
 
+  // 添加新的单位配置，使用第一个可用选项作为默认值
+  const defaultOption = availableOptions[0]
+
   config.displayUnits.push({
-    name: availableOption.Name,
+    name: defaultOption.Name,
     type: type,
     enabled: true
   })
 
-  ElMessage.success(`已添加${type === 'workshop' ? '车间' : '部门'}：${availableOption.Name}`)
+  ElMessage.success(`已添加${type === 'workshop' ? '车间' : '部门'}：${defaultOption.Name}`)
 }
 
 // 获取可用选项（排除已选择的）
 const getAvailableOptions = (type, currentIndex) => {
   const allOptions = getUnitOptions(type)
+
+  // 获取其他选择框已使用的名称（排除当前选择框和空值）
   const usedNames = config.displayUnits
-    .filter((unit, index) => unit.type === type && index !== currentIndex)
+    .filter((unit, index) => {
+      return index !== currentIndex &&
+             unit.name &&
+             unit.name.trim() !== ''
+    })
     .map(unit => unit.name)
 
-  return allOptions.filter(option => !usedNames.includes(option.Name))
+  // 获取当前选择框的值，确保当前值始终可选
+  const currentValue = config.displayUnits[currentIndex]?.name
+
+  return allOptions.filter(option => {
+    // 如果是当前选择框的值，则允许显示
+    if (option.Name === currentValue) {
+      return true
+    }
+    // 否则检查是否已被其他选择框使用
+    return !usedNames.includes(option.Name)
+  })
+}
+
+// 获取可用车间数量
+const getAvailableWorkshopsCount = () => {
+  // 获取所有已使用的名称（车间+部门）
+  const allUsedNames = config.displayUnits
+    .map(unit => unit.name)
+    .filter(name => name && name.trim() !== '')
+
+  return workshops.value.filter(workshop => !allUsedNames.includes(workshop.Name)).length
+}
+
+// 获取可用部门数量
+const getAvailableDepartmentsCount = () => {
+  // 获取所有已使用的名称（车间+部门）
+  const allUsedNames = config.displayUnits
+    .map(unit => unit.name)
+    .filter(name => name && name.trim() !== '')
+
+  return departments.value.filter(department => !allUsedNames.includes(department.Name)).length
 }
 
 // 处理单位名称变更

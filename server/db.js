@@ -8,7 +8,11 @@ const config = {
   options: {
     encrypt: false,
     trustServerCertificate: true,
-    enableArithAbort: true
+    enableArithAbort: true,
+    useUTC: false,
+    requestTimeout: 30000,
+    connectionTimeout: 30000,
+    parseJSON: true
   },
   pool: {
     max: 10,
@@ -52,7 +56,11 @@ async function getDynamicConfig() {
         options: {
           encrypt: false,
           trustServerCertificate: true,
-          enableArithAbort: true
+          enableArithAbort: true,
+          useUTC: false,
+          requestTimeout: 30000,
+          connectionTimeout: 30000,
+          parseJSON: true
         },
         pool: {
           max: 10,
