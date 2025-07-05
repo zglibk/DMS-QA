@@ -464,9 +464,8 @@ const rules = {
   DefectiveCategory: [ { required: true, message: '请选择不良类别', trigger: 'change' } ],
   DefectiveDescription: [ { required: true, message: '请输入不良描述', trigger: 'blur' } ],
   DefectiveItem: [ { required: true, message: '请选择不良项', trigger: 'change' } ],
-  Disposition: [ { required: true, message: '请输入处置措施', trigger: 'blur' } ],
-  MainDept: [ { required: true, message: '请选择主责部门', trigger: 'change' } ],
-  MainPerson: [ { required: true, message: '请选择主责人', trigger: 'change' } ]
+  Disposition: [ { required: true, message: '请输入处置措施', trigger: 'blur' } ]
+  // 注意：MainDept 和 MainPerson 不再是必填项，有些问题需后续调查后才能确定责任部门和责任人
 }
 const router = useRouter()
 const options = reactive({

@@ -603,6 +603,216 @@
       </template>
     </el-dialog>
 
+    <!-- 编辑记录对话框 -->
+    <el-dialog
+      v-model="showEditDialog"
+      title="编辑投诉记录"
+      width="90%"
+      :close-on-click-modal="false"
+      :modal="true"
+      :append-to-body="true"
+      destroy-on-close
+      class="edit-dialog"
+      center
+      top="5vh"
+      :style="{ height: '90vh' }"
+    >
+      <div class="edit-content" v-loading="editFormLoading" element-loading-text="保存中...">
+        <el-form
+          :model="editFormData"
+          :rules="editRules"
+          ref="editFormRef"
+          label-width="120px"
+          class="edit-form"
+        >
+          <!-- 基本信息 -->
+          <el-card shadow="always" class="form-card" style="margin-bottom: 20px;">
+            <template #header>
+              <div class="form-card-header">基本信息</div>
+            </template>
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="投诉日期" prop="Date">
+                  <el-date-picker
+                    v-model="editFormData.Date"
+                    type="date"
+                    style="width: 100%"
+                    format="YYYY-MM-DD"
+                    value-format="YYYY-MM-DD"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="客户编号" prop="Customer">
+                  <el-input v-model="editFormData.Customer" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="工单号" prop="OrderNo">
+                  <el-input v-model="editFormData.OrderNo" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="产品名称" prop="ProductName">
+                  <el-input v-model="editFormData.ProductName" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="规格">
+                  <el-input v-model="editFormData.Specification" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="发生车间" prop="Workshop">
+                  <el-input v-model="editFormData.Workshop" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="生产数" prop="ProductionQty">
+                  <el-input-number v-model="editFormData.ProductionQty" :min="0" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="不良数">
+                  <el-input-number v-model="editFormData.DefectiveQty" :min="0" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="不良率(%)">
+                  <el-input-number v-model="editFormData.DefectiveRate" :min="0" :max="100" :precision="2" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-card>
+
+          <!-- 不良信息 -->
+          <el-card shadow="always" class="form-card" style="margin-bottom: 20px;">
+            <template #header>
+              <div class="form-card-header">不良信息</div>
+            </template>
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="投诉类别" prop="ComplaintCategory">
+                  <el-input v-model="editFormData.ComplaintCategory" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="客诉类型">
+                  <el-input v-model="editFormData.CustomerComplaintType" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="不良类别" prop="DefectiveCategory">
+                  <el-input v-model="editFormData.DefectiveCategory" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="不良项" prop="DefectiveItem">
+                  <el-input v-model="editFormData.DefectiveItem" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="16">
+                <el-form-item label="不良描述" prop="DefectiveDescription">
+                  <el-input v-model="editFormData.DefectiveDescription" type="textarea" :rows="2" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="24">
+                <el-form-item label="不良原因">
+                  <el-input v-model="editFormData.DefectiveReason" type="textarea" :rows="2" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-card>
+
+          <!-- 处置与补充 -->
+          <el-card shadow="always" class="form-card" style="margin-bottom: 20px;">
+            <template #header>
+              <div class="form-card-header">处置与补充</div>
+            </template>
+            <el-row :gutter="20">
+              <el-col :span="24">
+                <el-form-item label="处置措施" prop="Disposition">
+                  <el-input v-model="editFormData.Disposition" type="textarea" :rows="2" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="退货">
+                  <el-switch v-model="editFormData.ReturnGoods" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="是否补印">
+                  <el-switch v-model="editFormData.IsReprint" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="补印数量">
+                  <el-input-number v-model="editFormData.ReprintQty" :min="0" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-card>
+
+          <!-- 责任与考核 -->
+          <el-card shadow="always" class="form-card">
+            <template #header>
+              <div class="form-card-header">责任与考核</div>
+            </template>
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-form-item label="主责部门">
+                  <el-input v-model="editFormData.MainDept" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="主责人">
+                  <el-input v-model="editFormData.MainPerson" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="主责人考核">
+                  <el-input-number v-model="editFormData.MainPersonAssessment" :precision="2" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="次责人">
+                  <el-input v-model="editFormData.SecondPerson" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="次责人考核">
+                  <el-input-number v-model="editFormData.SecondPersonAssessment" :precision="2" style="width: 100%" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
+                <el-form-item label="管理者">
+                  <el-input v-model="editFormData.Manager" />
+                </el-form-item>
+              </el-col>
+              <el-col :span="24">
+                <el-form-item label="考核说明">
+                  <el-input v-model="editFormData.AssessmentDescription" type="textarea" :rows="2" />
+                </el-form-item>
+              </el-col>
+            </el-row>
+          </el-card>
+        </el-form>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelEdit">
+            <el-icon><Close /></el-icon>
+            取消
+          </el-button>
+          <el-button type="primary" @click="saveEdit" :loading="editFormLoading">
+            <el-icon><Check /></el-icon>
+            保存
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- Excel导出字段选择对话框 -->
     <el-dialog
       v-model="showExportDialog"
@@ -691,7 +901,7 @@
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
-import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete } from '@element-plus/icons-vue'
+import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
@@ -723,9 +933,28 @@ const detailData = ref(null)
 const detailLoading = ref(false)
 const detailFieldsLoading = ref(false)
 const detailSections = ref([])
-const isEditing = ref(false)
+
+// 编辑弹窗相关
+const showEditDialog = ref(false)
 const editFormData = ref({})
 const editFormLoading = ref(false)
+const editFormRef = ref(null)
+
+// 编辑表单验证规则（取消主责部门和主责人的必填校验）
+const editRules = {
+  Date: [{ required: true, message: '请选择投诉日期', trigger: 'change' }],
+  Customer: [{ required: true, message: '请输入客户编号', trigger: 'blur' }],
+  OrderNo: [{ required: true, message: '请输入工单号', trigger: 'blur' }],
+  ProductName: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  Workshop: [{ required: true, message: '请输入发生车间', trigger: 'blur' }],
+  ProductionQty: [{ required: true, message: '请输入生产数', trigger: 'blur' }],
+  ComplaintCategory: [{ required: true, message: '请输入投诉类别', trigger: 'blur' }],
+  DefectiveCategory: [{ required: true, message: '请输入不良类别', trigger: 'blur' }],
+  DefectiveDescription: [{ required: true, message: '请输入不良描述', trigger: 'blur' }],
+  DefectiveItem: [{ required: true, message: '请输入不良项', trigger: 'blur' }],
+  Disposition: [{ required: true, message: '请输入处置措施', trigger: 'blur' }]
+  // 注意：MainDept 和 MainPerson 不再是必填项
+}
 
 // 高级查询数据
 const advancedQuery = ref({
@@ -1279,18 +1508,122 @@ const viewDetail = async (row) => {
 // 编辑记录
 const editRecord = async (row) => {
   try {
-    // 使用路由跳转到投诉登记页面，并传递记录ID进行编辑
-    router.push({
-      path: '/add',
-      query: {
-        mode: 'edit',
-        id: row.ID
-      }
+    editFormLoading.value = true
+    const token = localStorage.getItem('token')
+
+    // 获取记录详情
+    const response = await axios.get(`/api/complaint/detail/${row.ID}`, {
+      headers: { Authorization: `Bearer ${token}` }
     })
+
+    if (response.data.success) {
+      const data = response.data.data
+
+      // 初始化编辑表单数据
+      editFormData.value = {
+        ID: data.ID,
+        Date: data.Date ? data.Date.split('T')[0] : '',
+        Customer: data.Customer || '',
+        OrderNo: data.OrderNo || '',
+        ProductName: data.ProductName || '',
+        Specification: data.Specification || '',
+        Workshop: data.Workshop || '',
+        ProductionQty: data.ProductionQty || 0,
+        DefectiveQty: data.DefectiveQty || 0,
+        DefectiveRate: data.DefectiveRate || 0,
+        ComplaintCategory: data.ComplaintCategory || '',
+        CustomerComplaintType: data.CustomerComplaintType || '',
+        DefectiveCategory: data.DefectiveCategory || '',
+        DefectiveItem: data.DefectiveItem || '',
+        DefectiveDescription: data.DefectiveDescription || '',
+        AttachmentFile: data.AttachmentFile || '',
+        DefectiveReason: data.DefectiveReason || '',
+        Disposition: data.Disposition || '',
+        ReturnGoods: data.ReturnGoods === '是' || data.ReturnGoods === true || data.ReturnGoods === 1,
+        IsReprint: data.IsReprint === '是' || data.IsReprint === true || data.IsReprint === 1,
+        ReprintQty: data.ReprintQty || 0,
+        Paper: data.Paper || '',
+        PaperSpecification: data.PaperSpecification || '',
+        PaperQty: data.PaperQty || 0,
+        PaperUnitPrice: data.PaperUnitPrice || 0,
+        MaterialA: data.MaterialA || '',
+        MaterialASpec: data.MaterialASpec || '',
+        MaterialAQty: data.MaterialAQty || 0,
+        MaterialAUnitPrice: data.MaterialAUnitPrice || 0,
+        MaterialB: data.MaterialB || '',
+        MaterialBSpec: data.MaterialBSpec || '',
+        MaterialBQty: data.MaterialBQty || 0,
+        MaterialBUnitPrice: data.MaterialBUnitPrice || 0,
+        MaterialC: data.MaterialC || '',
+        MaterialCSpec: data.MaterialCSpec || '',
+        MaterialCQty: data.MaterialCQty || 0,
+        MaterialCUnitPrice: data.MaterialCUnitPrice || 0,
+        LaborCost: data.LaborCost || 0,
+        TotalCost: data.TotalCost || 0,
+        MainDept: data.MainDept || '',
+        MainPerson: data.MainPerson || '',
+        MainPersonAssessment: data.MainPersonAssessment || 0,
+        SecondPerson: data.SecondPerson || '',
+        SecondPersonAssessment: data.SecondPersonAssessment || 0,
+        Manager: data.Manager || '',
+        ManagerAssessment: data.ManagerAssessment || 0,
+        AssessmentDescription: data.AssessmentDescription || ''
+      }
+
+      showEditDialog.value = true
+    } else {
+      ElMessage.error(response.data.message || '获取记录详情失败')
+    }
   } catch (error) {
-    console.error('跳转编辑页面失败:', error)
-    ElMessage.error('跳转编辑页面失败')
+    console.error('获取编辑数据失败:', error)
+    ElMessage.error('获取编辑数据失败')
+  } finally {
+    editFormLoading.value = false
   }
+}
+
+// 保存编辑
+const saveEdit = async () => {
+  try {
+    // 表单验证
+    if (!editFormRef.value) {
+      ElMessage.error('表单引用未找到')
+      return
+    }
+
+    const valid = await editFormRef.value.validate()
+    if (!valid) {
+      ElMessage.error('请填写必填字段')
+      return
+    }
+
+    editFormLoading.value = true
+    const token = localStorage.getItem('token')
+
+    const response = await axios.put(`/api/complaint/${editFormData.value.ID}`, editFormData.value, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (response.data.success) {
+      ElMessage.success('更新成功')
+      showEditDialog.value = false
+      // 刷新表格数据
+      await fetchData()
+    } else {
+      ElMessage.error(response.data.message || '更新失败')
+    }
+  } catch (error) {
+    console.error('保存编辑失败:', error)
+    ElMessage.error('保存失败')
+  } finally {
+    editFormLoading.value = false
+  }
+}
+
+// 取消编辑
+const cancelEdit = () => {
+  showEditDialog.value = false
+  editFormData.value = {}
 }
 
 // 删除记录
@@ -2787,6 +3120,67 @@ body::-webkit-scrollbar-thumb:hover {
 
 .complaint-table-card :deep(.el-table .el-table__border-right-patch) {
   border-right: 1px solid #409eff;
+}
+
+/* 编辑对话框样式 */
+.edit-dialog {
+  --el-dialog-margin-top: 5vh;
+}
+
+.edit-dialog :deep(.el-dialog) {
+  margin: 5vh auto;
+  height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.edit-dialog :deep(.el-dialog__header) {
+  flex-shrink: 0;
+  padding: 20px 20px 10px 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.edit-dialog :deep(.el-dialog__body) {
+  flex: 1;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.edit-dialog :deep(.el-dialog__footer) {
+  flex-shrink: 0;
+  padding: 10px 20px 20px 20px;
+  border-top: 1px solid #ebeef5;
+}
+
+.edit-content {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.edit-form {
+  height: 100%;
+}
+
+.edit-form .form-card {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.edit-form .form-card-header {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  display: flex;
+  align-items: center;
+}
+
+.edit-form .form-card-header::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  background: #409eff;
+  margin-right: 8px;
+  border-radius: 2px;
 }
 
 /* 卡片类型样式 */

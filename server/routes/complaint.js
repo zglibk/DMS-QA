@@ -11,11 +11,11 @@ router.use(auth);
 // 返回: { success, message, id }
 router.post('/', async (req, res) => {
   const data = req.body;
-  // 必填字段校验
+  // 必填字段校验（取消主责部门和主责人的必填校验）
   const requiredFields = [
     'Date', 'Customer', 'OrderNo', 'ProductName', 'Workshop', 'ProductionQty',
     'ComplaintCategory', 'DefectiveCategory', 'DefectiveDescription', 'DefectiveItem',
-    'Disposition', 'MainDept', 'MainPerson'
+    'Disposition'
   ];
   for (const field of requiredFields) {
     if (!data[field] && data[field] !== 0) {
@@ -340,11 +340,11 @@ router.put('/:id', async (req, res) => {
       return res.status(400).json({ success: false, message: '无效的记录ID' });
     }
 
-    // 必填字段校验
+    // 必填字段校验（取消主责部门和主责人的必填校验）
     const requiredFields = [
       'Date', 'Customer', 'OrderNo', 'ProductName', 'Workshop', 'ProductionQty',
       'ComplaintCategory', 'DefectiveCategory', 'DefectiveDescription', 'DefectiveItem',
-      'Disposition', 'MainDept', 'MainPerson'
+      'Disposition'
     ];
 
     for (const field of requiredFields) {
