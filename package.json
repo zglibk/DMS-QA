@@ -30,11 +30,11 @@
     "type": "git",
     "url": "https://gitee.com/zglibk/dms-qa.git"
   },
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
   "dependencies": {
     "node-cron": "^4.2.0",
     "uuid": "^11.1.0"
-  },
-  "devDependencies": {
-    "concurrently": "^8.2.2"
   }
 }
