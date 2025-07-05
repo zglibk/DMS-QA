@@ -174,37 +174,38 @@
               stripe
               :loading="tableLoading"
               empty-text="暂无投诉记录"
+              border
             >
-              <el-table-column label="#" type="index" width="60" :index="(index) => (page - 1) * pageSize + index + 1" />
-              <el-table-column prop="Date" label="日期" width="110" sortable>
+              <el-table-column label="#" type="index" width="60" :index="(index) => (page - 1) * pageSize + index + 1" resizable />
+              <el-table-column prop="Date" label="日期" width="110" sortable resizable>
                 <template #default="scope">
                   <el-tag type="info" size="small">
                     {{ scope.row.Date ? (scope.row.Date.length > 10 ? scope.row.Date.slice(0, 10) : scope.row.Date) : '' }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="Customer" label="客户编号" width="120" show-overflow-tooltip />
-              <el-table-column prop="OrderNo" label="工单号" width="130" show-overflow-tooltip />
-              <el-table-column prop="ProductName" label="产品名称" width="140" show-overflow-tooltip />
-              <el-table-column prop="Workshop" label="发生车间" width="110">
+              <el-table-column prop="Customer" label="客户编号" width="120" show-overflow-tooltip resizable />
+              <el-table-column prop="OrderNo" label="工单号" width="130" show-overflow-tooltip resizable />
+              <el-table-column prop="ProductName" label="产品名称" width="140" show-overflow-tooltip resizable />
+              <el-table-column prop="Workshop" label="发生车间" width="110" resizable>
                 <template #default="scope">
                   <el-tag size="small" :type="getWorkshopTagType(scope.row.Workshop)">
                     {{ scope.row.Workshop }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="ComplaintCategory" label="投诉类别" width="110">
+              <el-table-column prop="ComplaintCategory" label="投诉类别" width="110" resizable>
                 <template #default="scope">
                   <el-tag size="small" :type="scope.row.ComplaintCategory === '客诉' ? 'danger' : 'warning'">
                     {{ scope.row.ComplaintCategory }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="DefectiveCategory" label="不良类别" width="120" show-overflow-tooltip />
-              <el-table-column prop="DefectiveItem" label="不良项" width="120" show-overflow-tooltip />
-              <el-table-column prop="DefectiveDescription" label="不良描述" width="150" show-overflow-tooltip />
-              <el-table-column prop="MainDept" label="主责部门" width="110" show-overflow-tooltip />
-              <el-table-column prop="MainPerson" label="主责人" width="100" show-overflow-tooltip />
+              <el-table-column prop="DefectiveCategory" label="不良类别" width="120" show-overflow-tooltip resizable />
+              <el-table-column prop="DefectiveItem" label="不良项" width="120" show-overflow-tooltip resizable />
+              <el-table-column prop="DefectiveDescription" label="不良描述" width="150" show-overflow-tooltip resizable />
+              <el-table-column prop="MainDept" label="主责部门" width="110" show-overflow-tooltip resizable />
+              <el-table-column prop="MainPerson" label="主责人" width="100" show-overflow-tooltip resizable />
               <el-table-column label="操作" width="120" fixed="right">
                 <template #default="scope">
                   <el-button type="primary" :icon="View" size="small" @click="viewDetail(scope.row)">
@@ -2702,6 +2703,37 @@ body::-webkit-scrollbar-thumb:hover {
   overflow-y: auto;
 }
 */
+
+/* 表格列宽拖拽增强样式 */
+.complaint-table-card :deep(.el-table th.gutter) {
+  display: table-cell !important;
+}
+
+.complaint-table-card :deep(.el-table .el-table__header-wrapper .el-table__header thead tr th) {
+  position: relative;
+}
+
+.complaint-table-card :deep(.el-table .el-table__header-wrapper .el-table__header thead tr th:hover) {
+  background-color: #f5f7fa;
+}
+
+/* 拖拽手柄样式 */
+.complaint-table-card :deep(.el-table th.is-leaf) {
+  border-right: 1px solid #ebeef5;
+}
+
+.complaint-table-card :deep(.el-table th.is-leaf:hover) {
+  border-right-color: #409eff;
+}
+
+/* 拖拽时的视觉反馈 */
+.complaint-table-card :deep(.el-table .el-table__border-left-patch) {
+  border-left: 1px solid #409eff;
+}
+
+.complaint-table-card :deep(.el-table .el-table__border-right-patch) {
+  border-right: 1px solid #409eff;
+}
 
 /* 卡片类型样式 */
 .card-workshop {
