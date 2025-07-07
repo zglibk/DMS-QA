@@ -357,38 +357,137 @@
               :loading="tableLoading"
               empty-text="暂无投诉记录"
               border
+              class="enhanced-table"
             >
-              <el-table-column label="#" type="index" width="60" :index="(index) => (page - 1) * pageSize + index + 1" resizable />
-              <el-table-column prop="Date" label="日期" width="110" sortable resizable>
+              <el-table-column type="index" width="50" :index="(index) => (page - 1) * pageSize + index + 1" resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <span class="header-text">#</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="Date" width="110" sortable resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon date-icon"><Calendar /></el-icon>
+                    <span class="header-text">日期</span>
+                  </div>
+                </template>
                 <template #default="scope">
                   <el-tag type="info" size="small">
                     {{ scope.row.Date ? (scope.row.Date.length > 10 ? scope.row.Date.slice(0, 10) : scope.row.Date) : '' }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="Customer" label="客户编号" width="120" show-overflow-tooltip resizable />
-              <el-table-column prop="OrderNo" label="工单号" width="130" show-overflow-tooltip resizable />
-              <el-table-column prop="ProductName" label="产品名称" width="140" show-overflow-tooltip resizable />
-              <el-table-column prop="Workshop" label="发生车间" width="110" resizable>
+
+              <el-table-column prop="Customer" width="120" show-overflow-tooltip resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon customer-icon"><User /></el-icon>
+                    <span class="header-text">客户编号</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="OrderNo" width="130" show-overflow-tooltip resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon order-icon"><DocumentCopy /></el-icon>
+                    <span class="header-text">工单号</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="ProductName" width="140" show-overflow-tooltip resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon product-icon"><Box /></el-icon>
+                    <span class="header-text">产品名称</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="Workshop" width="110" resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon workshop-icon"><OfficeBuilding /></el-icon>
+                    <span class="header-text">发生车间</span>
+                  </div>
+                </template>
                 <template #default="scope">
                   <el-tag size="small" :type="getWorkshopTagType(scope.row.Workshop)">
                     {{ scope.row.Workshop }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="ComplaintCategory" label="投诉类别" width="110" resizable>
+
+              <el-table-column prop="ComplaintCategory" width="110" resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon category-icon"><Warning /></el-icon>
+                    <span class="header-text">投诉类别</span>
+                  </div>
+                </template>
                 <template #default="scope">
                   <el-tag size="small" :type="scope.row.ComplaintCategory === '客诉' ? 'danger' : 'warning'">
                     {{ scope.row.ComplaintCategory }}
                   </el-tag>
                 </template>
               </el-table-column>
-              <el-table-column prop="DefectiveCategory" label="不良类别" width="120" show-overflow-tooltip resizable />
-              <el-table-column prop="DefectiveItem" label="不良项" width="120" show-overflow-tooltip resizable />
-              <el-table-column prop="DefectiveDescription" label="不良描述" width="150" show-overflow-tooltip resizable />
-              <el-table-column prop="MainDept" label="主责部门" width="110" show-overflow-tooltip resizable />
-              <el-table-column prop="MainPerson" label="主责人" width="100" show-overflow-tooltip resizable />
-              <el-table-column label="操作" width="100" fixed="right">
+
+              <el-table-column prop="DefectiveCategory" width="120" show-overflow-tooltip resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon defect-icon"><CircleClose /></el-icon>
+                    <span class="header-text">不良类别</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="DefectiveItem" width="120" show-overflow-tooltip resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon item-icon"><InfoFilled /></el-icon>
+                    <span class="header-text">不良项</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="DefectiveDescription" width="150" show-overflow-tooltip resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon desc-icon"><ChatLineRound /></el-icon>
+                    <span class="header-text">不良描述</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="MainDept" width="110" show-overflow-tooltip resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon dept-icon"><Coordinate /></el-icon>
+                    <span class="header-text">主责部门</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column prop="MainPerson" width="100" show-overflow-tooltip resizable>
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon person-icon"><Avatar /></el-icon>
+                    <span class="header-text">主责人</span>
+                  </div>
+                </template>
+              </el-table-column>
+
+              <el-table-column width="100" fixed="right">
+                <template #header>
+                  <div class="table-header-cell">
+                    <el-icon class="header-icon action-icon"><Setting /></el-icon>
+                    <span class="header-text">操作</span>
+                  </div>
+                </template>
                 <template #default="scope">
                   <div class="action-buttons">
                     <el-button text :icon="View" size="small" @click="viewDetail(scope.row)" title="查看详情" class="action-btn" />
@@ -956,7 +1055,7 @@
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
-import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning } from '@element-plus/icons-vue'
+import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning, DocumentCopy, Box, CircleClose, ChatLineRound, Coordinate, Avatar, Setting } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
@@ -986,6 +1085,7 @@ const tableLoading = ref(false)
 
 // 详情弹窗相关
 const showDetailDialog = ref(false)
+const isEditing = ref(false)
 const detailData = ref(null)
 const detailLoading = ref(false)
 const detailFieldsLoading = ref(false)
@@ -1451,37 +1551,55 @@ const fetchQualityStats = async () => {
   try {
     const token = localStorage.getItem('token')
 
-    // 获取内诉数量（不合格数）
-    const innerComplaintRes = await axios.get('/api/complaint/list', {
-      headers: { Authorization: `Bearer ${token}` },
-      params: {
-        page: 1,
-        pageSize: 1,
-        complaintCategory: '内诉',
-        startDate: selectedMonth.value + '-01',
-        endDate: selectedMonth.value + '-31'
-      }
-    })
+    // 计算正确的月末日期
+    const [year, month] = selectedMonth.value.split('-').map(Number)
+    const lastDay = new Date(year, month, 0).getDate() // 获取该月的最后一天
+    const startDate = `${selectedMonth.value}-01`
+    const endDate = `${selectedMonth.value}-${lastDay.toString().padStart(2, '0')}`
+
+    // 并行获取数据
+    const [innerComplaintRes, outerComplaintRes, batchStatsRes] = await Promise.all([
+      // 获取内诉数量（不合格数）
+      axios.get('/api/complaint/list', {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          page: 1,
+          pageSize: 1,
+          complaintCategory: '内诉',
+          startDate: startDate,
+          endDate: endDate
+        }
+      }),
+      // 获取客诉批次数量
+      axios.get('/api/complaint/list', {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          page: 1,
+          pageSize: 1,
+          complaintCategory: '客诉',
+          startDate: startDate,
+          endDate: endDate
+        }
+      }),
+      // 获取月度批次统计数据
+      axios.get('/api/quality-metrics/month-batch-stats', {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          month: selectedMonth.value
+        }
+      })
+    ])
 
     const failedInspections = innerComplaintRes.data.total || 0
-
-    // 获取客诉批次数量
-    const outerComplaintRes = await axios.get('/api/complaint/list', {
-      headers: { Authorization: `Bearer ${token}` },
-      params: {
-        page: 1,
-        pageSize: 1,
-        complaintCategory: '客诉',
-        startDate: selectedMonth.value + '-01',
-        endDate: selectedMonth.value + '-31'
-      }
-    })
-
     const complaintBatches = outerComplaintRes.data.total || 0
 
-    // 暂时使用模拟数据，后续需要从ERP获取真实数据
-    const totalInspections = 1000 // 需要从迅越ERP获取
-    const totalDeliveries = 800   // 需要从迅越ERP获取
+    // 从API获取真实的批次数据
+    const batchData = batchStatsRes.data.success ? batchStatsRes.data.data : null
+    const totalInspections = batchData ? batchData.inspectionBatches : 0
+    const totalDeliveries = batchData ? batchData.deliveryBatches : 0
+
+    console.log('批次数据:', batchData)
+    console.log('投诉数据:', { failedInspections, complaintBatches })
 
     // 计算合格率和客诉率
     const passRate = totalInspections > 0 ?
@@ -1535,9 +1653,15 @@ const chartData = ref({
   categoryData: []
 })
 const renderCharts = () => {
-  // 柱形图
-  const barChart = echarts.init(document.getElementById('barChart'))
-  barChart.setOption({
+  try {
+    // 柱形图
+    const barChartDom = document.getElementById('barChart')
+    if (!barChartDom) {
+      console.warn('barChart DOM元素未找到')
+      return
+    }
+    const barChart = echarts.init(barChartDom)
+    barChart.setOption({
     tooltip: {
       trigger: 'axis',
       formatter: '{b}: {c}件'
@@ -1569,8 +1693,14 @@ const renderCharts = () => {
       }
     }]
   })
+
   // 折线图
-  const lineChart = echarts.init(document.getElementById('lineChart'))
+  const lineChartDom = document.getElementById('lineChart')
+  if (!lineChartDom) {
+    console.warn('lineChart DOM元素未找到')
+    return
+  }
+  const lineChart = echarts.init(lineChartDom)
   lineChart.setOption({
     tooltip: {
       trigger: 'axis',
@@ -1605,8 +1735,14 @@ const renderCharts = () => {
       }
     }]
   })
+
   // 玫瑰图
-  const roseChart = echarts.init(document.getElementById('roseChart'))
+  const roseChartDom = document.getElementById('roseChart')
+  if (!roseChartDom) {
+    console.warn('roseChart DOM元素未找到')
+    return
+  }
+  const roseChart = echarts.init(roseChartDom)
   roseChart.setOption({
     tooltip: {
       trigger: 'item',
@@ -1643,6 +1779,9 @@ const renderCharts = () => {
       }
     }]
   })
+  } catch (error) {
+    console.error('图表渲染失败:', error)
+  }
 }
 const fetchChartData = async () => {
   try {
@@ -3052,51 +3191,103 @@ body::-webkit-scrollbar-thumb:hover {
 .stats-carousel {
   width: 100%;
   margin-bottom: 0.5rem; /* 减小与下方的间距 */
-  background-color: rgb(224, 242, 215); /* 设置背景色 */
-  border-radius: 0.75rem;
-  padding: 1rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 50%, #e2e8f0 100%);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  border: 1px solid rgba(226, 232, 240, 0.6);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04);
+  position: relative;
+  overflow: hidden;
+}
+
+/* 轮播图背景装饰 */
+.stats-carousel::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -50%;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle, rgba(64, 158, 255, 0.03) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+.stats-carousel::after {
+  content: '';
+  position: absolute;
+  bottom: -30%;
+  left: -30%;
+  width: 60%;
+  height: 60%;
+  background: radial-gradient(circle, rgba(103, 194, 58, 0.02) 0%, transparent 70%);
+  pointer-events: none;
 }
 
 .carousel-page {
   display: flex;
-  gap: 1.25rem;
+  gap: 1.5rem;
   align-items: center; /* 改为居中对齐 */
   justify-content: center; /* 水平居中 */
   height: 100%;
-  padding: 0 1rem;
+  padding: 0 1.5rem;
+  position: relative;
+  z-index: 1;
 }
 
 /* 轮播图指示器样式 */
 .stats-carousel :deep(.el-carousel__indicators) {
-  margin-top: 0.5rem;
+  margin-top: 1rem;
 }
 
 .stats-carousel :deep(.el-carousel__indicator) {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
+  margin: 0 6px;
 }
 
 .stats-carousel :deep(.el-carousel__button) {
-  width: 8px;
-  height: 8px;
+  width: 10px;
+  height: 10px;
   border-radius: 50%;
-  background-color: #c0c4cc;
+  background-color: rgba(148, 163, 184, 0.4);
+  border: 2px solid transparent;
+  transition: all 0.3s ease;
 }
 
 .stats-carousel :deep(.el-carousel__indicator.is-active .el-carousel__button) {
   background-color: #409eff;
+  border-color: rgba(64, 158, 255, 0.3);
+  box-shadow: 0 0 0 4px rgba(64, 158, 255, 0.1);
+  transform: scale(1.2);
 }
 
 /* 轮播图箭头样式 */
 .stats-carousel :deep(.el-carousel__arrow) {
-  background-color: rgba(255, 255, 255, 0.8);
-  color: #409eff;
-  border: 1px solid #e4e7ed;
+  background: rgba(255, 255, 255, 0.95);
+  color: #64748b;
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  backdrop-filter: blur(8px);
+  transition: all 0.3s ease;
 }
 
 .stats-carousel :deep(.el-carousel__arrow:hover) {
-  background-color: #409eff;
+  background: #409eff;
   color: white;
+  border-color: #409eff;
+  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.3);
+  transform: scale(1.05);
+}
+
+.stats-carousel :deep(.el-carousel__arrow--left) {
+  left: 15px;
+}
+
+.stats-carousel :deep(.el-carousel__arrow--right) {
+  right: 15px;
 }
 
 /* 轮播图内的卡片样式 */
@@ -3110,11 +3301,19 @@ body::-webkit-scrollbar-thumb:hover {
   flex-direction: row;
   align-items: center;
   align-self: center; /* 确保卡片在容器中垂直居中 */
-  padding: 1rem;
-  border-radius: 0.75rem;
-  background: white;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 1.25rem;
+  background: rgba(255, 255, 255, 0.9);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
   transition: all 0.3s ease;
+}
+
+.carousel-page .stat-card:hover {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  border-color: rgba(64, 158, 255, 0.2);
 }
 .stat-row-flex .stat-card {
   flex: 1 1 0;
@@ -4003,6 +4202,169 @@ body::-webkit-scrollbar-thumb:hover {
 /* 表格标题栏文字水平居中 */
 .complaint-table-card :deep(.el-table .el-table__header-wrapper .el-table__header thead tr th .cell) {
   text-align: center !important;
+}
+
+/* 美化表头样式 */
+.enhanced-table :deep(.el-table__header) {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+}
+
+.enhanced-table :deep(.el-table__header th) {
+  background: transparent !important;
+  border-bottom: 2px solid #e2e8f0;
+  font-weight: 600;
+  color: #374151;
+  padding: 16px 8px !important;
+}
+
+.enhanced-table :deep(.el-table__header th:hover) {
+  background: rgba(64, 158, 255, 0.05) !important;
+}
+
+/* 表头单元格样式 */
+.table-header-cell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-weight: 600;
+  color: #374151;
+  font-size: 13px;
+  width: 100%;
+}
+
+.header-icon {
+  font-size: 14px;
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+.header-text {
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+/* 不同类型图标的颜色 */
+.date-icon {
+  color: #10b981;
+}
+
+.customer-icon {
+  color: #3b82f6;
+}
+
+.order-icon {
+  color: #8b5cf6;
+}
+
+.product-icon {
+  color: #f59e0b;
+}
+
+.workshop-icon {
+  color: #ef4444;
+}
+
+.category-icon {
+  color: #f97316;
+}
+
+.defect-icon {
+  color: #dc2626;
+}
+
+.item-icon {
+  color: #06b6d4;
+}
+
+.desc-icon {
+  color: #84cc16;
+}
+
+.dept-icon {
+  color: #6366f1;
+}
+
+.person-icon {
+  color: #ec4899;
+}
+
+.action-icon {
+  color: #64748b;
+}
+
+/* 表头悬停效果 */
+.enhanced-table :deep(.el-table__header th:hover .header-icon) {
+  transform: scale(1.1);
+  opacity: 1;
+}
+
+.enhanced-table :deep(.el-table__header th:hover .header-text) {
+  color: #1f2937;
+}
+
+/* 排序箭头水平排列 */
+.enhanced-table :deep(.el-table th.is-sortable .cell) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  position: relative !important;
+}
+
+.enhanced-table :deep(.el-table th.is-sortable .caret-wrapper) {
+  display: inline-flex !important;
+  flex-direction: row !important;
+  align-items: center !important;
+  gap: 2px !important;
+  margin-left: 0 !important;
+  height: 12px !important;
+  width: auto !important;
+  vertical-align: middle !important;
+  position: static !important;
+  flex-shrink: 0 !important;
+}
+
+.enhanced-table :deep(.el-table th.is-sortable .sort-caret) {
+  position: static !important;
+  border: 2px solid transparent !important;
+  margin: 0 1px !important;
+  width: 0 !important;
+  height: 0 !important;
+  display: inline-block !important;
+}
+
+.enhanced-table :deep(.el-table th.is-sortable .sort-caret.ascending) {
+  border-bottom-color: #c0c4cc !important;
+  border-top: none !important;
+  border-left-width: 2px !important;
+  border-right-width: 2px !important;
+  border-bottom-width: 3px !important;
+}
+
+.enhanced-table :deep(.el-table th.is-sortable .sort-caret.descending) {
+  border-top-color: #c0c4cc !important;
+  border-bottom: none !important;
+  border-left-width: 2px !important;
+  border-right-width: 2px !important;
+  border-top-width: 3px !important;
+}
+
+.enhanced-table :deep(.el-table th.is-sortable .sort-caret.ascending:hover) {
+  border-bottom-color: #409eff !important;
+}
+
+.enhanced-table :deep(.el-table th.is-sortable .sort-caret.descending:hover) {
+  border-top-color: #409eff !important;
+}
+
+/* 激活状态的排序箭头 */
+.enhanced-table :deep(.el-table th.is-sortable.ascending .sort-caret.ascending) {
+  border-bottom-color: #409eff !important;
+}
+
+.enhanced-table :deep(.el-table th.is-sortable.descending .sort-caret.descending) {
+  border-top-color: #409eff !important;
 }
 
 /* 拖拽手柄样式 */

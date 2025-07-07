@@ -166,19 +166,67 @@ router.get('/list', async (req, res) => {
       defectiveRateMin, // 最小不良率
       defectiveRateMax, // 最大不良率
       returnGoods,      // 退货状态
-      isReprint         // 补印状态
+      isReprint,        // 补印状态
+      timeRange,        // 时间范围
+      // 钻取参数
+      period,           // 时间段钻取
+      category          // 类别钻取（这里的category指的是defectiveCategory）
     } = req.query;
 
     let pool = await sql.connect(await getDynamicConfig());
 
-    // 构建搜索条件
-    let whereClause = 'WHERE Date >= DATEADD(year, -1, GETDATE()) AND Date <= GETDATE()';
+    // 构建基础时间范围条件
+    let whereClause = '';
+    const now = new Date();
 
-    // 如果有高级查询参数，则使用高级查询
+    // 处理timeRange参数
+    if (timeRange) {
+      let timeStartDate = '';
+      switch (timeRange) {
+        case '2months':
+          const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+          timeStartDate = twoMonthsAgo.toISOString().split('T')[0];
+          break;
+        case '3months':
+          const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+          timeStartDate = threeMonthsAgo.toISOString().split('T')[0];
+          break;
+        case '4months':
+          const fourMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+          timeStartDate = fourMonthsAgo.toISOString().split('T')[0];
+          break;
+        case '5months':
+          const fiveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+          timeStartDate = fiveMonthsAgo.toISOString().split('T')[0];
+          break;
+        case '6months':
+          const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+          timeStartDate = sixMonthsAgo.toISOString().split('T')[0];
+          break;
+        case '1year':
+          const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+          timeStartDate = oneYearAgo.toISOString().split('T')[0];
+          break;
+        case '2years':
+          const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+          timeStartDate = twoYearsAgo.toISOString().split('T')[0];
+          break;
+        default:
+          const defaultStart = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+          timeStartDate = defaultStart.toISOString().split('T')[0];
+      }
+      whereClause = `WHERE Date >= '${timeStartDate}'`;
+    } else {
+      // 默认显示近1年数据
+      whereClause = 'WHERE Date >= DATEADD(year, -1, GETDATE()) AND Date <= GETDATE()';
+    }
+
+    // 如果有高级查询参数或钻取参数，则使用高级查询
     if (customer || orderNo || productName || workshop || complaintCategory || customerComplaintType ||
         defectiveCategory || mainDept || mainPerson || startDate || endDate ||
         defectiveRateMin !== undefined || defectiveRateMax !== undefined ||
-        returnGoods !== undefined || isReprint !== undefined) {
+        returnGoods !== undefined || isReprint !== undefined || timeRange ||
+        period || category) {
 
       // 客户查询
       if (customer) {
@@ -251,6 +299,37 @@ router.get('/list', async (req, res) => {
       // 补印状态查询
       if (isReprint !== undefined && isReprint !== '') {
         whereClause += ` AND IsReprint = ${isReprint === '1' ? 1 : 0}`;
+      }
+
+      // 钻取参数处理
+      // 时间段钻取
+      if (period) {
+        // period格式可能是 "2024年12月"、"25年5月" 或 "2024-12"
+        if (period.includes('年') && period.includes('月')) {
+          // 处理中文格式 "2024年12月" 或 "25年5月"
+          const yearMatch = period.match(/(\d{2,4})年/);
+          const monthMatch = period.match(/(\d{1,2})月/);
+          if (yearMatch && monthMatch) {
+            let year = yearMatch[1];
+            // 如果是2位年份，转换为4位年份
+            if (year.length === 2) {
+              year = '20' + year;
+            }
+            const month = monthMatch[1].padStart(2, '0');
+            whereClause += ` AND YEAR(Date) = ${year} AND MONTH(Date) = ${parseInt(month)}`;
+          }
+        } else if (period.includes('-')) {
+          // 处理格式 "2024-12"
+          const [year, month] = period.split('-');
+          if (year && month) {
+            whereClause += ` AND YEAR(Date) = ${year} AND MONTH(Date) = ${parseInt(month)}`;
+          }
+        }
+      }
+
+      // 类别钻取（不良类别）
+      if (category) {
+        whereClause += ` AND DefectiveCategory = N'${category}'`;
       }
 
     } else if (search) {
@@ -1014,26 +1093,58 @@ router.get('/analysis', async (req, res) => {
     const now = new Date();
 
     switch (timeRange) {
+      case '2months':
+        // 近2个月：当前月份 + 前1个月 = 2个月（7、6月）
+        const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+        startDate = twoMonthsAgo.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        dateCondition = `Date >= '${startDate}'`;
+        break;
+      case '3months':
+        // 近3个月：当前月份 + 前2个月 = 3个月（7、6、5月）
+        const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        startDate = threeMonthsAgo.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        dateCondition = `Date >= '${startDate}'`;
+        break;
+      case '4months':
+        // 近4个月：当前月份 + 前3个月 = 4个月（7、6、5、4月）
+        const fourMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+        startDate = fourMonthsAgo.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        dateCondition = `Date >= '${startDate}'`;
+        break;
+      case '5months':
+        // 近5个月：当前月份 + 前4个月 = 5个月（7、6、5、4、3月）
+        const fiveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+        startDate = fiveMonthsAgo.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        dateCondition = `Date >= '${startDate}'`;
+        break;
       case '6months':
-        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        // 近6个月：当前月份 + 前5个月 = 6个月（7、6、5、4、3、2月）
+        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         startDate = sixMonthsAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
         dateCondition = `Date >= '${startDate}'`;
         break;
       case '1year':
-        const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+        // 近1年：当前月份 + 前11个月 = 12个月
+        const oneYearAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
         startDate = oneYearAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
         dateCondition = `Date >= '${startDate}'`;
         break;
       case '2years':
-        const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+        // 近2年：当前月份 + 前23个月 = 24个月
+        const twoYearsAgo = new Date(now.getFullYear(), now.getMonth() - 23, 1);
         startDate = twoYearsAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
         dateCondition = `Date >= '${startDate}'`;
         break;
       default:
-        const defaultStart = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        // 默认近6个月：当前月份 + 前5个月 = 6个月（7、6、5、4、3、2月）
+        const defaultStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         startDate = defaultStart.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
         dateCondition = `Date >= '${startDate}'`;
@@ -1063,24 +1174,44 @@ router.get('/analysis', async (req, res) => {
     let batchStartDate, batchEndDate;
 
     switch (timeRange) {
+      case '2months':
+        const twoMonthsAgo2 = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+        batchStartDate = twoMonthsAgo2.toISOString().split('T')[0];
+        batchEndDate = now.toISOString().split('T')[0];
+        break;
+      case '3months':
+        const threeMonthsAgo2 = new Date(now.getFullYear(), now.getMonth() - 3, 1);
+        batchStartDate = threeMonthsAgo2.toISOString().split('T')[0];
+        batchEndDate = now.toISOString().split('T')[0];
+        break;
+      case '4months':
+        const fourMonthsAgo2 = new Date(now.getFullYear(), now.getMonth() - 4, 1);
+        batchStartDate = fourMonthsAgo2.toISOString().split('T')[0];
+        batchEndDate = now.toISOString().split('T')[0];
+        break;
+      case '5months':
+        const fiveMonthsAgo2 = new Date(now.getFullYear(), now.getMonth() - 5, 1);
+        batchStartDate = fiveMonthsAgo2.toISOString().split('T')[0];
+        batchEndDate = now.toISOString().split('T')[0];
+        break;
       case '6months':
-        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-        batchStartDate = sixMonthsAgo.toISOString().split('T')[0];
+        const sixMonthsAgo2 = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        batchStartDate = sixMonthsAgo2.toISOString().split('T')[0];
         batchEndDate = now.toISOString().split('T')[0];
         break;
       case '1year':
-        const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
-        batchStartDate = oneYearAgo.toISOString().split('T')[0];
+        const oneYearAgo2 = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+        batchStartDate = oneYearAgo2.toISOString().split('T')[0];
         batchEndDate = now.toISOString().split('T')[0];
         break;
       case '2years':
-        const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), 1);
-        batchStartDate = twoYearsAgo.toISOString().split('T')[0];
+        const twoYearsAgo2 = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+        batchStartDate = twoYearsAgo2.toISOString().split('T')[0];
         batchEndDate = now.toISOString().split('T')[0];
         break;
       default:
-        const defaultStart = new Date(now.getFullYear(), now.getMonth() - 6, 1);
-        batchStartDate = defaultStart.toISOString().split('T')[0];
+        const defaultStart2 = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        batchStartDate = defaultStart2.toISOString().split('T')[0];
         batchEndDate = now.toISOString().split('T')[0];
     }
 
@@ -1137,6 +1268,18 @@ router.get('/analysis', async (req, res) => {
     // 根据维度获取不同的数据
     switch (dimension) {
       case 'time':
+        // 计算需要返回的月份数量
+        let monthCount = 6; // 默认6个月
+        switch (timeRange) {
+          case '2months': monthCount = 2; break;
+          case '3months': monthCount = 3; break;
+          case '4months': monthCount = 4; break;
+          case '5months': monthCount = 5; break;
+          case '6months': monthCount = 6; break;
+          case '1year': monthCount = 12; break;
+          case '2years': monthCount = 24; break;
+        }
+
         const timeQuery = `
           SELECT
             YEAR(Date) as year,
@@ -1152,7 +1295,8 @@ router.get('/analysis', async (req, res) => {
         `;
 
         const timeResult = await pool.request().query(timeQuery);
-        chartData = timeResult.recordset;
+        // 只取最近的指定月份数量
+        chartData = timeResult.recordset.slice(-monthCount);
         tableData = chartData.map(item => ({
           ...item,
           rate: summaryData.totalComplaints > 0 ?

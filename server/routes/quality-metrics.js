@@ -248,14 +248,14 @@ router.put('/monthly-batches/:id', async (req, res) => {
     try {
         const { id } = req.params;
         const { InspectionBatches, DeliveryBatches, Remarks } = req.body;
-        
+
         console.log(`更新月度批次数据 - ID: ${id}`);
-        
+
         const pool = await db.getConnection();
-        
+
         const query = `
-            UPDATE MonthlyBatchStats 
-            SET 
+            UPDATE MonthlyBatchStats
+            SET
                 InspectionBatches = @InspectionBatches,
                 DeliveryBatches = @DeliveryBatches,
                 Remarks = @Remarks,
@@ -263,16 +263,16 @@ router.put('/monthly-batches/:id', async (req, res) => {
                 UpdatedAt = GETDATE()
             WHERE ID = @ID
         `;
-        
+
         const request = pool.request();
         request.input('ID', sql.Int, parseInt(id));
         request.input('InspectionBatches', sql.Int, InspectionBatches || 0);
         request.input('DeliveryBatches', sql.Int, DeliveryBatches || 0);
         request.input('Remarks', sql.NVarChar(500), Remarks || '');
         request.input('UpdatedBy', sql.NVarChar(50), 'admin'); // 后续从token获取
-        
+
         const result = await request.query(query);
-        
+
         if (result.rowsAffected[0] > 0) {
             console.log(`月度批次数据更新成功 - ID: ${id}`);
             res.json({
@@ -285,12 +285,90 @@ router.put('/monthly-batches/:id', async (req, res) => {
                 message: '未找到指定的月度批次数据'
             });
         }
-        
+
     } catch (error) {
         console.error('更新月度批次数据失败:', error);
         res.status(500).json({
             success: false,
             message: '更新月度批次数据失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 获取指定月份的批次统计数据（用于首页卡片）
+ * GET /api/quality-metrics/month-batch-stats
+ */
+router.get('/month-batch-stats', async (req, res) => {
+    try {
+        const { month } = req.query; // 格式: YYYY-MM
+
+        if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+            return res.status(400).json({
+                success: false,
+                message: '请提供有效的月份参数，格式: YYYY-MM'
+            });
+        }
+
+        const [year, monthNum] = month.split('-').map(Number);
+
+        console.log(`获取指定月份批次统计数据 - ${year}年${monthNum}月`);
+
+        const pool = await db.getConnection();
+
+        // 查询指定月份的批次数据
+        const query = `
+            SELECT
+                InspectionBatches,
+                DeliveryBatches,
+                StatYear,
+                StatMonth
+            FROM MonthlyBatchStats
+            WHERE StatYear = @year AND StatMonth = @month
+        `;
+
+        const request = pool.request();
+        request.input('year', sql.Int, year);
+        request.input('month', sql.Int, monthNum);
+
+        const result = await request.query(query);
+
+        if (result.recordset.length > 0) {
+            const data = result.recordset[0];
+            console.log(`找到批次数据:`, data);
+
+            res.json({
+                success: true,
+                data: {
+                    inspectionBatches: data.InspectionBatches || 0,
+                    deliveryBatches: data.DeliveryBatches || 0,
+                    year: data.StatYear,
+                    month: data.StatMonth
+                },
+                message: '批次统计数据获取成功'
+            });
+        } else {
+            console.log(`未找到${year}年${monthNum}月的批次数据`);
+
+            // 返回默认值
+            res.json({
+                success: true,
+                data: {
+                    inspectionBatches: 0,
+                    deliveryBatches: 0,
+                    year: year,
+                    month: monthNum
+                },
+                message: '未找到指定月份的批次数据，返回默认值'
+            });
+        }
+
+    } catch (error) {
+        console.error('获取月份批次统计数据失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取月份批次统计数据失败',
             error: error.message
         });
     }

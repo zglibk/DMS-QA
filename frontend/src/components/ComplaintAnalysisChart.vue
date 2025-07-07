@@ -9,36 +9,37 @@
           </span>
           <div class="header-controls">
             <!-- 维度选择 -->
-            <el-select 
-              v-model="selectedDimension" 
+            <el-select
+              v-model="selectedDimension"
               @change="handleDimensionChange"
-              size="small"
-              style="width: 120px"
+              style="width: 140px"
             >
               <el-option label="时间趋势" value="time" />
               <el-option label="车间分析" value="workshop" />
               <el-option label="类别分析" value="category" />
               <el-option label="客户分析" value="customer" />
             </el-select>
-            
+
             <!-- 时间范围选择 -->
-            <el-select 
-              v-model="selectedTimeRange" 
+            <el-select
+              v-model="selectedTimeRange"
               @change="loadData"
-              size="small"
-              style="width: 120px"
+              style="width: 140px"
             >
+              <el-option label="近2个月" value="2months" />
+              <el-option label="近3个月" value="3months" />
+              <el-option label="近4个月" value="4months" />
+              <el-option label="近5个月" value="5months" />
               <el-option label="近6个月" value="6months" />
               <el-option label="近1年" value="1year" />
               <el-option label="近2年" value="2years" />
             </el-select>
-            
+
             <!-- 投诉类型筛选 -->
-            <el-select 
-              v-model="selectedComplaintType" 
+            <el-select
+              v-model="selectedComplaintType"
               @change="loadData"
-              size="small"
-              style="width: 100px"
+              style="width: 120px"
               clearable
               placeholder="类型"
             >
@@ -62,49 +63,68 @@
       
       <!-- 统计概览卡片 -->
       <div class="summary-cards" v-if="summaryData">
-        <div class="summary-card">
-          <div class="card-icon total">
-            <el-icon><DataBoard /></el-icon>
+        <div class="summary-card total-card">
+          <div class="card-left">
+            <div class="card-icon total">
+              <el-icon><DataBoard /></el-icon>
+            </div>
           </div>
-          <div class="card-content">
-            <div class="card-value">{{ summaryData.totalComplaints || 0 }}</div>
-            <div class="card-label">总投诉数</div>
-          </div>
-        </div>
-        <div class="summary-card">
-          <div class="card-icon inner">
-            <el-icon><Warning /></el-icon>
-          </div>
-          <div class="card-content">
-            <div class="card-value">{{ summaryData.innerComplaints || 0 }}</div>
-            <div class="card-label">内诉数量</div>
+          <div class="card-right">
+            <div class="card-title">总投诉数</div>
+            <div class="card-value total-value">{{ summaryData.totalComplaints || 0 }}</div>
+            <div class="card-subtitle">本期统计</div>
           </div>
         </div>
-        <div class="summary-card">
-          <div class="card-icon outer">
-            <el-icon><CircleClose /></el-icon>
+
+        <div class="summary-card inner-card">
+          <div class="card-left">
+            <div class="card-icon inner">
+              <el-icon><Warning /></el-icon>
+            </div>
           </div>
-          <div class="card-content">
-            <div class="card-value">{{ summaryData.outerComplaints || 0 }}</div>
-            <div class="card-label">客诉数量</div>
-          </div>
-        </div>
-        <div class="summary-card">
-          <div class="card-icon rate">
-            <el-icon><DataAnalysis /></el-icon>
-          </div>
-          <div class="card-content">
-            <div class="card-value">{{ summaryData.firstPassRate || 0 }}%</div>
-            <div class="card-label">一次交检合格率</div>
+          <div class="card-right">
+            <div class="card-title">内诉数量</div>
+            <div class="card-value inner-value">{{ summaryData.innerComplaints || 0 }}</div>
+            <div class="card-subtitle">内部投诉</div>
           </div>
         </div>
-        <div class="summary-card">
-          <div class="card-icon customer-rate">
-            <el-icon><Warning /></el-icon>
+
+        <div class="summary-card outer-card">
+          <div class="card-left">
+            <div class="card-icon outer">
+              <el-icon><CircleClose /></el-icon>
+            </div>
           </div>
-          <div class="card-content">
-            <div class="card-value">{{ summaryData.customerComplaintRate || 0 }}%</div>
-            <div class="card-label">客诉率</div>
+          <div class="card-right">
+            <div class="card-title">客诉数量</div>
+            <div class="card-value outer-value">{{ summaryData.outerComplaints || 0 }}</div>
+            <div class="card-subtitle">客户投诉</div>
+          </div>
+        </div>
+
+        <div class="summary-card rate-card">
+          <div class="card-left">
+            <div class="card-icon rate">
+              <el-icon><DataAnalysis /></el-icon>
+            </div>
+          </div>
+          <div class="card-right">
+            <div class="card-title">一次交检合格率</div>
+            <div class="card-value rate-value">{{ summaryData.firstPassRate || 0 }}%</div>
+            <div class="card-subtitle">质量指标</div>
+          </div>
+        </div>
+
+        <div class="summary-card customer-rate-card">
+          <div class="card-left">
+            <div class="card-icon customer-rate">
+              <el-icon><Warning /></el-icon>
+            </div>
+          </div>
+          <div class="card-right">
+            <div class="card-title">客诉率</div>
+            <div class="card-value customer-rate-value">{{ summaryData.customerComplaintRate || 0 }}%</div>
+            <div class="card-subtitle">客诉指标</div>
           </div>
         </div>
       </div>
@@ -177,45 +197,161 @@
     <el-dialog
       v-model="detailDialogVisible"
       :title="detailDialogTitle"
-      width="80%"
-      top="5vh"
+      width="85%"
+      top="3vh"
       :close-on-click-modal="false"
+      :modal="true"
+      :append-to-body="true"
+      :lock-scroll="false"
+      center
+      class="complaint-detail-dialog enhanced-dialog"
     >
-      <el-table
-        :data="detailDialogData"
-        stripe
-        border
-        height="60vh"
-        style="width: 100%"
-      >
-        <el-table-column prop="ComplaintNo" label="投诉编号" width="120" />
-        <el-table-column prop="ComplaintDate" label="投诉日期" width="100">
-          <template #default="scope">
-            {{ scope.row.ComplaintDate ? new Date(scope.row.ComplaintDate).toLocaleDateString() : '' }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="CustomerName" label="客户名称" width="150" />
-        <el-table-column prop="WorkOrder" label="工单号" width="120" />
-        <el-table-column prop="ComplaintCategory" label="投诉类别" width="80" />
-        <el-table-column prop="DefectiveCategory" label="不良类别" width="100" />
-        <el-table-column prop="Workshop" label="责任车间" width="100" />
-        <el-table-column prop="ComplaintDescription" label="投诉描述" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="ProcessingStatus" label="处理状态" width="100">
-          <template #default="scope">
-            <el-tag :type="scope.row.ProcessingStatus === '已完成' ? 'success' : 'warning'">
-              {{ scope.row.ProcessingStatus }}
-            </el-tag>
-          </template>
-        </el-table-column>
-      </el-table>
+      <!-- 自定义标题 -->
+      <template #header="{ close, titleId, titleClass }">
+        <div class="enhanced-dialog-header">
+          <div class="header-left">
+            <div class="header-icon-wrapper">
+              <el-icon class="header-icon" size="22">
+                <Document />
+              </el-icon>
+            </div>
+            <div class="header-text">
+              <span :id="titleId" :class="titleClass" class="dialog-title">
+                {{ detailDialogTitle }}
+              </span>
+              <span class="dialog-subtitle">共 {{ detailDialogData.length }} 条记录</span>
+            </div>
+          </div>
+          <div class="header-right">
+            <el-button
+              type="text"
+              @click="close"
+              class="close-btn"
+              size="large"
+            >
+              <el-icon size="18"><Close /></el-icon>
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <div class="enhanced-dialog-content">
+        <el-table
+          :data="detailDialogData"
+          stripe
+          border
+          height="58vh"
+          style="width: 100%"
+          class="enhanced-detail-table"
+          header-cell-class-name="enhanced-table-header"
+          cell-class-name="enhanced-table-cell"
+          :row-class-name="getRowClassName"
+        >
+          <el-table-column prop="ID" label="ID" width="70" align="center" fixed="left">
+            <template #default="scope">
+              <span class="id-badge">{{ scope.row.ID }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="Date" label="投诉日期" width="100" align="center">
+            <template #default="scope">
+              <div class="date-cell">
+                <el-icon class="date-icon" size="14"><Calendar /></el-icon>
+                <span class="date-text">
+                  {{ scope.row.Date ? new Date(scope.row.Date).toLocaleDateString('zh-CN', { year: '2-digit', month: '2-digit', day: '2-digit' }) : '' }}
+                </span>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="Customer" label="客户代码" width="100" align="center" show-overflow-tooltip>
+            <template #default="scope">
+              <span class="customer-code">{{ scope.row.Customer }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="OrderNo" label="工单号" width="130" align="center">
+            <template #default="scope">
+              <span class="order-no">{{ scope.row.OrderNo }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="ProductName" label="产品名称" width="140" show-overflow-tooltip>
+            <template #default="scope">
+              <span class="product-name">{{ scope.row.ProductName }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="ComplaintCategory" label="投诉类别" width="90" align="center">
+            <template #default="scope">
+              <el-tag
+                size="small"
+                :type="scope.row.ComplaintCategory === '客诉' ? 'danger' : 'primary'"
+                class="category-tag"
+              >
+                {{ scope.row.ComplaintCategory }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="DefectiveCategory" label="不良类别" width="100" align="center">
+            <template #default="scope">
+              <el-tag size="small" type="warning" class="defective-tag">
+                {{ scope.row.DefectiveCategory }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="Workshop" label="责任车间" width="90" align="center">
+            <template #default="scope">
+              <el-tag size="small" type="info" class="workshop-tag">
+                {{ scope.row.Workshop }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="DefectiveDescription" label="不良描述" min-width="180" show-overflow-tooltip>
+            <template #default="scope">
+              <span class="description-text">{{ scope.row.DefectiveDescription }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="DefectiveQty" label="不良数量" width="90" align="center">
+            <template #default="scope">
+              <span class="quantity-badge">{{ scope.row.DefectiveQty }}</span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="DefectiveRate" label="不良率" width="80" align="center">
+            <template #default="scope">
+              <span class="rate-badge" :class="getRateClass(scope.row.DefectiveRate)">
+                {{ scope.row.DefectiveRate ? scope.row.DefectiveRate + '%' : '' }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="MainDept" label="主责部门" width="100" align="center">
+            <template #default="scope">
+              <el-tag size="small" type="success" class="dept-tag">
+                {{ scope.row.MainDept }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column prop="MainPerson" label="主责人" width="90" align="center">
+            <template #default="scope">
+              <span class="person-name">{{ scope.row.MainPerson }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+      </div>
 
       <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="detailDialogVisible = false">关闭</el-button>
-          <el-button type="primary" @click="exportDetailData">
-            <el-icon><Download /></el-icon>
-            导出详细数据
-          </el-button>
+        <div class="enhanced-dialog-footer">
+          <div class="footer-left">
+            <el-text type="info" size="small" class="footer-tip">
+              <el-icon><InfoFilled /></el-icon>
+              双击表格行可查看更多详细信息
+            </el-text>
+          </div>
+          <div class="footer-right">
+            <el-button @click="detailDialogVisible = false" size="default" class="footer-btn">
+              <el-icon><Close /></el-icon>
+              关闭
+            </el-button>
+            <el-button type="primary" @click="exportDetailData" size="default" class="footer-btn primary-btn">
+              <el-icon><Download /></el-icon>
+              导出数据
+            </el-button>
+          </div>
         </div>
       </template>
     </el-dialog>
@@ -226,7 +362,8 @@
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Refresh, DataAnalysis, Grid, Warning, CircleClose, DataBoard, Download
+  Refresh, DataAnalysis, Grid, Warning, CircleClose, DataBoard, Download,
+  Document, Close, Calendar, InfoFilled
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
@@ -316,6 +453,24 @@ const getBaseChartOption = () => ({
     bottom: '15%',
     top: '8%',
     containLabel: true
+  }
+})
+
+// 饼图基础配置
+const getPieBaseChartOption = () => ({
+  tooltip: {
+    trigger: 'item',
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderColor: '#E4E7ED',
+    borderWidth: 1,
+    textStyle: { color: '#606266' },
+    formatter: '{b}: {c} ({d}%)'
+  },
+  legend: {
+    bottom: 10,
+    left: 'center',
+    textStyle: { fontSize: 12, color: '#606266' },
+    itemGap: 20
   }
 })
 
@@ -410,19 +565,25 @@ const handleRowClick = (row) => {
 // 数据钻取方法
 const drillDownToTimeDetail = async (row) => {
   try {
+    console.log('时间钻取参数:', row)
     // 使用现有的投诉列表API进行数据钻取
     const response = await axios.get('/api/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
         period: row.period,
-        complaintType: selectedComplaintType.value
+        complaintCategory: selectedComplaintType.value === '内诉' ? '内诉' : selectedComplaintType.value === '客诉' ? '客诉' : '',
+        timeRange: selectedTimeRange.value
       }
     })
 
+    console.log('时间钻取响应:', response.data)
     if (response.data.success) {
       // 显示详细数据对话框
-      showDetailDialog(`${row.period} 时间段详细数据`, response.data.data.records)
+      const records = response.data.data?.records || response.data.data || []
+      showDetailDialog(`${row.period} 时间段详细数据`, records)
+    } else {
+      ElMessage.error(response.data.message || '获取详细数据失败')
     }
   } catch (error) {
     console.error('获取时间详细数据失败:', error)
@@ -432,18 +593,24 @@ const drillDownToTimeDetail = async (row) => {
 
 const drillDownToWorkshopDetail = async (row) => {
   try {
+    console.log('车间钻取参数:', row)
     // 使用现有的投诉列表API进行数据钻取
     const response = await axios.get('/api/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
         workshop: row.workshop,
-        timeRange: selectedTimeRange.value
+        timeRange: selectedTimeRange.value,
+        complaintCategory: selectedComplaintType.value === '内诉' ? '内诉' : selectedComplaintType.value === '客诉' ? '客诉' : ''
       }
     })
 
+    console.log('车间钻取响应:', response.data)
     if (response.data.success) {
-      showDetailDialog(`${row.workshop} 车间详细数据`, response.data.data.records)
+      const records = response.data.data?.records || response.data.data || []
+      showDetailDialog(`${row.workshop} 车间详细数据`, records)
+    } else {
+      ElMessage.error(response.data.message || '获取详细数据失败')
     }
   } catch (error) {
     console.error('获取车间详细数据失败:', error)
@@ -453,18 +620,24 @@ const drillDownToWorkshopDetail = async (row) => {
 
 const drillDownToCategoryDetail = async (row) => {
   try {
+    console.log('类别钻取参数:', row)
     // 使用现有的投诉列表API进行数据钻取
     const response = await axios.get('/api/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
-        category: row.category,
-        timeRange: selectedTimeRange.value
+        defectiveCategory: row.category,
+        timeRange: selectedTimeRange.value,
+        complaintCategory: selectedComplaintType.value === '内诉' ? '内诉' : selectedComplaintType.value === '客诉' ? '客诉' : ''
       }
     })
 
+    console.log('类别钻取响应:', response.data)
     if (response.data.success) {
-      showDetailDialog(`${row.category} 类别详细数据`, response.data.data.records)
+      const records = response.data.data?.records || response.data.data || []
+      showDetailDialog(`${row.category} 类别详细数据`, records)
+    } else {
+      ElMessage.error(response.data.message || '获取详细数据失败')
     }
   } catch (error) {
     console.error('获取类别详细数据失败:', error)
@@ -474,18 +647,24 @@ const drillDownToCategoryDetail = async (row) => {
 
 const drillDownToCustomerDetail = async (row) => {
   try {
+    console.log('客户钻取参数:', row)
     // 使用现有的投诉列表API进行数据钻取
     const response = await axios.get('/api/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
         customer: row.customer,
-        timeRange: selectedTimeRange.value
+        timeRange: selectedTimeRange.value,
+        complaintCategory: selectedComplaintType.value === '内诉' ? '内诉' : selectedComplaintType.value === '客诉' ? '客诉' : ''
       }
     })
 
+    console.log('客户钻取响应:', response.data)
     if (response.data.success) {
-      showDetailDialog(`${row.customer} 客户详细数据`, response.data.data.records)
+      const records = response.data.data?.records || response.data.data || []
+      showDetailDialog(`${row.customer} 客户详细数据`, records)
+    } else {
+      ElMessage.error(response.data.message || '获取详细数据失败')
     }
   } catch (error) {
     console.error('获取客户详细数据失败:', error)
@@ -504,6 +683,25 @@ const showDetailDialog = (title, data) => {
   detailDialogData.value = data || []
   detailDialogVisible.value = true
   console.log(`${title}:`, data)
+}
+
+// 表格行样式
+const getRowClassName = ({ row, rowIndex }) => {
+  if (row.ComplaintCategory === '客诉') {
+    return 'customer-complaint-row'
+  } else if (row.ComplaintCategory === '内诉') {
+    return 'internal-complaint-row'
+  }
+  return ''
+}
+
+// 不良率样式
+const getRateClass = (rate) => {
+  if (!rate) return ''
+  const numRate = parseFloat(rate)
+  if (numRate >= 5) return 'rate-high'
+  if (numRate >= 2) return 'rate-medium'
+  return 'rate-low'
 }
 
 // 导出详细数据
@@ -711,7 +909,7 @@ const getWorkshopChartOption = () => {
 
 // 类别分布图表配置（玫瑰图）
 const getCategoryChartOption = () => {
-  const baseOption = getBaseChartOption()
+  const baseOption = getPieBaseChartOption()
   const data = chartData.value || []
   const pieData = data.map(item => ({
     name: item.category || '',
@@ -809,10 +1007,7 @@ const getCustomerChartOption = () => {
       type: 'bar',
       data: totalData,
       itemStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-          { offset: 0, color: '#409EFF' },
-          { offset: 1, color: '#79bbff' }
-        ]),
+        color: '#409EFF',
         borderRadius: [4, 4, 0, 0],
         shadowColor: 'rgba(64, 158, 255, 0.3)',
         shadowBlur: 10
@@ -856,17 +1051,49 @@ const exportData = () => {
 
 // 初始化图表
 const initChart = () => {
-  if (chartRef.value) {
+  if (chartRef.value && chartRef.value.offsetWidth > 0 && chartRef.value.offsetHeight > 0) {
     try {
+      // 如果已经存在实例，先销毁
+      if (chartInstance.value) {
+        chartInstance.value.dispose()
+      }
+
       chartInstance.value = echarts.init(chartRef.value)
 
-      // 监听窗口大小变化
-      window.addEventListener('resize', () => {
-        chartInstance.value?.resize()
-      })
+      // 监听窗口大小变化 - 添加防抖优化
+      let resizeTimer = null
+      const handleResize = () => {
+        if (resizeTimer) {
+          clearTimeout(resizeTimer)
+        }
+        resizeTimer = setTimeout(() => {
+          if (chartInstance.value) {
+            console.log('窗口大小变化，重新调整图表尺寸')
+            chartInstance.value.resize()
+          }
+        }, 100) // 100ms防抖
+      }
+
+      window.addEventListener('resize', handleResize)
+
+      // 组件卸载时清理事件监听
+      const cleanup = () => {
+        window.removeEventListener('resize', handleResize)
+        if (resizeTimer) {
+          clearTimeout(resizeTimer)
+        }
+      }
+
+      // 在组件卸载时清理
+      window.addEventListener('beforeunload', cleanup)
     } catch (error) {
       console.error('图表初始化失败:', error)
     }
+  } else {
+    console.warn('图表容器DOM未准备好，延迟初始化')
+    setTimeout(() => {
+      initChart()
+    }, 100)
   }
 }
 
@@ -874,8 +1101,11 @@ const initChart = () => {
 onMounted(async () => {
   try {
     await nextTick()
-    initChart()
-    await loadData()
+    // 延迟初始化，确保DOM完全渲染
+    setTimeout(async () => {
+      initChart()
+      await loadData()
+    }, 200)
   } catch (error) {
     console.error('组件初始化失败:', error)
   }
@@ -921,54 +1151,170 @@ onMounted(async () => {
 /* 统计概览卡片样式 */
 .summary-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #f8f9fa;
-  border-radius: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+  padding: 0;
 }
 
 .summary-card {
   display: flex;
   align-items: center;
-  padding: 16px;
+  padding: 20px;
   background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  gap: 12px;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.summary-card:hover::before {
+  transform: scaleX(1);
+}
+
+.card-left {
+  margin-right: 16px;
 }
 
 .card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 20px;
+  font-size: 24px;
+  transition: all 0.3s ease;
 }
 
-.card-icon.total { background: #e3f2fd; color: #1976d2; }
-.card-icon.inner { background: #fff3e0; color: #f57c00; }
-.card-icon.outer { background: #ffebee; color: #d32f2f; }
-.card-icon.rate { background: #e8f5e8; color: #388e3c; }
-.card-icon.customer-rate { background: #fce4ec; color: #c2185b; }
+/* Element Plus 经典配色 */
+.card-icon.total {
+  background: linear-gradient(135deg, #409EFF20, #409EFF10);
+  color: #409EFF;
+  border: 2px solid #409EFF20;
+}
+.card-icon.inner {
+  background: linear-gradient(135deg, #E6A23C20, #E6A23C10);
+  color: #E6A23C;
+  border: 2px solid #E6A23C20;
+}
+.card-icon.outer {
+  background: linear-gradient(135deg, #F56C6C20, #F56C6C10);
+  color: #F56C6C;
+  border: 2px solid #F56C6C20;
+}
+.card-icon.rate {
+  background: linear-gradient(135deg, #67C23A20, #67C23A10);
+  color: #67C23A;
+  border: 2px solid #67C23A20;
+}
+.card-icon.customer-rate {
+  background: linear-gradient(135deg, #909399, #909399);
+  color: #909399;
+  border: 2px solid #90939920;
+}
 
-.card-content {
+.summary-card:hover .card-icon {
+  transform: scale(1.1);
+}
+
+.card-right {
   flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-title {
+  font-size: 13px;
+  color: #909399;
+  font-weight: 500;
+  margin-bottom: 2px;
 }
 
 .card-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 4px;
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  transition: all 0.3s ease;
 }
 
-.card-label {
-  font-size: 12px;
-  color: #666;
+.card-subtitle {
+  font-size: 11px;
+  color: #C0C4CC;
+  font-weight: 400;
+}
+
+/* 不同卡片的数值颜色 */
+.total-value { color: #409EFF; }
+.inner-value { color: #E6A23C; }
+.outer-value { color: #F56C6C; }
+.rate-value { color: #67C23A; }
+.customer-rate-value { color: #909399; }
+
+/* 卡片入场动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.summary-card {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.summary-card:nth-child(1) { animation-delay: 0.1s; }
+.summary-card:nth-child(2) { animation-delay: 0.2s; }
+.summary-card:nth-child(3) { animation-delay: 0.3s; }
+.summary-card:nth-child(4) { animation-delay: 0.4s; }
+.summary-card:nth-child(5) { animation-delay: 0.5s; }
+
+/* 数值动画效果 */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card-value {
+  animation: countUp 0.8s ease-out;
+  animation-delay: 0.3s;
+  animation-fill-mode: both;
+}
+
+/* 图标脉冲动画 */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.summary-card:hover .card-icon {
+  animation: pulse 1s ease-in-out infinite;
 }
 
 /* 图表和表格并排布局 */
@@ -976,23 +1322,31 @@ onMounted(async () => {
   display: flex;
   gap: 20px;
   margin: 20px 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .chart-container {
-  flex: 1;
+  flex: 0 0 50%; /* 固定占50%宽度 */
+  width: 50%;
+  min-width: 0; /* 防止内容溢出 */
   padding: 20px;
   background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
   border-radius: 8px;
   border: 1px solid #e9ecef;
+  box-sizing: border-box;
 }
 
 .data-table {
-  flex: 0 0 700px;
+  flex: 0 0 50%; /* 固定占50%宽度 */
+  width: 50%;
+  min-width: 0; /* 防止内容溢出 */
   padding: 20px;
   background: white;
   border-radius: 8px;
   border: 1px solid #e9ecef;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
 }
 
 .section-title {
@@ -1012,14 +1366,88 @@ onMounted(async () => {
   color: #409EFF;
 }
 
-/* 响应式设计 */
-@media (max-width: 1200px) {
+/* 响应式设计 - 动态布局 */
+/* 超小屏幕 - 强制垂直布局 */
+@media (max-width: 768px) {
   .chart-and-table-container {
     flex-direction: column;
+    gap: 12px;
   }
 
+  .chart-container,
   .data-table {
     flex: none;
+    width: 100%;
+    max-width: 100%;
+    padding: 12px;
+  }
+
+  .chart {
+    height: 300px !important;
+  }
+}
+
+/* 小屏幕 - 根据内容动态决定布局 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .chart-and-table-container {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .chart-container,
+  .data-table {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 400px; /* 最小宽度，如果不够则换行 */
+    padding: 16px;
+  }
+
+  .chart {
+    height: 350px !important;
+  }
+}
+
+/* 中等屏幕 - 优先保持一排，空间不足时换行 */
+@media (min-width: 1025px) and (max-width: 1200px) {
+  .chart-and-table-container {
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+
+  .chart-container,
+  .data-table {
+    flex: 1 1 calc(50% - 9px);
+    min-width: 450px; /* 最小宽度，如果不够则换行 */
+    padding: 18px;
+  }
+}
+
+/* 大屏幕 - 固定50%布局 */
+@media (min-width: 1201px) and (max-width: 1600px) {
+  .chart-and-table-container {
+    gap: 20px;
+    flex-wrap: nowrap; /* 强制一排显示 */
+  }
+
+  .chart-container,
+  .data-table {
+    flex: 0 0 calc(50% - 10px);
+    width: calc(50% - 10px);
+    padding: 20px;
+  }
+}
+
+/* 超大屏幕 - 固定50%布局，增加间距 */
+@media (min-width: 1601px) {
+  .chart-and-table-container {
+    gap: 24px;
+    flex-wrap: nowrap; /* 强制一排显示 */
+  }
+
+  .chart-container,
+  .data-table {
+    flex: 0 0 calc(50% - 12px);
+    width: calc(50% - 12px);
+    padding: 24px;
   }
 }
 
@@ -1031,5 +1459,319 @@ onMounted(async () => {
   display: flex;
   justify-content: center;
   gap: 20px;
+}
+
+/* 投诉详细数据对话框样式 */
+.complaint-detail-dialog :deep(.el-dialog) {
+  height: 85vh !important;
+  max-height: 85vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 auto !important;
+  top: 5vh !important;
+  transform: translateY(0) !important;
+}
+
+.complaint-detail-dialog :deep(.el-dialog__header) {
+  flex-shrink: 0 !important;
+  padding: 24px 24px 16px 24px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.complaint-detail-dialog :deep(.el-dialog__title) {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  letter-spacing: 0.025em !important;
+  position: relative !important;
+  padding-left: 32px !important;
+  line-height: 1.5 !important;
+}
+
+.complaint-detail-dialog :deep(.el-dialog__title::before) {
+  content: '📊' !important;
+  font-size: 18px !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)) !important;
+}
+
+.complaint-detail-dialog :deep(.el-dialog__body) {
+  flex: 1 !important;
+  padding: 24px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+
+.complaint-detail-dialog :deep(.el-dialog__footer) {
+  flex-shrink: 0 !important;
+  padding: 16px 24px 24px 24px !important;
+  border-top: 1px solid #e5e7eb !important;
+  background: #f9fafb !important;
+}
+
+.complaint-detail-dialog :deep(.el-table) {
+  flex: 1 !important;
+  height: 100% !important;
+}
+
+/* 增强对话框样式 */
+.enhanced-dialog :deep(.el-dialog) {
+  border-radius: 12px !important;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25) !important;
+  overflow: hidden !important;
+}
+
+.enhanced-dialog-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 12px 12px 0 0;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.header-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  backdrop-filter: blur(10px);
+}
+
+.header-icon {
+  color: white !important;
+}
+
+.header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.dialog-title {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: white !important;
+  margin: 0 !important;
+}
+
+.dialog-subtitle {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 400;
+}
+
+.header-right .close-btn {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  border-radius: 8px !important;
+  width: 36px !important;
+  height: 36px !important;
+  padding: 0 !important;
+  transition: all 0.3s ease !important;
+}
+
+.header-right .close-btn:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  transform: scale(1.05);
+}
+
+.enhanced-dialog-content {
+  padding: 24px;
+  background: #fafbfc;
+}
+
+.enhanced-detail-table {
+  border-radius: 8px !important;
+  overflow: hidden !important;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+}
+
+.enhanced-detail-table :deep(.enhanced-table-header) {
+  background: #fafafa !important;
+  color: #606266 !important;
+  font-weight: 600 !important;
+  font-size: 13px !important;
+  border-bottom: 1px solid #ebeef5 !important;
+}
+
+.enhanced-detail-table :deep(.enhanced-table-cell) {
+  padding: 12px 8px !important;
+  border-bottom: 1px solid #f1f5f9 !important;
+}
+
+.enhanced-detail-table :deep(.customer-complaint-row) {
+  background: rgba(254, 226, 226, 0.5) !important;
+}
+
+.enhanced-detail-table :deep(.internal-complaint-row) {
+  background: rgba(219, 234, 254, 0.5) !important;
+}
+
+.id-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.date-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  justify-content: center;
+}
+
+.date-icon {
+  color: #6b7280;
+}
+
+.date-text {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.customer-code {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  background: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.order-no {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.product-name {
+  font-size: 13px;
+  color: #374151;
+  line-height: 1.4;
+}
+
+.category-tag, .defective-tag, .workshop-tag, .dept-tag {
+  font-weight: 500 !important;
+  border-radius: 6px !important;
+}
+
+.description-text {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.4;
+}
+
+.quantity-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  background: #e0f2fe;
+  color: #0f4c75;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rate-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rate-low {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.rate-medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.rate-high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.person-name {
+  font-size: 13px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.enhanced-dialog-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+}
+
+.footer-left .footer-tip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #6b7280 !important;
+  font-size: 13px !important;
+}
+
+.footer-right {
+  display: flex;
+  gap: 12px;
+}
+
+.footer-btn {
+  border-radius: 8px !important;
+  font-weight: 500 !important;
+  padding: 10px 20px !important;
+  transition: all 0.3s ease !important;
+}
+
+.footer-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.primary-btn {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+  border: none !important;
+}
+
+.primary-btn:hover {
+  background: linear-gradient(135deg, #2563eb, #1e40af) !important;
 }
 </style>

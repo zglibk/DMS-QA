@@ -1535,6 +1535,12 @@
       title="失败行详细数据"
       width="80%"
       :close-on-click-modal="false"
+      :modal="true"
+      :append-to-body="true"
+      :lock-scroll="false"
+      center
+      top="10vh"
+      class="row-details-dialog"
     >
       <div v-if="selectedRowData">
         <h4>错误信息：</h4>
@@ -4115,5 +4121,60 @@ const triggerManualBackup = async () => {
 
 .dialog-footer {
   text-align: right;
+}
+
+/* 失败行详情对话框样式 */
+.row-details-dialog :deep(.el-dialog) {
+  height: 80vh !important;
+  max-height: 80vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+  margin: 0 auto !important;
+  top: 10vh !important;
+  transform: translateY(0) !important;
+}
+
+.row-details-dialog :deep(.el-dialog__header) {
+  flex-shrink: 0 !important;
+  padding: 24px 24px 16px 24px !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  background: linear-gradient(135deg, #f9fafb 0%, #ffffff 100%) !important;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+.row-details-dialog :deep(.el-dialog__title) {
+  font-size: 18px !important;
+  font-weight: 600 !important;
+  color: #111827 !important;
+  letter-spacing: 0.025em !important;
+  position: relative !important;
+  padding-left: 32px !important;
+  line-height: 1.5 !important;
+}
+
+.row-details-dialog :deep(.el-dialog__title::before) {
+  content: '📋' !important;
+  font-size: 18px !important;
+  position: absolute !important;
+  left: 0 !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.1)) !important;
+}
+
+.row-details-dialog :deep(.el-dialog__body) {
+  flex: 1 !important;
+  padding: 24px !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+}
+
+.row-details-dialog :deep(.el-dialog__footer) {
+  flex-shrink: 0 !important;
+  padding: 16px 24px 24px 24px !important;
+  border-top: 1px solid #e5e7eb !important;
+  background: #f9fafb !important;
 }
 </style>

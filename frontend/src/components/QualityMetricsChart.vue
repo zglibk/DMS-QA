@@ -34,23 +34,58 @@
         </div>
       </template>
       
-      <!-- 指标卡片 -->
-      <div class="metrics-summary" v-if="summaryData">
-        <div class="metric-card">
-          <div class="metric-value">{{ summaryData.YearlyFirstPassRate }}%</div>
-          <div class="metric-label">年度一次交检合格率</div>
+      <!-- 统计概览卡片 -->
+      <div class="summary-cards" v-if="summaryData">
+        <div class="summary-card first-pass-card">
+          <div class="card-left">
+            <div class="card-icon first-pass">
+              <el-icon><DataAnalysis /></el-icon>
+            </div>
+          </div>
+          <div class="card-right">
+            <div class="card-title">年度一次交检合格率</div>
+            <div class="card-value first-pass-value">{{ summaryData.YearlyFirstPassRate }}%</div>
+            <div class="card-subtitle">质量指标</div>
+          </div>
         </div>
-        <div class="metric-card">
-          <div class="metric-value">{{ summaryData.YearlyDeliveryPassRate }}%</div>
-          <div class="metric-label">年度交货批次合格率</div>
+
+        <div class="summary-card delivery-pass-card">
+          <div class="card-left">
+            <div class="card-icon delivery-pass">
+              <el-icon><Flag /></el-icon>
+            </div>
+          </div>
+          <div class="card-right">
+            <div class="card-title">年度交货批次合格率</div>
+            <div class="card-value delivery-pass-value">{{ summaryData.YearlyDeliveryPassRate }}%</div>
+            <div class="card-subtitle">交货指标</div>
+          </div>
         </div>
-        <div class="metric-card">
-          <div class="metric-value">{{ summaryData.TotalInspectionBatches }}</div>
-          <div class="metric-label">年度交检批次</div>
+
+        <div class="summary-card inspection-batch-card">
+          <div class="card-left">
+            <div class="card-icon inspection-batch">
+              <el-icon><Document /></el-icon>
+            </div>
+          </div>
+          <div class="card-right">
+            <div class="card-title">年度交检批次</div>
+            <div class="card-value inspection-batch-value">{{ summaryData.TotalInspectionBatches }}</div>
+            <div class="card-subtitle">交检统计</div>
+          </div>
         </div>
-        <div class="metric-card">
-          <div class="metric-value">{{ summaryData.TotalDeliveryBatches }}</div>
-          <div class="metric-label">年度发货批次</div>
+
+        <div class="summary-card delivery-batch-card">
+          <div class="card-left">
+            <div class="card-icon delivery-batch">
+              <el-icon><Goods /></el-icon>
+            </div>
+          </div>
+          <div class="card-right">
+            <div class="card-title">年度发货批次</div>
+            <div class="card-value delivery-batch-value">{{ summaryData.TotalDeliveryBatches }}</div>
+            <div class="card-subtitle">发货统计</div>
+          </div>
         </div>
       </div>
       
@@ -119,7 +154,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, DataAnalysis, Grid } from '@element-plus/icons-vue'
+import { Refresh, DataAnalysis, Grid, CircleCheck, Document, Box } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
 
@@ -140,9 +175,13 @@ const chartOption = ref({
     left: 'center',
     top: '2%',
     textStyle: {
-      fontSize: 18,
-      fontWeight: 'bold',
+      fontSize: 16,
+      fontWeight: '600',
       color: '#303133'
+    },
+    subtextStyle: {
+      color: '#909399',
+      fontSize: 12
     }
   },
   tooltip: {
@@ -150,60 +189,123 @@ const chartOption = ref({
     axisPointer: {
       type: 'cross',
       crossStyle: {
-        color: '#999'
+        color: '#C0C4CC',
+        width: 1,
+        type: 'dashed'
+      },
+      lineStyle: {
+        color: '#C0C4CC',
+        width: 1,
+        type: 'dashed'
       }
     },
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
     borderColor: '#E4E7ED',
     borderWidth: 1,
+    borderRadius: 6,
     textStyle: {
-      color: '#606266'
+      color: '#606266',
+      fontSize: 12,
+      lineHeight: 20
     },
+    padding: [12, 16],
+    shadowColor: 'rgba(0, 0, 0, 0.12)',
+    shadowBlur: 12,
+    shadowOffsetY: 4,
     formatter: function(params) {
-      let result = `<div style="font-weight: bold; margin-bottom: 8px; color: #303133;">${params[0].axisValue}</div>`
+      let result = `<div style="font-weight: 600; margin-bottom: 8px; color: #303133; font-size: 13px;">${params[0].axisValue}</div>`
       params.forEach(param => {
         const unit = param.seriesName.includes('率') ? '%' : '批次'
         const value = param.seriesName.includes('率') ?
           parseFloat(param.value).toFixed(2) : param.value
-        result += `<div style="margin: 4px 0; display: flex; align-items: center;">
-          <span style="display: inline-block; width: 10px; height: 10px; background: ${param.color}; margin-right: 8px; border-radius: 2px;"></span>
-          <span style="flex: 1;">${param.seriesName}:</span>
-          <span style="font-weight: bold; margin-left: 8px;">${value}${unit}</span>
+        const colorStyle = param.seriesName.includes('率') ?
+          'border-radius: 50%;' : 'border-radius: 2px;'
+        result += `<div style="margin: 6px 0; display: flex; align-items: center; font-size: 12px;">
+          <span style="display: inline-block; width: 10px; height: 10px; background: ${param.color}; margin-right: 10px; ${colorStyle}"></span>
+          <span style="flex: 1; color: #606266;">${param.seriesName}:</span>
+          <span style="font-weight: 600; margin-left: 12px; color: #303133;">${value}${unit}</span>
         </div>`
       })
       return result
     }
   },
   legend: {
-    data: ['交检批次', '发货批次', '一次交检合格率', '交货批次合格率'],
+    data: [
+      {
+        name: '交检批次',
+        icon: 'rect',
+        itemStyle: { color: '#409EFF' }
+      },
+      {
+        name: '发货批次',
+        icon: 'rect',
+        itemStyle: { color: '#67C23A' }
+      },
+      {
+        name: '一次交检合格率',
+        icon: 'circle',
+        itemStyle: { color: '#E6A23C' }
+      },
+      {
+        name: '交货批次合格率',
+        icon: 'circle',
+        itemStyle: { color: '#F56C6C' }
+      }
+    ],
     bottom: 10,
     left: 'center',
     textStyle: {
       fontSize: 12,
-      color: '#606266'
+      color: '#606266',
+      fontWeight: '500'
     },
-    itemGap: 20
+    itemWidth: 18,
+    itemHeight: 12,
+    itemGap: 25,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    borderRadius: 6,
+    padding: [6, 12],
+    shadowColor: 'rgba(0, 0, 0, 0.08)',
+    shadowBlur: 6,
+    shadowOffsetY: 2
   },
   grid: {
     left: '5%',
     right: '12%',
-    bottom: '15%',
+    bottom: '18%',
     top: '12%',
-    containLabel: true
+    containLabel: true,
+    backgroundColor: 'rgba(250, 250, 250, 0.3)',
+    borderColor: 'rgba(220, 223, 230, 0.3)',
+    borderWidth: 1,
+    borderRadius: 4
   },
   xAxis: {
     type: 'category',
     boundaryGap: false,
     data: [],
     axisLine: {
-      show: false
+      show: true,
+      lineStyle: {
+        color: '#E4E7ED',
+        width: 1
+      }
     },
     axisLabel: {
-      fontSize: 11,
+      fontSize: 12,
       color: '#606266',
-      rotate: 0
+      fontWeight: '500',
+      rotate: 0,
+      margin: 12
     },
     axisTick: {
+      show: true,
+      lineStyle: {
+        color: '#E4E7ED'
+      },
+      length: 4
+    },
+    splitLine: {
       show: false
     }
   },
@@ -220,13 +322,16 @@ const chartOption = ref({
       },
       splitLine: {
         lineStyle: {
-          color: '#F5F7FA',
-          type: 'dashed'
+          color: '#F2F6FC',
+          type: 'solid',
+          width: 1
         }
       },
       nameTextStyle: {
         color: '#909399',
-        fontSize: 12
+        fontSize: 12,
+        fontWeight: '500',
+        padding: [0, 0, 0, 10]
       }
     },
     {
@@ -244,7 +349,9 @@ const chartOption = ref({
       },
       nameTextStyle: {
         color: '#909399',
-        fontSize: 12
+        fontSize: 12,
+        fontWeight: '500',
+        padding: [0, 10, 0, 0]
       },
       min: 98,
       max: 100
@@ -256,16 +363,37 @@ const chartOption = ref({
       type: 'bar',
       yAxisIndex: 0,
       data: [],
-      barWidth: '30%',
+      barWidth: '28%',
       itemStyle: {
-        color: '#5470c6'
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: '#409EFF' },
+            { offset: 1, color: '#79BBFF' }
+          ]
+        },
+        borderRadius: [4, 4, 0, 0]
       },
       label: {
         show: true,
         position: 'top',
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#333'
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#409EFF',
+        formatter: '{c}'
+      },
+      emphasis: {
+        itemStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: '#337ECC' },
+              { offset: 1, color: '#66B2FF' }
+            ]
+          }
+        }
       }
     },
     {
@@ -273,16 +401,37 @@ const chartOption = ref({
       type: 'bar',
       yAxisIndex: 0,
       data: [],
-      barWidth: '30%',
+      barWidth: '28%',
       itemStyle: {
-        color: '#91cc75'
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: '#67C23A' },
+            { offset: 1, color: '#95D475' }
+          ]
+        },
+        borderRadius: [4, 4, 0, 0]
       },
       label: {
         show: true,
         position: 'top',
-        fontSize: 12,
-        fontWeight: 'bold',
-        color: '#333'
+        fontSize: 11,
+        fontWeight: '600',
+        color: '#67C23A',
+        formatter: '{c}'
+      },
+      emphasis: {
+        itemStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: '#529B2E' },
+              { offset: 1, color: '#85CE61' }
+            ]
+          }
+        }
       }
     },
     {
@@ -292,26 +441,43 @@ const chartOption = ref({
       data: [],
       smooth: true,
       symbol: 'circle',
-      symbolSize: 12,
+      symbolSize: 8,
       lineStyle: {
-        width: 4,
-        color: '#fac858'
+        width: 3,
+        color: '#E6A23C',
+        shadowColor: 'rgba(230, 162, 60, 0.3)',
+        shadowBlur: 10,
+        shadowOffsetY: 3
       },
       itemStyle: {
-        color: '#fff',
-        borderColor: '#fac858',
-        borderWidth: 3
+        color: '#E6A23C',
+        borderColor: '#FFFFFF',
+        borderWidth: 2,
+        shadowColor: 'rgba(230, 162, 60, 0.4)',
+        shadowBlur: 8
       },
       label: {
         show: true,
         position: 'top',
         formatter: '{c}%',
         fontSize: 11,
-        color: '#fac858',
-        fontWeight: 'bold'
+        color: '#E6A23C',
+        fontWeight: '600',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        padding: [2, 6],
+        borderRadius: 4
       },
       emphasis: {
-        focus: 'series'
+        focus: 'series',
+        lineStyle: {
+          width: 4,
+          color: '#CF9236'
+        },
+        itemStyle: {
+          color: '#CF9236',
+          borderWidth: 3,
+          shadowBlur: 12
+        }
       }
     },
     {
@@ -321,26 +487,43 @@ const chartOption = ref({
       data: [],
       smooth: true,
       symbol: 'circle',
-      symbolSize: 12,
+      symbolSize: 8,
       lineStyle: {
-        width: 4,
-        color: '#ee6666'
+        width: 3,
+        color: '#F56C6C',
+        shadowColor: 'rgba(245, 108, 108, 0.3)',
+        shadowBlur: 10,
+        shadowOffsetY: 3
       },
       itemStyle: {
-        color: '#fff',
-        borderColor: '#ee6666',
-        borderWidth: 3
+        color: '#F56C6C',
+        borderColor: '#FFFFFF',
+        borderWidth: 2,
+        shadowColor: 'rgba(245, 108, 108, 0.4)',
+        shadowBlur: 8
       },
       label: {
         show: true,
         position: 'top',
         formatter: '{c}%',
         fontSize: 11,
-        color: '#ee6666',
-        fontWeight: 'bold'
+        color: '#F56C6C',
+        fontWeight: '600',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        padding: [2, 6],
+        borderRadius: 4
       },
       emphasis: {
-        focus: 'series'
+        focus: 'series',
+        lineStyle: {
+          width: 4,
+          color: '#F78989'
+        },
+        itemStyle: {
+          color: '#F78989',
+          borderWidth: 3,
+          shadowBlur: 12
+        }
       }
     }
   ]
@@ -484,10 +667,32 @@ const initChart = () => {
     chartInstance.value.setOption(chartOption.value)
     console.log('初始图表选项设置完成')
 
-    // 监听窗口大小变化
-    window.addEventListener('resize', () => {
-      chartInstance.value?.resize()
-    })
+    // 监听窗口大小变化 - 添加防抖优化
+    let resizeTimer = null
+    const handleResize = () => {
+      if (resizeTimer) {
+        clearTimeout(resizeTimer)
+      }
+      resizeTimer = setTimeout(() => {
+        if (chartInstance.value) {
+          console.log('窗口大小变化，重新调整图表尺寸')
+          chartInstance.value.resize()
+        }
+      }, 100) // 100ms防抖
+    }
+
+    window.addEventListener('resize', handleResize)
+
+    // 组件卸载时清理事件监听
+    const cleanup = () => {
+      window.removeEventListener('resize', handleResize)
+      if (resizeTimer) {
+        clearTimeout(resizeTimer)
+      }
+    }
+
+    // 在组件卸载时清理
+    window.addEventListener('beforeunload', cleanup)
   } else {
     console.error('chartRef.value 不存在，无法初始化图表')
   }
@@ -537,58 +742,154 @@ onMounted(async () => {
   align-items: center;
 }
 
-.metrics-summary {
+/* 统计概览卡片样式 */
+.summary-cards {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: 16px;
-  margin-bottom: 20px;
-  padding: 16px;
-  background: #f8f9fa;
-  border-radius: 6px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+  margin-bottom: 24px;
+  padding: 0;
 }
 
-.metric-card {
-  text-align: center;
-  padding: 12px;
+.summary-card {
+  display: flex;
+  align-items: center;
+  padding: 20px;
   background: white;
-  border-radius: 6px;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
 }
 
-.metric-value {
+.summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.summary-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.summary-card:hover::before {
+  transform: scaleX(1);
+}
+
+.card-left {
+  margin-right: 16px;
+}
+
+.card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 24px;
-  font-weight: bold;
-  color: #409EFF;
-  margin-bottom: 4px;
+  transition: all 0.3s ease;
 }
 
-.metric-label {
-  font-size: 12px;
-  color: #666;
+/* Element Plus 经典配色 */
+.card-icon.first-pass {
+  background: linear-gradient(135deg, #67C23A20, #67C23A10);
+  color: #67C23A;
+  border: 2px solid #67C23A20;
 }
+.card-icon.delivery-pass {
+  background: linear-gradient(135deg, #409EFF20, #409EFF10);
+  color: #409EFF;
+  border: 2px solid #409EFF20;
+}
+.card-icon.inspection-batch {
+  background: linear-gradient(135deg, #E6A23C20, #E6A23C10);
+  color: #E6A23C;
+  border: 2px solid #E6A23C20;
+}
+.card-icon.delivery-batch {
+  background: linear-gradient(135deg, #909399, #909399);
+  color: #909399;
+  border: 2px solid #90939920;
+}
+
+.summary-card:hover .card-icon {
+  transform: scale(1.1);
+}
+
+.card-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.card-title {
+  font-size: 13px;
+  color: #909399;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.card-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  transition: all 0.3s ease;
+}
+
+.card-subtitle {
+  font-size: 11px;
+  color: #C0C4CC;
+  font-weight: 400;
+}
+
+/* 不同卡片的数值颜色 */
+.first-pass-value { color: #67C23A; }
+.delivery-pass-value { color: #409EFF; }
+.inspection-batch-value { color: #E6A23C; }
+.delivery-batch-value { color: #909399; }
 
 /* 图表和表格并排布局 */
 .chart-and-table-container {
   display: flex;
   gap: 20px;
   margin: 20px 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .chart-container {
-  flex: 1;
+  flex: 0 0 50%; /* 固定占50%宽度 */
+  width: 50%;
+  min-width: 0; /* 防止内容溢出 */
   padding: 20px;
   background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
   border-radius: 8px;
   border: 1px solid #e9ecef;
+  box-sizing: border-box;
 }
 
 .data-table {
-  flex: 0 0 700px; /* 增加固定宽度 */
+  flex: 0 0 50%; /* 固定占50%宽度 */
+  width: 50%;
+  min-width: 0; /* 防止内容溢出 */
   padding: 20px;
   background: white;
   border-radius: 8px;
   border: 1px solid #e9ecef;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  box-sizing: border-box;
 }
 
 .section-title {
@@ -608,14 +909,88 @@ onMounted(async () => {
   color: #409EFF;
 }
 
-/* 响应式设计 */
-@media (max-width: 1200px) {
+/* 响应式设计 - 动态布局 */
+/* 超小屏幕 - 强制垂直布局 */
+@media (max-width: 768px) {
   .chart-and-table-container {
     flex-direction: column;
+    gap: 12px;
   }
 
+  .chart-container,
   .data-table {
     flex: none;
+    width: 100%;
+    max-width: 100%;
+    padding: 12px;
+  }
+
+  .chart {
+    height: 300px !important;
+  }
+}
+
+/* 小屏幕 - 根据内容动态决定布局 */
+@media (min-width: 769px) and (max-width: 1024px) {
+  .chart-and-table-container {
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+
+  .chart-container,
+  .data-table {
+    flex: 1 1 calc(50% - 8px);
+    min-width: 400px; /* 最小宽度，如果不够则换行 */
+    padding: 16px;
+  }
+
+  .chart {
+    height: 350px !important;
+  }
+}
+
+/* 中等屏幕 - 优先保持一排，空间不足时换行 */
+@media (min-width: 1025px) and (max-width: 1200px) {
+  .chart-and-table-container {
+    flex-wrap: wrap;
+    gap: 18px;
+  }
+
+  .chart-container,
+  .data-table {
+    flex: 1 1 calc(50% - 9px);
+    min-width: 450px; /* 最小宽度，如果不够则换行 */
+    padding: 18px;
+  }
+}
+
+/* 大屏幕 - 固定50%布局 */
+@media (min-width: 1201px) and (max-width: 1600px) {
+  .chart-and-table-container {
+    gap: 20px;
+    flex-wrap: nowrap; /* 强制一排显示 */
+  }
+
+  .chart-container,
+  .data-table {
+    flex: 0 0 calc(50% - 10px);
+    width: calc(50% - 10px);
+    padding: 20px;
+  }
+}
+
+/* 超大屏幕 - 固定50%布局，增加间距 */
+@media (min-width: 1601px) {
+  .chart-and-table-container {
+    gap: 24px;
+    flex-wrap: nowrap; /* 强制一排显示 */
+  }
+
+  .chart-container,
+  .data-table {
+    flex: 0 0 calc(50% - 12px);
+    width: calc(50% - 12px);
+    padding: 24px;
   }
 }
 
@@ -645,5 +1020,49 @@ onMounted(async () => {
 .rate-poor {
   color: #F56C6C;
   font-weight: bold;
+}
+
+/* 卡片入场动画 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.summary-card {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.summary-card:nth-child(1) { animation-delay: 0.1s; }
+.summary-card:nth-child(2) { animation-delay: 0.2s; }
+.summary-card:nth-child(3) { animation-delay: 0.3s; }
+.summary-card:nth-child(4) { animation-delay: 0.4s; }
+
+/* 数值动画效果 */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.card-value {
+  animation: countUp 0.8s ease-out;
+  animation-delay: 0.3s;
+  animation-fill-mode: both;
+}
+
+/* 图标脉冲动画 */
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
+}
+
+.summary-card:hover .card-icon {
+  animation: pulse 1s ease-in-out infinite;
 }
 </style>
