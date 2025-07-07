@@ -995,4 +995,260 @@ function getDefaultCheckedStatus(key) {
   return defaultSelectedFields.includes(key);
 }
 
+// ===================== 投诉数据分析接口 =====================
+// GET /api/complaint/analysis
+// 参数: dimension, timeRange, complaintType
+// 返回: { success, chartData, tableData, summaryData }
+router.get('/analysis', async (req, res) => {
+  try {
+    const { dimension = 'time', timeRange = '6months', complaintType = '' } = req.query;
+
+    console.log('投诉数据分析请求:', { dimension, timeRange, complaintType });
+
+    let pool = await sql.connect(await getDynamicConfig());
+
+    // 计算时间范围
+    let dateCondition = '';
+    let startDate = '';
+    let endDate = '';
+    const now = new Date();
+
+    switch (timeRange) {
+      case '6months':
+        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        startDate = sixMonthsAgo.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        dateCondition = `Date >= '${startDate}'`;
+        break;
+      case '1year':
+        const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+        startDate = oneYearAgo.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        dateCondition = `Date >= '${startDate}'`;
+        break;
+      case '2years':
+        const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+        startDate = twoYearsAgo.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        dateCondition = `Date >= '${startDate}'`;
+        break;
+      default:
+        const defaultStart = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        startDate = defaultStart.toISOString().split('T')[0];
+        endDate = now.toISOString().split('T')[0];
+        dateCondition = `Date >= '${startDate}'`;
+    }
+
+    // 投诉类型条件
+    let complaintCondition = '';
+    if (complaintType) {
+      complaintCondition = `AND ComplaintCategory = N'${complaintType}'`;
+    }
+
+    let chartData = [];
+    let tableData = [];
+    let summaryData = {};
+
+    // 获取汇总数据 - 投诉数据
+    const complaintSummaryQuery = `
+      SELECT
+        COUNT(*) as totalComplaints,
+        SUM(CASE WHEN ComplaintCategory = N'内诉' THEN 1 ELSE 0 END) as innerComplaints,
+        SUM(CASE WHEN ComplaintCategory = N'客诉' THEN 1 ELSE 0 END) as outerComplaints
+      FROM ComplaintRegister
+      WHERE ${dateCondition} ${complaintCondition}
+    `;
+
+    // 获取批次统计数据 - 根据时间范围筛选
+    let batchStartDate, batchEndDate;
+
+    switch (timeRange) {
+      case '6months':
+        const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        batchStartDate = sixMonthsAgo.toISOString().split('T')[0];
+        batchEndDate = now.toISOString().split('T')[0];
+        break;
+      case '1year':
+        const oneYearAgo = new Date(now.getFullYear() - 1, now.getMonth(), 1);
+        batchStartDate = oneYearAgo.toISOString().split('T')[0];
+        batchEndDate = now.toISOString().split('T')[0];
+        break;
+      case '2years':
+        const twoYearsAgo = new Date(now.getFullYear() - 2, now.getMonth(), 1);
+        batchStartDate = twoYearsAgo.toISOString().split('T')[0];
+        batchEndDate = now.toISOString().split('T')[0];
+        break;
+      default:
+        const defaultStart = new Date(now.getFullYear(), now.getMonth() - 6, 1);
+        batchStartDate = defaultStart.toISOString().split('T')[0];
+        batchEndDate = now.toISOString().split('T')[0];
+    }
+
+    const startYear = new Date(batchStartDate).getFullYear();
+    const startMonth = new Date(batchStartDate).getMonth() + 1;
+    const endYear = new Date(batchEndDate).getFullYear();
+    const endMonth = new Date(batchEndDate).getMonth() + 1;
+
+    const batchSummaryQuery = `
+      SELECT
+        SUM(InspectionBatches) as totalInspectionBatches,
+        SUM(DeliveryBatches) as totalDeliveryBatches
+      FROM MonthlyBatchStats
+      WHERE (StatYear = ${startYear} AND StatMonth >= ${startMonth})
+         OR (StatYear > ${startYear} AND StatYear < ${endYear})
+         OR (StatYear = ${endYear} AND StatMonth <= ${endMonth})
+    `;
+
+    const [complaintResult, batchResult] = await Promise.all([
+      pool.request().query(complaintSummaryQuery),
+      pool.request().query(batchSummaryQuery)
+    ]);
+
+    const complaintSummary = complaintResult.recordset[0];
+    const batchSummary = batchResult.recordset[0];
+
+    // 计算一次交检合格率和客诉率
+    const totalInspectionBatches = batchSummary.totalInspectionBatches || 0;
+    const totalDeliveryBatches = batchSummary.totalDeliveryBatches || 0;
+    const innerComplaints = complaintSummary.innerComplaints || 0;
+    const outerComplaints = complaintSummary.outerComplaints || 0;
+
+    // 一次交检合格率 = (总交检批次 - 内诉批次) / 总交检批次 * 100%
+    const firstPassRate = totalInspectionBatches > 0 ?
+      (((totalInspectionBatches - innerComplaints) / totalInspectionBatches) * 100).toFixed(1) : '0.0';
+
+    // 客诉率 = 客诉批次 / 总交货批次 * 100%
+    const customerComplaintRate = totalDeliveryBatches > 0 ?
+      ((outerComplaints / totalDeliveryBatches) * 100).toFixed(2) : '0.00';
+
+    summaryData = {
+      totalComplaints: complaintSummary.totalComplaints || 0,
+      innerComplaints: innerComplaints,
+      outerComplaints: outerComplaints,
+      totalInspectionBatches: totalInspectionBatches,
+      totalDeliveryBatches: totalDeliveryBatches,
+      firstPassRate: firstPassRate,
+      customerComplaintRate: customerComplaintRate,
+      // 保留原有的投诉率计算（客诉占总投诉比例）
+      complaintRate: complaintSummary.totalComplaints > 0 ?
+        ((outerComplaints / complaintSummary.totalComplaints) * 100).toFixed(1) : '0.0'
+    };
+
+    // 根据维度获取不同的数据
+    switch (dimension) {
+      case 'time':
+        const timeQuery = `
+          SELECT
+            YEAR(Date) as year,
+            MONTH(Date) as month,
+            RIGHT(CAST(YEAR(Date) AS nvarchar(4)), 2) + N'年' + CAST(MONTH(Date) AS nvarchar(2)) + N'月' as period,
+            COUNT(*) as totalCount,
+            SUM(CASE WHEN ComplaintCategory = N'内诉' THEN 1 ELSE 0 END) as innerCount,
+            SUM(CASE WHEN ComplaintCategory = N'客诉' THEN 1 ELSE 0 END) as outerCount
+          FROM ComplaintRegister
+          WHERE ${dateCondition} ${complaintCondition}
+          GROUP BY YEAR(Date), MONTH(Date)
+          ORDER BY YEAR(Date), MONTH(Date)
+        `;
+
+        const timeResult = await pool.request().query(timeQuery);
+        chartData = timeResult.recordset;
+        tableData = chartData.map(item => ({
+          ...item,
+          rate: summaryData.totalComplaints > 0 ?
+            ((item.totalCount / summaryData.totalComplaints) * 100).toFixed(1) : '0.0'
+        }));
+        break;
+
+      case 'workshop':
+        const workshopQuery = `
+          SELECT
+            Workshop as workshop,
+            COUNT(*) as totalCount,
+            SUM(CASE WHEN ComplaintCategory = N'内诉' THEN 1 ELSE 0 END) as innerCount,
+            SUM(CASE WHEN ComplaintCategory = N'客诉' THEN 1 ELSE 0 END) as outerCount
+          FROM ComplaintRegister
+          WHERE ${dateCondition} ${complaintCondition} AND Workshop IS NOT NULL AND Workshop != ''
+          GROUP BY Workshop
+          ORDER BY COUNT(*) DESC
+        `;
+
+        const workshopResult = await pool.request().query(workshopQuery);
+        chartData = workshopResult.recordset;
+        tableData = chartData.map(item => ({
+          ...item,
+          rate: summaryData.totalComplaints > 0 ?
+            ((item.totalCount / summaryData.totalComplaints) * 100).toFixed(1) : '0.0'
+        }));
+        break;
+
+      case 'category':
+        const categoryQuery = `
+          SELECT
+            DefectiveCategory as category,
+            COUNT(*) as count
+          FROM ComplaintRegister
+          WHERE ${dateCondition} ${complaintCondition} AND DefectiveCategory IS NOT NULL AND DefectiveCategory != ''
+          GROUP BY DefectiveCategory
+          ORDER BY COUNT(*) DESC
+        `;
+
+        const categoryResult = await pool.request().query(categoryQuery);
+        chartData = categoryResult.recordset;
+        tableData = chartData.map(item => ({
+          ...item,
+          rate: summaryData.totalComplaints > 0 ?
+            ((item.count / summaryData.totalComplaints) * 100).toFixed(1) : '0.0'
+        }));
+        break;
+
+      case 'customer':
+        const customerQuery = `
+          SELECT
+            Customer as customer,
+            COUNT(*) as totalCount,
+            SUM(CASE WHEN ComplaintCategory = N'内诉' THEN 1 ELSE 0 END) as innerCount,
+            SUM(CASE WHEN ComplaintCategory = N'客诉' THEN 1 ELSE 0 END) as outerCount
+          FROM ComplaintRegister
+          WHERE ${dateCondition} ${complaintCondition} AND Customer IS NOT NULL AND Customer != ''
+          GROUP BY Customer
+          ORDER BY COUNT(*) DESC
+        `;
+
+        const customerResult = await pool.request().query(customerQuery);
+        chartData = customerResult.recordset;
+        tableData = chartData.map(item => ({
+          ...item,
+          rate: summaryData.totalComplaints > 0 ?
+            ((item.totalCount / summaryData.totalComplaints) * 100).toFixed(1) : '0.0'
+        }));
+        break;
+    }
+
+    console.log('投诉数据分析结果:', {
+      dimension,
+      chartDataCount: chartData.length,
+      tableDataCount: tableData.length,
+      summaryData
+    });
+
+    res.json({
+      success: true,
+      chartData,
+      tableData,
+      summaryData
+    });
+
+  } catch (err) {
+    console.error('投诉数据分析失败:', err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+      chartData: [],
+      tableData: [],
+      summaryData: {}
+    });
+  }
+});
+
 module.exports = router;

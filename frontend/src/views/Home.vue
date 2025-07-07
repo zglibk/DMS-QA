@@ -416,39 +416,8 @@
           <!-- 质量指标趋势分析卡片 -->
           <QualityMetricsChart />
 
-          <!-- 数据分析图表卡片 -->
-          <el-card class="chart-card">
-            <div class="chart-title">投诉数据分析图表</div>
-            <!-- 图表筛选条件区 -->
-            <div class="chart-filter-row">
-              <el-form :inline="true" size="small" @submit.prevent>
-                <el-form-item label="部门">
-                  <el-select v-model="chartFilter.department" placeholder="请选择部门" style="width:120px" @change="fetchChartData">
-                    <el-option v-for="item in chartOptions.departments" :key="item" :label="item" :value="item" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item label="车间">
-                  <el-select v-model="chartFilter.workshop" placeholder="请选择车间" style="width:120px" @change="fetchChartData">
-                    <el-option v-for="item in chartOptions.workshops" :key="item" :label="item" :value="item" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item label="不良项">
-                  <el-select v-model="chartFilter.defectiveItem" placeholder="请选择不良项" style="width:120px" @change="fetchChartData">
-                    <el-option v-for="item in chartOptions.defectiveItems" :key="item" :label="item" :value="item" />
-                  </el-select>
-                </el-form-item>
-                <el-form-item label="日期">
-                  <el-date-picker v-model="chartFilter.dateRange" type="daterange" range-separator="至" start-placeholder="开始日期" end-placeholder="结束日期" style="width:220px" @change="fetchChartData" />
-                </el-form-item>
-              </el-form>
-            </div>
-            <!-- 图表区 -->
-            <div class="chart-content-flex">
-              <div class="chart-box"><div class="chart-label">{{ getChartTitle('柱形图') }}</div><div class="chart-ec" id="barChart"></div></div>
-              <div class="chart-box"><div class="chart-label">{{ getChartTitle('趋势图') }}</div><div class="chart-ec" id="lineChart"></div></div>
-              <div class="chart-box"><div class="chart-label">{{ getChartTitle('占比分析图') }}</div><div class="chart-ec" id="roseChart"></div></div>
-            </div>
-          </el-card>
+          <!-- 投诉数据分析图表 -->
+          <ComplaintAnalysisChart />
         </div>
         <!-- 右侧高级查询卡片 -->
         <div :span="4">
@@ -992,6 +961,7 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
 import QualityMetricsChart from '@/components/QualityMetricsChart.vue'
+import ComplaintAnalysisChart from '@/components/ComplaintAnalysisChart.vue'
 import * as echarts from 'echarts'
 import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
