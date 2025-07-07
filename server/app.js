@@ -25,6 +25,7 @@ const authRouter = require('./routes/auth');
 const configRouter = require('./routes/config');
 const importRouter = require('./routes/import');
 const uploadRouter = require('./routes/upload');
+const qualityMetricsRouter = require('./routes/quality-metrics');
 
 const app = express();
 app.use(cors());
@@ -56,6 +57,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/config', configRouter);
 app.use('/api/import', importRouter);
 app.use('/api/upload', uploadRouter);
+app.use('/api/quality-metrics', qualityMetricsRouter);
 
 // 静态文件服务 - 提供拷贝的附件文件访问
 app.use('/files/attachments', express.static(path.join(__dirname, 'uploads/attachments')));

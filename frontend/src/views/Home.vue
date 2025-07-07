@@ -413,9 +413,12 @@
               />
             </div>
           </el-card>
+          <!-- 质量指标趋势分析卡片 -->
+          <QualityMetricsChart />
+
           <!-- 数据分析图表卡片 -->
           <el-card class="chart-card">
-            <div class="chart-title">数据分析图表</div>
+            <div class="chart-title">投诉数据分析图表</div>
             <!-- 图表筛选条件区 -->
             <div class="chart-filter-row">
               <el-form :inline="true" size="small" @submit.prevent>
@@ -988,6 +991,7 @@ import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled,
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
+import QualityMetricsChart from '@/components/QualityMetricsChart.vue'
 import * as echarts from 'echarts'
 import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
