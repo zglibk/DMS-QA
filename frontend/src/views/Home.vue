@@ -16,49 +16,8 @@
 -->
 
 <template>
-  <div class="home-bg">
-    <!-- 顶部导航栏 -->
-    <div class="home-header">
-        <!-- 左侧logo及系统名 -->
-        <div class="header-left">
-          <img :src="siteConfig?.logoBase64Img || '/logo.png'" alt="logo" class="logo" @error="handleLogoError" />
-          <span class="logo-text">{{ siteConfig?.siteName || '质量数据管理系统' }}</span>
-        </div>
-        <!-- 中间菜单栏 -->
-        <div class="header-center">
-          <div class="nav-menu-wrap">
-            <el-menu mode="horizontal" :default-active="activeMenu" @select="handleMenuSelect" class="nav-menu" :ellipsis="false">
-              <el-menu-item index="home">首页</el-menu-item>
-              <el-menu-item index="complaint">投诉管理</el-menu-item>
-              <el-menu-item index="stats">数据可视化</el-menu-item>
-            </el-menu>
-          </div>
-        </div>
-        <!-- 右侧用户区 -->
-        <div class="header-right">  
-          <el-button type="primary" text class="admin-btn" @click="goAdmin">登录后台</el-button>
-          <el-avatar :size="32" :src="user.Avatar" class="avatar-icon" @click="goProfile">
-            <template v-if="!user.Avatar">
-              <el-icon><User /></el-icon>
-            </template>
-          </el-avatar>
-          <span class="username" @click="goProfile">{{ user.Username }}</span>
-          <el-dropdown>
-            <span class="el-dropdown-link">
-              <el-icon><arrow-down /></el-icon>
-            </span>
-            <template #dropdown>
-              <el-dropdown-menu>
-                <el-dropdown-item @click="goProfile">个人中心</el-dropdown-item>
-                <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
-              </el-dropdown-menu>
-            </template>
-          </el-dropdown>
-        </div>
-    </div>
-
-    <!-- 内容区 -->
-    <div class="home-main">
+  <AppLayout>
+    <div class="home-content">
         <!-- 统计控制区 -->
         <div class="stats-control">
           <div class="stats-control-left">
@@ -778,11 +737,6 @@
       </div>
     </div>
 
-    <!-- 底部版权栏 -->
-    <div class="home-footer">
-      © 2024 质量数据管理系统 版权所有
-    </div>
-
     <!-- 详情查看弹窗 -->
     <el-dialog
       v-model="showDetailDialog"
@@ -1050,17 +1004,18 @@
         </div>
       </template>
     </el-dialog>
-  </div>
+  </AppLayout>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
-import { ArrowDown, User, Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning, DocumentCopy, Box, CircleClose, ChatLineRound, Coordinate, Avatar, Setting } from '@element-plus/icons-vue'
+import { Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning, DocumentCopy, Box, CircleClose, ChatLineRound, Coordinate, Avatar, Setting } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
 import QualityMetricsChart from '@/components/QualityMetricsChart.vue'
 import ComplaintAnalysisChart from '@/components/ComplaintAnalysisChart.vue'
+import AppLayout from '@/components/common/AppLayout.vue'
 import * as echarts from 'echarts'
 import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
@@ -1069,7 +1024,6 @@ import * as XLSX from 'xlsx-js-style'
 import { saveAs } from 'file-saver'
 
 const router = useRouter()
-const activeMenu = ref('home')
 
 // 网站配置
 const { siteConfig, loadSiteConfig } = useSiteConfig()
@@ -1358,37 +1312,7 @@ const fetchProfile = async () => {
   }
 }
 
-const handleMenuSelect = (index) => {
-  activeMenu.value = index
-  if (index === 'complaint') {
-    router.push('/add')
-  } else if (index === 'stats') {
-    router.push('/data-visualization')
-  }
-}
-const goProfile = () => {
-  router.push('/profile')
-}
-const logout = () => {
-  // 清除token并跳转登录
-  localStorage.removeItem('token')
-  window.location.href = '/login'
-}
-const goAdmin = () => {
-  // 权限校验：仅admin或有后台权限的用户可进入
-  if (user.value.Role === 'admin') {
-    router.push('/admin/dashboard')
-  } else {
-    ElMessage.error('无后台权限')
-  }
-}
-
-// 删除原有的 loadSiteConfig 函数，现在使用 composable 中的
-
-// LOGO加载错误处理
-const handleLogoError = (event) => {
-  event.target.src = '/logo.png' // 回退到默认LOGO
-}
+// 导航相关方法已移至 AppHeader 组件
 
 const fetchTableData = async () => {
   tableLoading.value = true
@@ -3071,6 +2995,30 @@ body::-webkit-scrollbar-thumb:hover {
   width: 100%;
   z-index: 100;
 }
+
+.fixed-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.scrollable-content {
+  margin-top: 4rem; /* 为固定头部留出空间 */
+  margin-bottom: 3rem; /* 为固定底部留出空间 */
+  min-height: calc(100vh - 7rem); /* 确保内容区域至少占满剩余空间 */
+  overflow-y: auto;
+}
+
+.fixed-footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  margin-top: 0;
+}
 .header-left {
   display: flex;
   align-items: center;
@@ -3106,7 +3054,16 @@ body::-webkit-scrollbar-thumb:hover {
 .nav-menu :deep(.el-menu-item) {
   background: transparent !important;
   position: relative;
+  padding: 0 24px !important;
+  margin: 0 8px;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
+
+/* 悬停背景效果 - 已禁用 */
+
+/* 底部指示线 */
 .nav-menu :deep(.el-menu-item)::after {
   content: '';
   display: block;
@@ -3114,22 +3071,35 @@ body::-webkit-scrollbar-thumb:hover {
   left: 50%;
   bottom: 0;
   width: 0;
-  height: 2.5px;
-  background: #409EFF;
-  border-radius: 2px;
-  transition: width 0.2s, left 0.2s;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  border-radius: 2px 2px 0 0;
+  transform: translateX(-50%);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
 }
+
+/* 悬停背景效果已禁用 */
+
 .nav-menu :deep(.el-menu-item:hover)::after,
 .nav-menu :deep(.el-menu-item.is-active)::after {
-  width: 60%;
-  left: 20%;
+  width: 80%;
 }
+
 .nav-menu :deep(.el-menu-item:hover),
 .nav-menu :deep(.el-menu-item.is-active) {
   background: transparent !important;
   color: #409EFF !important;
   box-shadow: none !important;
   border-bottom: none !important;
+  transform: translateY(-1px);
+}
+
+/* 激活状态背景效果已禁用 */
+
+.nav-menu :deep(.el-menu-item.is-active) {
+  font-weight: 600;
+  color: #409EFF !important;
 }
 .header-right {
   display: flex;
@@ -3652,10 +3622,11 @@ body::-webkit-scrollbar-thumb:hover {
   background: #fff;
   color: #888;
   text-align: center;
-  padding: 1rem 0 0.5rem 0;
+  padding: 1rem 0;
   font-size: 0.9rem;
   letter-spacing: 1px;
-  box-shadow: 0 -0.0625rem 0.375rem 0 rgba(0,0,0,0.03);
+  border-top: 1px solid #f0f0f0;
+  box-shadow: 0 -2px 8px rgba(0,0,0,0.04);
 }
 .unit-card {
   /* 只保留阴影和无边框，不设置background，避免覆盖子类 */

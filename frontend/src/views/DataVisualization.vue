@@ -1,7 +1,8 @@
 <template>
-  <div class="data-visualization">
-    <!-- 页面标题 -->
-    <div class="page-header">
+  <AppLayout>
+    <div class="data-visualization-content">
+      <!-- 页面标题 -->
+      <div class="page-header">
       <h1 class="page-title">数据可视化大屏</h1>
       <div class="header-actions">
         <el-button type="primary" :icon="RefreshLeft" @click="refreshData">刷新数据</el-button>
@@ -172,15 +173,19 @@
         </el-tab-pane>
       </el-tabs>
     </div>
-  </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
-import { RefreshLeft, Download, Document, WarningFilled, User, InfoFilled } from '@element-plus/icons-vue'
+import { RefreshLeft, Download, Document, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import AppLayout from '@/components/common/AppLayout.vue'
+
+// 导航相关方法已移至 AppHeader 组件
 
 // 响应式数据
 const activeTab = ref('overview')
@@ -248,6 +253,8 @@ const refreshDetails = () => {
 const formatDate = (dateStr) => {
   return new Date(dateStr).toLocaleDateString()
 }
+
+// 导航相关方法已移至 AppHeader 组件
 
 // 获取基础数据
 const fetchBasicData = async () => {
@@ -415,10 +422,8 @@ onMounted(() => {
 </script>
 
 <style scoped>
-.data-visualization {
-  padding: 20px;
-  background: #f5f7fa;
-  min-height: 100vh;
+.data-visualization-content {
+  /* 数据可视化页面特有样式 */
 }
 
 /* 页面标题 */

@@ -1,41 +1,5 @@
 <template>
-  <div class="form-container">
-    <!-- 顶部导航栏 -->
-    <el-header class="home-header">
-      <div class="header-left">
-        <img :src="siteConfig?.logoBase64Img || '/logo.png'" alt="logo" class="logo" @error="handleLogoError" />
-        <span class="logo-text">{{ siteConfig?.siteName || '质量数据管理系统' }}</span>
-      </div>
-      <div class="header-center">
-        <div class="nav-menu-wrap">
-          <el-menu mode="horizontal" :default-active="activeMenu" @select="handleMenuSelect" class="nav-menu" :ellipsis="false">
-            <el-menu-item index="home">首页</el-menu-item>
-            <el-menu-item index="complaint">投诉管理</el-menu-item>
-            <el-menu-item index="stats">统计分析</el-menu-item>
-          </el-menu>
-        </div>
-      </div>
-      <div class="header-right">        
-        <el-button type="primary" text class="admin-btn" @click="goAdmin">登录后台</el-button>
-        <el-avatar :size="32" :src="user.Avatar" class="avatar-icon" @click="goProfile">
-          <template v-if="!user.Avatar">
-            <el-icon><User /></el-icon>
-          </template>
-        </el-avatar>
-        <span class="username" @click="goProfile">{{ username }}</span>
-        <el-dropdown>
-          <span class="el-dropdown-link">
-            <el-icon><arrow-down /></el-icon>
-          </span>
-          <template #dropdown>
-            <el-dropdown-menu>
-              <el-dropdown-item @click="goProfile">个人中心</el-dropdown-item>
-              <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
-            </el-dropdown-menu>
-          </template>
-        </el-dropdown>
-      </div>
-    </el-header>
+  <AppLayout>
 
     <div class="form-content">
       <el-form :model="form" :rules="rules" ref="formRef" label-width="120px" style="max-width: 1100px; margin: 30px auto;">
@@ -371,11 +335,6 @@
       </el-form>
     </div>
 
-    <!-- 底部版权栏 -->
-    <el-footer class="home-footer">
-      © 2024 质量数据管理系统 版权所有
-    </el-footer>
-
     <!-- 图片预览遮罩和弹窗 -->
     <div v-if="showPreview" class="img-preview-mask" @click.self="showPreview = false">
       <div class="img-preview-box">
@@ -383,26 +342,24 @@
         <img :src="previewImgUrl" class="img-preview-large" @click.stop @dblclick="showPreview = false" />
       </div>
     </div>
-  </div>
+  </AppLayout>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, watch } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
-import { ArrowDown, User, CircleClose } from '@element-plus/icons-vue'
+import { CircleClose } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
 import { useSiteConfig } from '../composables/useSiteConfig'
+import AppLayout from '@/components/common/AppLayout.vue'
 
 // 网站配置
 const { siteConfig, loadSiteConfig } = useSiteConfig()
 
-// 图片加载错误处理
-const handleLogoError = (event) => {
-  event.target.src = '/logo.png' // 回退到默认图片
-}
+// 导航相关方法已移至 AppHeader 组件
 
 const formRef = ref()
 const form = ref({
@@ -478,26 +435,9 @@ const options = reactive({
   defectiveItems: []
 })
 const username = ref('admin')
-const activeMenu = ref('complaint')
 const isEditMode = ref(false)
 const editId = ref(null)
 const loading = ref(false)
-const handleMenuSelect = (index) => {
-  activeMenu.value = index
-  if (index === 'home') router.push('/')
-  if (index === 'complaint') router.push('/add')
-  // 可扩展其他菜单
-}
-const goProfile = () => {
-  router.push('/profile')
-}
-const logout = () => {
-  localStorage.removeItem('token')
-  window.location.href = '/login'
-}
-const goAdmin = () => {
-  window.open('http://localhost:3001/admin', '_blank')
-}
 
 const userStore = useUserStore()
 const { user } = storeToRefs(userStore)
@@ -781,23 +721,52 @@ watch([
 .nav-menu :deep(.el-menu-item) {
   background: transparent !important;
   position: relative;
+  padding: 0 24px !important;
+  margin: 0 8px;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: hidden;
 }
+
+/* 悬停背景效果 - 已禁用 */
+
+/* 底部指示线 */
+.nav-menu :deep(.el-menu-item)::after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  border-radius: 2px 2px 0 0;
+  transform: translateX(-50%);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+/* 悬停背景效果已禁用 */
+
+.nav-menu :deep(.el-menu-item:hover)::after,
+.nav-menu :deep(.el-menu-item.is-active)::after {
+  width: 80%;
+}
+
+.nav-menu :deep(.el-menu-item:hover),
+.nav-menu :deep(.el-menu-item.is-active) {
+  background: transparent !important;
+  color: #409EFF !important;
+  box-shadow: none !important;
+  border-bottom: none !important;
+  transform: translateY(-1px);
+}
+
+/* 激活状态背景效果已禁用 */
 
 .nav-menu :deep(.el-menu-item.is-active) {
-  color: #409eff;
-  background: transparent !important;
-}
-
-.nav-menu :deep(.el-menu-item.is-active::after) {
-  content: '';
-  position: absolute;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 20px;
-  height: 2px;
-  background: #409eff;
-  border-radius: 1px;
+  font-weight: 600;
+  color: #409EFF !important;
 }
 
 .header-right {
