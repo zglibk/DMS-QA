@@ -172,6 +172,53 @@
         </el-button>
       </div>
     </el-card>
+
+    <!-- 详细数据对话框 -->
+    <el-dialog
+      v-model="detailDialogVisible"
+      :title="detailDialogTitle"
+      width="80%"
+      top="5vh"
+      :close-on-click-modal="false"
+    >
+      <el-table
+        :data="detailDialogData"
+        stripe
+        border
+        height="60vh"
+        style="width: 100%"
+      >
+        <el-table-column prop="ComplaintNo" label="投诉编号" width="120" />
+        <el-table-column prop="ComplaintDate" label="投诉日期" width="100">
+          <template #default="scope">
+            {{ scope.row.ComplaintDate ? new Date(scope.row.ComplaintDate).toLocaleDateString() : '' }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="CustomerName" label="客户名称" width="150" />
+        <el-table-column prop="WorkOrder" label="工单号" width="120" />
+        <el-table-column prop="ComplaintCategory" label="投诉类别" width="80" />
+        <el-table-column prop="DefectiveCategory" label="不良类别" width="100" />
+        <el-table-column prop="Workshop" label="责任车间" width="100" />
+        <el-table-column prop="ComplaintDescription" label="投诉描述" min-width="200" show-overflow-tooltip />
+        <el-table-column prop="ProcessingStatus" label="处理状态" width="100">
+          <template #default="scope">
+            <el-tag :type="scope.row.ProcessingStatus === '已完成' ? 'success' : 'warning'">
+              {{ scope.row.ProcessingStatus }}
+            </el-tag>
+          </template>
+        </el-table-column>
+      </el-table>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="detailDialogVisible = false">关闭</el-button>
+          <el-button type="primary" @click="exportDetailData">
+            <el-icon><Download /></el-icon>
+            导出详细数据
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -179,7 +226,7 @@
 import { ref, onMounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Refresh, DataAnalysis, Grid, Warning, CircleClose, DataBoard
+  Refresh, DataAnalysis, Grid, Warning, CircleClose, DataBoard, Download
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
@@ -363,70 +410,111 @@ const handleRowClick = (row) => {
 // 数据钻取方法
 const drillDownToTimeDetail = async (row) => {
   try {
-    const response = await axios.get('/api/complaint/time-detail', {
-      params: { period: row.period, complaintType: selectedComplaintType.value }
+    // 使用现有的投诉列表API进行数据钻取
+    const response = await axios.get('/api/complaint/list', {
+      params: {
+        page: 1,
+        pageSize: 50,
+        period: row.period,
+        complaintType: selectedComplaintType.value
+      }
     })
 
     if (response.data.success) {
-      // 显示详细数据对话框或跳转到详细页面
-      showDetailDialog('时间详细数据', response.data.data)
+      // 显示详细数据对话框
+      showDetailDialog(`${row.period} 时间段详细数据`, response.data.data.records)
     }
   } catch (error) {
     console.error('获取时间详细数据失败:', error)
-    ElMessage.error('获取详细数据失败')
+    ElMessage.error('获取时间详细数据失败')
   }
 }
 
 const drillDownToWorkshopDetail = async (row) => {
   try {
-    const response = await axios.get('/api/complaint/workshop-detail', {
-      params: { workshop: row.workshop, timeRange: selectedTimeRange.value }
+    // 使用现有的投诉列表API进行数据钻取
+    const response = await axios.get('/api/complaint/list', {
+      params: {
+        page: 1,
+        pageSize: 50,
+        workshop: row.workshop,
+        timeRange: selectedTimeRange.value
+      }
     })
 
     if (response.data.success) {
-      showDetailDialog('车间详细数据', response.data.data)
+      showDetailDialog(`${row.workshop} 车间详细数据`, response.data.data.records)
     }
   } catch (error) {
     console.error('获取车间详细数据失败:', error)
-    ElMessage.error('获取详细数据失败')
+    ElMessage.error('获取车间详细数据失败')
   }
 }
 
 const drillDownToCategoryDetail = async (row) => {
   try {
-    const response = await axios.get('/api/complaint/category-detail', {
-      params: { category: row.category, timeRange: selectedTimeRange.value }
+    // 使用现有的投诉列表API进行数据钻取
+    const response = await axios.get('/api/complaint/list', {
+      params: {
+        page: 1,
+        pageSize: 50,
+        category: row.category,
+        timeRange: selectedTimeRange.value
+      }
     })
 
     if (response.data.success) {
-      showDetailDialog('类别详细数据', response.data.data)
+      showDetailDialog(`${row.category} 类别详细数据`, response.data.data.records)
     }
   } catch (error) {
     console.error('获取类别详细数据失败:', error)
-    ElMessage.error('获取详细数据失败')
+    ElMessage.error('获取类别详细数据失败')
   }
 }
 
 const drillDownToCustomerDetail = async (row) => {
   try {
-    const response = await axios.get('/api/complaint/customer-detail', {
-      params: { customer: row.customer, timeRange: selectedTimeRange.value }
+    // 使用现有的投诉列表API进行数据钻取
+    const response = await axios.get('/api/complaint/list', {
+      params: {
+        page: 1,
+        pageSize: 50,
+        customer: row.customer,
+        timeRange: selectedTimeRange.value
+      }
     })
 
     if (response.data.success) {
-      showDetailDialog('客户详细数据', response.data.data)
+      showDetailDialog(`${row.customer} 客户详细数据`, response.data.data.records)
     }
   } catch (error) {
     console.error('获取客户详细数据失败:', error)
-    ElMessage.error('获取详细数据失败')
+    ElMessage.error('获取客户详细数据失败')
   }
 }
 
+// 详细数据对话框相关
+const detailDialogVisible = ref(false)
+const detailDialogTitle = ref('')
+const detailDialogData = ref([])
+
 // 显示详细数据对话框
 const showDetailDialog = (title, data) => {
-  // 这里可以实现一个详细数据展示对话框
+  detailDialogTitle.value = title
+  detailDialogData.value = data || []
+  detailDialogVisible.value = true
   console.log(`${title}:`, data)
-  ElMessage.info(`点击查看${title}（功能开发中）`)
+}
+
+// 导出详细数据
+const exportDetailData = () => {
+  if (detailDialogData.value.length === 0) {
+    ElMessage.warning('没有数据可导出')
+    return
+  }
+
+  // 这里可以实现Excel导出功能
+  ElMessage.info('导出功能开发中...')
 }
 
 // 更新图表
@@ -500,9 +588,29 @@ const getTimeChartOption = () => {
         data: innerData,
         smooth: true,
         symbol: 'circle',
-        symbolSize: 6,
-        lineStyle: { width: 3 },
-        itemStyle: { color: '#f57c00' }
+        symbolSize: 8,
+        lineStyle: {
+          width: 3,
+          shadowColor: 'rgba(245, 124, 0, 0.3)',
+          shadowBlur: 10
+        },
+        itemStyle: {
+          color: '#f57c00',
+          borderWidth: 2,
+          borderColor: '#fff',
+          shadowColor: 'rgba(245, 124, 0, 0.5)',
+          shadowBlur: 5
+        },
+        label: {
+          show: true,
+          position: 'top',
+          fontSize: 12,
+          fontWeight: 'bold',
+          color: '#f57c00',
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          borderRadius: 4,
+          padding: [2, 6]
+        }
       },
       {
         name: '客诉',
@@ -510,9 +618,29 @@ const getTimeChartOption = () => {
         data: outerData,
         smooth: true,
         symbol: 'circle',
-        symbolSize: 6,
-        lineStyle: { width: 3 },
-        itemStyle: { color: '#d32f2f' }
+        symbolSize: 8,
+        lineStyle: {
+          width: 3,
+          shadowColor: 'rgba(211, 47, 47, 0.3)',
+          shadowBlur: 10
+        },
+        itemStyle: {
+          color: '#d32f2f',
+          borderWidth: 2,
+          borderColor: '#fff',
+          shadowColor: 'rgba(211, 47, 47, 0.5)',
+          shadowBlur: 5
+        },
+        label: {
+          show: true,
+          position: 'top',
+          fontSize: 12,
+          fontWeight: 'bold',
+          color: '#d32f2f',
+          backgroundColor: 'rgba(255, 255, 255, 0.8)',
+          borderRadius: 4,
+          padding: [2, 6]
+        }
       }
     ]
   }
@@ -544,14 +672,38 @@ const getWorkshopChartOption = () => {
         type: 'bar',
         data: innerData,
         stack: 'total',
-        itemStyle: { color: '#f57c00' }
+        itemStyle: {
+          color: '#f57c00',
+          borderRadius: [0, 0, 4, 4],
+          shadowColor: 'rgba(245, 124, 0, 0.3)',
+          shadowBlur: 8
+        },
+        label: {
+          show: true,
+          position: 'inside',
+          fontSize: 12,
+          fontWeight: 'bold',
+          color: '#fff'
+        }
       },
       {
         name: '客诉',
         type: 'bar',
         data: outerData,
         stack: 'total',
-        itemStyle: { color: '#d32f2f' }
+        itemStyle: {
+          color: '#d32f2f',
+          borderRadius: [4, 4, 0, 0],
+          shadowColor: 'rgba(211, 47, 47, 0.3)',
+          shadowBlur: 8
+        },
+        label: {
+          show: true,
+          position: 'inside',
+          fontSize: 12,
+          fontWeight: 'bold',
+          color: '#fff'
+        }
       }
     ]
   }
@@ -575,18 +727,54 @@ const getCategoryChartOption = () => {
       center: ['50%', '45%'],
       roseType: 'area',
       itemStyle: {
-        borderRadius: 8
+        borderRadius: 8,
+        borderWidth: 2,
+        borderColor: '#fff',
+        shadowColor: 'rgba(0, 0, 0, 0.2)',
+        shadowBlur: 10
       },
       data: pieData,
       label: {
         show: true,
-        formatter: '{b}\n{d}%'
+        formatter: '{b}\n{c}\n{d}%',
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#333',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 4,
+        padding: [4, 8],
+        rich: {
+          name: {
+            fontSize: 12,
+            fontWeight: 'bold'
+          },
+          value: {
+            fontSize: 11,
+            color: '#666'
+          },
+          percent: {
+            fontSize: 11,
+            color: '#999'
+          }
+        }
+      },
+      labelLine: {
+        show: true,
+        length: 15,
+        length2: 10,
+        lineStyle: {
+          width: 2
+        }
       },
       emphasis: {
         itemStyle: {
-          shadowBlur: 10,
+          shadowBlur: 20,
           shadowOffsetX: 0,
           shadowColor: 'rgba(0, 0, 0, 0.5)'
+        },
+        label: {
+          fontSize: 14,
+          fontWeight: 'bold'
         }
       }
     }]
@@ -624,7 +812,26 @@ const getCustomerChartOption = () => {
         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
           { offset: 0, color: '#409EFF' },
           { offset: 1, color: '#79bbff' }
-        ])
+        ]),
+        borderRadius: [4, 4, 0, 0],
+        shadowColor: 'rgba(64, 158, 255, 0.3)',
+        shadowBlur: 10
+      },
+      label: {
+        show: true,
+        position: 'top',
+        fontSize: 12,
+        fontWeight: 'bold',
+        color: '#409EFF',
+        backgroundColor: 'rgba(255, 255, 255, 0.8)',
+        borderRadius: 4,
+        padding: [2, 6]
+      },
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 15,
+          shadowColor: 'rgba(64, 158, 255, 0.5)'
+        }
       }
     }]
   }
