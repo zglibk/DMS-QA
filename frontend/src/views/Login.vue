@@ -1,5 +1,40 @@
 <template>
   <div class="login-container-flex">
+    <!-- 波涛效果 -->
+    <div class="wave-container">
+      <svg class="wave-svg wave1" viewBox="0 0 1200 120" preserveAspectRatio="none">
+        <path d="M0,80 Q150,0 300,80 Q450,160 600,80 Q750,0 900,80 Q1050,160 1200,80 L1200,120 L0,120 Z" fill="rgba(255,255,255,0.3)"/>
+      </svg>
+      <svg class="wave-svg wave2" viewBox="0 0 1200 120" preserveAspectRatio="none">
+        <path d="M0,100 Q200,20 400,100 Q600,180 800,100 Q1000,20 1200,100 L1200,120 L0,120 Z" fill="rgba(255,255,255,0.2)"/>
+      </svg>
+      <svg class="wave-svg wave3" viewBox="0 0 1200 120" preserveAspectRatio="none">
+        <path d="M0,90 Q300,10 600,90 Q900,170 1200,90 L1200,120 L0,120 Z" fill="rgba(255,255,255,0.15)"/>
+      </svg>
+    </div>
+
+    <!-- 装饰性浮动圆圈 -->
+    <div class="floating-circle-1"></div>
+    <div class="floating-circle-2"></div>
+    <div class="floating-circle-3"></div>
+    <div class="floating-circle-4"></div>
+    <div class="floating-circle-5"></div>
+    <div class="floating-circle-6"></div>
+    <div class="floating-circle-7"></div>
+    <div class="floating-circle-8"></div>
+    <div class="floating-circle-9"></div>
+    <div class="floating-circle-10"></div>
+    <div class="floating-circle-11"></div>
+    <div class="floating-circle-12"></div>
+    <div class="floating-circle-13"></div>
+    <div class="floating-circle-14"></div>
+    <div class="floating-circle-15"></div>
+    <div class="floating-circle-16"></div>
+    <div class="floating-circle-17"></div>
+    <div class="floating-circle-18"></div>
+    <div class="floating-circle-19"></div>
+    <div class="floating-circle-20"></div>
+
     <div class="api-base-switch">
       <el-popover placement="bottom" width="320" trigger="click">
         <template #reference>
@@ -50,20 +85,6 @@
             </div>
           </el-form-item>
         </el-form>
-        <!-- 登录提示 -->
-        <el-alert
-          title="测试账号"
-          type="info"
-          :closable="false"
-          style="margin-bottom: 20px;"
-        >
-          <template #default>
-            <div style="font-size: 13px;">
-              <div>用户名: admin</div>
-              <div>密&nbsp;&nbsp;&nbsp;码: 123456</div>
-            </div>
-          </template>
-        </el-alert>
       </div>
 
 
@@ -71,24 +92,68 @@
   </div>
 </template>
 
+<!--
+  登录页面脚本部分
+
+  功能说明：
+  1. 用户登录表单处理
+  2. 表单验证和提交
+  3. API地址动态切换
+  4. 网站配置加载
+  5. 记住密码功能
+
+  技术特点：
+  - Vue 3 Composition API
+  - Element Plus表单验证
+  - Pinia状态管理
+  - 响应式数据绑定
+-->
 <script setup>
+/**
+ * 导入依赖模块
+ */
+// Vue 3核心API
 import { ref, reactive, onMounted, watch } from 'vue'
+// HTTP请求库
 import axios from 'axios'
+// 路由管理
 import { useRouter } from 'vue-router'
+// Element Plus图标
 import { User, Lock } from '@element-plus/icons-vue'
+// Element Plus消息组件
 import { ElMessage } from 'element-plus'
+// 用户状态管理
 import { useUserStore } from '../store/user'
+// 网站配置管理
 import { useSiteConfig } from '../composables/useSiteConfig'
 
+/**
+ * 响应式数据定义
+ */
+// 表单引用，用于表单验证
 const formRef = ref()
 
-const form = ref({ username: 'admin', password: '', rememberMe: false })
+// 登录表单数据
+const form = ref({
+  username: 'admin',      // 默认用户名（开发环境便利）
+  password: '',           // 密码
+  rememberMe: false       // 记住密码选项
+})
+
+// 路由实例
 const router = useRouter()
+// 用户状态管理实例
 const userStore = useUserStore()
 
-// 网站配置
+// 网站配置管理
 const { siteConfig, loadSiteConfig } = useSiteConfig()
 
+/**
+ * 表单验证规则
+ *
+ * 使用Element Plus的表单验证机制
+ * 支持必填验证、长度验证、触发时机等
+ */
 const rules = reactive({
   username: [
     { required: true, message: '请输入登录名', trigger: 'blur' },
@@ -184,12 +249,38 @@ const saveApiBase = () => {
 <style scoped>
 .login-container-flex {
   min-height: 100vh;
-  background: #34495e;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   transition: min-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  position: relative;
+  overflow: hidden;
+}
+
+.login-container-flex::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+  opacity: 0.95;
+  z-index: 0;
+}
+
+.login-container-flex::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
+  animation: float 8s ease-in-out infinite;
+  z-index: 1;
 }
 .login-center-wrap {
   display: flex;
@@ -199,6 +290,7 @@ const saveApiBase = () => {
   height: auto;
   min-height: 0;
   transition: min-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  z-index: 2;
 }
 
 .login-box {
@@ -638,10 +730,329 @@ const saveApiBase = () => {
     transform: translateY(0);
   }
 }
+/* 波涛容器 */
+.wave-container {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 120px;
+  overflow: hidden;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* SVG波浪样式 */
+.wave-svg {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 200%;
+  height: 120px;
+}
+
+.wave1 {
+  animation: wave-animation 4s linear infinite;
+  animation-delay: 0s;
+}
+
+.wave2 {
+  animation: wave-animation 6s linear infinite reverse;
+  animation-delay: -2s;
+}
+
+.wave3 {
+  animation: wave-animation 8s linear infinite;
+  animation-delay: -4s;
+}
+
+/* 波涛动画 */
+@keyframes wave-animation {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
 .api-base-switch {
   position: absolute;
   top: 2rem;
   right: 2rem;
   z-index: 100;
+}
+
+/* 浮动动画 - 加快速度 */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-30px) rotate(180deg);
+  }
+}
+
+/* 快速浮动动画 */
+@keyframes float-fast {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translateY(-40px) rotate(360deg) scale(1.2);
+  }
+}
+
+/* 慢速浮动动画 */
+@keyframes float-slow {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translateY(-25px) rotate(-180deg) scale(0.8);
+  }
+}
+
+
+
+.login-container-flex .floating-circle-1 {
+  position: absolute;
+  top: 20%;
+  right: 15%;
+  width: 60px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 50%;
+  animation: float-fast 3s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-2 {
+  position: absolute;
+  bottom: 25%;
+  left: 20%;
+  width: 80px;
+  height: 80px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  animation: float 4s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-3 {
+  position: absolute;
+  top: 15%;
+  left: 8%;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 50%;
+  animation: float-slow 5s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-4 {
+  position: absolute;
+  top: 60%;
+  right: 8%;
+  width: 50px;
+  height: 50px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  animation: float-fast 3.5s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-5 {
+  position: absolute;
+  top: 35%;
+  left: 5%;
+  width: 30px;
+  height: 30px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  animation: float 2.5s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-6 {
+  position: absolute;
+  bottom: 15%;
+  right: 25%;
+  width: 70px;
+  height: 70px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 50%;
+  animation: float-slow 6s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-7 {
+  position: absolute;
+  top: 45%;
+  right: 3%;
+  width: 35px;
+  height: 35px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  animation: float-fast 4.5s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-8 {
+  position: absolute;
+  bottom: 40%;
+  left: 3%;
+  width: 45px;
+  height: 45px;
+  background: rgba(255, 255, 255, 0.13);
+  border-radius: 50%;
+  animation: float 3.8s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+/* 新增的光晕 */
+.login-container-flex .floating-circle-9 {
+  position: absolute;
+  top: 10%;
+  left: 25%;
+  width: 25px;
+  height: 25px;
+  background: rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  animation: float-fast 2.8s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-10 {
+  position: absolute;
+  top: 70%;
+  right: 30%;
+  width: 55px;
+  height: 55px;
+  background: rgba(255, 255, 255, 0.11);
+  border-radius: 50%;
+  animation: float-slow 5.5s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-11 {
+  position: absolute;
+  top: 25%;
+  left: 35%;
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  animation: float 2.2s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-12 {
+  position: absolute;
+  bottom: 35%;
+  right: 12%;
+  width: 38px;
+  height: 38px;
+  background: rgba(255, 255, 255, 0.17);
+  border-radius: 50%;
+  animation: float-fast 3.2s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-13 {
+  position: absolute;
+  top: 55%;
+  left: 12%;
+  width: 28px;
+  height: 28px;
+  background: rgba(255, 255, 255, 0.19);
+  border-radius: 50%;
+  animation: float-slow 4.8s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-14 {
+  position: absolute;
+  top: 8%;
+  right: 35%;
+  width: 42px;
+  height: 42px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 50%;
+  animation: float 3.6s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-15 {
+  position: absolute;
+  bottom: 20%;
+  left: 8%;
+  width: 32px;
+  height: 32px;
+  background: rgba(255, 255, 255, 0.21);
+  border-radius: 50%;
+  animation: float-fast 2.9s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-16 {
+  position: absolute;
+  top: 40%;
+  right: 20%;
+  width: 48px;
+  height: 48px;
+  background: rgba(255, 255, 255, 0.12);
+  border-radius: 50%;
+  animation: float-slow 5.2s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-17 {
+  position: absolute;
+  bottom: 50%;
+  left: 30%;
+  width: 22px;
+  height: 22px;
+  background: rgba(255, 255, 255, 0.24);
+  border-radius: 50%;
+  animation: float 2.4s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-18 {
+  position: absolute;
+  top: 30%;
+  right: 5%;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 50%;
+  animation: float-fast 3.4s ease-in-out infinite reverse;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-19 {
+  position: absolute;
+  bottom: 10%;
+  right: 40%;
+  width: 26px;
+  height: 26px;
+  background: rgba(255, 255, 255, 0.23);
+  border-radius: 50%;
+  animation: float-slow 4.6s ease-in-out infinite;
+  z-index: 1;
+}
+
+.login-container-flex .floating-circle-20 {
+  position: absolute;
+  top: 65%;
+  left: 25%;
+  width: 52px;
+  height: 52px;
+  background: rgba(255, 255, 255, 0.13);
+  border-radius: 50%;
+  animation: float 4.2s ease-in-out infinite reverse;
+  z-index: 1;
 }
 </style> 

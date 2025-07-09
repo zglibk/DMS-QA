@@ -1,33 +1,111 @@
+/**
+ * 用户认证路由模块
+ *
+ * 功能说明：
+ * 1. 用户登录验证
+ * 2. JWT token生成和验证
+ * 3. 用户资料管理
+ * 4. 密码加密和验证
+ * 5. 管理员账户初始化
+ *
+ * 安全特性：
+ * - bcrypt密码哈希
+ * - JWT token认证
+ * - 用户状态检查
+ * - 权限验证中间件
+ *
+ * 技术栈：
+ * - Express Router
+ * - JSON Web Token (JWT)
+ * - bcryptjs (密码加密)
+ * - SQL Server数据库
+ */
+
+// 导入Express路由模块
 const express = require('express');
+// 导入JWT库，用于生成和验证token
 const jwt = require('jsonwebtoken');
+// 导入bcrypt库，用于密码加密
 const bcrypt = require('bcryptjs');
+// 导入数据库连接模块
 const { sql, config, getDynamicConfig } = require('../db');
+// 创建路由实例
 const router = express.Router();
+// JWT密钥（生产环境应使用环境变量）
 const SECRET = 'dms-secret';
+// 导入认证中间件
 const authMiddleware = require('../middleware/auth');
 
-// ===================== 登录接口 =====================
-// POST /api/auth/login
-// 参数: { username, password }
-// 返回: { token } 登录成功返回JWT token
+/**
+ * 用户登录接口
+ *
+ * 路由：POST /api/auth/login
+ *
+ * 请求参数：
+ * - username: 用户名
+ * - password: 密码（明文）
+ *
+ * 响应数据：
+ * - 成功：{ token: "JWT字符串" }
+ * - 失败：{ message: "错误信息" }
+ *
+ * 状态码：
+ * - 200: 登录成功
+ * - 401: 用户名或密码错误
+ * - 403: 用户被禁用
+ * - 500: 服务器错误
+ *
+ * 安全机制：
+ * 1. 密码使用bcrypt哈希存储和验证
+ * 2. JWT token有效期2小时
+ * 3. 检查用户状态（是否被禁用）
+ * 4. 不泄露具体错误原因（用户名不存在vs密码错误）
+ */
 router.post('/login', async (req, res) => {
   const { username, password } = req.body;
+
   try {
+    // 连接数据库
     let pool = await sql.connect(await getDynamicConfig());
-    // 查询用户
+
+    // 查询用户信息
     const result = await pool.request()
       .input('Username', sql.NVarChar, username)
       .query('SELECT * FROM [User] WHERE Username = @Username');
+
     const user = result.recordset[0];
-    if (!user) return res.status(401).json({ message: '用户名或密码错误' });
-    if (user.Status === 0) return res.status(403).json({ message: '该用户已被禁用，请联系管理员' });
-    // 校验密码
+
+    // 用户不存在
+    if (!user) {
+      return res.status(401).json({ message: '用户名或密码错误' });
+    }
+
+    // 用户被禁用
+    if (user.Status === 0) {
+      return res.status(403).json({ message: '该用户已被禁用，请联系管理员' });
+    }
+
+    // 验证密码
     const valid = await bcrypt.compare(password, user.Password);
-    if (!valid) return res.status(401).json({ message: '用户名或密码错误' });
-    // 生成token
-    const token = jwt.sign({ username: user.Username, role: user.Role }, SECRET, { expiresIn: '2h' });
+    if (!valid) {
+      return res.status(401).json({ message: '用户名或密码错误' });
+    }
+
+    // 生成JWT token
+    const token = jwt.sign(
+      {
+        username: user.Username,
+        role: user.Role
+      },
+      SECRET,
+      { expiresIn: '2h' }
+    );
+
+    // 返回token
     res.json({ token });
+
   } catch (err) {
+    console.error('登录错误:', err);
     res.status(500).json({ message: err.message });
   }
 });

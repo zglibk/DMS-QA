@@ -20,10 +20,20 @@
           <el-icon><HomeFilled /></el-icon>
           <span v-show="!collapsed">仪表盘</span>
         </el-menu-item>
-        <el-menu-item index="/admin/supplier">
-          <el-icon><OfficeBuilding /></el-icon>
-          <span v-show="!collapsed">供应商管理</span>
-        </el-menu-item>
+        <el-sub-menu index="/admin/supplier">
+          <template #title>
+            <el-icon><OfficeBuilding /></el-icon>
+            <span v-show="!collapsed">供应商管理</span>
+          </template>
+          <el-menu-item index="/admin/supplier/list">
+            <el-icon><List /></el-icon>
+            <span v-show="!collapsed">供应商列表</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/supplier/material-price">
+            <el-icon><Money /></el-icon>
+            <span v-show="!collapsed">材料价格</span>
+          </el-menu-item>
+        </el-sub-menu>
         <el-sub-menu index="/admin/user">
           <template #title>
             <el-icon><User /></el-icon>
@@ -89,7 +99,9 @@
             <el-breadcrumb-item v-if="route.path.startsWith('/admin/user')">用户管理</el-breadcrumb-item>
             <el-breadcrumb-item v-if="route.path === '/admin/user/list'">用户列表</el-breadcrumb-item>
             <el-breadcrumb-item v-else-if="route.path === '/admin/dashboard'">仪表盘</el-breadcrumb-item>
-            <el-breadcrumb-item v-else-if="route.path === '/admin/supplier'">供应商管理</el-breadcrumb-item>
+            <el-breadcrumb-item v-else-if="route.path.startsWith('/admin/supplier')">供应商管理</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="route.path === '/admin/supplier/list'">供应商列表</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="route.path === '/admin/supplier/material-price'">材料价格</el-breadcrumb-item>
             <el-breadcrumb-item v-else-if="route.path.startsWith('/admin/data-management') || route.path.startsWith('/admin/path-analysis') || route.path.startsWith('/admin/file-copy-test') || route.path.startsWith('/admin/system-config')">设置</el-breadcrumb-item>
             <el-breadcrumb-item v-if="route.path === '/admin/data-management'">数据管理</el-breadcrumb-item>
             <el-breadcrumb-item v-if="route.path === '/admin/path-analysis'">路径格式分析</el-breadcrumb-item>
@@ -173,7 +185,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument } from '@element-plus/icons-vue'
+import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument, List, Money } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import Profile from '../Profile.vue'
@@ -188,11 +200,16 @@ const { user } = storeToRefs(userStore)
 const { siteConfig } = useSiteConfig()
 
 const collapsed = ref(false)
-const activeMenu = computed(() => route.path.startsWith('/admin/user') ? '/admin/user/list' : route.path)
+const activeMenu = computed(() => {
+  if (route.path.startsWith('/admin/user')) return '/admin/user/list'
+  if (route.path.startsWith('/admin/supplier')) return route.path
+  return route.path
+})
 const pageTitle = computed(() => {
   switch (route.path) {
     case '/admin/dashboard': return '仪表盘'
-    case '/admin/supplier': return '供应商管理'
+    case '/admin/supplier/list': return '供应商列表'
+    case '/admin/supplier/material-price': return '材料价格管理'
     case '/admin/user': return '用户管理'
     default: return ''
   }

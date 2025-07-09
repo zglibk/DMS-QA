@@ -1,7 +1,7 @@
 # DMS-QA 质量管理系统
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Version](https://img.shields.io/badge/Version-v2.1.0-green.svg)](https://gitee.com/lbk168/dms-qa)
+[![Version](https://img.shields.io/badge/Version-v2.2.0-green.svg)](https://gitee.com/lbk168/dms-qa)
 [![Status](https://img.shields.io/badge/Status-开发中-orange.svg)](https://gitee.com/lbk168/dms-qa)
 
 ## 项目简介
@@ -76,8 +76,10 @@ DMS-QA/
 
 > 🔄 **持续更新**: 系统功能持续迭代中，新特性和优化不断加入。
 
-### v2.1.0 新增功能 ✨
-- 📊 **Excel导入功能** - 支持多工作表选择和字段映射
+### v2.2.0 新增功能 ✨
+- 📊 **材料价格管理** - 支持供应商材料价格管理，历史价格追踪
+- 🎨 **登录页面美化** - 新增波浪动画效果和浮动光晕，提升视觉体验
+- 📝 **详细代码注释** - 为前后端所有核心文件添加详细中文注释，便于理解和维护
 - 🔄 **智能数据转换** - 自动处理日期、数字等数据类型
 - 📁 **文件自动拷贝** - Excel超链接文件自动拷贝到服务器
 - ⚙️ **系统配置管理** - 数据库连接、存储路径等可视化配置

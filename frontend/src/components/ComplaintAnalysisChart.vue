@@ -153,6 +153,7 @@
             border
             height="450"
             @row-click="handleRowClick"
+            @row-dblclick="handleRowDoubleClick"
             style="cursor: pointer;"
           >
             <el-table-column 
@@ -246,6 +247,7 @@
           header-cell-class-name="enhanced-table-header"
           cell-class-name="enhanced-table-cell"
           :row-class-name="getRowClassName"
+          @row-dblclick="handleDetailRowDoubleClick"
         >
           <el-table-column prop="ID" label="ID" width="70" align="center" fixed="left">
             <template #default="scope">
@@ -355,6 +357,125 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 右侧滑出的详细记录抽屉 -->
+    <el-drawer
+      v-model="detailDrawerVisible"
+      :title="detailDrawerTitle"
+      direction="rtl"
+      size="48%"
+      :close-on-click-modal="false"
+      :modal="true"
+      :append-to-body="true"
+      :lock-scroll="false"
+      class="complaint-detail-drawer"
+      :destroy-on-close="true"
+    >
+      <template #header="{ close, titleId, titleClass }">
+        <div class="drawer-header">
+          <div class="header-left">
+            <div class="header-icon-wrapper">
+              <el-icon class="header-icon" size="20">
+                <Document />
+              </el-icon>
+            </div>
+            <div class="header-text">
+              <span :id="titleId" :class="titleClass" class="drawer-title">
+                {{ detailDrawerTitle }}
+              </span>
+              <span class="drawer-subtitle">投诉记录详细信息</span>
+            </div>
+          </div>
+          <div class="header-right">
+            <el-button
+              type="text"
+              @click="close"
+              class="close-btn"
+              size="large"
+            >
+              <el-icon size="16"><Close /></el-icon>
+            </el-button>
+          </div>
+        </div>
+      </template>
+
+      <div class="drawer-content-wrapper">
+        <div class="drawer-content" v-if="detailDrawerData" v-loading="detailFieldsLoading" element-loading-text="加载字段信息中...">
+          <!-- 动态显示所有字段 -->
+          <div v-for="section in detailSections" :key="section.title" class="detail-section">
+            <div class="section-header">
+              <el-icon class="section-icon" :class="section.iconClass">
+                <InfoFilled v-if="section.icon === 'InfoFilled'" />
+                <WarningFilled v-else-if="section.icon === 'WarningFilled'" />
+                <Tools v-else-if="section.icon === 'Tools'" />
+                <Money v-else-if="section.icon === 'Money'" />
+                <UserFilled v-else-if="section.icon === 'UserFilled'" />
+                <QuestionFilled v-else-if="section.icon === 'QuestionFilled'" />
+              </el-icon>
+              <span class="section-title">{{ section.title }}</span>
+            </div>
+            <div class="section-content">
+              <div class="field-grid">
+                <div
+                  v-for="field in section.fields"
+                  :key="field.key"
+                  class="field-item"
+                  :class="{ 'full-width': isFullWidthField(field) }"
+                >
+                  <label class="field-label">{{ field.label }}:</label>
+                  <div class="field-value" :class="getFieldValueClass(field)">
+                    <!-- 特殊字段处理 -->
+                    <template v-if="field.key === 'ID'">
+                      <span class="id-badge">{{ detailDrawerData[field.key] }}</span>
+                    </template>
+                    <template v-else-if="field.type === 'date'">
+                      <span class="date-text">{{ formatDate(detailDrawerData[field.key]) }}</span>
+                    </template>
+                    <template v-else-if="field.key.includes('Price') || field.key.includes('Cost')">
+                      <span class="price">{{ formatPrice(detailDrawerData[field.key]) }}</span>
+                    </template>
+                    <template v-else-if="field.key === 'DefectiveRate'">
+                      <span class="rate-badge" :class="getRateClass(detailDrawerData[field.key])">
+                        {{ detailDrawerData[field.key] ? detailDrawerData[field.key] + '%' : '0%' }}
+                      </span>
+                    </template>
+                    <template v-else-if="field.type === 'boolean'">
+                      <el-tag :type="detailDrawerData[field.key] ? 'success' : 'info'" size="small">
+                        {{ detailDrawerData[field.key] ? '是' : '否' }}
+                      </el-tag>
+                    </template>
+                    <template v-else-if="field.key === 'ComplaintCategory'">
+                      <el-tag :type="detailDrawerData[field.key] === '客诉' ? 'danger' : 'warning'" size="small">
+                        {{ detailDrawerData[field.key] || '未分类' }}
+                      </el-tag>
+                    </template>
+                    <template v-else-if="field.key === 'Workshop'">
+                      <el-tag type="info" size="small">{{ detailDrawerData[field.key] || '未指定' }}</el-tag>
+                    </template>
+                    <template v-else>
+                      <span>{{ detailDrawerData[field.key] || '未填写' }}</span>
+                    </template>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 底部关闭按钮 -->
+          <div class="drawer-footer">
+            <el-button
+              type="primary"
+              size="large"
+              @click="detailDrawerVisible = false"
+              class="close-drawer-btn"
+            >
+              <el-icon><Close /></el-icon>
+              关闭
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </el-drawer>
   </div>
 </template>
 
@@ -363,7 +484,8 @@ import { ref, onMounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Refresh, DataAnalysis, Grid, Warning, CircleClose, DataBoard, Download,
-  Document, Close, Calendar, InfoFilled
+  Document, Close, Calendar, InfoFilled, UserFilled, CircleCheck, Money,
+  WarningFilled, Tools, QuestionFilled
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
@@ -562,6 +684,53 @@ const handleRowClick = (row) => {
   }
 }
 
+// 行双击处理（显示详细信息）
+const handleRowDoubleClick = (row) => {
+  console.log('行双击事件:', row)
+  ElMessage.info('双击功能需要在数据明细对话框中的表格上使用')
+}
+
+// 详细数据对话框中的行双击处理
+const handleDetailRowDoubleClick = async (row) => {
+  console.log('详细数据行双击事件:', row)
+
+  if (!row.ID) {
+    ElMessage.warning('无法获取记录ID')
+    return
+  }
+
+  try {
+    // 获取完整的投诉记录详情
+    const token = localStorage.getItem('token')
+    const response = await axios.get(`/api/complaint/detail/${row.ID}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (response.data.success) {
+      detailDrawerData.value = response.data.data
+
+      // 确保字段信息已加载，如果没有则先加载
+      if (exportFields.value.length === 0) {
+        detailFieldsLoading.value = true
+        await fetchExportFields()
+        detailFieldsLoading.value = false
+      }
+
+      // 组织详情字段显示
+      detailSections.value = organizeDetailFields()
+
+      detailDrawerTitle.value = `投诉记录 #${row.ID} 详细信息`
+      detailDrawerVisible.value = true
+      console.log('获取详细记录成功:', response.data.data)
+    } else {
+      ElMessage.error(response.data.message || '获取详细记录失败')
+    }
+  } catch (error) {
+    console.error('获取详细记录失败:', error)
+    ElMessage.error('获取详细记录失败')
+  }
+}
+
 // 数据钻取方法
 const drillDownToTimeDetail = async (row) => {
   try {
@@ -677,6 +846,16 @@ const detailDialogVisible = ref(false)
 const detailDialogTitle = ref('')
 const detailDialogData = ref([])
 
+// 详细记录抽屉相关
+const detailDrawerVisible = ref(false)
+const detailDrawerTitle = ref('')
+const detailDrawerData = ref(null)
+const detailFieldsLoading = ref(false)
+
+// 字段信息
+const exportFields = ref([])
+const detailSections = ref([])
+
 // 显示详细数据对话框
 const showDetailDialog = (title, data) => {
   detailDialogTitle.value = title
@@ -714,6 +893,149 @@ const exportDetailData = () => {
   // 这里可以实现Excel导出功能
   ElMessage.info('导出功能开发中...')
 }
+
+// 获取字段信息
+const fetchExportFields = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.get('/api/complaint/fields', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (res.data.success) {
+      exportFields.value = res.data.data
+      console.log('获取到字段信息:', exportFields.value.length, '个字段')
+    } else {
+      ElMessage.error('获取字段信息失败')
+    }
+  } catch (error) {
+    console.error('获取字段信息失败:', error)
+    ElMessage.error('获取字段信息失败: ' + (error.response?.data?.message || error.message))
+  }
+}
+
+// 格式化日期
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  })
+}
+
+// 格式化价格
+const formatPrice = (price) => {
+  if (!price || price === 0) return '¥0.00'
+  return `¥${parseFloat(price).toFixed(2)}`
+}
+
+// 判断是否为全宽字段
+const isFullWidthField = (field) => {
+  const fullWidthKeys = ['DefectiveDescription', 'DefectiveReason', 'Disposition', 'AssessmentDescription']
+  return fullWidthKeys.includes(field.key) || field.key.includes('Description') || field.key.includes('Reason')
+}
+
+// 获取字段值的CSS类
+const getFieldValueClass = (field) => {
+  const classes = []
+
+  if (isFullWidthField(field)) {
+    classes.push('text-content')
+  }
+
+  if (field.key.includes('Qty') && field.key !== 'ProductionQty') {
+    classes.push('highlight-error')
+  } else if (field.key === 'ProductionQty') {
+    classes.push('highlight-number')
+  }
+
+  return classes.join(' ')
+}
+
+// 组织详情字段为分组显示
+const organizeDetailFields = () => {
+  if (!exportFields.value || exportFields.value.length === 0) {
+    return []
+  }
+
+  // 定义字段分组 - 根据实际数据库字段
+  const fieldGroups = {
+    basic: {
+      title: '基本信息',
+      icon: 'InfoFilled',
+      iconClass: '',
+      fields: ['Date', 'Customer', 'OrderNo', 'ProductName', 'Specification', 'Workshop', 'ProductionQty', 'DefectiveQty', 'DefectiveRate']
+    },
+    complaint: {
+      title: '投诉信息',
+      icon: 'WarningFilled',
+      iconClass: 'warning',
+      fields: ['ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'DefectiveDescription', 'DefectiveReason', 'AttachmentFile']
+    },
+    disposition: {
+      title: '处理信息',
+      icon: 'Tools',
+      iconClass: 'success',
+      fields: ['Disposition', 'ReturnGoods', 'IsReprint', 'ReprintQty']
+    },
+    materials: {
+      title: '材料成本',
+      icon: 'Money',
+      iconClass: 'info',
+      fields: ['Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice', 'MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice', 'MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice', 'MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice', 'LaborCost', 'TotalCost']
+    },
+    responsibility: {
+      title: '责任信息',
+      icon: 'UserFilled',
+      iconClass: 'danger',
+      fields: ['MainDept', 'MainPerson', 'MainPersonAssessment', 'SecondPerson', 'SecondPersonAssessment', 'Manager', 'ManagerAssessment']
+    },
+    assessment: {
+      title: '补充说明',
+      icon: 'QuestionFilled',
+      iconClass: 'warning',
+      fields: ['AssessmentDescription']
+    }
+  }
+
+  const sections = []
+
+  Object.keys(fieldGroups).forEach(groupKey => {
+    const group = fieldGroups[groupKey]
+    const groupFields = []
+
+    group.fields.forEach(fieldKey => {
+      const field = exportFields.value.find(f => f.key === fieldKey)
+      if (field) {
+        groupFields.push(field)
+      }
+    })
+
+    if (groupFields.length > 0) {
+      sections.push({
+        title: group.title,
+        icon: group.icon,
+        iconClass: group.iconClass,
+        fields: groupFields
+      })
+    }
+  })
+
+  return sections
+}
+
+// 判断是否有成本信息
+const hasCostInfo = computed(() => {
+  if (!detailDrawerData.value) return false
+  const data = detailDrawerData.value
+  return data.Paper || data.PaperSpecification || data.PaperQty ||
+         data.PaperUnitPrice || data.LaborCost || data.TotalCost ||
+         data.MaterialA || data.MaterialASpec || data.MaterialAQty || data.MaterialAUnitPrice ||
+         data.MaterialB || data.MaterialBSpec || data.MaterialBQty || data.MaterialBUnitPrice ||
+         data.MaterialC || data.MaterialCSpec || data.MaterialCQty || data.MaterialCUnitPrice
+})
 
 // 更新图表
 const updateChart = () => {
@@ -1773,5 +2095,485 @@ onMounted(async () => {
 
 .primary-btn:hover {
   background: linear-gradient(135deg, #2563eb, #1e40af) !important;
+}
+
+/* 详细记录抽屉样式 */
+.complaint-detail-drawer :deep(.el-drawer) {
+  border-radius: 12px 0 0 12px !important;
+  box-shadow: -10px 0 30px rgba(0, 0, 0, 0.15) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.complaint-detail-drawer :deep(.el-drawer__header) {
+  padding: 0 !important;
+  margin-bottom: 0 !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  flex-shrink: 0 !important;
+}
+
+.complaint-detail-drawer :deep(.el-drawer__body) {
+  padding: 0 !important;
+  background: #f8fafc !important;
+  flex: 1 !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.drawer-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  color: white;
+}
+
+.drawer-header .header-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.drawer-header .header-icon-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.drawer-header .header-icon {
+  color: white !important;
+}
+
+.drawer-header .header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.drawer-title {
+  font-size: 16px !important;
+  font-weight: 600 !important;
+  color: white !important;
+  margin: 0 !important;
+}
+
+.drawer-subtitle {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+  font-weight: 400;
+}
+
+.drawer-header .close-btn {
+  background: rgba(255, 255, 255, 0.1) !important;
+  border: 1px solid rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  border-radius: 6px !important;
+  width: 32px !important;
+  height: 32px !important;
+  padding: 0 !important;
+  transition: all 0.3s ease !important;
+}
+
+.drawer-header .close-btn:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  transform: scale(1.05);
+}
+
+/* 抽屉内容容器样式 */
+.drawer-content-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  background: #f8fafc;
+  height: 100%;
+}
+
+.drawer-content {
+  padding: 24px 24px 0 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 100%;
+  overflow-y: auto;
+}
+
+/* 抽屉底部按钮样式 */
+.drawer-footer {
+  padding: 20px 24px;
+  border-top: 1px solid #e5e7eb;
+  background: #f8fafc;
+  display: flex;
+  justify-content: center;
+  margin-top: auto;
+}
+
+.close-drawer-btn {
+  min-width: 120px;
+  border-radius: 8px;
+  font-weight: 600;
+}
+
+.info-card {
+  border-radius: 12px !important;
+  border: 1px solid #e5e7eb !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06) !important;
+  transition: all 0.3s ease !important;
+}
+
+.info-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1) !important;
+  transform: translateY(-2px);
+}
+
+.info-card :deep(.el-card__header) {
+  background: linear-gradient(135deg, #f8fafc 0%, #ffffff 100%) !important;
+  border-bottom: 1px solid #e5e7eb !important;
+  padding: 16px 20px !important;
+}
+
+.info-card .card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.info-card .card-icon {
+  font-size: 16px;
+}
+
+.info-card .card-icon.warning {
+  color: #f59e0b;
+}
+
+.info-card .card-icon.success {
+  color: #10b981;
+}
+
+.info-card .card-icon.danger {
+  color: #ef4444;
+}
+
+.info-card .card-icon.info {
+  color: #3b82f6;
+}
+
+.info-card .card-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  padding: 0;
+}
+
+.info-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.info-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.info-item label {
+  font-size: 12px;
+  font-weight: 500;
+  color: #6b7280;
+  margin-bottom: 2px;
+}
+
+.info-item span {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.info-item .id-badge {
+  display: inline-block;
+  padding: 4px 8px;
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 36px;
+  text-align: center;
+}
+
+.info-item .date-text {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.info-item .customer-code {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #1f2937;
+  background: #f3f4f6;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.info-item .order-no {
+  font-family: 'Courier New', monospace;
+  font-size: 12px;
+  font-weight: 600;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  display: inline-block;
+}
+
+.info-item .product-name {
+  font-size: 14px;
+  color: #374151;
+  font-weight: 500;
+}
+
+.info-item .attachment-file {
+  font-size: 12px;
+  color: #3b82f6;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.info-item .quantity {
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.info-item .defective-qty {
+  font-weight: 600;
+  color: #ef4444;
+}
+
+.info-item .person-name {
+  font-weight: 500;
+  color: #374151;
+}
+
+.info-item .assessment {
+  font-weight: 600;
+  color: #f59e0b;
+}
+
+.info-item .price {
+  font-weight: 600;
+  color: #10b981;
+  font-family: 'Courier New', monospace;
+}
+
+.info-item .total-cost {
+  font-weight: 700;
+  color: #ef4444;
+  font-family: 'Courier New', monospace;
+  font-size: 16px;
+}
+
+.info-item .description-text {
+  font-size: 13px;
+  color: #4b5563;
+  line-height: 1.5;
+  background: #f9fafb;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-left: 3px solid #e5e7eb;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .complaint-detail-drawer :deep(.el-drawer) {
+    width: 90% !important;
+  }
+
+  .info-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .drawer-content {
+    padding: 16px;
+    gap: 16px;
+  }
+
+  .drawer-content-wrapper {
+    padding: 0;
+  }
+}
+
+/* 详情字段显示样式 */
+.detail-section {
+  margin-bottom: 24px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.section-icon {
+  font-size: 18px;
+}
+
+.section-icon.warning {
+  color: #f59e0b;
+}
+
+.section-icon.success {
+  color: #10b981;
+}
+
+.section-icon.info {
+  color: #3b82f6;
+}
+
+.section-icon.danger {
+  color: #ef4444;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.section-content {
+  padding: 20px;
+}
+
+.field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+}
+
+.field-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.field-item.full-width {
+  grid-column: 1 / -1;
+}
+
+.field-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #6b7280;
+  margin: 0;
+}
+
+.field-value {
+  font-size: 14px;
+  color: #374151;
+  min-height: 20px;
+}
+
+.field-value.text-content {
+  background: #f9fafb;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #e5e7eb;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.5;
+}
+
+.field-value.highlight-error {
+  color: #dc2626;
+  font-weight: 600;
+}
+
+.field-value.highlight-number {
+  color: #059669;
+  font-weight: 600;
+}
+
+.id-badge {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.date-text {
+  color: #6366f1;
+  font-weight: 500;
+}
+
+.price {
+  color: #059669;
+  font-weight: 600;
+}
+
+.rate-badge {
+  padding: 4px 8px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.rate-badge.low {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.rate-badge.medium {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.rate-badge.high {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+@media (max-width: 480px) {
+  .complaint-detail-drawer :deep(.el-drawer) {
+    width: 95% !important;
+  }
+
+  .drawer-header {
+    padding: 16px 20px;
+  }
+
+  .drawer-title {
+    font-size: 14px !important;
+  }
+
+  .drawer-subtitle {
+    font-size: 11px;
+  }
 }
 </style>

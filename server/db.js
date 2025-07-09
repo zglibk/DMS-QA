@@ -1,32 +1,89 @@
+/**
+ * 数据库连接配置模块
+ *
+ * 功能说明：
+ * 1. 管理SQL Server数据库连接
+ * 2. 支持动态配置切换
+ * 3. 连接池管理
+ * 4. 配置缓存优化
+ *
+ * 设计特点：
+ * - 默认配置 + 动态配置
+ * - 连接池复用
+ * - 配置缓存机制
+ * - 错误处理和重试
+ *
+ * 数据库要求：
+ * - SQL Server 2008R2 或更高版本
+ * - 支持TCP/IP连接
+ * - 启用混合身份验证
+ */
+
+// 导入SQL Server驱动
 const sql = require('mssql');
 
+/**
+ * 默认数据库连接配置
+ *
+ * 配置说明：
+ * - user: 数据库用户名
+ * - password: 数据库密码
+ * - server: 数据库服务器地址
+ * - database: 数据库名称
+ * - options: 连接选项
+ * - pool: 连接池配置
+ *
+ * 注意：生产环境应使用环境变量存储敏感信息
+ */
 const config = {
-  user: 'sa',
-  password: 'Qa369*',
-  server: '192.168.1.57',
-  database: 'DMS-QA',
+  user: 'sa',                    // 数据库用户名
+  password: 'Qa369*',            // 数据库密码
+  server: '192.168.1.57',        // 数据库服务器IP
+  database: 'DMS-QA',            // 数据库名称
   options: {
-    encrypt: false,
-    trustServerCertificate: true,
-    enableArithAbort: true,
-    useUTC: false,
-    requestTimeout: 30000,
-    connectionTimeout: 30000,
-    parseJSON: true
+    encrypt: false,              // 不使用SSL加密（内网环境）
+    trustServerCertificate: true, // 信任服务器证书
+    enableArithAbort: true,      // 启用算术中止
+    useUTC: false,               // 不使用UTC时间
+    requestTimeout: 30000,       // 请求超时时间（30秒）
+    connectionTimeout: 30000,    // 连接超时时间（30秒）
+    parseJSON: true              // 自动解析JSON字段
   },
   pool: {
-    max: 10,
-    min: 0,
-    idleTimeoutMillis: 30000
+    max: 10,                     // 连接池最大连接数
+    min: 0,                      // 连接池最小连接数
+    idleTimeoutMillis: 30000     // 空闲连接超时时间
   }
 };
 
-// 缓存动态配置，避免频繁查询数据库
-let cachedDynamicConfig = null;
-let configCacheTime = 0;
-const CONFIG_CACHE_DURATION = 60000; // 缓存1分钟
+/**
+ * 动态配置缓存
+ *
+ * 目的：避免频繁查询数据库获取配置
+ * 机制：内存缓存 + 时间过期
+ */
+let cachedDynamicConfig = null;  // 缓存的配置对象
+let configCacheTime = 0;         // 缓存时间戳
+const CONFIG_CACHE_DURATION = 60000; // 缓存有效期（1分钟）
 
-// 获取动态数据库配置
+/**
+ * 获取动态数据库配置
+ *
+ * 功能：从DbConfig表获取当前有效的数据库配置
+ *
+ * 工作流程：
+ * 1. 检查缓存是否有效
+ * 2. 如果缓存过期，从数据库查询最新配置
+ * 3. 更新缓存并返回配置
+ * 4. 如果查询失败，返回默认配置
+ *
+ * 缓存机制：
+ * - 减少数据库查询频率
+ * - 提高系统性能
+ * - 避免配置表锁定
+ *
+ * 返回值：数据库连接配置对象
+ */
 async function getDynamicConfig() {
   // 检查缓存是否有效
   const now = Date.now();
@@ -36,13 +93,25 @@ async function getDynamicConfig() {
 
   let pool = null;
   try {
-    // 首先尝试从数据库获取配置
+    // 使用默认配置连接数据库
     pool = await sql.connect(config);
+
+    // 查询当前有效的数据库配置
     const result = await pool.request()
-      .query('SELECT TOP 1 Host, DatabaseName, DbUser, DbPassword, FileStoragePath, FileServerPort, FileUrlPrefix, ExcelTempPath, NetworkSharePath FROM DbConfig WHERE IsCurrent = 1 ORDER BY ID DESC');
+      .query(`
+        SELECT TOP 1
+          Host, DatabaseName, DbUser, DbPassword,
+          FileStoragePath, FileServerPort, FileUrlPrefix,
+          ExcelTempPath, NetworkSharePath
+        FROM DbConfig
+        WHERE IsCurrent = 1
+        ORDER BY ID DESC
+      `);
 
     if (result.recordset.length > 0) {
       const dbConfig = result.recordset[0];
+
+      // 构建新的数据库配置
       cachedDynamicConfig = {
         user: dbConfig.DbUser,
         password: dbConfig.DbPassword,
@@ -110,7 +179,10 @@ async function getConnection() {
       // 如果有旧的连接池，先关闭它
       if (globalPool) {
         try {
-          await globalPool.close();
+          // 只有在连接池已连接或连接中时才关闭
+          if (globalPool.connected || globalPool.connecting) {
+            await globalPool.close();
+          }
         } catch (err) {
           console.log('关闭旧连接池失败:', err.message);
         }
@@ -120,14 +192,14 @@ async function getConnection() {
       globalPool = new sql.ConnectionPool(dynamicConfig);
       poolConfig = { ...dynamicConfig };
 
-      // 连接到数据库
-      await globalPool.connect();
-
       // 添加错误处理
       globalPool.on('error', (err) => {
         console.error('连接池错误:', err);
         globalPool = null; // 重置连接池，下次重新创建
       });
+
+      // 连接到数据库
+      await globalPool.connect();
     }
 
     return globalPool;
@@ -166,7 +238,10 @@ async function executeQuery(queryFn) {
       // 重置连接池，准备重试
       if (globalPool) {
         try {
-          await globalPool.close();
+          // 只有在连接池已连接或连接中时才关闭
+          if (globalPool.connected || globalPool.connecting) {
+            await globalPool.close();
+          }
         } catch (closeErr) {
           console.log('关闭连接池失败:', closeErr.message);
         }

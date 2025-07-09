@@ -138,7 +138,6 @@
                 <div class="unit-header">
                   <div class="stat-title">{{ item.unit }}</div>
                   <el-tag
-                    size="small"
                     :type="item.type === 'workshop' ? 'primary' : 'success'"
                     class="unit-tag"
                   >
@@ -171,68 +170,58 @@
                 <!-- 动态渲染每页的卡片 -->
                 <template v-for="(card, cardIndex) in page">
                   <!-- 今日投诉卡片 -->
-                  <div v-if="card.type === 'today'" :key="`today-${pageIndex}-${cardIndex}`" class="stat-card card-today">
-                    <div class="card-icon">
-                      <el-icon><Calendar /></el-icon>
+                  <div v-if="card.type === 'today'" :key="`today-${pageIndex}-${cardIndex}`" class="summary-card today-card">
+                    <div class="card-left">
+                      <div class="card-icon today">
+                        <el-icon><Calendar /></el-icon>
+                      </div>
                     </div>
-                    <div class="card-content">
-                      <div class="card-header">
-                        <div class="stat-title">今日投诉</div>
-                        <div class="stat-value"><b>{{ todayCount }}</b></div>
-                      </div>
-                      <div class="card-divider"></div>
-                      <div class="card-stats">
-                        <span class="stat-item-inline">内诉: <b>{{ todayInnerCount || 0 }}</b></span>
-                        <span class="stat-item-inline">客诉: <b>{{ todayOuterCount || 0 }}</b></span>
-                      </div>
+                    <div class="card-right">
+                      <div class="card-title">今日投诉</div>
+                      <div class="card-value today-value">{{ todayCount }}</div>
+                      <div class="card-subtitle">内诉: {{ todayInnerCount || 0 }} | 客诉: {{ todayOuterCount || 0 }}</div>
                     </div>
                   </div>
 
                   <!-- 选定月份总投诉卡片 -->
-                  <div v-else-if="card.type === 'month'" :key="`month-${pageIndex}-${cardIndex}`" class="stat-card card-month">
-                    <div class="card-icon">
-                      <el-icon><DataAnalysis /></el-icon>
+                  <div v-else-if="card.type === 'month'" :key="`month-${pageIndex}-${cardIndex}`" class="summary-card month-card">
+                    <div class="card-left">
+                      <div class="card-icon total">
+                        <el-icon><DataAnalysis /></el-icon>
+                      </div>
                     </div>
-                    <div class="card-content">
-                      <div class="card-header">
-                        <div class="stat-title">{{ selectedMonthText }}总投诉</div>
-                        <div class="stat-value"><b>{{ monthCount }}</b></div>
-                      </div>
-                      <div class="card-divider"></div>
-                      <div class="card-stats">
-                        <span class="stat-item-inline">内诉: <b>{{ monthInnerCount || 0 }}</b></span>
-                        <span class="stat-item-inline">客诉: <b>{{ monthOuterCount || 0 }}</b></span>
-                      </div>
+                    <div class="card-right">
+                      <div class="card-title">{{ selectedMonthText }}总投诉</div>
+                      <div class="card-value total-value">{{ monthCount }}</div>
+                      <div class="card-subtitle">内诉: {{ monthInnerCount || 0 }} | 客诉: {{ monthOuterCount || 0 }}</div>
                     </div>
                   </div>
 
                   <!-- 一次交检合格率卡片 -->
-                  <div v-else-if="card.type === 'quality'" :key="`quality-${pageIndex}-${cardIndex}`" class="stat-card quality-rate-card special-layout">
-                    <div class="card-icon">
-                      <el-icon><CircleCheck /></el-icon>
-                    </div>
-                    <div class="card-content-vertical">
-                      <div class="card-title-row">一次交检合格率</div>
-                      <div class="card-percentage-row">{{ qualityStats.passRate }}%</div>
-                      <div class="card-detail-row">
-                        <span>交检: {{ qualityStats.totalInspections }}</span>
-                        <span>不合格: {{ qualityStats.failedInspections }}</span>
+                  <div v-else-if="card.type === 'quality'" :key="`quality-${pageIndex}-${cardIndex}`" class="summary-card quality-card">
+                    <div class="card-left">
+                      <div class="card-icon rate">
+                        <el-icon><CircleCheck /></el-icon>
                       </div>
+                    </div>
+                    <div class="card-right">
+                      <div class="card-title">一次交检合格率</div>
+                      <div class="card-value rate-value">{{ qualityStats.passRate }}%</div>
+                      <div class="card-subtitle">交检: {{ qualityStats.totalInspections }} | 不合格: {{ qualityStats.failedInspections }}</div>
                     </div>
                   </div>
 
                   <!-- 客诉率卡片 -->
-                  <div v-else-if="card.type === 'complaint'" :key="`complaint-${pageIndex}-${cardIndex}`" class="stat-card complaint-rate-card special-layout">
-                    <div class="card-icon">
-                      <el-icon><Warning /></el-icon>
-                    </div>
-                    <div class="card-content-vertical">
-                      <div class="card-title-row">客诉率</div>
-                      <div class="card-percentage-row">{{ qualityStats.complaintRate }}%</div>
-                      <div class="card-detail-row">
-                        <span>交付: {{ qualityStats.totalDeliveries }}</span>
-                        <span>客诉: {{ qualityStats.complaintBatches }}</span>
+                  <div v-else-if="card.type === 'complaint'" :key="`complaint-${pageIndex}-${cardIndex}`" class="summary-card complaint-card">
+                    <div class="card-left">
+                      <div class="card-icon customer-rate">
+                        <el-icon><Warning /></el-icon>
                       </div>
+                    </div>
+                    <div class="card-right">
+                      <div class="card-title">客诉率</div>
+                      <div class="card-value customer-rate-value">{{ qualityStats.complaintRate }}%</div>
+                      <div class="card-subtitle">交付: {{ qualityStats.totalDeliveries }} | 客诉: {{ qualityStats.complaintBatches }}</div>
                     </div>
                   </div>
 
@@ -240,30 +229,31 @@
                   <div
                     v-else-if="card.type === 'unit'"
                     :key="`unit-${pageIndex}-${cardIndex}`"
-                    :class="['stat-card', 'unit-card', getUnitCardClass(card.data.type, cardIndex)]"
+                    class="summary-card unit-card"
                   >
-                    <div class="card-icon">
-                      <el-icon>
-                        <OfficeBuilding v-if="card.data.type === 'department'" />
-                        <Tools v-else />
-                      </el-icon>
+                    <div class="card-left">
+                      <div class="card-icon" :class="card.data.type === 'workshop' ? 'inner' : 'outer'">
+                        <el-icon>
+                          <OfficeBuilding v-if="card.data.type === 'department'" />
+                          <Tools v-else />
+                        </el-icon>
+                      </div>
                     </div>
-                    <div class="card-content">
-                      <div class="unit-header">
-                        <div class="stat-title">{{ card.data.unit }}</div>
+                    <div class="card-right">
+                      <div class="card-title">
+                        {{ card.data.unit }}
                         <el-tag
-                          size="small"
                           :type="card.data.type === 'workshop' ? 'primary' : 'success'"
-                          class="unit-tag"
+                          size="small"
+                          style="margin-left: 8px;"
                         >
                           {{ card.data.type === 'workshop' ? '车间' : '部门' }}
                         </el-tag>
                       </div>
-                      <div class="card-divider"></div>
-                      <div class="unit-stats-horizontal">
-                        <span class="stat-item-inline">内诉: <b>{{ card.data.inner }}</b></span>
-                        <span class="stat-item-inline">客诉: <b>{{ card.data.outer }}</b></span>
+                      <div class="card-value" :class="card.data.type === 'workshop' ? 'inner-value' : 'outer-value'">
+                        {{ (card.data.inner || 0) + (card.data.outer || 0) }}
                       </div>
+                      <div class="card-subtitle">内诉: {{ card.data.inner || 0 }} | 客诉: {{ card.data.outer || 0 }}</div>
                     </div>
                   </div>
                 </template>
@@ -283,6 +273,9 @@
                 <div class="table-title">
                   <el-icon><Document /></el-icon>
                   <span>历史投诉记录</span>
+                  <el-tooltip content="双击表格行可快速查看详情" placement="top">
+                    <el-icon class="tip-icon"><QuestionFilled /></el-icon>
+                  </el-tooltip>
                 </div>
                 <div class="table-actions">
                   <el-input
@@ -297,12 +290,12 @@
                       <el-button :icon="Search" @click="handleSimpleSearch" />
                     </template>
                   </el-input>
-                  <el-button type="primary" @click="router.push('/add')" style="margin-left: 12px;">
-                    <el-icon><Plus /></el-icon>
+                  <el-button type="primary" @click="showComplaintDialog = true" style="margin-left: 12px;" class="add-complaint-btn">
+                    <el-icon style="margin-right: 6px;"><DocumentCopy /></el-icon>
                     新增投诉
                   </el-button>
-                  <el-button type="success" @click="showExportDialog = true" style="margin-left: 8px;">
-                    <el-icon><ArrowDown /></el-icon>
+                  <el-button type="success" @click="showExportDialog = true" style="margin-left: 8px;" class="export-btn">
+                    <el-icon style="margin-right: 6px;"><Download /></el-icon>
                     导出Excel
                   </el-button>
                 </div>
@@ -317,6 +310,7 @@
               empty-text="暂无投诉记录"
               border
               class="enhanced-table"
+              @row-dblclick="handleRowDoubleClick"
             >
               <el-table-column type="index" width="50" :index="(index) => (page - 1) * pageSize + index + 1" resizable>
                 <template #header>
@@ -334,7 +328,7 @@
                   </div>
                 </template>
                 <template #default="scope">
-                  <el-tag type="info" size="small">
+                  <el-tag type="info" >
                     {{ scope.row.Date ? (scope.row.Date.length > 10 ? scope.row.Date.slice(0, 10) : scope.row.Date) : '' }}
                   </el-tag>
                 </template>
@@ -358,7 +352,7 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="ProductName" width="140" show-overflow-tooltip resizable>
+              <el-table-column prop="ProductName" min-width="140" show-overflow-tooltip resizable>
                 <template #header>
                   <div class="table-header-cell">
                     <el-icon class="header-icon product-icon"><Box /></el-icon>
@@ -375,7 +369,7 @@
                   </div>
                 </template>
                 <template #default="scope">
-                  <el-tag size="small" :type="getWorkshopTagType(scope.row.Workshop)">
+                  <el-tag :type="getWorkshopTagType(scope.row.Workshop)">
                     {{ scope.row.Workshop }}
                   </el-tag>
                 </template>
@@ -389,13 +383,13 @@
                   </div>
                 </template>
                 <template #default="scope">
-                  <el-tag size="small" :type="scope.row.ComplaintCategory === '客诉' ? 'danger' : 'warning'">
+                  <el-tag :type="scope.row.ComplaintCategory === '客诉' ? 'danger' : 'warning'">
                     {{ scope.row.ComplaintCategory }}
                   </el-tag>
                 </template>
               </el-table-column>
 
-              <el-table-column prop="DefectiveCategory" width="120" show-overflow-tooltip resizable>
+              <el-table-column prop="DefectiveCategory" min-width="120" show-overflow-tooltip resizable>
                 <template #header>
                   <div class="table-header-cell">
                     <el-icon class="header-icon defect-icon"><CircleClose /></el-icon>
@@ -404,7 +398,7 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="DefectiveItem" width="120" show-overflow-tooltip resizable>
+              <el-table-column prop="DefectiveItem" min-width="120" show-overflow-tooltip resizable>
                 <template #header>
                   <div class="table-header-cell">
                     <el-icon class="header-icon item-icon"><InfoFilled /></el-icon>
@@ -413,7 +407,7 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="DefectiveDescription" width="150" show-overflow-tooltip resizable>
+              <el-table-column prop="DefectiveDescription" min-width="150" show-overflow-tooltip resizable>
                 <template #header>
                   <div class="table-header-cell">
                     <el-icon class="header-icon desc-icon"><ChatLineRound /></el-icon>
@@ -422,7 +416,7 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="MainDept" width="110" show-overflow-tooltip resizable>
+              <el-table-column prop="MainDept" min-width="110" show-overflow-tooltip resizable>
                 <template #header>
                   <div class="table-header-cell">
                     <el-icon class="header-icon dept-icon"><Coordinate /></el-icon>
@@ -431,7 +425,7 @@
                 </template>
               </el-table-column>
 
-              <el-table-column prop="MainPerson" width="100" show-overflow-tooltip resizable>
+              <el-table-column prop="MainPerson" min-width="100" show-overflow-tooltip resizable>
                 <template #header>
                   <div class="table-header-cell">
                     <el-icon class="header-icon person-icon"><Avatar /></el-icon>
@@ -449,9 +443,9 @@
                 </template>
                 <template #default="scope">
                   <div class="action-buttons">
-                    <el-button text :icon="View" size="small" @click="viewDetail(scope.row)" title="查看详情" class="action-btn" />
-                    <el-button text :icon="Edit" size="small" @click="editRecord(scope.row)" title="修改记录" class="action-btn" />
-                    <el-button text :icon="Delete" size="small" @click="deleteRecord(scope.row)" title="删除记录" class="action-btn danger-btn" />
+                    <el-button text :icon="View" @click="viewDetail(scope.row)" title="查看详情" class="action-btn" />
+                    <el-button text :icon="Edit" @click="editRecord(scope.row)" title="修改记录" class="action-btn" />
+                    <el-button text :icon="Delete" @click="deleteRecord(scope.row)" title="删除记录" class="action-btn danger-btn" />
                   </div>
                 </template>
               </el-table-column>
@@ -487,7 +481,7 @@
               </div>
             </template>
 
-            <el-form :model="advancedQuery" label-width="70px" size="small" class="advanced-form">
+            <el-form :model="advancedQuery" label-width="70px"  class="advanced-form">
               <!-- 客户查询 -->
               <el-form-item label="客户">
                 <el-input
@@ -651,8 +645,7 @@
                   end-placeholder="结束日期"
                   format="YYYY-MM-DD"
                   value-format="YYYY-MM-DD"
-                  style="width: 100%"
-                  size="small"
+                  style="width: 100%"                 
                 />
               </el-form-item>
 
@@ -665,8 +658,7 @@
                     :max="100"
                     :precision="2"
                     placeholder="最小值"
-                    style="width: 70px"
-                    size="small"
+                    style="width: 70px"                    
                   />
                   <span style="margin: 0 8px; color: #909399;">-</span>
                   <el-input-number
@@ -675,8 +667,7 @@
                     :max="100"
                     :precision="2"
                     placeholder="最大值"
-                    style="width: 70px"
-                    size="small"
+                    style="width: 70px"                    
                   />
                   <span style="margin-left: 4px; color: #909399; font-size: 12px;">%</span>
                 </div>
@@ -714,16 +705,14 @@
               <el-form-item>
                 <div class="query-actions">
                   <el-button
-                    type="primary"
-                    size="small"
+                    type="primary"                    
                     @click="handleAdvancedQuery"
                     :loading="tableLoading"
                   >
                     <el-icon><Search /></el-icon>
                     查询
                   </el-button>
-                  <el-button
-                    size="small"
+                  <el-button                    
                     @click="resetAdvancedQuery"
                   >
                     <el-icon><RefreshLeft /></el-icon>
@@ -741,7 +730,7 @@
     <el-dialog
       v-model="showDetailDialog"
       :title="isEditing ? '编辑投诉记录' : '投诉记录详情'"
-      width="90%"
+      width="60%" 
       :close-on-click-modal="false"
       :modal="true"
       :append-to-body="true"
@@ -793,7 +782,7 @@
             <div class="attachment-info">
               <el-icon class="file-icon"><Document /></el-icon>
               <span class="file-name">{{ detailData.AttachmentFile }}</span>
-              <el-button type="primary" size="small" link>
+              <el-button type="primary"  link>
                 <el-icon><Download /></el-icon>
                 下载
               </el-button>
@@ -815,8 +804,7 @@
     <!-- 编辑记录对话框 -->
     <el-dialog
       v-model="showEditDialog"
-      title="编辑投诉记录"
-      width="90%"
+      width="60%"
       :close-on-click-modal="false"
       :modal="true"
       :append-to-body="true"
@@ -824,17 +812,22 @@
       destroy-on-close
       class="edit-dialog"
       center
-      top="10vh"
-      :style="{ height: '80vh' }"
+      top="5vh"
     >
+      <template #header>
+        <div class="edit-dialog-header">
+          <el-icon class="header-icon"><Edit /></el-icon>
+          <span class="header-title">编辑投诉记录</span>
+        </div>
+      </template>
       <div class="edit-content" v-loading="editFormLoading" element-loading-text="保存中...">
         <el-form
           :model="editFormData"
           :rules="editRules"
           ref="editFormRef"
-          label-width="80px"
+          label-width="120px"
           class="edit-form"
-          size="small"
+          size="default"
         >
           <!-- 动态显示所有字段分组 -->
           <div v-for="section in editSections" :key="section.title" class="edit-section">
@@ -854,7 +847,70 @@
                 </div>
               </template>
               <div class="section-content">
-                <el-row :gutter="16">
+                <!-- 如果是tab布局 -->
+                <el-tabs v-if="section.isTabbed" v-model="activeTab[section.title]" type="border-card" class="material-tabs">
+                  <el-tab-pane v-for="tab in section.tabs" :key="tab.name" :label="tab.label" :name="tab.name">
+                    <el-row :gutter="16">
+                      <el-col
+                        v-for="field in getTabFields(tab.fields)"
+                        :key="field.key"
+                        :span="getFieldSpan(field)"
+                      >
+                        <el-form-item
+                          :label="field.label"
+                          :prop="field.key"
+                          :label-width="getFieldLabelWidth(field)"
+                        >
+                          <!-- 日期字段 -->
+                          <el-date-picker
+                            v-if="field.type === 'date'"
+                            v-model="editFormData[field.key]"
+                            type="date"
+                            style="width: 100%"
+                            format="YYYY-MM-DD"
+                            value-format="YYYY-MM-DD"
+                          />
+                          <!-- 数字字段 -->
+                          <el-input-number
+                            v-else-if="field.type === 'number' || field.type === 'decimal'"
+                            v-model="editFormData[field.key]"
+                            :precision="field.type === 'decimal' ? 2 : 0"
+                            :min="0"
+                            style="width: 100%"
+                          />
+                          <!-- 材料名称下拉框 -->
+                          <el-select
+                            v-else-if="['Paper', 'MaterialA', 'MaterialB', 'MaterialC'].includes(field.key)"
+                            v-model="editFormData[field.key]"
+                            filterable
+                            allow-create
+                            :placeholder="`请选择或输入${field.label}`"
+                            style="width: 100%"
+                            @change="handleEditMaterialChange(field.key, $event)"
+                            :loading="editMaterialLoading"
+                          >
+                            <el-option
+                              v-for="material in editMaterialNames"
+                              :key="material"
+                              :label="material"
+                              :value="material"
+                            />
+                          </el-select>
+                          <!-- 文本字段 -->
+                          <el-input
+                            v-else
+                            v-model="editFormData[field.key]"
+                            :type="field.type === 'textarea' ? 'textarea' : 'text'"
+                            :rows="field.type === 'textarea' ? 3 : undefined"
+                            style="width: 100%"
+                          />
+                        </el-form-item>
+                      </el-col>
+                    </el-row>
+                  </el-tab-pane>
+                </el-tabs>
+                <!-- 普通布局 -->
+                <el-row v-else :gutter="16">
                   <el-col
                     v-for="field in section.fields"
                     :key="field.key"
@@ -873,7 +929,6 @@
                         style="width: 100%"
                         format="YYYY-MM-DD"
                         value-format="YYYY-MM-DD"
-                        size="small"
                       />
                       <!-- 数字字段 -->
                       <el-input-number
@@ -882,21 +937,173 @@
                         :precision="field.type === 'decimal' ? 2 : 0"
                         :min="0"
                         style="width: 100%"
-                        size="small"
                       />
                       <!-- 布尔值字段 -->
                       <el-switch
                         v-else-if="field.key === 'ReturnGoods' || field.key === 'IsReprint'"
                         v-model="editFormData[field.key]"
-                        size="small"
                       />
+                      <!-- 发生车间下拉框 -->
+                      <el-select
+                        v-else-if="field.key === 'Workshop'"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        placeholder="请选择发生车间"
+                        style="width: 100%"
+                      >
+                        <el-option v-for="item in editOptions.workshops" :key="item" :label="item" :value="item" />
+                      </el-select>
+                      <!-- 投诉类别下拉框 -->
+                      <el-select
+                        v-else-if="field.key === 'ComplaintCategory'"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        placeholder="请选择投诉类别"
+                        style="width: 100%"
+                      >
+                        <el-option v-for="item in editOptions.complaintCategories" :key="item" :label="item" :value="item" />
+                      </el-select>
+                      <!-- 客诉类型下拉框 -->
+                      <el-select
+                        v-else-if="field.key === 'CustomerComplaintType'"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        placeholder="请选择客诉类型"
+                        :disabled="editFormData.ComplaintCategory !== '客诉'"                        
+                        style="width: 100%"
+                      >
+                        <el-option v-for="item in editOptions.customerComplaintTypes" :key="item" :label="item" :value="item" />
+                      </el-select>
+                      <!-- 不良类别下拉框 -->
+                      <el-select
+                        v-else-if="field.key === 'DefectiveCategory'"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        placeholder="请选择不良类别"
+                        @change="handleEditCategoryChange"
+                        value-key="ID"                        
+                        style="width: 100%"
+                      >
+                        <el-option
+                          v-for="item in editOptions.defectiveCategories"
+                          :key="item.ID"
+                          :label="item.Name"
+                          :value="item"
+                        />
+                      </el-select>
+                      <!-- 不良项下拉框 -->
+                      <el-select
+                        v-else-if="field.key === 'DefectiveItem'"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        placeholder="请选择不良项"                        
+                        style="width: 100%"
+                      >
+                        <el-option v-for="item in editOptions.defectiveItems" :key="item" :label="item" :value="item" />
+                      </el-select>
+                      <!-- 主责部门下拉框 -->
+                      <el-select
+                        v-else-if="field.key === 'MainDept'"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        placeholder="请选择主责部门"                       
+                        style="width: 100%"
+                      >
+                        <el-option v-for="item in editOptions.departments" :key="item" :label="item" :value="item" />
+                      </el-select>
+                      <!-- 主责人下拉框 -->
+                      <el-select
+                        v-else-if="field.key === 'MainPerson'"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        placeholder="请选择主责人"                        
+                        style="width: 100%"
+                      >
+                        <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
+                      </el-select>
+                      <!-- 次责人下拉框 -->
+                      <el-select
+                        v-else-if="field.key === 'SecondPerson'"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        placeholder="请选择次责人"                        
+                        style="width: 100%"
+                      >
+                        <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
+                      </el-select>
+                      <!-- 责任主管下拉框 -->
+                      <el-select
+                        v-else-if="field.key === 'Manager'"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        placeholder="请选择责任主管"
+                        style="width: 100%"
+                      >
+                        <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
+                      </el-select>
+                      <!-- 材料名称下拉框 -->
+                      <el-select
+                        v-else-if="['Paper', 'MaterialA', 'MaterialB', 'MaterialC'].includes(field.key)"
+                        v-model="editFormData[field.key]"
+                        filterable
+                        allow-create
+                        :placeholder="`请选择或输入${field.label}`"
+                        style="width: 100%"
+                        @change="handleEditMaterialChange(field.key, $event)"
+                        :loading="editMaterialLoading"
+                      >
+                        <el-option
+                          v-for="material in editMaterialNames"
+                          :key="material"
+                          :label="material"
+                          :value="material"
+                        />
+                      </el-select>
+                      <!-- 附件文件字段 - 特殊处理 -->
+                      <div v-else-if="field.key === 'AttachmentFile'" class="attachment-field">
+                        <el-input
+                          v-model="editFormData[field.key]"
+                          placeholder="请选择附件文件"
+                          readonly
+                          class="attachment-input"
+                        />
+                        <el-button type="primary" @click="selectFile" class="select-file-btn">
+                          <el-icon><Document /></el-icon>
+                          选择文件
+                        </el-button>
+                        <div
+                          class="file-drop-zone"
+                          @drop="handleFileDrop"
+                          @dragover.prevent
+                          @dragenter.prevent
+                          title="或拖拽文件到此处"
+                        >
+                          <el-icon><Upload /></el-icon>
+                        </div>
+                        <!-- 图片预览区域 -->
+                        <div class="image-preview-area">
+                          <div v-if="editFormData[field.key] && isImageFile(editFormData[field.key])" class="image-preview" @dblclick="showImagePreview">
+                            <img
+                              :src="getImagePreviewUrl(editFormData[field.key])"
+                              alt="预览图"
+                              @error="handleImageError"
+                              @load="handleImageLoad"
+                            />
+                          </div>
+                          <div v-else class="image-placeholder">
+                            <div class="placeholder-content">
+                              <el-icon class="placeholder-icon"><Picture /></el-icon>
+                              <span class="placeholder-text">暂无图片</span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
                       <!-- 文本字段 -->
                       <el-input
                         v-else
                         v-model="editFormData[field.key]"
                         :type="isFullWidthField(field) ? 'textarea' : 'text'"
                         :rows="isFullWidthField(field) ? 2 : undefined"
-                        size="small"
                       />
                     </el-form-item>
                   </el-col>
@@ -908,17 +1115,33 @@
       </div>
 
       <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="cancelEdit">
-            <el-icon><Close /></el-icon>
+        <div class="edit-dialog-footer">
+          <el-button size="default" @click="cancelEdit" class="cancel-btn">
+            <el-icon style="margin-right: 6px;"><Close /></el-icon>
             取消
           </el-button>
-          <el-button type="primary" @click="saveEdit" :loading="editFormLoading">
-            <el-icon><Check /></el-icon>
-            保存
+          <el-button type="success" size="default" @click="saveEdit" :loading="editFormLoading" class="save-btn">
+            <el-icon style="margin-right: 6px;"><Check /></el-icon>
+            {{ editFormLoading ? '保存中...' : '保存' }}
           </el-button>
         </div>
       </template>
+    </el-dialog>
+
+    <!-- 图片预览对话框 -->
+    <el-dialog
+      v-model="showImageDialog"
+      title="图片预览"
+      width="80%"
+      :close-on-click-modal="true"
+      :modal="true"
+      :append-to-body="true"
+      class="image-preview-dialog"
+      center
+    >
+      <div class="image-preview-container">
+        <img :src="previewImageUrl" alt="预览图片" class="preview-image" />
+      </div>
     </el-dialog>
 
     <!-- Excel导出字段选择对话框 -->
@@ -933,24 +1156,21 @@
     >
       <div class="export-field-selection">
         <div class="field-selection-header">
-          <el-button
-            size="small"
+          <el-button            
             @click="selectAllFields"
             :type="activeSelectionButton === 'all' ? 'primary' : ''"
             :class="{ 'active-selection-btn': activeSelectionButton === 'all' }"
           >
             全选
           </el-button>
-          <el-button
-            size="small"
+          <el-button            
             @click="selectNoneFields"
             :type="activeSelectionButton === 'none' ? 'primary' : ''"
             :class="{ 'active-selection-btn': activeSelectionButton === 'none' }"
           >
             全不选
           </el-button>
-          <el-button
-            size="small"
+          <el-button            
             @click="selectDefaultFields"
             :type="activeSelectionButton === 'default' ? 'primary' : ''"
             :class="{ 'active-selection-btn': activeSelectionButton === 'default' }"
@@ -1004,18 +1224,42 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 新增投诉对话框 -->
+    <el-dialog
+      v-model="showComplaintDialog"
+      width="70%"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      class="complaint-dialog"
+      :destroy-on-close="true"
+      :append-to-body="true"
+      :lock-scroll="false"
+      :modal="true"
+      center
+      top="3vh"
+    >
+      <template #header>
+        <div class="dialog-header-with-icon">
+          <el-icon class="dialog-icon"><DocumentCopy /></el-icon>
+          <span class="dialog-title">新增投诉记录</span>
+        </div>
+      </template>
+      <ComplaintFormDialog @success="handleComplaintSuccess" @cancel="showComplaintDialog = false" />
+    </el-dialog>
   </AppLayout>
 </template>
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
-import { Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning, DocumentCopy, Box, CircleClose, ChatLineRound, Coordinate, Avatar, Setting } from '@element-plus/icons-vue'
+import { Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning, DocumentCopy, Box, CircleClose, ChatLineRound, Coordinate, Avatar, Setting, Picture, Upload, Money } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
 import QualityMetricsChart from '@/components/QualityMetricsChart.vue'
 import ComplaintAnalysisChart from '@/components/ComplaintAnalysisChart.vue'
 import AppLayout from '@/components/common/AppLayout.vue'
+import ComplaintFormDialog from '../components/ComplaintFormDialog.vue'
 import * as echarts from 'echarts'
 import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
@@ -1048,9 +1292,22 @@ const detailSections = ref([])
 // 编辑弹窗相关
 const showEditDialog = ref(false)
 const editFormData = ref({})
+const originalFormData = ref({}) // 保存原始数据用于比较
 const editFormLoading = ref(false)
 const editFormRef = ref(null)
 const editSections = ref([])
+const activeTab = ref({})
+
+// 编辑表单下拉选项数据
+const editOptions = reactive({
+  workshops: [],
+  departments: [],
+  persons: [],
+  complaintCategories: [],
+  customerComplaintTypes: [],
+  defectiveCategories: [],
+  defectiveItems: []
+})
 
 // 编辑表单验证规则（取消主责部门和主责人的必填校验）
 const editRules = {
@@ -1093,6 +1350,16 @@ const customerComplaintTypeOptions = ref([])
 const defectiveCategoryOptions = ref([])
 const departmentOptions = ref([])
 const personOptions = ref([])
+
+/**
+ * 编辑表单材料相关数据
+ */
+// 编辑表单材料名称列表
+const editMaterialNames = ref([])
+// 编辑表单材料数据加载状态
+const editMaterialLoading = ref(false)
+// 编辑表单单价获取缓存
+const editPriceCache = reactive({})
 
 // 是否使用高级查询
 const isAdvancedQuery = ref(false)
@@ -1144,6 +1411,9 @@ const shouldShowTodayCard = computed(() => {
 const exportLoading = ref(false)
 const showExportDialog = ref(false)
 const activeSelectionButton = ref('')
+
+// 投诉表单对话框
+const showComplaintDialog = ref(false)
 
 // 可导出的字段定义（动态从后端获取）
 const exportFields = ref([])
@@ -1807,6 +2077,15 @@ const handleAdvancedQuery = () => {
   fetchTableData()
 }
 
+// 处理投诉表单成功提交
+const handleComplaintSuccess = () => {
+  showComplaintDialog.value = false
+  ElMessage.success('投诉记录添加成功')
+  // 刷新表格数据和统计数据
+  fetchTableData()
+  fetchStats()
+}
+
 // 重置高级查询
 const resetAdvancedQuery = () => {
   advancedQuery.value = {
@@ -1913,11 +2192,398 @@ const viewDetail = async (row) => {
   }
 }
 
+// 表格行双击事件处理
+const handleRowDoubleClick = (row) => {
+  console.log('表格行双击事件:', row)
+  // 调用查看详情函数，实现与"查看详情"按钮相同的效果
+  viewDetail(row)
+}
+
+// 获取编辑表单下拉选项数据
+/**
+ * 获取编辑表单下拉选项数据
+ */
+const fetchEditOptions = async () => {
+  try {
+    const token = localStorage.getItem('token')
+
+    // 并行获取表单选项和材料名称
+    const [optionsResponse] = await Promise.all([
+      axios.get('/api/complaint/options', {
+        headers: { Authorization: `Bearer ${token}` }
+      }),
+      fetchEditMaterialNames()
+    ])
+
+    console.log('编辑表单API响应:', optionsResponse.data)
+
+    // 参考新增投诉的实现，直接访问response.data而不是response.data.data
+    const data = optionsResponse.data
+    editOptions.workshops = data.workshops?.map(item => item.Name) || []
+    editOptions.departments = data.departments?.map(item => item.Name) || []
+    editOptions.persons = data.persons?.map(item => item.Name) || []
+    editOptions.complaintCategories = data.complaintCategories?.map(item => item.Name) || []
+    editOptions.customerComplaintTypes = data.customerComplaintTypes?.map(item => item.Name) || []
+    // 不良类别需要保持对象格式，因为需要ID来获取不良项
+    editOptions.defectiveCategories = data.defectiveCategories || []
+    editOptions.defectiveItems = [] // 初始为空，根据不良类别动态加载
+
+    console.log('获取编辑表单下拉选项成功:', {
+      workshops: editOptions.workshops.length,
+      departments: editOptions.departments.length,
+      persons: editOptions.persons.length,
+      complaintCategories: editOptions.complaintCategories.length,
+      customerComplaintTypes: editOptions.customerComplaintTypes.length,
+      defectiveCategories: editOptions.defectiveCategories.length,
+      materialNames: editMaterialNames.value.length
+    })
+    console.log('详细选项数据:', editOptions)
+  } catch (error) {
+    console.error('获取编辑表单下拉选项失败:', error)
+    ElMessage.error('获取下拉选项失败: ' + (error.response?.data?.message || error.message))
+  }
+}
+
+/**
+ * 获取编辑表单材料名称列表
+ */
+const fetchEditMaterialNames = async () => {
+  try {
+    editMaterialLoading.value = true;
+    const token = localStorage.getItem('token');
+    const res = await axios.get('/api/admin/material-prices/material-names', {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (res.data.success) {
+      editMaterialNames.value = res.data.data || [];
+      console.log('获取编辑表单材料名称列表成功:', editMaterialNames.value);
+    } else {
+      console.warn('获取编辑表单材料名称列表失败:', res.data.message);
+    }
+  } catch (error) {
+    console.error('获取编辑表单材料名称列表失败:', error);
+    // 不显示错误消息，因为这不是关键功能
+  } finally {
+    editMaterialLoading.value = false;
+  }
+}
+
+/**
+ * 处理编辑表单材料选择变更事件
+ *
+ * @param {string} materialType - 材料类型（Paper, MaterialA, MaterialB, MaterialC）
+ * @param {string} materialName - 选择的材料名称
+ */
+const handleEditMaterialChange = async (materialType, materialName) => {
+  if (!materialName) {
+    return;
+  }
+
+  // 检查缓存
+  const cacheKey = materialName;
+  if (editPriceCache[cacheKey]) {
+    setEditMaterialPrice(materialType, editPriceCache[cacheKey]);
+    // 如果是纸张，触发人工成本计算
+    if (materialType === 'Paper') {
+      calculateEditLaborCost();
+    }
+    return;
+  }
+
+  try {
+    const token = localStorage.getItem('token');
+    const res = await axios.get('/api/admin/material-prices/get-price', {
+      params: { materialName },
+      headers: { Authorization: `Bearer ${token}` }
+    });
+
+    if (res.data.success) {
+      const priceData = res.data.data;
+
+      // 如果返回的是数组（多个供应商），取第一个
+      const price = Array.isArray(priceData) ? priceData[0] : priceData;
+
+      if (price && price.unitPrice !== null && price.unitPrice !== undefined) {
+        // 缓存价格信息
+        editPriceCache[cacheKey] = price;
+
+        // 设置单价
+        setEditMaterialPrice(materialType, price);
+
+        // 如果是纸张，触发人工成本计算
+        if (materialType === 'Paper') {
+          calculateEditLaborCost();
+        }
+
+        // 显示成功消息
+        ElMessage.success(`已自动填入${materialName}的单价：￥${price.unitPrice}`);
+      } else {
+        console.log(`材料"${materialName}"没有设置单价`);
+      }
+    } else {
+      console.log(`未找到材料"${materialName}"的价格信息:`, res.data.message);
+    }
+  } catch (error) {
+    console.error('获取材料单价失败:', error);
+    // 不显示错误消息，让用户可以手动输入单价
+  }
+}
+
+/**
+ * 设置编辑表单材料单价
+ *
+ * @param {string} materialType - 材料类型
+ * @param {object} priceInfo - 价格信息对象
+ */
+const setEditMaterialPrice = (materialType, priceInfo) => {
+  const priceFieldMap = {
+    'Paper': 'PaperUnitPrice',
+    'MaterialA': 'MaterialAUnitPrice',
+    'MaterialB': 'MaterialBUnitPrice',
+    'MaterialC': 'MaterialCUnitPrice'
+  };
+
+  const priceField = priceFieldMap[materialType];
+  if (priceField && priceInfo.unitPrice !== null && editFormData.value) {
+    editFormData.value[priceField] = priceInfo.unitPrice;
+    // 单价变化后，触发总成本计算
+    calculateEditTotalCost();
+  }
+}
+
+/**
+ * 计算编辑表单的人工成本
+ * 根据纸张数量和车间类型自动计算人工成本
+ *
+ * 计算规则：
+ * - 柔印机：70元/千米
+ * - 轮转机：45元/千米
+ * - 其他机台：35元/千米
+ *
+ * 分段计算：
+ * - ≤1000米：基础单价 × 1
+ * - ≤2000米：基础单价 × 2
+ * - ≤3000米：基础单价 × 3
+ * - >3000米：向上取整(长度/1000) × 基础单价
+ */
+const calculateEditLaborCost = () => {
+  if (!editFormData.value) {
+    return;
+  }
+
+  const paperQty = editFormData.value.PaperQty; // 纸张数量（长度）
+  const workshop = editFormData.value.Workshop; // 发生车间
+
+  // 如果纸张数量或车间为空，清空人工成本
+  if (!paperQty || !workshop) {
+    editFormData.value.LaborCost = 0;
+    calculateEditTotalCost(); // 触发总成本重新计算
+    return;
+  }
+
+  // 确保纸张数量是数字
+  const length = Number(paperQty);
+  if (isNaN(length) || length <= 0) {
+    editFormData.value.LaborCost = 0;
+    calculateEditTotalCost(); // 触发总成本重新计算
+    return;
+  }
+
+  // 根据车间类型确定基础单价（元/千米）
+  let basePrice = 35; // 默认其他机台
+  if (workshop.includes('柔印机')) {
+    basePrice = 70;
+  } else if (workshop.includes('轮转机')) {
+    basePrice = 45;
+  }
+
+  // 根据长度分段计算
+  let laborCost = 0;
+  if (length <= 1000) {
+    laborCost = basePrice;
+  } else if (length <= 2000) {
+    laborCost = basePrice * 2;
+  } else if (length <= 3000) {
+    laborCost = basePrice * 3;
+  } else {
+    // 超过3000米，按千米向上取整计算
+    const segments = Math.ceil(length / 1000);
+    laborCost = basePrice * segments;
+  }
+
+  // 设置计算结果
+  editFormData.value.LaborCost = laborCost;
+
+  console.log(`编辑表单人工成本计算: 纸张数量=${length}米, 车间=${workshop}, 基础单价=${basePrice}元/千米, 计算结果=${laborCost}元`);
+
+  // 人工成本变化后，触发总成本计算
+  calculateEditTotalCost();
+}
+
+/**
+ * 计算编辑表单的总成本
+ * 根据各材料成本和人工成本自动计算总成本
+ *
+ * 计算公式：
+ * 纸张成本 = (纸张规格/1000) × 纸张数量 × 纸张单价
+ * 材料A成本 = (材料A规格/1000) × 材料A数量 × 材料A单价
+ * 材料B成本 = (材料B规格/1000) × 材料B数量 × 材料B单价
+ * 材料C成本 = (材料C规格/1000) × 材料C数量 × 材料C单价
+ * 总成本 = 纸张成本 + 材料A成本 + 材料B成本 + 材料C成本 + 人工费用
+ */
+const calculateEditTotalCost = () => {
+  if (!editFormData.value) {
+    return;
+  }
+
+  // 获取表单数据
+  const formData = editFormData.value;
+
+  // 计算纸张成本：(纸张规格/1000) × 纸张数量 × 纸张单价
+  const paperCost = calculateEditMaterialCost(
+    formData.PaperSpecification,
+    formData.PaperQty,
+    formData.PaperUnitPrice
+  );
+
+  // 计算材料A成本：(材料A规格/1000) × 材料A数量 × 材料A单价
+  const materialACost = calculateEditMaterialCost(
+    formData.MaterialASpec,
+    formData.MaterialAQty,
+    formData.MaterialAUnitPrice
+  );
+
+  // 计算材料B成本：(材料B规格/1000) × 材料B数量 × 材料B单价
+  const materialBCost = calculateEditMaterialCost(
+    formData.MaterialBSpec,
+    formData.MaterialBQty,
+    formData.MaterialBUnitPrice
+  );
+
+  // 计算材料C成本：(材料C规格/1000) × 材料C数量 × 材料C单价
+  const materialCCost = calculateEditMaterialCost(
+    formData.MaterialCSpec,
+    formData.MaterialCQty,
+    formData.MaterialCUnitPrice
+  );
+
+  // 获取人工费用
+  const laborCost = Number(formData.LaborCost) || 0;
+
+  // 计算总成本
+  const totalCost = paperCost + materialACost + materialBCost + materialCCost + laborCost;
+
+  // 四舍五入到2位小数，如果为0则保持0
+  editFormData.value.TotalCost = totalCost === 0 ? 0 : Math.round(totalCost * 100) / 100;
+
+  console.log(`编辑表单总成本计算: 纸张=${paperCost}, 材料A=${materialACost}, 材料B=${materialBCost}, 材料C=${materialCCost}, 人工=${laborCost}, 总计=${editFormData.value.TotalCost}元`);
+
+  // 总成本变化后，触发主责人考核计算
+  calculateEditMainPersonAssessment();
+}
+
+/**
+ * 计算编辑表单的主责人考核金额
+ * 根据总成本自动计算主责人考核金额
+ *
+ * 计算规则：
+ * 1. 如果总成本 > 0，则主责人考核金额 = 总成本 × 50%
+ * 2. 如果主责人考核金额不足20元，则计为20元
+ */
+const calculateEditMainPersonAssessment = () => {
+  if (!editFormData.value) {
+    return;
+  }
+
+  const totalCost = Number(editFormData.value.TotalCost) || 0;
+
+  // 如果总成本为0或负数，主责人考核金额为0
+  if (totalCost <= 0) {
+    editFormData.value.MainPersonAssessment = 0;
+    console.log(`编辑表单主责人考核计算: 总成本=${totalCost}元, 考核金额=0元 (总成本≤0)`);
+    return;
+  }
+
+  // 计算主责人考核金额：总成本 × 50%
+  let assessmentAmount = totalCost * 0.5;
+
+  // 如果考核金额不足20元，则计为20元
+  if (assessmentAmount < 20) {
+    assessmentAmount = 20;
+  }
+
+  // 四舍五入到2位小数
+  editFormData.value.MainPersonAssessment = Math.round(assessmentAmount * 100) / 100;
+
+  console.log(`编辑表单主责人考核计算: 总成本=${totalCost}元, 考核金额=${editFormData.value.MainPersonAssessment}元 (${totalCost}×50%=${totalCost * 0.5}, 最低20元)`);
+}
+
+/**
+ * 计算编辑表单单个材料的成本
+ *
+ * @param {number} spec - 材料规格
+ * @param {number} qty - 材料数量
+ * @param {number} unitPrice - 材料单价
+ * @returns {number} 材料成本
+ */
+const calculateEditMaterialCost = (spec, qty, unitPrice) => {
+  // 转换为数字，如果无效则返回0
+  const specification = Number(spec) || 0;
+  const quantity = Number(qty) || 0;
+  const price = Number(unitPrice) || 0;
+
+  // 如果任何一个值为0或无效，返回0
+  if (specification === 0 || quantity === 0 || price === 0) {
+    return 0;
+  }
+
+  // 计算成本：(规格/1000) × 数量 × 单价
+  const cost = (specification / 1000) * quantity * price;
+
+  // 返回结果，如果计算出错则返回0
+  return isNaN(cost) ? 0 : cost;
+}
+
+// 处理不良类别变化（编辑表单）
+const handleEditCategoryChange = async (categoryObj) => {
+  console.log('编辑表单不良类别变化:', categoryObj)
+
+  // 清空不良项选择
+  if (editFormData.value) {
+    editFormData.value.DefectiveItem = ''
+  }
+  editOptions.defectiveItems = []
+
+  if (!categoryObj || !categoryObj.ID) {
+    return
+  }
+
+  try {
+    const token = localStorage.getItem('token')
+    console.log('请求不良项 - CategoryID:', categoryObj.ID)
+    const response = await axios.get(`/api/complaint/defective-items/${categoryObj.ID}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    // 参考新增投诉的实现，后端直接返回字符串数组
+    editOptions.defectiveItems = response.data || []
+    console.log('获取不良项成功:', editOptions.defectiveItems)
+  } catch (error) {
+    console.error('获取不良项失败:', error)
+    editOptions.defectiveItems = []
+    ElMessage.error('获取不良项失败: ' + (error.response?.data?.message || error.message))
+  }
+}
+
 // 编辑记录
 const editRecord = async (row) => {
   try {
     editFormLoading.value = true
     const token = localStorage.getItem('token')
+
+    // 先获取下拉选项数据
+    await fetchEditOptions()
 
     // 获取记录详情
     const response = await axios.get(`/api/complaint/detail/${row.ID}`, {
@@ -1928,7 +2594,7 @@ const editRecord = async (row) => {
       const data = response.data.data
 
       // 初始化编辑表单数据
-      editFormData.value = {
+      const formData = {
         ID: data.ID,
         Date: data.Date ? data.Date.split('T')[0] : '',
         Customer: data.Customer || '',
@@ -1978,6 +2644,22 @@ const editRecord = async (row) => {
         AssessmentDescription: data.AssessmentDescription || ''
       }
 
+      editFormData.value = formData
+
+      // 如果有不良类别，需要找到对应的不良类别对象并加载不良项
+      if (data.DefectiveCategory) {
+        // 从下拉选项中找到匹配的不良类别对象
+        const categoryObj = editOptions.defectiveCategories.find(cat =>
+          cat.Name === data.DefectiveCategory || cat.ID === data.DefectiveCategory
+        )
+        if (categoryObj) {
+          // 更新表单数据为对象格式
+          editFormData.value.DefectiveCategory = categoryObj
+          // 加载对应的不良项
+          await handleEditCategoryChange(categoryObj)
+        }
+      }
+
       // 确保字段信息已加载，如果没有则先加载
       if (exportFields.value.length === 0) {
         await fetchExportFields()
@@ -1986,7 +2668,17 @@ const editRecord = async (row) => {
       // 组织编辑字段显示
       editSections.value = organizeEditFields()
 
+      // 初始化tab状态
+      activeTab.value = {
+        '材料明细': 'paper'
+      }
+
       showEditDialog.value = true
+
+      // 等待DOM更新完成后再保存原始数据
+      await nextTick()
+      // 深拷贝保存原始数据，确保所有数据处理完成后再备份
+      originalFormData.value = JSON.parse(JSON.stringify(editFormData.value))
     } else {
       ElMessage.error(response.data.message || '获取记录详情失败')
     }
@@ -2001,6 +2693,29 @@ const editRecord = async (row) => {
 // 保存编辑
 const saveEdit = async () => {
   try {
+    // 检查数据是否有变更
+    if (!hasDataChanged()) {
+      ElMessage.primary('数据未发生变更，无需保存')
+      return
+    }
+
+    // 确认保存
+    try {
+      await ElMessageBox.confirm(
+        '确定要保存当前修改吗？',
+        '确认保存',
+        {
+          confirmButtonText: '确定保存',
+          cancelButtonText: '取消',
+          type: 'warning',
+          customClass: 'save-confirm-dialog'
+        }
+      )
+    } catch {
+      // 用户取消保存
+      return
+    }
+
     // 表单验证
     if (!editFormRef.value) {
       ElMessage.error('表单引用未找到')
@@ -2036,6 +2751,11 @@ const saveEdit = async () => {
     // 转换布尔值为数据库bit类型（true/false）
     submitData.ReturnGoods = Boolean(submitData.ReturnGoods)
     submitData.IsReprint = Boolean(submitData.IsReprint)
+
+    // 处理不良类别格式：如果是对象，转换为字符串
+    if (submitData.DefectiveCategory && typeof submitData.DefectiveCategory === 'object') {
+      submitData.DefectiveCategory = submitData.DefectiveCategory.Name || submitData.DefectiveCategory
+    }
 
     // 确保数字字段不为空
     const numberFields = ['ProductionQty', 'DefectiveQty', 'DefectiveRate', 'ReprintQty',
@@ -2126,10 +2846,287 @@ const saveEdit = async () => {
   }
 }
 
+// 检查数据是否有变更
+const hasDataChanged = () => {
+  // 如果原始数据为空或者没有ID，说明还没有正确初始化，不应该判断为有变更
+  if (!originalFormData.value || !originalFormData.value.ID || !editFormData.value || !editFormData.value.ID) {
+    console.log('数据未初始化，无变更')
+    return false
+  }
+
+  // 比较所有字段
+  const originalKeys = Object.keys(originalFormData.value)
+  const currentKeys = Object.keys(editFormData.value)
+
+  // 检查字段数量是否相同
+  if (originalKeys.length !== currentKeys.length) {
+    console.log('字段数量不同，有变更')
+    return true
+  }
+
+  // 逐个比较字段值
+  for (const key of originalKeys) {
+    const originalValue = originalFormData.value[key]
+    const currentValue = editFormData.value[key]
+
+    // 特殊处理对象类型（如不良类别）
+    if (typeof originalValue === 'object' && originalValue !== null &&
+        typeof currentValue === 'object' && currentValue !== null) {
+      const originalStr = JSON.stringify(originalValue)
+      const currentStr = JSON.stringify(currentValue)
+      if (originalStr !== currentStr) {
+        console.log(`字段 ${key} 对象值有变更:`, { original: originalStr, current: currentStr })
+        return true
+      }
+    } else {
+      // 统一转换为字符串进行比较，处理null/undefined/空字符串的情况
+      const originalStr = (originalValue === null || originalValue === undefined) ? '' : String(originalValue)
+      const currentStr = (currentValue === null || currentValue === undefined) ? '' : String(currentValue)
+
+      if (originalStr !== currentStr) {
+        console.log(`字段 ${key} 值有变更:`, { original: originalStr, current: currentStr })
+        return true
+      }
+    }
+  }
+
+  console.log('数据无变更')
+  return false
+}
+
+// 文件选择功能
+const selectedFile = ref(null)
+const selectedFileHandle = ref(null)
+
+const selectFile = async () => {
+  try {
+    // 使用File System Access API
+    if ('showOpenFilePicker' in window) {
+      console.log('使用 File System Access API')
+
+      const [fileHandle] = await window.showOpenFilePicker({
+        multiple: false,
+        types: [{
+          description: '所有文件',
+          accept: { '*/*': [] }
+        }],
+        excludeAcceptAllOption: false
+      })
+
+      const file = await fileHandle.getFile()
+      selectedFile.value = file
+      selectedFileHandle.value = fileHandle
+
+      // 尝试构建更完整的路径信息
+      let filePath = file.name
+
+      // 如果fileHandle有更多信息，尝试获取
+      if (fileHandle.name) {
+        filePath = fileHandle.name
+      }
+
+      // 尝试从文件对象获取更多路径信息
+      if (file.webkitRelativePath) {
+        filePath = file.webkitRelativePath
+      }
+
+      // 检查是否有路径相关的属性
+      console.log('File properties:', {
+        name: file.name,
+        webkitRelativePath: file.webkitRelativePath,
+        handleName: fileHandle.name,
+        fileHandle: fileHandle
+      })
+
+      // 由于浏览器安全限制，我们需要用户提供完整路径
+      try {
+        const { value } = await ElMessageBox.prompt(
+          `已选择文件: ${file.name}\n\n由于浏览器安全限制，请手动输入文件的完整路径:`,
+          '设置文件路径',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '仅使用文件名',
+            inputValue: `C:\\Users\\Documents\\${file.name}`,
+            inputPlaceholder: '例如: C:\\Users\\Documents\\Pictures\\image.jpg',
+            inputType: 'text'
+          }
+        )
+        editFormData.value.AttachmentFile = value || file.name
+        ElMessage.success('文件路径设置成功')
+      } catch {
+        // 用户选择仅使用文件名
+        editFormData.value.AttachmentFile = file.name
+        ElMessage.success('文件选择成功（仅文件名）')
+      }
+
+      return
+    }
+  } catch (error) {
+    if (error.name === 'AbortError') {
+      console.log('用户取消选择文件')
+      return
+    }
+    console.log('File System Access API 不支持或出错:', error)
+  }
+
+  // 降级到传统的文件输入方法
+  console.log('使用传统文件输入方法')
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '*/*'
+  input.multiple = false
+
+  input.onchange = async (event) => {
+    const file = event.target.files[0]
+    if (file) {
+      selectedFile.value = file
+
+      console.log('传统方法选择的文件:', {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
+        webkitRelativePath: file.webkitRelativePath
+      })
+
+      // 提示用户输入完整路径
+      try {
+        const { value } = await ElMessageBox.prompt(
+          `已选择文件: ${file.name}\n\n请输入文件的完整路径:`,
+          '设置文件路径',
+          {
+            confirmButtonText: '确定',
+            cancelButtonText: '仅使用文件名',
+            inputValue: `C:\\Users\\Documents\\${file.name}`,
+            inputPlaceholder: '例如: C:\\Users\\Documents\\Pictures\\image.jpg'
+          }
+        )
+        editFormData.value.AttachmentFile = value || file.name
+        ElMessage.success('文件路径设置成功')
+      } catch {
+        // 用户选择仅使用文件名
+        editFormData.value.AttachmentFile = file.name
+        ElMessage.success('文件选择成功（仅文件名）')
+      }
+    }
+  }
+
+  input.click()
+}
+
+// 判断是否为图片文件
+const isImageFile = (filePath) => {
+  if (!filePath) return false
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
+  const extension = filePath.toLowerCase().substring(filePath.lastIndexOf('.'))
+  return imageExtensions.includes(extension)
+}
+
+// 获取图片预览URL
+const getImagePreviewUrl = (filePath) => {
+  if (!filePath) return ''
+
+  // 如果有选择的文件对象，使用URL.createObjectURL创建预览URL
+  if (selectedFile.value && selectedFile.value.name === filePath) {
+    return URL.createObjectURL(selectedFile.value)
+  }
+
+  // 如果是完整路径，直接使用
+  if (filePath.startsWith('http') || filePath.startsWith('file://')) {
+    return filePath
+  }
+
+  // 否则假设是相对路径，需要根据实际情况调整
+  return `file:///${filePath}`
+}
+
+// 图片预览相关
+const showImageDialog = ref(false)
+const previewImageUrl = ref('')
+
+// 显示图片预览
+const showImagePreview = () => {
+  if (editFormData.value.AttachmentFile && isImageFile(editFormData.value.AttachmentFile)) {
+    previewImageUrl.value = getImagePreviewUrl(editFormData.value.AttachmentFile)
+    showImageDialog.value = true
+  }
+}
+
+// 图片加载错误处理
+const handleImageError = (event) => {
+  console.log('图片加载失败:', event.target.src)
+  // 隐藏图片，显示占位符
+  event.target.style.display = 'none'
+}
+
+// 图片加载成功处理
+const handleImageLoad = (event) => {
+  console.log('图片加载成功:', event.target.src)
+  event.target.style.display = 'block'
+}
+
+// 处理文件拖拽
+const handleFileDrop = async (event) => {
+  event.preventDefault()
+
+  const files = event.dataTransfer.files
+  if (files.length > 0) {
+    const file = files[0]
+    selectedFile.value = file
+
+    console.log('拖拽文件信息:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: file.lastModified,
+      webkitRelativePath: file.webkitRelativePath
+    })
+
+    // 尝试从拖拽事件获取更多路径信息
+    let filePath = file.name
+
+    // 检查DataTransferItem是否有路径信息
+    const items = event.dataTransfer.items
+    if (items && items.length > 0) {
+      const item = items[0]
+      if (item.webkitGetAsEntry) {
+        const entry = item.webkitGetAsEntry()
+        if (entry && entry.fullPath) {
+          console.log('文件条目路径:', entry.fullPath)
+          filePath = entry.fullPath
+        }
+      }
+    }
+
+    // 提示用户确认或修改路径
+    try {
+      const { value } = await ElMessageBox.prompt(
+        `已拖拽文件: ${file.name}\n\n请确认或修改文件的完整路径:`,
+        '设置文件路径',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '仅使用文件名',
+          inputValue: filePath.startsWith('/') ? `C:${filePath.replace(/\//g, '\\')}` : `C:\\Users\\Documents\\${file.name}`,
+          inputPlaceholder: '例如: C:\\Users\\Documents\\Pictures\\image.jpg'
+        }
+      )
+      editFormData.value.AttachmentFile = value || file.name
+      ElMessage.success('文件路径设置成功')
+    } catch {
+      // 用户选择仅使用文件名
+      editFormData.value.AttachmentFile = file.name
+      ElMessage.success('文件选择成功（仅文件名）')
+    }
+  }
+}
+
 // 取消编辑
 const cancelEdit = () => {
   showEditDialog.value = false
   editFormData.value = {}
+  originalFormData.value = {}
+  selectedFile.value = null // 清理文件选择状态
+  selectedFileHandle.value = null // 清理文件句柄状态
 }
 
 // 删除记录
@@ -2246,7 +3243,13 @@ const organizeDetailFields = () => {
       title: '物料信息',
       icon: 'Document',
       iconClass: 'info',
-      fields: ['Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice', 'MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice', 'MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice', 'MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice', 'LaborCost', 'TotalCost']
+      fields: ['Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice', 'MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice', 'MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice', 'MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice']
+    },
+    qualityCost: {
+      title: '质量成本损失',
+      icon: 'Money',
+      iconClass: 'danger',
+      fields: ['LaborCost', 'TotalCost']
     },
     processing: {
       title: '处理信息',
@@ -2272,22 +3275,37 @@ const organizeDetailFields = () => {
 
   Object.keys(fieldGroups).forEach(groupKey => {
     const group = fieldGroups[groupKey]
-    const groupFields = []
 
-    group.fields.forEach(fieldKey => {
-      const field = exportFields.value.find(f => f.key === fieldKey)
-      if (field) {
-        groupFields.push(field)
-      }
-    })
-
-    if (groupFields.length > 0) {
+    // 处理tab结构
+    if (group.isTabbed && group.tabs) {
       sections.push({
         title: group.title,
         icon: group.icon,
         iconClass: group.iconClass,
-        fields: groupFields
+        isTabbed: true,
+        tabs: group.tabs
       })
+    } else {
+      // 处理普通字段结构
+      const groupFields = []
+
+      if (group.fields) {
+        group.fields.forEach(fieldKey => {
+          const field = exportFields.value.find(f => f.key === fieldKey)
+          if (field) {
+            groupFields.push(field)
+          }
+        })
+      }
+
+      if (groupFields.length > 0) {
+        sections.push({
+          title: group.title,
+          icon: group.icon,
+          iconClass: group.iconClass,
+          fields: groupFields
+        })
+      }
     }
   })
 
@@ -2321,16 +3339,38 @@ const organizeEditFields = () => {
       fields: ['Disposition', 'ReturnGoods', 'IsReprint', 'ReprintQty']
     },
     materials: {
-      title: '材料成本',
-      icon: 'Document',
-      iconClass: 'info',
-      fields: ['Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice', 'LaborCost', 'TotalCost']
-    },
-    materialsDetail: {
       title: '材料明细',
       icon: 'Document',
       iconClass: 'info',
-      fields: ['MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice', 'MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice', 'MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice']
+      isTabbed: true,
+      tabs: [
+        {
+          name: 'paper',
+          label: '纸张',
+          fields: ['Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice']
+        },
+        {
+          name: 'materialA',
+          label: '材料A',
+          fields: ['MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice']
+        },
+        {
+          name: 'materialB',
+          label: '材料B',
+          fields: ['MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice']
+        },
+        {
+          name: 'materialC',
+          label: '材料C',
+          fields: ['MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice']
+        }
+      ]
+    },
+    qualityCost: {
+      title: '质量成本损失',
+      icon: 'Money',
+      iconClass: 'danger',
+      fields: ['LaborCost', 'TotalCost']
     },
     responsibility: {
       title: '责任与考核',
@@ -2350,22 +3390,37 @@ const organizeEditFields = () => {
 
   Object.keys(fieldGroups).forEach(groupKey => {
     const group = fieldGroups[groupKey]
-    const groupFields = []
 
-    group.fields.forEach(fieldKey => {
-      const field = exportFields.value.find(f => f.key === fieldKey)
-      if (field) {
-        groupFields.push(field)
-      }
-    })
-
-    if (groupFields.length > 0) {
+    // 处理tab结构
+    if (group.isTabbed && group.tabs) {
       sections.push({
         title: group.title,
         icon: group.icon,
         iconClass: group.iconClass,
-        fields: groupFields
+        isTabbed: true,
+        tabs: group.tabs
       })
+    } else {
+      // 处理普通字段结构
+      const groupFields = []
+
+      if (group.fields) {
+        group.fields.forEach(fieldKey => {
+          const field = exportFields.value.find(f => f.key === fieldKey)
+          if (field) {
+            groupFields.push(field)
+          }
+        })
+      }
+
+      if (groupFields.length > 0) {
+        sections.push({
+          title: group.title,
+          icon: group.icon,
+          iconClass: group.iconClass,
+          fields: groupFields
+        })
+      }
     }
   })
 
@@ -2375,67 +3430,141 @@ const organizeEditFields = () => {
 // 获取字段标签宽度
 const getFieldLabelWidth = (field) => {
   if (isFullWidthField(field)) {
-    return '80px'
+    return '120px'
   }
 
-  // 根据字段名长度调整标签宽度
+  // 根据字段名长度调整标签宽度，增加更多空间避免换行
   const labelLength = field.label.length
-  if (labelLength <= 3) {
-    return '50px'
-  } else if (labelLength <= 4) {
-    return '60px'
-  } else if (labelLength <= 6) {
+  if (labelLength <= 2) {
     return '80px'
-  } else {
+  } else if (labelLength <= 3) {
+    return '90px'
+  } else if (labelLength <= 4) {
     return '100px'
+  } else if (labelLength <= 6) {
+    return '120px'
+  } else if (labelLength <= 8) {
+    return '140px'
+  } else {
+    return '160px'
   }
 }
 
-// 获取字段占用的列宽 - 响应式布局
+// 获取tab字段
+const getTabFields = (fieldKeys) => {
+  if (!fieldKeys || !Array.isArray(fieldKeys) || !exportFields.value) {
+    return []
+  }
+  return fieldKeys.map(key => exportFields.value.find(f => f.key === key)).filter(Boolean)
+}
+
+// 获取字段组件
+const getFieldComponent = (field) => {
+  if (field.type === 'date') return 'el-date-picker'
+  if (field.type === 'number' || field.type === 'decimal') return 'el-input-number'
+  if (field.key === 'ReturnGoods' || field.key === 'IsReprint') return 'el-switch'
+  if (field.key === 'Workshop' || field.key === 'ComplaintCategory' || field.key === 'CustomerComplaintType' || field.key === 'DefectiveCategory') return 'el-select'
+  if (field.type === 'textarea') return 'el-input'
+  return 'el-input'
+}
+
+// 获取字段属性
+const getFieldProps = (field) => {
+  const props = { style: 'width: 100%'}
+
+  if (field.type === 'date') {
+    props.type = 'date'
+    props.format = 'YYYY-MM-DD'
+    props['value-format'] = 'YYYY-MM-DD'
+  } else if (field.type === 'number' || field.type === 'decimal') {
+    props.precision = field.type === 'decimal' ? 2 : 0
+    props.min = 0
+  } else if (field.type === 'textarea') {
+    props.type = 'textarea'
+    props.rows = 3
+  }
+
+  return props
+}
+
+// 获取字段占用的列宽 - 优化布局规则
 const getFieldSpan = (field) => {
   // 全宽字段占满整行
   if (isFullWidthField(field)) {
     return 24
   }
 
-  // 需要减少2/3宽度的紧凑字段
-  const compactFields = [
-    'Date', 'Customer', 'OrderNo', 'Workshop',
-    'ProductionQty', 'DefectiveQty', 'DefectiveRate',
-    'ComplaintCategory', 'DefectiveCategory', 'DefectiveItem',
-    'MainDept', 'MainPerson', 'MainPersonAssessment',
-    'SecondPerson', 'SecondPersonAssessment', 'ManagerAssessment'
-  ]
+  // 根据字段类型和用途进行分组布局
+  const fieldKey = field.key
+  const labelLength = field.label.length
 
-  if (compactFields.includes(field.key)) {
-    return 8  // 紧凑字段 - 3列布局
+  // 基本信息模块 - 紧凑布局
+  if (['Date', 'Customer', 'OrderNo', 'Workshop'].includes(fieldKey)) {
+    return 12  // 2列布局
   }
 
-  // 中等宽度字段
-  const mediumFields = [
-    'ProductName', 'Specification', 'CustomerComplaintType', 'Manager',
-    'ReturnGoods', 'IsReprint', 'ReprintQty', 'AttachmentFile',
-    'Paper', 'PaperSpecification', 'PaperQty', 'PaperUnitPrice',
-    'LaborCost', 'TotalCost'
-  ]
-
-  if (mediumFields.includes(field.key)) {
-    return 12  // 中等字段 - 2列布局
+  // 产品信息 - 产品名称占50%，规格占50%
+  if (fieldKey === 'ProductName') {
+    return 12  // 50%宽度
+  }
+  if (fieldKey === 'Specification') {
+    return 12  // 50%宽度
   }
 
-  // 材料字段
-  const materialFields = [
-    'MaterialA', 'MaterialASpec', 'MaterialAQty', 'MaterialAUnitPrice',
-    'MaterialB', 'MaterialBSpec', 'MaterialBQty', 'MaterialBUnitPrice',
-    'MaterialC', 'MaterialCSpec', 'MaterialCQty', 'MaterialCUnitPrice'
-  ]
-
-  if (materialFields.includes(field.key)) {
-    return 6  // 材料字段 - 4列布局（仅材料部分）
+  // 数量相关字段 - 3列布局
+  if (['ProductionQty', 'DefectiveQty', 'DefectiveRate', 'ReprintQty'].includes(fieldKey)) {
+    return 8  // 3列布局
   }
 
-  // 默认宽度
-  return 12
+  // 材料明细模块 - 材料名称和规格各占50%
+  if (['Paper', 'MaterialA', 'MaterialB', 'MaterialC'].includes(fieldKey)) {
+    return 12  // 50%宽度
+  }
+  if (['PaperSpecification', 'MaterialASpec', 'MaterialBSpec', 'MaterialCSpec'].includes(fieldKey)) {
+    return 12  // 50%宽度
+  }
+
+  // 数量和价格字段 - 数量字段2倍宽度
+  if (['PaperQty', 'MaterialAQty', 'MaterialBQty', 'MaterialCQty'].includes(fieldKey)) {
+    return 16  // 2倍当前宽度
+  }
+  if (['PaperUnitPrice', 'MaterialAUnitPrice', 'MaterialBUnitPrice', 'MaterialCUnitPrice'].includes(fieldKey)) {
+    return 8   // 标准宽度
+  }
+
+  // 成本字段 - 2列布局
+  if (['LaborCost', 'TotalCost'].includes(fieldKey)) {
+    return 12  // 2列布局
+  }
+
+  // 人员相关字段 - 3列布局
+  if (['MainDept', 'MainPerson', 'Manager', 'SecondPerson'].includes(fieldKey)) {
+    return 8  // 3列布局
+  }
+
+  // 考核字段 - 2列布局
+  if (['MainPersonAssessment', 'SecondPersonAssessment', 'ManagerAssessment'].includes(fieldKey)) {
+    return 12  // 2列布局
+  }
+
+  // 处置相关 - 根据字段类型
+  if (['ReturnGoods', 'IsReprint'].includes(fieldKey)) {
+    return 8  // 3列布局（开关类型）
+  }
+
+  // 下拉选择类字段 - 2列布局
+  if (['ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem'].includes(fieldKey)) {
+    return 12  // 2列布局
+  }
+
+  // 根据标签长度的默认规则
+  if (labelLength <= 4) {
+    return 8   // 3列布局
+  } else if (labelLength <= 8) {
+    return 12  // 2列布局
+  } else {
+    return 24  // 单列布局
+  }
 }
 
 watch(pageCount, (val) => {
@@ -2443,6 +3572,44 @@ watch(pageCount, (val) => {
     gotoPage.value = 1
   } else if (gotoPage.value > val) {
     gotoPage.value = val
+  }
+})
+
+// 监听编辑表单纸张数量和车间变化，自动计算人工成本
+watch(() => editFormData.value ? [editFormData.value.PaperQty, editFormData.value.Workshop] : [], (values) => {
+  console.log('编辑表单人工成本监听器触发:', values);
+  if (editFormData.value) {
+    calculateEditLaborCost();
+  }
+}, { deep: true })
+
+// 监听编辑表单成本相关字段变化，自动计算总成本
+watch(() => editFormData.value ? [
+  editFormData.value.PaperSpecification,
+  editFormData.value.PaperQty,
+  editFormData.value.PaperUnitPrice,
+  editFormData.value.MaterialASpec,
+  editFormData.value.MaterialAQty,
+  editFormData.value.MaterialAUnitPrice,
+  editFormData.value.MaterialBSpec,
+  editFormData.value.MaterialBQty,
+  editFormData.value.MaterialBUnitPrice,
+  editFormData.value.MaterialCSpec,
+  editFormData.value.MaterialCQty,
+  editFormData.value.MaterialCUnitPrice,
+  editFormData.value.LaborCost
+] : [], (values) => {
+  console.log('编辑表单总成本监听器触发:', values);
+  if (editFormData.value) {
+    calculateEditTotalCost();
+  }
+}, { deep: true })
+
+// 监听编辑表单总成本变化，自动计算主责人考核
+watch(() => editFormData.value ? editFormData.value.TotalCost : 0, (totalCost) => {
+  console.log('编辑表单主责人考核监听器触发:', totalCost);
+  if (editFormData.value) {
+    calculateEditMainPersonAssessment();
   }
 })
 
@@ -2724,6 +3891,11 @@ onMounted(() => {
   nextTick(() => {
     renderCharts()
 
+    // 初始化智能布局
+    setTimeout(() => {
+      applyOptimalLayout()
+    }, 100)
+
     // 延迟初始化查询卡片位置，确保所有内容都已渲染
     setTimeout(() => {
       initQueryCardPosition()
@@ -2744,6 +3916,23 @@ onMounted(() => {
 
   // 添加窗口大小变化监听
   window.addEventListener('resize', handleResize)
+
+  // 添加布局优化监听器
+  setTimeout(() => {
+    const layoutObserver = new ResizeObserver(() => {
+      if (window.innerWidth > 1200) {
+        setTimeout(() => {
+          applyOptimalLayout()
+        }, 50)
+      }
+    })
+
+    // 观察主容器的大小变化
+    const mainContent = document.querySelector('.home-main')
+    if (mainContent) {
+      layoutObserver.observe(mainContent)
+    }
+  }, 300)
 })
 
 // 注意：由于事件监听器使用了匿名函数，我们在组件销毁时会自动清理
@@ -2778,6 +3967,88 @@ const handleScroll = () => {
   }, 10) // 10ms防抖延迟，保持响应性
 }
 
+// 智能布局算法 - 动态计算最优布局
+const calculateOptimalLayout = () => {
+  const queryCard = document.querySelector('.query-card')
+  const tableContainer = document.querySelector('.table-container')
+  const mainContent = document.querySelector('.home-main')
+
+  if (!tableContainer || !mainContent) return null
+
+  // 获取主容器的实际可用宽度
+  const mainRect = mainContent.getBoundingClientRect()
+  const containerPadding = 40 // 2.5rem = 40px
+  const availableWidth = mainRect.width - containerPadding * 2
+
+  // 如果没有查询卡片，表格占满全宽
+  if (!queryCard) {
+    return {
+      queryCardWidth: 0,
+      tableMarginRight: 0,
+      containerPadding
+    }
+  }
+
+  // 计算查询卡片的最优宽度（占总宽度的20-25%）
+  let queryCardWidth = Math.min(Math.max(availableWidth * 0.22, 320), 420)
+
+  // 根据屏幕宽度微调
+  if (window.innerWidth >= 1600) {
+    queryCardWidth = Math.min(queryCardWidth, 420)
+  } else if (window.innerWidth >= 1400) {
+    queryCardWidth = Math.min(queryCardWidth, 380)
+  } else {
+    queryCardWidth = Math.min(queryCardWidth, 340)
+  }
+
+  // 计算表格容器的最优右边距
+  const cardGap = 40 // 增加卡片间距
+  const tableMarginRight = queryCardWidth + cardGap
+
+  return {
+    queryCardWidth: Math.round(queryCardWidth),
+    tableMarginRight: Math.round(tableMarginRight),
+    containerPadding
+  }
+}
+
+
+
+// 应用智能布局
+const applyOptimalLayout = () => {
+  const layout = calculateOptimalLayout()
+  if (!layout) return
+
+  const queryCard = document.querySelector('.query-card')
+  const tableContainer = document.querySelector('.table-container')
+
+  if (tableContainer) {
+    // 应用表格容器边距
+    tableContainer.style.marginRight = `${layout.tableMarginRight}px`
+
+    // 如果有查询卡片，应用其样式
+    if (queryCard && layout.queryCardWidth > 0) {
+      queryCard.style.position = 'fixed'
+      queryCard.style.right = '16px' // 固定右边距，更靠近浏览器右边
+      queryCard.style.width = `${layout.queryCardWidth}px`
+      queryCard.style.transform = 'none'
+      queryCard.style.zIndex = '1000'
+    }
+
+
+
+    // 调试信息（开发环境）
+    if (process.env.NODE_ENV === 'development') {
+      console.log('智能布局应用:', {
+        queryCardWidth: layout.queryCardWidth,
+        tableMarginRight: layout.tableMarginRight,
+        screenWidth: window.innerWidth,
+        hasQueryCard: !!queryCard
+      })
+    }
+  }
+}
+
 // 完全重置查询卡片到初始状态
 const resetQueryCardToInitialState = () => {
   const queryCard = document.querySelector('.query-card')
@@ -2785,12 +4056,8 @@ const resetQueryCardToInitialState = () => {
 
   if (!queryCard || !tableCard) return
 
-  // 完全重置样式
-  queryCard.style.position = 'fixed'
-  queryCard.style.right = '2.5rem'
-  queryCard.style.width = '300px'
-  queryCard.style.transform = 'none'
-  queryCard.style.zIndex = '1000'
+  // 使用智能布局算法
+  applyOptimalLayout()
 
   // 强制重新计算布局
   tableCard.offsetHeight
@@ -2850,7 +4117,9 @@ const handleResize = () => {
   // 设置新的定时器，防抖处理
   resizeTimeout = setTimeout(() => {
     const queryCard = document.querySelector('.query-card')
-    if (!queryCard) return
+    const tableContainer = document.querySelector('.table-container')
+
+    if (!queryCard || !tableContainer) return
 
     // 如果是小屏幕，重置查询卡片样式
     if (window.innerWidth <= 1200) {
@@ -2858,16 +4127,14 @@ const handleResize = () => {
       queryCard.style.top = 'auto'
       queryCard.style.right = 'auto'
       queryCard.style.width = '100%'
+      tableContainer.style.marginRight = '0'
     } else {
-      // 大屏幕时完全重置并重新初始化位置
-      setTimeout(() => {
-        // 使用新的重置函数
-        resetQueryCardToInitialState()
+      // 大屏幕时使用智能布局算法
+      applyOptimalLayout()
 
-        // 重新初始化滚动监听
-        setTimeout(() => {
-          initQueryCardPosition()
-        }, 100)
+      // 重新初始化滚动监听
+      setTimeout(() => {
+        initQueryCardPosition()
       }, 100)
     }
   }, 200) // 防抖延迟200ms
@@ -3260,31 +4527,134 @@ body::-webkit-scrollbar-thumb:hover {
   right: 15px;
 }
 
-/* 轮播图内的卡片样式 */
-.carousel-page .stat-card {
+/* 轮播图内的统计卡片样式 - 与ComplaintAnalysisChart保持一致 */
+.carousel-page .summary-card {
+  display: flex;
+  align-items: center;
+  padding: 20px;
+  margin: 0 8px;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid #f0f0f0;
+  transition: all 0.3s ease;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  height: 120px;
   flex: 1 1 0;
   min-width: 0;
-  max-width: 400px; /* 设置最大宽度，防止卡片过宽 */
-  margin: 0;
-  height: 7.5rem;
+  max-width: 400px;
+}
+
+.carousel-page .summary-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.carousel-page .summary-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+}
+
+.carousel-page .summary-card:hover::before {
+  transform: scaleX(1);
+}
+
+.carousel-page .card-left {
+  margin-right: 16px;
+}
+
+.carousel-page .card-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
   display: flex;
-  flex-direction: row;
   align-items: center;
-  align-self: center; /* 确保卡片在容器中垂直居中 */
-  padding: 1.25rem;
-  background: rgba(255, 255, 255, 0.9);
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+  justify-content: center;
+  font-size: 24px;
   transition: all 0.3s ease;
 }
 
-.carousel-page .stat-card:hover {
-  background: rgba(255, 255, 255, 0.95);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.1);
-  transform: translateY(-2px);
-  border-color: rgba(64, 158, 255, 0.2);
+/* Element Plus 经典配色 */
+.carousel-page .card-icon.today {
+  background: linear-gradient(135deg, #409EFF20, #409EFF10);
+  color: #409EFF;
+  border: 2px solid #409EFF20;
 }
+.carousel-page .card-icon.total {
+  background: linear-gradient(135deg, #409EFF20, #409EFF10);
+  color: #409EFF;
+  border: 2px solid #409EFF20;
+}
+.carousel-page .card-icon.inner {
+  background: linear-gradient(135deg, #E6A23C20, #E6A23C10);
+  color: #E6A23C;
+  border: 2px solid #E6A23C20;
+}
+.carousel-page .card-icon.outer {
+  background: linear-gradient(135deg, #F56C6C20, #F56C6C10);
+  color: #F56C6C;
+  border: 2px solid #F56C6C20;
+}
+.carousel-page .card-icon.rate {
+  background: linear-gradient(135deg, #67C23A20, #67C23A10);
+  color: #67C23A;
+  border: 2px solid #67C23A20;
+}
+.carousel-page .card-icon.customer-rate {
+  background: linear-gradient(135deg, #90939920, #90939910);
+  color: #909399;
+  border: 2px solid #90939920;
+}
+
+.carousel-page .summary-card:hover .card-icon {
+  transform: scale(1.1);
+}
+
+.carousel-page .card-right {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.carousel-page .card-title {
+  font-size: 13px;
+  color: #909399;
+  font-weight: 500;
+  margin-bottom: 2px;
+  display: flex;
+  align-items: center;
+}
+
+.carousel-page .card-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin-bottom: 2px;
+  transition: all 0.3s ease;
+}
+
+.carousel-page .card-subtitle {
+  font-size: 11px;
+  color: #C0C4CC;
+  font-weight: 400;
+}
+
+/* 不同卡片的数值颜色 */
+.carousel-page .today-value { color: #409EFF; }
+.carousel-page .total-value { color: #409EFF; }
+.carousel-page .inner-value { color: #E6A23C; }
+.carousel-page .outer-value { color: #F56C6C; }
+.carousel-page .rate-value { color: #67C23A; }
+.carousel-page .customer-rate-value { color: #909399; }
 .stat-row-flex .stat-card {
   flex: 1 1 0;
   min-width: 0;
@@ -3309,148 +4679,6 @@ body::-webkit-scrollbar-thumb:hover {
   transform: translateY(-3px);
 }
 
-/* 单位卡片布局 */
-.unit-header {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
-}
-
-.unit-stats-horizontal {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-.stat-item-inline {
-  font-size: 0.75rem;
-  color: #666;
-}
-
-.stat-item-inline b {
-  font-size: 1rem;
-  font-weight: bold;
-  margin-left: 0.25rem;
-}
-/* 卡片图标样式 */
-.card-icon {
-  flex-shrink: 0;
-  width: 2rem;
-  height: 2rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.card-icon .el-icon {
-  font-size: 1.75rem;
-  color: #409eff;
-}
-
-/* 卡片内容样式 */
-.card-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-/* 卡片头部样式 */
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-/* 卡片分隔线 */
-.card-divider {
-  height: 1px;
-  background-color: #f0f0f0;
-  margin: 0.25rem 0;
-}
-
-/* 卡片统计区域 */
-.card-stats {
-  display: flex;
-  gap: 1rem;
-  align-items: center;
-}
-
-/* 特殊布局卡片样式 */
-.special-layout .card-content-vertical {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  height: 100%;
-  padding: 0.25rem 0;
-}
-
-.card-title-row {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #409eff;
-  line-height: 1.2;
-}
-
-.card-percentage-row {
-  font-size: 1.25rem;
-  font-weight: bold;
-  color: #f56c6c !important;
-  line-height: 1;
-  margin: 0.25rem 0;
-}
-
-.card-detail-row {
-  display: flex;
-  gap: 0.5rem;
-  font-size: 0.7rem;
-  color: #666;
-  line-height: 1.1;
-  white-space: nowrap;
-  overflow: hidden;
-}
-
-.card-detail-row span {
-  flex: 1;
-  min-width: 0;
-  text-overflow: ellipsis;
-  overflow: hidden;
-}
-
-.stat-title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #409eff;
-  margin: 0;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.stat-value {
-  font-size: 0.75rem;
-  font-weight: normal;
-  color: #666;
-  margin: 0;
-}
-
-.stat-value b {
-  font-size: 1.5rem;
-  font-weight: bold;
-  color: #303133 !important;
-  margin-right: 0.25rem;
-}
-
-/* 在header中的stat-value样式调整 */
-.card-header .stat-value {
-  margin: 0;
-}
-
-.card-header .stat-value b {
-  font-size: 1.75rem;
-}
 
 .unit-tag {
   font-size: 0.625rem !important;
@@ -3464,7 +4692,8 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .table-container {
-  margin-right: 320px; /* 为固定定位的查询卡片留出空间：300px宽度 + 20px间距 */
+  margin-right: 380px; /* 增加默认边距，为高级查询卡片留出更多空间 */
+  transition: margin-right 0.3s ease; /* 平滑过渡效果 */
 }
 .table-card {
   background: #fff;
@@ -3484,14 +4713,14 @@ body::-webkit-scrollbar-thumb:hover {
   box-shadow: 0 0.125rem 0.5rem 0 rgba(0,0,0,0.06);
   height: auto;
   min-height: unset;
+  width: 340px; /* 增加默认宽度 */
   display: block;
   position: fixed; /* 使用fixed定位以便精确控制 */
   top: 120px; /* 初始位置，避免与导航栏重叠 */
-  right: 2.5rem; /* 与页面右边距保持一致 */
-  width: 300px; /* 固定宽度 */
+  right: 1rem; /* 更靠近浏览器右边 */
   margin-top: 0 !important; /* 确保与左侧卡片顶部对齐 */
   z-index: 1000; /* 确保在其他元素之上 */
-  transition: top 0.2s ease-out; /* 平滑过渡效果 */
+  transition: top 0.2s ease-out, width 0.3s ease, right 0.3s ease; /* 平滑过渡效果 */
 }
 
 .query-header {
@@ -3837,6 +5066,18 @@ body::-webkit-scrollbar-thumb:hover {
   color: #303133;
 }
 
+.table-title .tip-icon {
+  color: #909399;
+  font-size: 14px;
+  margin-left: 4px;
+  cursor: help;
+  transition: color 0.2s ease;
+}
+
+.table-title .tip-icon:hover {
+  color: #409eff;
+}
+
 .table-actions {
   display: flex;
   align-items: center;
@@ -4149,6 +5390,24 @@ body::-webkit-scrollbar-thumb:hover {
   flex: 1;
 }
 
+/* 表格行双击提示样式 */
+.complaint-table-card :deep(.el-table__body-wrapper .el-table__row) {
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.complaint-table-card :deep(.el-table__body-wrapper .el-table__row:hover) {
+  background-color: #f0f9ff !important;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.complaint-table-card :deep(.el-table__body-wrapper .el-table__row:hover td) {
+  background-color: transparent !important;
+}
+
+
+
 /* 移除表格高度限制，让页面自然滚动 */
 /*
 .complaint-table-card .el-table__body-wrapper {
@@ -4358,20 +5617,25 @@ body::-webkit-scrollbar-thumb:hover {
 
 /* 编辑对话框样式 */
 .edit-dialog {
-  --el-dialog-margin-top: 10vh;
+  --el-dialog-margin-top: 5vh;
 }
 
 .edit-dialog :deep(.el-dialog) {
-  margin: 10vh auto;
-  height: 80vh;
+  margin: 5vh auto;
+  height: 90vh;
+  max-height: 90vh;
   display: flex;
   flex-direction: column;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px 4px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.08);
 }
 
 .edit-dialog :deep(.el-dialog__header) {
   flex-shrink: 0;
-  padding: 16px 20px 12px 20px;
-  border-bottom: 1px solid #ebeef5;
+  padding: 20px 24px 16px 24px;
+  border-bottom: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-radius: 12px 12px 0 0;
 }
 
 .edit-dialog :deep(.el-dialog__body) {
@@ -4381,22 +5645,167 @@ body::-webkit-scrollbar-thumb:hover {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: #fafbfc;
 }
 
 .edit-dialog :deep(.el-dialog__footer) {
-  flex-shrink: 0;
-  padding: 12px 20px 16px 20px;
-  border-top: 1px solid #ebeef5;
+  padding: 16px 24px 20px 24px;
+  border-top: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-radius: 0 0 12px 12px;
+}
+
+/* 编辑对话框头部样式 */
+.edit-dialog-header {
+  display: flex;
+  align-items: center;
+  color: #303133;
+}
+
+.edit-dialog-header .header-icon {
+  font-size: 20px;
+  margin-right: 10px;
+  color: #409eff;
+}
+
+.edit-dialog-header .header-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
+/* 编辑对话框底部按钮样式 */
+.edit-dialog-footer {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+}
+
+.edit-dialog-footer .cancel-btn {
+  background: #f5f7fa;
+  border-color: #dcdfe6;
+  color: #606266;
+  transition: all 0.3s ease;
+}
+
+.edit-dialog-footer .cancel-btn:hover {
+  background: #ecf5ff;
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.edit-dialog-footer .save-btn {
+  background: #67c23a;
+  border-color: #67c23a;
+  transition: all 0.3s ease;
+}
+
+.edit-dialog-footer .save-btn:hover {
+  background: #5daf34;
+  border-color: #5daf34;
 }
 
 .edit-content {
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 16px 20px;
+  padding: 24px;
   background: #fafbfc;
   height: 100%;
-  max-height: calc(80vh - 160px);
+  max-height: calc(90vh - 180px);
+}
+
+.edit-form :deep(.el-form-item) {
+  margin-bottom: 20px;
+}
+
+.edit-form :deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #606266;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
+  line-height: 32px;
+  padding-right: 12px;
+}
+
+.edit-form :deep(.el-form-item__content) {
+  line-height: 32px;
+}
+
+/* 统一控件高度 - 所有输入控件保持32px高度 */
+.edit-form :deep(.el-input__wrapper),
+.edit-form :deep(.el-select .el-input__wrapper),
+.edit-form :deep(.el-date-editor.el-input),
+.edit-form :deep(.el-input-number .el-input__wrapper),
+.edit-form :deep(.el-cascader .el-input__wrapper) {
+  min-height: 32px !important;
+  height: 32px !important;
+}
+
+.edit-form :deep(.el-input__inner),
+.edit-form :deep(.el-select .el-input__inner),
+.edit-form :deep(.el-date-editor .el-input__inner),
+.edit-form :deep(.el-input-number .el-input__inner) {
+  height: 32px !important;
+  line-height: 32px !important;
+}
+
+/* 强制所有下拉框高度一致 */
+.edit-form :deep(.el-select),
+.edit-form :deep(.el-select .el-input),
+.edit-form :deep(.el-select .el-input__wrapper) {
+  height: 32px !important;
+  min-height: 32px !important;
+}
+
+/* 强制所有日期选择器高度一致 */
+.edit-form :deep(.el-date-editor),
+.edit-form :deep(.el-date-editor .el-input__wrapper) {
+  height: 32px !important;
+  min-height: 32px !important;
+}
+
+/* 强制所有数字输入框高度一致 */
+.edit-form :deep(.el-input-number),
+.edit-form :deep(.el-input-number .el-input__wrapper) {
+  height: 32px !important;
+  min-height: 32px !important;
+}
+
+.edit-form :deep(.el-select) {
+  width: 100%;
+}
+
+.edit-form :deep(.el-date-editor) {
+  width: 100%;
+}
+
+.edit-form :deep(.el-input-number) {
+  width: 100%;
+}
+
+/* 材料明细tab样式 */
+.material-tabs {
+  margin-top: 16px;
+}
+
+.material-tabs :deep(.el-tabs__header) {
+  margin-bottom: 16px;
+}
+
+.material-tabs :deep(.el-tabs__item) {
+  font-weight: 500;
+  color: #606266;
+}
+
+.material-tabs :deep(.el-tabs__item.is-active) {
+  color: #409eff;
+  font-weight: 600;
+}
+
+.material-tabs :deep(.el-tabs__content) {
+  padding: 16px 0;
 }
 
 .edit-form {
@@ -4404,25 +5813,43 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .edit-form .form-card {
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  border: 1px solid #e4e7ed;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.3s ease;
+  margin-bottom: 20px;
 }
 
-.edit-form .form-card-header {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
+.edit-form .form-card:hover {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
+  border-color: #c6d9f7;
+}
+
+.edit-form .form-card :deep(.el-card__header) {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 1px solid #e4e7ed;
+  padding: 16px 20px;
+  border-radius: 10px 10px 0 0;
+}
+
+.edit-form .section-header {
   display: flex;
   align-items: center;
+  font-weight: 600;
+  color: #303133;
+  font-size: 16px;
 }
 
-.edit-form .form-card-header::before {
-  content: '';
-  width: 4px;
-  height: 16px;
-  background: #409eff;
+.edit-form .section-icon {
   margin-right: 8px;
-  border-radius: 2px;
+  font-size: 16px;
+  color: #409eff;
+}
+
+.edit-form .form-card :deep(.el-card__body) {
+  padding: 20px;
+  background: white;
+  border-radius: 0 0 10px 10px;
 }
 
 /* 编辑表单字段优化 */
@@ -4486,21 +5913,48 @@ body::-webkit-scrollbar-thumb:hover {
   padding: 12px 16px;
 }
 
-/* 编辑表单字段布局 */
+/* 编辑表单字段布局优化 */
 .edit-form :deep(.el-form-item) {
-  margin-bottom: 12px;
+  margin-bottom: 16px;
 }
 
 .edit-form :deep(.el-form-item__label) {
-  font-size: 12px;
+  font-size: 13px;
   color: #606266;
   font-weight: 500;
-  padding-right: 6px;
+  padding-right: 8px;
   line-height: 32px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  overflow: hidden;
 }
 
 .edit-form :deep(.el-form-item__content) {
   line-height: 32px;
+}
+
+/* 优化行间距 */
+.edit-form :deep(.el-row) {
+  margin-bottom: 8px;
+}
+
+.edit-form :deep(.el-row:last-child) {
+  margin-bottom: 0;
+}
+
+/* 优化列间距 */
+.edit-form :deep(.el-col) {
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* 材料明细tab内容优化 */
+.material-tabs :deep(.el-tab-pane) {
+  padding: 16px 0;
+}
+
+.material-tabs :deep(.el-row) {
+  margin-bottom: 12px;
 }
 
 /* 编辑对话框分组样式 */
@@ -4561,7 +6015,7 @@ body::-webkit-scrollbar-thumb:hover {
 
   /* 调整对话框宽度 */
   .edit-dialog :deep(.el-dialog) {
-    width: 95% !important;
+    width: 60% !important;
     margin: 5vh auto !important;
   }
 }
@@ -4935,6 +6389,172 @@ body::-webkit-scrollbar-thumb:hover {
   padding: 10px 0;
 }
 
+/* 保存确认对话框样式 */
+:deep(.save-confirm-dialog) {
+  border-radius: 12px;
+}
+
+:deep(.save-confirm-dialog .el-message-box__header) {
+  padding: 20px 20px 10px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+:deep(.save-confirm-dialog .el-message-box__title) {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+:deep(.save-confirm-dialog .el-message-box__content) {
+  padding: 20px;
+  color: #606266;
+  font-size: 14px;
+}
+
+:deep(.save-confirm-dialog .el-message-box__btns) {
+  padding: 10px 20px 20px;
+  text-align: right;
+}
+
+:deep(.save-confirm-dialog .el-button--primary) {
+  background: linear-gradient(135deg, #409eff 0%, #66b3ff 100%);
+  border: none;
+  border-radius: 6px;
+  padding: 8px 20px;
+  font-weight: 500;
+}
+
+:deep(.save-confirm-dialog .el-button--default) {
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  padding: 8px 20px;
+  margin-right: 10px;
+}
+
+/* 附件文件字段样式 */
+.attachment-field {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+}
+
+.attachment-input {
+  flex: 1;
+  min-width: 300px; /* 确保文本框有足够宽度 */
+}
+
+.select-file-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.file-drop-zone {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  color: #909399;
+}
+
+.file-drop-zone:hover {
+  border-color: #409eff;
+  color: #409eff;
+  background: rgba(64, 158, 255, 0.1);
+}
+
+.file-drop-zone.dragover {
+  border-color: #409eff;
+  background: rgba(64, 158, 255, 0.2);
+  color: #409eff;
+}
+
+.image-preview-area {
+  flex-shrink: 0;
+  width: 80px;
+  height: 80px;
+}
+
+.image-preview {
+  width: 80px;
+  height: 80px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.image-preview:hover {
+  border-color: #409eff;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
+}
+
+.image-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-placeholder {
+  width: 80px;
+  height: 80px;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #c0c4cc;
+}
+
+.placeholder-icon {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.placeholder-text {
+  font-size: 10px;
+  color: #909399;
+  text-align: center;
+  line-height: 1.2;
+}
+
+/* 图片预览对话框样式 */
+.image-preview-dialog :deep(.el-dialog) {
+  border-radius: 12px;
+}
+
+.image-preview-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+  background: #f5f5f5;
+  border-radius: 8px;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 70vh;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
 /* 确保对话框不影响页面布局 */
 :deep(.el-dialog) {
   position: fixed !important;
@@ -5117,5 +6737,197 @@ body.el-popup-parent--hidden {
     gap: 0.5rem; /* 减小轮播图内卡片间距 */
     padding: 0 0.5rem; /* 减小轮播图页面内边距 */
   }
+}
+
+/* 投诉表单对话框样式 */
+.complaint-dialog {
+  border-radius: 12px;
+}
+
+.complaint-dialog .el-dialog {
+  margin: 3vh auto !important;
+  max-height: 94vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.15);
+}
+
+.complaint-dialog .el-dialog__header {
+  background: #409eff;
+  color: white;
+  border-radius: 12px 12px 0 0;
+  padding: 20px 24px;
+  text-align: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+}
+
+.complaint-dialog .el-dialog__title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.complaint-dialog .el-dialog__body {
+  padding: 20px;
+  flex: 1;
+  overflow-y: auto;
+  max-height: calc(94vh - 120px);
+  background: #fafbfc;
+}
+
+/* 对话框标题图标样式 */
+.dialog-header-with-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.dialog-icon {
+  font-size: 20px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.dialog-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: white;
+}
+
+/* 确保对话框遮罩层覆盖整个视窗 */
+.complaint-dialog .el-overlay {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+}
+
+/* 按钮美化样式 */
+.add-complaint-btn {
+  background: #409eff !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3) !important;
+  transition: all 0.3s ease !important;
+  font-weight: 600 !important;
+}
+
+.add-complaint-btn:hover {
+  background: #66b1ff !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.4) !important;
+}
+
+.export-btn {
+  background: #67c23a !important;
+  border: none !important;
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.3) !important;
+  transition: all 0.3s ease !important;
+  font-weight: 600 !important;
+}
+
+.export-btn:hover {
+  background: #85ce61 !important;
+  transform: translateY(-2px) !important;
+  box-shadow: 0 6px 20px rgba(103, 194, 58, 0.4) !important;
+}
+
+/* 搜索框美化 */
+.search-input {
+  border-radius: 8px !important;
+}
+
+.search-input .el-input__wrapper {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+  border-radius: 8px !important;
+  transition: all 0.3s ease !important;
+}
+
+.search-input .el-input__wrapper:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.search-input .el-input__wrapper.is-focus {
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3) !important;
+}
+
+/* 表格标题图标美化 */
+.table-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.table-title-icon {
+  font-size: 18px;
+  color: #409eff;
+}
+
+/* 操作按钮美化 */
+.action-btn {
+  transition: all 0.3s ease !important;
+  border-radius: 6px !important;
+}
+
+.action-btn:hover {
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15) !important;
+}
+
+.danger-btn:hover {
+  color: #f56c6c !important;
+  background-color: rgba(245, 108, 108, 0.1) !important;
+}
+
+/* 统计卡片图标美化 */
+.card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: rgba(64, 158, 255, 0.1);
+  margin-bottom: 12px;
+}
+
+.card-icon .el-icon {
+  font-size: 24px;
+  color: #409eff;
+}
+
+/* 特殊卡片图标颜色 */
+.card-today .card-icon {
+  background: rgba(255, 193, 7, 0.1);
+}
+
+.card-today .card-icon .el-icon {
+  color: #ffc107;
+}
+
+.card-month .card-icon {
+  background: rgba(64, 158, 255, 0.1);
+}
+
+.card-month .card-icon .el-icon {
+  color: #409eff;
+}
+
+.quality-rate-card .card-icon {
+  background: rgba(103, 194, 58, 0.1);
+}
+
+.quality-rate-card .card-icon .el-icon {
+  color: #67c23a;
+}
+
+.complaint-rate-card .card-icon {
+  background: rgba(245, 108, 108, 0.1);
+}
+
+.complaint-rate-card .card-icon .el-icon {
+  color: #f56c6c;
 }
 </style>

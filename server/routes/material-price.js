@@ -4,9 +4,251 @@ const sql = require('mssql');
 const XLSX = require('xlsx');
 const { executeQuery } = require('../db');
 
-// 测试路由
+/**
+ * 测试路由
+ * 功能：验证材料价格路由是否正常工作
+ */
 router.post('/test', (req, res) => {
   res.json({ success: true, message: '测试路由工作正常' });
+});
+
+/**
+ * 获取材料单价接口
+ *
+ * 功能：根据材料名称和供应商获取当前有效的材料单价
+ * 用途：投诉记录新增/编辑时自动填入材料单价
+ *
+ * 请求方式：GET /api/admin/material-prices/get-price
+ *
+ * 查询参数：
+ * - materialName: 材料名称（必填）
+ * - supplier: 供应商名称（可选，如果不提供则返回所有供应商的价格）
+ *
+ * 响应格式：
+ * {
+ *   success: true,
+ *   data: {
+ *     unitPrice: 12.50,
+ *     supplier: "供应商A",
+ *     materialName: "材料名称",
+ *     effectiveDate: "2025-01-01",
+ *     version: 1
+ *   }
+ * }
+ *
+ * 或者返回多个供应商的价格：
+ * {
+ *   success: true,
+ *   data: [
+ *     { unitPrice: 12.50, supplier: "供应商A", ... },
+ *     { unitPrice: 13.00, supplier: "供应商B", ... }
+ *   ]
+ * }
+ */
+router.get('/get-price', async (req, res) => {
+  try {
+    const { materialName, supplier } = req.query;
+
+    // 验证必填参数
+    if (!materialName) {
+      return res.status(400).json({
+        success: false,
+        message: '材料名称不能为空'
+      });
+    }
+
+    // 使用executeQuery执行查询
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+
+      // 构建查询条件
+      let whereConditions = ['IsActive = 1', 'MaterialName = @materialName'];
+      request.input('materialName', sql.NVarChar, materialName);
+
+      // 如果指定了供应商，添加供应商条件
+      if (supplier) {
+        whereConditions.push('Supplier = @supplier');
+        request.input('supplier', sql.NVarChar, supplier);
+      }
+
+      // 查询当前有效的材料价格
+      const query = `
+        SELECT TOP 10
+          ID,
+          MaterialName,
+          Supplier,
+          UnitPrice,
+          Remarks,
+          EffectiveDate,
+          Version,
+          CreatedBy,
+          CreatedDate
+        FROM MaterialPrice
+        WHERE ${whereConditions.join(' AND ')}
+        ORDER BY EffectiveDate DESC, Version DESC
+      `;
+
+      return await request.query(query);
+    });
+
+    if (result.recordset.length === 0) {
+      return res.json({
+        success: false,
+        message: supplier
+          ? `未找到材料"${materialName}"在供应商"${supplier}"的价格信息`
+          : `未找到材料"${materialName}"的价格信息`
+      });
+    }
+
+    // 如果指定了供应商，返回单个价格信息
+    if (supplier) {
+      const priceInfo = result.recordset[0];
+      return res.json({
+        success: true,
+        data: {
+          unitPrice: priceInfo.UnitPrice,
+          supplier: priceInfo.Supplier,
+          materialName: priceInfo.MaterialName,
+          effectiveDate: priceInfo.EffectiveDate,
+          version: priceInfo.Version,
+          remarks: priceInfo.Remarks
+        }
+      });
+    }
+
+    // 如果没有指定供应商，返回所有供应商的价格信息
+    const priceList = result.recordset.map(item => ({
+      unitPrice: item.UnitPrice,
+      supplier: item.Supplier,
+      materialName: item.MaterialName,
+      effectiveDate: item.EffectiveDate,
+      version: item.Version,
+      remarks: item.Remarks
+    }));
+
+    res.json({
+      success: true,
+      data: priceList
+    });
+
+  } catch (error) {
+    console.error('获取材料单价失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取材料单价失败: ' + error.message
+    });
+  }
+});
+
+/**
+ * 获取材料名称列表接口
+ *
+ * 功能：获取所有有效的材料名称，用于前端下拉选择
+ * 用途：投诉记录新增/编辑时的材料选择下拉框
+ *
+ * 请求方式：GET /api/admin/material-prices/material-names
+ *
+ * 响应格式：
+ * {
+ *   success: true,
+ *   data: ["材料A", "材料B", "材料C"]
+ * }
+ */
+router.get('/material-names', async (req, res) => {
+  try {
+    // 使用executeQuery执行查询
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+
+      // 查询所有有效的材料名称（去重）
+      const query = `
+        SELECT DISTINCT MaterialName
+        FROM MaterialPrice
+        WHERE IsActive = 1
+          AND MaterialName IS NOT NULL
+          AND MaterialName != ''
+        ORDER BY MaterialName ASC
+      `;
+
+      return await request.query(query);
+    });
+
+    // 提取材料名称列表
+    const materialNames = result.recordset.map(item => item.MaterialName);
+
+    res.json({
+      success: true,
+      data: materialNames
+    });
+
+  } catch (error) {
+    console.error('获取材料名称列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取材料名称列表失败: ' + error.message
+    });
+  }
+});
+
+/**
+ * 获取供应商列表接口
+ *
+ * 功能：获取指定材料的所有供应商，或所有供应商列表
+ * 用途：投诉记录新增/编辑时的供应商选择
+ *
+ * 请求方式：GET /api/admin/material-prices/suppliers
+ *
+ * 查询参数：
+ * - materialName: 材料名称（可选，如果提供则返回该材料的供应商）
+ *
+ * 响应格式：
+ * {
+ *   success: true,
+ *   data: ["供应商A", "供应商B", "供应商C"]
+ * }
+ */
+router.get('/suppliers', async (req, res) => {
+  try {
+    const { materialName } = req.query;
+
+    // 使用executeQuery执行查询
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+
+      // 构建查询条件
+      let whereConditions = ['IsActive = 1', 'Supplier IS NOT NULL', "Supplier != ''"];
+
+      if (materialName) {
+        whereConditions.push('MaterialName = @materialName');
+        request.input('materialName', sql.NVarChar, materialName);
+      }
+
+      // 查询供应商列表（去重）
+      const query = `
+        SELECT DISTINCT Supplier
+        FROM MaterialPrice
+        WHERE ${whereConditions.join(' AND ')}
+        ORDER BY Supplier ASC
+      `;
+
+      return await request.query(query);
+    });
+
+    // 提取供应商列表
+    const suppliers = result.recordset.map(item => item.Supplier);
+
+    res.json({
+      success: true,
+      data: suppliers
+    });
+
+  } catch (error) {
+    console.error('获取供应商列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取供应商列表失败: ' + error.message
+    });
+  }
 });
 
 // 获取材料价格列表（分页、搜索、排序）
@@ -533,6 +775,151 @@ router.get('/history', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '获取历史数据失败: ' + error.message
+    });
+  }
+});
+
+// 获取筛选选项（材料名称和供应商列表）
+router.get('/filter-options', async (req, res) => {
+  try {
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+
+      // 获取所有不重复的材料名称
+      const materialNamesQuery = `
+        SELECT DISTINCT MaterialName
+        FROM MaterialPrice
+        WHERE MaterialName IS NOT NULL AND MaterialName != ''
+        ORDER BY MaterialName ASC
+      `;
+
+      // 获取所有不重复的供应商
+      const suppliersQuery = `
+        SELECT DISTINCT Supplier
+        FROM MaterialPrice
+        WHERE Supplier IS NOT NULL AND Supplier != ''
+        ORDER BY Supplier ASC
+      `;
+
+      const materialNamesResult = await request.query(materialNamesQuery);
+      const suppliersResult = await request.query(suppliersQuery);
+
+      return {
+        materialNames: materialNamesResult.recordset.map(row => row.MaterialName),
+        suppliers: suppliersResult.recordset.map(row => row.Supplier)
+      };
+    });
+
+    if (!result) {
+      return res.status(500).json({
+        success: false,
+        message: '数据库连接失败'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('获取筛选选项失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取筛选选项失败: ' + error.message
+    });
+  }
+});
+
+// 导出材料价格数据
+router.get('/export', async (req, res) => {
+  try {
+    const { materialName, supplier, isActive, minPrice, maxPrice } = req.query;
+
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+
+      // 构建WHERE条件
+      let whereConditions = [];
+      let paramIndex = 1;
+
+      // 有效状态筛选
+      if (isActive !== undefined && isActive !== '') {
+        whereConditions.push(`IsActive = @param${paramIndex}`);
+        request.input(`param${paramIndex}`, isActive === '1');
+        paramIndex++;
+      }
+
+      // 材料名称筛选
+      if (materialName) {
+        whereConditions.push(`MaterialName LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, `%${materialName}%`);
+        paramIndex++;
+      }
+
+      // 供应商筛选
+      if (supplier) {
+        whereConditions.push(`Supplier LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, `%${supplier}%`);
+        paramIndex++;
+      }
+
+      // 价格范围筛选
+      if (minPrice !== undefined && minPrice !== '') {
+        whereConditions.push(`UnitPrice >= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, parseFloat(minPrice));
+        paramIndex++;
+      }
+
+      if (maxPrice !== undefined && maxPrice !== '') {
+        whereConditions.push(`UnitPrice <= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, parseFloat(maxPrice));
+        paramIndex++;
+      }
+
+      // 构建完整查询
+      let query = `
+        SELECT
+          ID,
+          MaterialName,
+          UnitPrice,
+          Supplier,
+          Remarks,
+          EffectiveDate,
+          CreatedDate,
+          UpdatedDate,
+          Version,
+          IsActive
+        FROM MaterialPrice
+      `;
+
+      if (whereConditions.length > 0) {
+        query += ` WHERE ${whereConditions.join(' AND ')}`;
+      }
+
+      query += ` ORDER BY MaterialName ASC, CreatedDate DESC`;
+
+      const result = await request.query(query);
+      return result.recordset;
+    });
+
+    if (!result) {
+      return res.status(500).json({
+        success: false,
+        message: '数据库连接失败'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: result
+    });
+
+  } catch (error) {
+    console.error('导出材料价格数据失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '导出失败: ' + error.message
     });
   }
 });

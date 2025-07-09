@@ -1,16 +1,21 @@
 {
+  "_comment": "DMS-QA 质量管理系统 - 前端项目配置文件",
   "name": "dms-qa-frontend",
   "version": "2.2.0",
   "main": "index.js",
+  "description": "DMS-QA质量管理系统前端应用，基于Vue3+Element Plus构建的现代化Web应用",
+  "_engines_comment": "Node.js和npm版本要求，确保兼容性",
   "engines": {
     "node": ">=16.0.0",
     "npm": ">=8.0.0"
   },
+  "_scripts_comment": "项目脚本命令",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
     "serve": "vite preview"
   },
+  "_keywords_comment": "项目关键词，用于搜索和分类",
   "keywords": [
     "dms",
     "quality-management",
@@ -19,7 +24,7 @@
   ],
   "author": "David Lee (zglibk) <1039297691@qq.com>",
   "license": "Apache-2.0",
-  "description": "",
+  "_dependencies_comment": "生产环境依赖包",
   "dependencies": {
     "axios": "^1.0.0",
     "cropperjs": "^1.5.13",
@@ -35,9 +40,26 @@
     "xlsx": "^0.18.5",
     "xlsx-js-style": "^1.2.0"
   },
+  "_devDependencies_comment": "开发环境依赖包",
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
     "@vitejs/plugin-vue": "^4.0.0",
     "vite": "^4.0.0"
+  },
+  "_dependency_descriptions": {
+    "axios": "HTTP请求库，用于与后端API通信",
+    "cropperjs": "图片裁剪库，用于头像上传功能",
+    "echarts": "数据可视化图表库，用于统计图表",
+    "element-plus": "Vue3 UI组件库，提供丰富的界面组件",
+    "file-saver": "文件下载库，用于导出Excel等文件",
+    "pinia": "Vue3状态管理库，替代Vuex",
+    "sortablejs": "拖拽排序库，用于列表排序功能",
+    "vue": "Vue3框架核心",
+    "vue-advanced-cropper": "Vue图片裁剪组件",
+    "vue-router": "Vue路由管理器",
+    "vuedraggable": "Vue拖拽组件",
+    "xlsx": "Excel文件处理库",
+    "xlsx-js-style": "Excel样式处理库",
+    "vite": "现代化前端构建工具"
   }
 }

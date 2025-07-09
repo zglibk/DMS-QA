@@ -15,7 +15,7 @@
           <el-icon><Upload /></el-icon>
           导入Excel
         </el-button>
-        <el-button @click="exportData">
+        <el-button @click="openExportDialog">
           <el-icon><Download /></el-icon>
           导出数据
         </el-button>
@@ -376,6 +376,93 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <!-- 导出筛选对话框 -->
+    <el-dialog
+      v-model="showExportDialog"
+      title="导出数据筛选"
+      width="500px"
+      :close-on-click-modal="false"
+      :modal="true"
+      :append-to-body="true"
+      :lock-scroll="false"
+      class="export-dialog"
+      center
+    >
+      <el-form :model="exportForm" label-width="100px">
+        <el-form-item label="材料名称">
+          <el-select
+            v-model="exportForm.materialName"
+            placeholder="请选择材料名称"
+            filterable
+            style="width: 100%"
+          >
+            <el-option label="全部" value="" />
+            <el-option
+              v-for="name in filterOptions.materialNames"
+              :key="name"
+              :label="name"
+              :value="name"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="供应商">
+          <el-select
+            v-model="exportForm.supplier"
+            placeholder="请选择供应商"
+            filterable
+            style="width: 100%"
+          >
+            <el-option label="全部" value="" />
+            <el-option
+              v-for="supplier in filterOptions.suppliers"
+              :key="supplier"
+              :label="supplier"
+              :value="supplier"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="有效状态">
+          <el-select
+            v-model="exportForm.isActive"
+            placeholder="请选择有效状态"
+            clearable
+            style="width: 100%"
+          >
+            <el-option label="全部" value="" />
+            <el-option label="有效" value="1" />
+            <el-option label="无效" value="0" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="价格范围">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <el-input-number
+              v-model="exportForm.minPrice"
+              placeholder="最低价格"
+              :min="0"
+              :precision="2"
+              style="width: 150px"
+            />
+            <span>-</span>
+            <el-input-number
+              v-model="exportForm.maxPrice"
+              placeholder="最高价格"
+              :min="0"
+              :precision="2"
+              style="width: 150px"
+            />
+          </div>
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showExportDialog = false">取消</el-button>
+        <el-button @click="resetExportForm">重置</el-button>
+        <el-button type="primary" @click="confirmExport">
+          <el-icon><Download /></el-icon>
+          确认导出
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -383,7 +470,8 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Upload, Download, Search, RefreshLeft, Edit, Delete, UploadFilled, Clock, Document } from '@element-plus/icons-vue'
-import * as XLSX from 'xlsx'
+import * as XLSX from 'xlsx-js-style'
+import { saveAs } from 'file-saver'
 import axios from 'axios'
 
 // 响应式数据
@@ -393,6 +481,7 @@ const importing = ref(false)
 const showAddDialog = ref(false)
 const showImportDialog = ref(false)
 const showHistoryDialog = ref(false)
+const showExportDialog = ref(false)
 const editingItem = ref(null)
 const tableData = ref([])
 const previewData = ref([])
@@ -406,6 +495,21 @@ const searchForm = reactive({
   supplier: '',
   minPrice: null,
   maxPrice: null
+})
+
+// 导出表单
+const exportForm = reactive({
+  materialName: '', // 默认为"全部"
+  supplier: '', // 默认为"全部"
+  isActive: '', // 默认为"全部"
+  minPrice: null,
+  maxPrice: null
+})
+
+// 筛选选项
+const filterOptions = reactive({
+  materialNames: [],
+  suppliers: []
 })
 
 // 分页
@@ -797,31 +901,222 @@ const cancelImport = () => {
   }
 }
 
-// 导出数据
-const exportData = async () => {
+// 加载筛选选项
+const loadFilterOptions = async () => {
   try {
     const token = localStorage.getItem('token')
     if (!token) {
-      console.warn('未找到token，跳转到登录页')
-      window.location.href = '/login'
+      ElMessage.error('请先登录')
       return
     }
 
-    const response = await axios.get('/api/admin/material-prices/export', {
-      headers: { Authorization: `Bearer ${token}` },
-      responseType: 'blob'
+    const response = await axios.get('/api/admin/material-prices/filter-options', {
+      headers: { Authorization: `Bearer ${token}` }
     })
 
-    const url = window.URL.createObjectURL(response.data)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `材料价格数据_${new Date().toISOString().slice(0, 10)}.xlsx`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    window.URL.revokeObjectURL(url)
+    if (response.data.success) {
+      filterOptions.materialNames = response.data.data.materialNames
+      filterOptions.suppliers = response.data.data.suppliers
+    } else {
+      ElMessage.error('加载筛选选项失败: ' + response.data.message)
+    }
+  } catch (error) {
+    console.error('加载筛选选项失败:', error)
+    ElMessage.error('加载筛选选项失败')
+  }
+}
 
-    ElMessage.success('导出成功')
+// 重置导出表单
+const resetExportForm = () => {
+  exportForm.materialName = ''
+  exportForm.supplier = ''
+  exportForm.isActive = ''
+  exportForm.minPrice = null
+  exportForm.maxPrice = null
+}
+
+// 打开导出对话框
+const openExportDialog = async () => {
+  showExportDialog.value = true
+  await loadFilterOptions()
+}
+
+// 确认导出
+const confirmExport = async () => {
+  await exportData(exportForm)
+  showExportDialog.value = false
+}
+
+
+
+// 导出数据
+const exportData = async (filters = {}) => {
+  try {
+    const token = localStorage.getItem('token')
+    if (!token) {
+      ElMessage.error('请先登录')
+      return
+    }
+
+    ElMessage.info('正在导出数据...')
+
+    // 构建查询参数
+    const params = new URLSearchParams()
+    if (filters.materialName) {
+      params.append('materialName', filters.materialName)
+    }
+    if (filters.supplier) {
+      params.append('supplier', filters.supplier)
+    }
+    if (filters.isActive !== '' && filters.isActive !== null && filters.isActive !== undefined) {
+      params.append('isActive', filters.isActive)
+    }
+    if (filters.minPrice !== null && filters.minPrice !== undefined) {
+      params.append('minPrice', filters.minPrice)
+    }
+    if (filters.maxPrice !== null && filters.maxPrice !== undefined) {
+      params.append('maxPrice', filters.maxPrice)
+    }
+
+    const queryString = params.toString()
+    const url = `/api/admin/material-prices/export${queryString ? '?' + queryString : ''}`
+
+    const response = await axios.get(url, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+
+    if (response.data.success) {
+      // 准备导出数据
+      const exportData = response.data.data.map(item => ({
+        '材料名称': item.MaterialName,
+        '单价': item.UnitPrice || '',
+        '供应商': item.Supplier || '',
+        '备注': item.Remarks || '',
+        '生效日期': formatDateTime(item.EffectiveDate),
+        '创建时间': formatDateTime(item.CreatedDate),
+        '更新时间': formatDateTime(item.UpdatedDate),
+        '版本': item.Version,
+        '状态': item.IsActive ? '有效' : '无效'
+      }))
+
+      // 创建工作簿
+      const wb = XLSX.utils.book_new()
+      const ws = XLSX.utils.json_to_sheet(exportData)
+
+      // 设置列宽
+      const colWidths = [
+        { wch: 30 }, // 材料名称
+        { wch: 12 }, // 单价
+        { wch: 20 }, // 供应商
+        { wch: 35 }, // 备注
+        { wch: 18 }, // 生效日期
+        { wch: 18 }, // 创建时间
+        { wch: 18 }, // 更新时间
+        { wch: 8 },  // 版本
+        { wch: 10 }  // 状态
+      ]
+      ws['!cols'] = colWidths
+
+      // 设置行高
+      const rowHeights = []
+      // 标题行高度
+      rowHeights[0] = { hpt: 25 }
+      // 数据行高度
+      for (let i = 1; i <= exportData.length; i++) {
+        rowHeights[i] = { hpt: 20 }
+      }
+      ws['!rows'] = rowHeights
+
+      // 美化表格样式
+      const range = XLSX.utils.decode_range(ws['!ref'])
+
+      // 定义样式 - 参考投诉历史记录的样式
+      const headerStyle = {
+        font: { name: 'Microsoft YaHei', sz: 11, bold: true, color: { rgb: '000000' } },
+        fill: { fgColor: { rgb: 'D9D9D9' } },
+        alignment: { horizontal: 'center', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      }
+
+      const dataStyle = {
+        font: { name: 'Microsoft YaHei', sz: 10 },
+        alignment: { horizontal: 'left', vertical: 'center' },
+        border: {
+          top: { style: 'thin', color: { rgb: 'D0D0D0' } },
+          bottom: { style: 'thin', color: { rgb: 'D0D0D0' } },
+          left: { style: 'thin', color: { rgb: 'D0D0D0' } },
+          right: { style: 'thin', color: { rgb: 'D0D0D0' } }
+        }
+      }
+
+      const evenRowStyle = {
+        ...dataStyle,
+        fill: { fgColor: { rgb: 'F8F9FA' } }
+      }
+
+      const oddRowStyle = {
+        ...dataStyle,
+        fill: { fgColor: { rgb: 'FFFFFF' } }
+      }
+
+      // 应用样式
+      for (let R = range.s.r; R <= range.e.r; ++R) {
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+          const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+          if (!ws[cellAddress]) continue
+
+          if (R === 0) {
+            // 标题行样式
+            ws[cellAddress].s = headerStyle
+          } else {
+            // 数据行样式 - 隔行变色
+            ws[cellAddress].s = R % 2 === 0 ? evenRowStyle : oddRowStyle
+
+            // 特殊列对齐
+            if (C === 1) { // 单价列右对齐
+              ws[cellAddress].s.alignment = { ...ws[cellAddress].s.alignment, horizontal: 'right' }
+            } else if (C === 7 || C === 8) { // 版本和状态列居中
+              ws[cellAddress].s.alignment = { ...ws[cellAddress].s.alignment, horizontal: 'center' }
+            }
+          }
+        }
+      }
+
+      // 添加工作表到工作簿
+      XLSX.utils.book_append_sheet(wb, ws, '材料价格数据')
+
+      // 生成文件名 - 参考投诉记录的命名格式
+      const now = new Date()
+      const year = now.getFullYear().toString().slice(-2) // 取年份后两位
+      const month = (now.getMonth() + 1).toString().padStart(2, '0')
+      const day = now.getDate().toString().padStart(2, '0')
+      const hours = now.getHours().toString().padStart(2, '0')
+      const minutes = now.getMinutes().toString().padStart(2, '0')
+      const seconds = now.getSeconds().toString().padStart(2, '0')
+
+      const dateStr = `${year}${month}${day}`
+      const timeStamp = `${hours}${minutes}${seconds}`
+      let fileName = `材料价格数据_${dateStr}${timeStamp}.xlsx`
+
+      // 如果有筛选条件，添加到文件名
+      if (filters.materialName || filters.supplier || filters.isActive !== '' || filters.minPrice || filters.maxPrice) {
+        fileName = `材料价格数据_筛选结果_${dateStr}${timeStamp}.xlsx`
+      }
+
+      // 导出文件
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([wbout], { type: 'application/octet-stream' })
+      saveAs(blob, fileName)
+
+      ElMessage.success(`成功导出 ${exportData.length} 条记录`)
+    } else {
+      ElMessage.error('导出失败: ' + response.data.message)
+    }
   } catch (error) {
     console.error('导出失败:', error)
     ElMessage.error('导出失败')
@@ -967,7 +1262,8 @@ const downloadTemplate = () => {
 .material-price-container {
   padding: 20px;
   background: #f5f5f5;
-  min-height: calc(100vh - 60px);
+  min-height: 100%;
+  height: auto;
 }
 
 /* 页面头部 */

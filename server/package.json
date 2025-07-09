@@ -1,11 +1,15 @@
 {
+  "_comment": "DMS-QA质量管理系统 - 后端服务器项目配置文件",
   "name": "dms-qa-server",
   "version": "2.2.0",
   "main": "app.js",
+  "description": "DMS-QA质量管理系统后端API服务，基于Node.js+Express+SQL Server构建的RESTful API服务器",
+  "_engines_comment": "Node.js和npm版本要求，确保服务器环境兼容性",
   "engines": {
     "node": ">=16.0.0",
     "npm": ">=8.0.0"
   },
+  "_keywords_comment": "项目关键词，用于搜索和分类",
   "keywords": [
     "dms",
     "quality-management",
@@ -15,9 +19,11 @@
   ],
   "author": "David Lee (zglibk) <1039297691@qq.com>",
   "license": "Apache-2.0",
+  "_scripts_comment": "项目脚本命令",
   "scripts": {
     "start": "node app.js"
   },
+  "_dependencies_comment": "生产环境依赖包",
   "dependencies": {
     "bcryptjs": "^2.4.3",
     "body-parser": "^1.20.2",
@@ -31,5 +37,19 @@
     "node-cron": "^4.2.0",
     "uuid": "^11.1.0",
     "xlsx": "^0.18.5"
+  },
+  "_dependency_descriptions": {
+    "bcryptjs": "密码加密库，用于用户密码的哈希存储和验证",
+    "body-parser": "请求体解析中间件，解析JSON和URL编码数据",
+    "cookie-parser": "Cookie解析中间件，处理HTTP Cookie",
+    "cors": "跨域资源共享中间件，允许前端跨域访问API",
+    "express": "Node.js Web框架，构建RESTful API服务器",
+    "file-saver": "文件保存库，用于服务器端文件操作",
+    "jsonwebtoken": "JWT令牌库，用于用户认证和授权",
+    "mssql": "SQL Server数据库驱动，连接和操作SQL Server数据库",
+    "multer": "文件上传中间件，处理multipart/form-data格式的文件上传",
+    "node-cron": "定时任务库，执行计划任务和数据清理",
+    "uuid": "UUID生成库，生成唯一标识符",
+    "xlsx": "Excel文件处理库，读取和生成Excel文件"
   }
 }
