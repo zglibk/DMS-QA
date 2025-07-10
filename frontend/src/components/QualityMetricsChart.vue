@@ -549,8 +549,6 @@ const getDeliveryPassRateClass = (rate) => {
 const loadData = async () => {
   loading.value = true
   try {
-    console.log(`加载质量指标数据 - 年份: ${selectedYear.value}`)
-
     // 获取趋势数据
     const trendsResponse = await axios.get('/api/quality-metrics/trends', {
       params: { year: selectedYear.value }
@@ -563,24 +561,19 @@ const loadData = async () => {
 
     if (trendsResponse.data.success) {
       chartData.value = trendsResponse.data.data || []
-      console.log('趋势数据更新成功:', chartData.value.length, '条记录')
       updateChart() // 无论有无数据都要更新图表
     } else {
-      console.error('趋势数据获取失败:', trendsResponse.data.message)
       chartData.value = []
       updateChart() // 清空图表
     }
 
     if (summaryResponse.data.success) {
       summaryData.value = summaryResponse.data.data
-      console.log('汇总数据更新成功:', summaryData.value)
     } else {
-      console.error('汇总数据获取失败:', summaryResponse.data.message)
       summaryData.value = null // 清空汇总数据
     }
 
   } catch (error) {
-    console.error('加载质量指标数据失败:', error)
     ElMessage.error('加载质量指标数据失败')
   } finally {
     loading.value = false
@@ -589,18 +582,12 @@ const loadData = async () => {
 
 // 更新图表
 const updateChart = () => {
-  console.log('updateChart 被调用')
-  console.log('chartInstance.value:', !!chartInstance.value)
-  console.log('chartData.value.length:', chartData.value.length)
-
   if (!chartInstance.value) {
-    console.error('图表实例不存在')
     return
   }
 
   // 处理空数据的情况
   if (!chartData.value || !chartData.value.length) {
-    console.log('图表数据为空，清空图表显示')
     const emptyOption = {
       xAxis: {
         data: []
@@ -613,7 +600,6 @@ const updateChart = () => {
       ]
     }
     chartInstance.value.setOption(emptyOption, false, true)
-    console.log('图表已清空')
     return
   }
 
@@ -622,14 +608,6 @@ const updateChart = () => {
   const deliveryPassRates = chartData.value.map(item => item.DeliveryPassRate)
   const inspectionBatches = chartData.value.map(item => item.InspectionBatches)
   const deliveryBatches = chartData.value.map(item => item.DeliveryBatches)
-
-  console.log('图表数据:', {
-    months,
-    firstPassRates,
-    deliveryPassRates,
-    inspectionBatches,
-    deliveryBatches
-  })
 
   // 更新图表数据
   const updateOption = {
@@ -644,9 +622,7 @@ const updateChart = () => {
     ]
   }
 
-  console.log('设置图表选项:', updateOption)
   chartInstance.value.setOption(updateOption, false, true) // notMerge=false, lazyUpdate=true
-  console.log('图表更新完成')
 }
 
 // 刷新数据
@@ -656,16 +632,9 @@ const refreshData = () => {
 
 // 初始化图表
 const initChart = () => {
-  console.log('initChart 被调用')
-  console.log('chartRef.value:', !!chartRef.value)
-
   if (chartRef.value) {
-    console.log('开始初始化图表实例')
     chartInstance.value = echarts.init(chartRef.value)
-    console.log('图表实例创建成功:', !!chartInstance.value)
-
     chartInstance.value.setOption(chartOption.value)
-    console.log('初始图表选项设置完成')
 
     // 监听窗口大小变化 - 添加防抖优化
     let resizeTimer = null
@@ -675,7 +644,6 @@ const initChart = () => {
       }
       resizeTimer = setTimeout(() => {
         if (chartInstance.value) {
-          console.log('窗口大小变化，重新调整图表尺寸')
           chartInstance.value.resize()
         }
       }, 100) // 100ms防抖
@@ -693,8 +661,6 @@ const initChart = () => {
 
     // 在组件卸载时清理
     window.addEventListener('beforeunload', cleanup)
-  } else {
-    console.error('chartRef.value 不存在，无法初始化图表')
   }
 }
 

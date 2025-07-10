@@ -211,7 +211,6 @@ const loadConfig = async (showMessage = false) => {
       }
     }
   } catch (error) {
-    console.error('加载存储配置失败:', error)
     ElMessage.error('加载存储配置失败')
   } finally {
     isLoading.value = false
@@ -257,7 +256,6 @@ const saveConfig = async () => {
           ElMessage.error(response.data.message || '保存失败')
         }
       } catch (error) {
-        console.error('保存存储配置失败:', error)
         ElMessage.error('保存存储配置失败')
       } finally {
         isSubmitting.value = false
@@ -280,7 +278,6 @@ const testStorage = async () => {
       ElMessage.error(response.data.message || '存储路径测试失败')
     }
   } catch (error) {
-    console.error('测试存储失败:', error)
     ElMessage.error('测试存储失败')
   } finally {
     isTesting.value = false

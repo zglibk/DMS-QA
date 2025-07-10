@@ -76,7 +76,6 @@ const loadSiteConfig = async () => {
     }
   } catch (error) {
     // 配置加载失败不影响应用运行
-    console.error('加载网站配置失败:', error)
   } finally {
     isLoading.value = false
   }

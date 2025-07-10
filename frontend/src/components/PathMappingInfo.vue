@@ -236,7 +236,6 @@ const loadConfig = async () => {
       supportedFileTypes.value = data.supportedFileTypes
     }
   } catch (error) {
-    console.error('加载路径映射配置失败:', error)
     ElMessage.error('加载配置失败: ' + error.message)
   } finally {
     loading.value = false

@@ -238,7 +238,6 @@ const testSingleFile = async () => {
       ElMessage.error('文件拷贝测试失败')
     }
   } catch (error) {
-    console.error('测试失败:', error)
     singleFileResult.value = {
       success: false,
       data: {
@@ -294,7 +293,6 @@ const testBatchFiles = async () => {
 
     ElMessage.success(`批量测试完成：成功 ${batchFileResult.value.successful} 个，失败 ${batchFileResult.value.failed} 个`)
   } catch (error) {
-    console.error('批量测试失败:', error)
     ElMessage.error('批量测试失败: ' + error.message)
   } finally {
     batchFileLoading.value = false
@@ -310,7 +308,6 @@ const loadConfig = async () => {
       config.value = response.data.data
     }
   } catch (error) {
-    console.error('加载配置失败:', error)
     ElMessage.error('加载配置失败: ' + error.message)
   } finally {
     configLoading.value = false

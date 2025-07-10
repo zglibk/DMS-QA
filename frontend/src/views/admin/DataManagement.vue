@@ -2027,7 +2027,6 @@ const previewFile = async () => {
       ElMessage.error(response.data.message || '预览失败')
     }
   } catch (error) {
-    console.error('预览文件失败:', error)
     ElMessage.error('预览文件失败: ' + (error.response?.data?.message || error.message))
   } finally {
     previewLoading.value = false
@@ -2064,7 +2063,6 @@ const previewSelectedSheet = async (sheetName) => {
       ElMessage.error(response.data.message || '预览失败')
     }
   } catch (error) {
-    console.error('预览工作表失败:', error)
     ElMessage.error('预览工作表失败: ' + (error.response?.data?.message || error.message))
   } finally {
     previewLoading.value = false
@@ -2330,7 +2328,6 @@ const validateData = async (applyConversions = null) => {
       ElMessage.error(response.data.message || '数据校验失败')
     }
   } catch (error) {
-    console.error('数据校验失败:', error)
     ElMessage.error('数据校验失败: ' + (error.response?.data?.message || error.message))
   } finally {
     validationLoading.value = false
@@ -2432,7 +2429,7 @@ const executeImport = async () => {
         }
       }
     } catch (error) {
-      console.error('获取进度失败:', error)
+      // 获取进度失败，静默处理
     }
   }, 500) // 每500ms更新一次进度
 
@@ -2471,7 +2468,6 @@ const executeImport = async () => {
       ElMessage.success('数据导入成功')
     }
   } catch (error) {
-    console.error('导入失败:', error)
     importResult.value = {
       success: false,
       message: error.response?.data?.message || error.message
@@ -2513,7 +2509,6 @@ const fetchFieldMapping = async () => {
       fieldMapping.value = response.data.data
     }
   } catch (error) {
-    console.error('获取字段映射失败:', error)
     ElMessage.error('获取字段映射失败')
   }
 }
@@ -2540,7 +2535,6 @@ const downloadTemplate = async () => {
 
     ElMessage.success('模板下载成功')
   } catch (error) {
-    console.error('下载模板失败:', error)
     ElMessage.error('下载模板失败: ' + (error.response?.data?.message || error.message))
   }
 }
@@ -2560,7 +2554,6 @@ const fetchTableList = async () => {
       ElMessage.error('获取表列表失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('获取表列表失败:', error)
     ElMessage.error('获取表列表失败: ' + (error.response?.data?.message || error.message))
   } finally {
     tableListLoading.value = false
@@ -2581,7 +2574,7 @@ const fetchTableStats = async (tableName) => {
       tableStats.value[tableName] = response.data.data
     }
   } catch (error) {
-    console.error(`获取表 ${tableName} 统计失败:`, error)
+    // 获取表统计失败，静默处理
   }
 }
 
@@ -2665,7 +2658,6 @@ const executeInitialize = async () => {
       ElMessage.error('初始化失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('初始化表失败:', error)
     const errorMessage = error.response?.data?.message || error.message
     initializeResult.value = {
       success: false,
@@ -2767,11 +2759,9 @@ const fetchDatabaseInfo = async () => {
         backupPathConfig.value = response.data.data.backupPath
       }
     } else {
-      console.warn('获取数据库信息失败:', response.data.message)
       // 不显示错误消息，避免影响用户体验
     }
   } catch (error) {
-    console.error('获取数据库信息失败:', error)
     // 不显示错误消息，避免影响用户体验
   } finally {
     databaseInfoLoading.value = false
@@ -2786,11 +2776,9 @@ const fetchBackupList = async () => {
     if (response.data.success) {
       backupList.value = response.data.data
     } else {
-      console.warn('获取备份列表失败:', response.data.message)
       // 不显示错误消息，避免影响用户体验
     }
   } catch (error) {
-    console.error('获取备份列表失败:', error)
     // 不显示错误消息，避免影响用户体验
   } finally {
     backupListLoading.value = false
@@ -2845,7 +2833,6 @@ const createDatabaseBackup = async () => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('创建备份失败:', error)
       ElMessage.error('创建备份失败: ' + (error.response?.data?.message || error.message))
     }
   } finally {
@@ -2938,7 +2925,6 @@ const saveBackupPath = async () => {
       ElMessage.error('保存备份路径失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('保存备份路径失败:', error)
     ElMessage.error('保存备份路径失败: ' + (error.response?.data?.message || error.message))
   } finally {
     backupPathSaving.value = false
@@ -2964,7 +2950,6 @@ const createBackupFolder = async () => {
       ElMessage.error('创建备份文件夹失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('创建备份文件夹失败:', error)
     ElMessage.error('创建备份文件夹失败: ' + (error.response?.data?.message || error.message))
   } finally {
     folderCreating.value = false
@@ -2977,7 +2962,6 @@ const createBackupFolder = async () => {
 
 // 处理备份子标签页切换
 const handleBackupSubTabChange = (tabName) => {
-  console.log('切换到备份子标签页:', tabName)
   if (tabName === 'auto') {
     fetchAutoBackupConfig()
     fetchAutoBackupStatus()
@@ -2986,7 +2970,7 @@ const handleBackupSubTabChange = (tabName) => {
 
 // 处理备份Tab切换
 const handleBackupTabChange = (tabName) => {
-  console.log('切换到备份方案:', tabName)
+  // 备份方案切换处理
 }
 
 // 保存默认备份路径
@@ -3003,7 +2987,6 @@ const saveDefaultBackupPath = async () => {
       ElMessage.error('保存失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('保存默认备份路径失败:', error)
     ElMessage.error('保存失败: ' + (error.response?.data?.message || error.message))
   } finally {
     defaultPathSaving.value = false
@@ -3029,7 +3012,6 @@ const saveAlternativeBackupPath = async () => {
       ElMessage.error('保存失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('保存备选方案路径失败:', error)
     ElMessage.error('保存失败: ' + (error.response?.data?.message || error.message))
   } finally {
     alternativePathSaving.value = false
@@ -3065,7 +3047,6 @@ const updateBackupPath = async (backup) => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('更新备份路径失败:', error)
       ElMessage.error('更新失败: ' + (error.response?.data?.message || error.message))
     }
   }
@@ -3094,7 +3075,6 @@ const verifyBackupFile = async (backup) => {
       ElMessage.error('验证失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('验证备份文件失败:', error)
     ElMessage.error('验证失败: ' + (error.response?.data?.message || error.message))
   }
 }
@@ -3127,7 +3107,6 @@ const deleteBackupRecord = async (backup) => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('删除备份记录失败:', error)
       ElMessage.error('删除失败: ' + (error.response?.data?.message || error.message))
     }
   }
@@ -3149,10 +3128,9 @@ const fetchAutoBackupConfig = async () => {
         ...response.data.data
       }
     } else {
-      console.warn('获取自动备份配置失败:', response.data.message)
+      // 获取自动备份配置失败，静默处理
     }
   } catch (error) {
-    console.error('获取自动备份配置失败:', error)
     ElMessage.error('获取自动备份配置失败: ' + (error.response?.data?.message || error.message))
   } finally {
     autoBackupConfigLoading.value = false
@@ -3172,7 +3150,6 @@ const saveAutoBackupConfig = async () => {
       ElMessage.error('保存失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('保存自动备份配置失败:', error)
     ElMessage.error('保存失败: ' + (error.response?.data?.message || error.message))
   } finally {
     autoBackupConfigSaving.value = false
@@ -3224,10 +3201,9 @@ const fetchAutoBackupStatus = async () => {
       autoBackupStatus.value = response.data.data
       autoBackupLogs.value = response.data.data.recentLogs || []
     } else {
-      console.warn('获取自动备份状态失败:', response.data.message)
+      // 获取自动备份状态失败，静默处理
     }
   } catch (error) {
-    console.error('获取自动备份状态失败:', error)
     ElMessage.error('获取自动备份状态失败: ' + (error.response?.data?.message || error.message))
   } finally {
     autoBackupStatusLoading.value = false
@@ -3262,7 +3238,6 @@ const triggerManualBackup = async () => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('触发备份失败:', error)
       ElMessage.error('触发备份失败: ' + (error.response?.data?.message || error.message))
     }
   } finally {

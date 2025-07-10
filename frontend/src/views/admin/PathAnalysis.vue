@@ -141,7 +141,6 @@ const fetchPathAnalysis = async () => {
       ElMessage.error('分析失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('获取路径分析失败:', error)
     ElMessage.error('获取数据失败: ' + (error.response?.data?.message || error.message))
   } finally {
     loading.value = false

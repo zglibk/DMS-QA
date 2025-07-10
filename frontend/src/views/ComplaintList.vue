@@ -353,23 +353,17 @@ const activeConditionsCount = computed(() => {
 
 // 获取下拉选项数据
 const fetchOptions = async () => {
-  console.log('=== 前端开始获取下拉选项 ===')
   try {
     const token = localStorage.getItem('token')
-    console.log('使用的token:', token ? '已获取' : '未获取')
 
     const response = await axios.get('/api/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     })
-    console.log('前端获取下拉选项响应:', response.data)
 
     if (response.data) {
       options.value = response.data
-      console.log('前端下拉选项数据更新成功:', options.value)
     }
   } catch (error) {
-    console.error('前端获取下拉选项失败:', error)
-    console.error('错误详情:', error.response?.data)
     ElMessage.error('获取下拉选项失败: ' + (error.response?.data?.message || error.message))
   }
 }
@@ -398,7 +392,6 @@ const fetchData = async () => {
       ElMessage.error('获取数据失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('获取投诉列表失败:', error)
     ElMessage.error('获取数据失败: ' + (error.response?.data?.message || error.message))
   } finally {
     tableLoading.value = false
@@ -474,7 +467,6 @@ const getDefectiveRateType = (rate) => {
 
 // 页面加载时获取数据
 onMounted(() => {
-  console.log('=== 页面加载，开始获取数据 ===')
   fetchOptions()
   fetchData()
 })

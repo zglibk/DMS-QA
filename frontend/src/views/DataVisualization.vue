@@ -235,12 +235,10 @@ const exportData = () => {
 }
 
 const handleFilterChange = () => {
-  console.log('筛选条件变更:', filterForm.value)
   fetchAllData()
 }
 
 const handleTabChange = (tabName) => {
-  console.log('切换标签页:', tabName)
   nextTick(() => {
     initCharts()
   })
@@ -271,13 +269,8 @@ const fetchBasicData = async () => {
     // 不良类别保持对象格式，因为需要ID和Name
     defectiveCategories.value = data.defectiveCategories || []
 
-    console.log('基础数据获取成功:', {
-      workshops: workshops.value.length,
-      departments: departments.value.length,
-      defectiveCategories: defectiveCategories.value.length
-    })
+
   } catch (error) {
-    console.error('获取基础数据失败:', error)
     // 设置默认空数组
     workshops.value = []
     departments.value = []
@@ -301,7 +294,7 @@ const fetchStatsData = async () => {
       rateTrend: -1.2
     }
   } catch (error) {
-    console.error('获取统计数据失败:', error)
+    // 获取统计数据失败，使用默认值
   }
 }
 
@@ -316,7 +309,7 @@ const fetchRecentComplaints = async () => {
     
     recentComplaints.value = res.data.data || []
   } catch (error) {
-    console.error('获取最新投诉记录失败:', error)
+    // 获取最新投诉记录失败，使用空数组
   }
 }
 
@@ -404,15 +397,15 @@ const initOverviewCharts = () => {
 
 // 其他图表初始化方法（占位）
 const initTrendChart = () => {
-  console.log('初始化趋势分析图表')
+  // 初始化趋势分析图表
 }
 
 const initComparisonChart = () => {
-  console.log('初始化对比分析图表')
+  // 初始化对比分析图表
 }
 
 const initDistributionChart = () => {
-  console.log('初始化分布分析图表')
+  // 初始化分布分析图表
 }
 
 // 生命周期

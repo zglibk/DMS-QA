@@ -604,9 +604,7 @@ const fetchOptions = async () => {
     options.defectiveCategories = data.defectiveCategories || [];
     options.defectiveItems = []; // 初始为空，根据不良类别动态加载
 
-    console.log('获取下拉选项成功:', options);
   } catch (error) {
-    console.error('获取下拉选项失败:', error);
     ElMessage.error('获取下拉选项失败: ' + (error.response?.data?.message || error.message));
   }
 }
@@ -627,12 +625,8 @@ const fetchMaterialNames = async () => {
 
     if (res.data.success) {
       materialNames.value = res.data.data || [];
-      console.log('获取材料名称列表成功:', materialNames.value);
-    } else {
-      console.warn('获取材料名称列表失败:', res.data.message);
     }
   } catch (error) {
-    console.error('获取材料名称列表失败:', error);
     // 不显示错误消息，因为这不是关键功能
   } finally {
     materialLoading.value = false;
@@ -690,14 +684,9 @@ const handleMaterialChange = async (materialType, materialName) => {
 
         // 显示成功消息
         ElMessage.success(`已自动填入${materialName}的单价：￥${price.unitPrice}`);
-      } else {
-        console.log(`材料"${materialName}"没有设置单价`);
       }
-    } else {
-      console.log(`未找到材料"${materialName}"的价格信息:`, res.data.message);
     }
   } catch (error) {
-    console.error('获取材料单价失败:', error);
     // 不显示错误消息，让用户可以手动输入单价
   }
 }
@@ -783,8 +772,6 @@ const calculateLaborCost = () => {
   // 设置计算结果
   form.value.LaborCost = laborCost;
 
-  console.log(`人工成本计算: 纸张数量=${length}米, 车间=${workshop}, 基础单价=${basePrice}元/千米, 计算结果=${laborCost}元`);
-
   // 人工成本变化后，触发总成本计算
   calculateTotalCost();
 }
@@ -841,8 +828,6 @@ const calculateTotalCost = () => {
   // 四舍五入到2位小数，如果为0则保持0
   form.value.TotalCost = totalCost === 0 ? 0 : Math.round(totalCost * 100) / 100;
 
-  console.log(`总成本计算: 纸张=${paperCost}, 材料A=${materialACost}, 材料B=${materialBCost}, 材料C=${materialCCost}, 人工=${laborCost}, 总计=${form.value.TotalCost}元`);
-
   // 总成本变化后，触发主责人考核计算
   calculateMainPersonAssessment();
 }
@@ -861,7 +846,6 @@ const calculateMainPersonAssessment = () => {
   // 如果总成本为0或负数，主责人考核金额为0
   if (totalCost <= 0) {
     form.value.MainPersonAssessment = 0;
-    console.log(`主责人考核计算: 总成本=${totalCost}元, 考核金额=0元 (总成本≤0)`);
     return;
   }
 
@@ -875,8 +859,6 @@ const calculateMainPersonAssessment = () => {
 
   // 四舍五入到2位小数
   form.value.MainPersonAssessment = Math.round(assessmentAmount * 100) / 100;
-
-  console.log(`主责人考核计算: 总成本=${totalCost}元, 考核金额=${form.value.MainPersonAssessment}元 (${totalCost}×50%=${totalCost * 0.5}, 最低20元)`);
 }
 
 /**
@@ -906,25 +888,19 @@ const calculateMaterialCost = (spec, qty, unitPrice) => {
 }
 
 const handleCategoryChange = async (selectedCategory) => {
-  console.log('不良类别变化:', selectedCategory);
   form.value.DefectiveItem = '';
   options.defectiveItems = [];
   if (selectedCategory && selectedCategory.ID) {
     try {
       const token = localStorage.getItem('token');
-      console.log('请求不良项 - CategoryID:', selectedCategory.ID);
       const res = await axios.get(`/api/complaint/defective-items/${selectedCategory.ID}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // 后端直接返回字符串数组，无需转换
       options.defectiveItems = res.data || [];
-      console.log('获取不良项成功:', options.defectiveItems);
     } catch (error) {
-      console.error('获取不良项失败:', error);
       ElMessage.error('获取不良项失败: ' + (error.response?.data?.message || error.message));
     }
-  } else {
-    console.log('没有选择有效的不良类别或缺少ID');
   }
 }
 
@@ -1021,8 +997,7 @@ watch([
 watch([
   () => form.value.PaperQty,
   () => form.value.Workshop
-], ([paperQty, workshop]) => {
-  console.log('人工成本监听器触发:', { paperQty, workshop });
+], () => {
   calculateLaborCost();
 })
 
@@ -1041,14 +1016,12 @@ watch([
   () => form.value.MaterialCQty,
   () => form.value.MaterialCUnitPrice,
   () => form.value.LaborCost
-], (values) => {
-  console.log('总成本监听器触发:', values);
+], () => {
   calculateTotalCost();
 })
 
 // 主责人考核自动计算
-watch(() => form.value.TotalCost, (totalCost) => {
-  console.log('主责人考核监听器触发:', totalCost);
+watch(() => form.value.TotalCost, () => {
   calculateMainPersonAssessment();
 })
 
@@ -1063,7 +1036,6 @@ onMounted(async () => {
   ]);
 
   // 初始化计算
-  console.log('组件挂载，执行初始计算');
   calculateLaborCost();
   calculateTotalCost();
   calculateMainPersonAssessment();

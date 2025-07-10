@@ -260,7 +260,6 @@ document.addEventListener('fullscreenchange', () => {
 
 // 图片加载错误处理
 const handleLogoError = (event) => {
-  console.warn('LOGO图片加载失败，使用默认图片')
   event.target.src = '/logo.png'
 }
 

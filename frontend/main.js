@@ -135,7 +135,6 @@ const initApp = async () => {
     await loadSiteConfig();
   } catch (error) {
     // 配置加载失败不影响应用启动
-    console.warn('初始化网站配置失败:', error);
   }
 
   // 将Vue应用挂载到id为'app'的DOM元素

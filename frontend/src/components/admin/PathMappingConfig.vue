@@ -233,7 +233,6 @@ const testConversion = async () => {
       ElMessage.error('路径转换测试失败')
     }
   } catch (error) {
-    console.error('测试路径转换失败:', error)
     testResult.value = '测试失败: ' + error.message
     ElMessage.error('测试路径转换失败')
   } finally {
@@ -269,7 +268,6 @@ const loadConfig = async (showMessage = false) => {
       ElMessage.error(response.data.message || '加载配置失败')
     }
   } catch (error) {
-    console.error('加载路径映射配置失败:', error)
     ElMessage.error('加载路径映射配置失败')
   } finally {
     isLoading.value = false
@@ -315,7 +313,6 @@ const saveConfig = async () => {
       ElMessage.error(response.data.message || '保存失败')
     }
   } catch (error) {
-    console.error('保存路径映射配置失败:', error)
     ElMessage.error('保存路径映射配置失败: ' + (error.response?.data?.message || error.message))
   } finally {
     isSubmitting.value = false

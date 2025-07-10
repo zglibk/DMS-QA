@@ -255,7 +255,6 @@ const loadWorkshopsAndDepartments = async () => {
       departments.value = departmentsRes.data.data
     }
   } catch (error) {
-    console.error('获取车间/部门数据失败:', error)
     ElMessage.error('获取车间/部门数据失败')
   } finally {
     isLoadingOptions.value = false
@@ -403,7 +402,6 @@ const loadConfig = async (showMessage = false) => {
       }
     }
   } catch (error) {
-    console.error('加载主页卡片配置失败:', error)
     if (showMessage) {
       ElMessage.error('加载配置失败')
     }
@@ -442,7 +440,6 @@ const saveConfig = async (setAsDefault = false) => {
       ElMessage.error(response.data.message || '保存失败')
     }
   } catch (error) {
-    console.error('保存主页卡片配置失败:', error)
     ElMessage.error('保存配置失败')
   } finally {
     isSubmitting.value = false
@@ -456,7 +453,6 @@ const saveAsDefault = async () => {
 
 // 拖拽结束处理
 const onDragEnd = () => {
-  console.log('拖拽结束，新顺序:', previewOrder.value)
   // 更新config.displayUnits的顺序
   const newOrder = []
 

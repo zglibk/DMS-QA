@@ -1428,12 +1428,10 @@ const fetchExportFields = async () => {
 
     if (res.data.success) {
       exportFields.value = res.data.data
-      console.log('获取到字段信息:', exportFields.value.length, '个字段')
     } else {
       ElMessage.error('获取字段信息失败')
     }
   } catch (error) {
-    console.error('获取字段信息失败:', error)
     ElMessage.error('获取字段信息失败: ' + (error.response?.data?.message || error.message))
   }
 }
@@ -1594,7 +1592,6 @@ const fetchTableData = async () => {
       page: page.value,
       pageSize: pageSize.value
     }
-    // console.log('发送请求参数:', params)
 
     // 如果使用高级查询，则使用高级查询参数，否则使用简单搜索
     if (isAdvancedQuery.value) {
@@ -1627,16 +1624,8 @@ const fetchTableData = async () => {
     })
 
     if (res.data.success) {
-      // console.log('🔍 数据接收调试:')
-      // console.log('- 接收到的数据条数:', res.data.data.length)
-      // console.log('- 总记录数:', res.data.total)
-      // console.log('- 页面大小:', res.data.pageSize)
-
       tableData.value = res.data.data
       total.value = res.data.total
-
-      // console.log('- 设置后tableData长度:', tableData.value.length)
-      // console.log('- tableData前3条:', res.data.data.slice(0, 3))
     }
   } catch (e) {
     tableData.value = []
@@ -1648,7 +1637,6 @@ const fetchTableData = async () => {
 
 // 处理月份变化
 const handleMonthChange = (value) => {
-  console.log('月份变化:', value, '当前selectedMonth:', selectedMonth.value)
   // 强制更新selectedMonth值
   selectedMonth.value = value
 
@@ -1661,23 +1649,19 @@ const handleMonthChange = (value) => {
   if (!isCurrentMonthSelected) {
     // 非当前月份，关闭今日统计显示
     showTodayStats.value = false
-    console.log('非当前月份，自动关闭今日统计显示')
   } else {
     // 当前月份，开启今日统计显示
     showTodayStats.value = true
-    console.log('当前月份，自动开启今日统计显示')
   }
 
   // 确保使用最新的月份值
   nextTick(() => {
-    console.log('准备获取统计数据，月份:', selectedMonth.value)
     fetchStats()
   })
 }
 
 // 处理今日统计开关
 const handleTodayStatsToggle = (value) => {
-  console.log('今日统计开关:', value)
   // 不需要重新获取数据，只是控制显示
 }
 
@@ -1686,7 +1670,6 @@ const fetchStats = async () => {
     statsLoading.value = true // 开始加载
     const token = localStorage.getItem('token')
     if (!token) {
-      console.warn('未找到token，跳转到登录页')
       window.location.href = '/login'
       return
     }
@@ -1695,8 +1678,6 @@ const fetchStats = async () => {
     const params = {
       month: selectedMonth.value
     }
-
-    console.log('发送统计请求，参数:', params)
 
     const res = await axios.get('/api/complaint/month-stats', {
       headers: { Authorization: `Bearer ${token}` },
@@ -1718,20 +1699,11 @@ const fetchStats = async () => {
       // 获取质量统计数据
       await fetchQualityStats()
 
-      console.log('统计数据获取成功:', {
-        targetMonth: res.data.targetMonth,
-        selectedMonth: selectedMonth.value,
-        todayCount: todayCount.value,
-        monthCount: monthCount.value,
-        unitsCount: statUnits.value.length
-      })
     } else {
-      console.error('统计数据获取失败:', res.data.message)
+      // 统计数据获取失败，静默处理
     }
   } catch (e) {
-    console.error('获取统计数据失败:', e)
     if (e.response && e.response.status === 401) {
-      console.warn('认证失败，跳转到登录页')
       localStorage.removeItem('token')
       window.location.href = '/login'
     }
@@ -1792,8 +1764,7 @@ const fetchQualityStats = async () => {
     const totalInspections = batchData ? batchData.inspectionBatches : 0
     const totalDeliveries = batchData ? batchData.deliveryBatches : 0
 
-    console.log('批次数据:', batchData)
-    console.log('投诉数据:', { failedInspections, complaintBatches })
+
 
     // 计算合格率和客诉率
     const passRate = totalInspections > 0 ?
@@ -1810,9 +1781,7 @@ const fetchQualityStats = async () => {
       complaintBatches
     }
 
-    console.log('质量统计数据:', qualityStats.value)
   } catch (error) {
-    console.error('获取质量统计数据失败:', error)
     // 设置默认值
     qualityStats.value = {
       passRate: 0,
@@ -1836,7 +1805,7 @@ const fetchChartOptions = async () => {
     chartOptions.value.workshops = res.data.workshops?.map(item => item.Name) || []
     chartOptions.value.defectiveItems = res.data.defectiveCategories?.map(item => item.Name) || []
   } catch (e) {
-    console.error('获取图表选项失败:', e)
+    // 获取图表选项失败，静默处理
   }
 }
 
@@ -1851,7 +1820,6 @@ const renderCharts = () => {
     // 柱形图
     const barChartDom = document.getElementById('barChart')
     if (!barChartDom) {
-      console.warn('barChart DOM元素未找到')
       return
     }
     const barChart = echarts.init(barChartDom)
@@ -1891,7 +1859,6 @@ const renderCharts = () => {
   // 折线图
   const lineChartDom = document.getElementById('lineChart')
   if (!lineChartDom) {
-    console.warn('lineChart DOM元素未找到')
     return
   }
   const lineChart = echarts.init(lineChartDom)
@@ -1933,7 +1900,6 @@ const renderCharts = () => {
   // 玫瑰图
   const roseChartDom = document.getElementById('roseChart')
   if (!roseChartDom) {
-    console.warn('roseChart DOM元素未找到')
     return
   }
   const roseChart = echarts.init(roseChartDom)
@@ -1974,7 +1940,7 @@ const renderCharts = () => {
     }]
   })
   } catch (error) {
-    console.error('图表渲染失败:', error)
+    // 图表渲染失败，静默处理
   }
 }
 const fetchChartData = async () => {
@@ -2033,9 +1999,8 @@ const fetchChartData = async () => {
       chartData.value.categoryData = categoryRes.data.data
     }
 
-    console.log('图表数据获取完成:', chartData.value)
   } catch (error) {
-    console.error('获取图表数据失败:', error)
+    // 获取图表数据失败，静默处理
   }
 
   // 刷新图表
@@ -2049,10 +2014,8 @@ const handlePageChange = (val) => {
 }
 
 const handleSizeChange = (val) => {
-  // console.log('分页大小改变:', val)
   pageSize.value = val
   page.value = 1
-  // console.log('当前pageSize:', pageSize.value)
   fetchTableData()
 }
 
@@ -2124,7 +2087,7 @@ const fetchOptions = async () => {
     departmentOptions.value = res.data.departments.map(item => item.Name)
     personOptions.value = res.data.persons.map(item => item.Name)
   } catch (error) {
-    console.error('获取下拉选项失败:', error)
+    // 获取下拉选项失败，静默处理
   }
 }
 
@@ -2185,7 +2148,6 @@ const viewDetail = async (row) => {
       ElMessage.error(response.data.message || '获取详情失败')
     }
   } catch (error) {
-    console.error('获取详情失败:', error)
     ElMessage.error('获取详情失败')
   } finally {
     detailLoading.value = false
@@ -2194,7 +2156,6 @@ const viewDetail = async (row) => {
 
 // 表格行双击事件处理
 const handleRowDoubleClick = (row) => {
-  console.log('表格行双击事件:', row)
   // 调用查看详情函数，实现与"查看详情"按钮相同的效果
   viewDetail(row)
 }
@@ -2215,8 +2176,6 @@ const fetchEditOptions = async () => {
       fetchEditMaterialNames()
     ])
 
-    console.log('编辑表单API响应:', optionsResponse.data)
-
     // 参考新增投诉的实现，直接访问response.data而不是response.data.data
     const data = optionsResponse.data
     editOptions.workshops = data.workshops?.map(item => item.Name) || []
@@ -2228,18 +2187,7 @@ const fetchEditOptions = async () => {
     editOptions.defectiveCategories = data.defectiveCategories || []
     editOptions.defectiveItems = [] // 初始为空，根据不良类别动态加载
 
-    console.log('获取编辑表单下拉选项成功:', {
-      workshops: editOptions.workshops.length,
-      departments: editOptions.departments.length,
-      persons: editOptions.persons.length,
-      complaintCategories: editOptions.complaintCategories.length,
-      customerComplaintTypes: editOptions.customerComplaintTypes.length,
-      defectiveCategories: editOptions.defectiveCategories.length,
-      materialNames: editMaterialNames.value.length
-    })
-    console.log('详细选项数据:', editOptions)
   } catch (error) {
-    console.error('获取编辑表单下拉选项失败:', error)
     ElMessage.error('获取下拉选项失败: ' + (error.response?.data?.message || error.message))
   }
 }
@@ -2257,12 +2205,10 @@ const fetchEditMaterialNames = async () => {
 
     if (res.data.success) {
       editMaterialNames.value = res.data.data || [];
-      console.log('获取编辑表单材料名称列表成功:', editMaterialNames.value);
     } else {
-      console.warn('获取编辑表单材料名称列表失败:', res.data.message);
+      // 获取材料名称列表失败，静默处理
     }
   } catch (error) {
-    console.error('获取编辑表单材料名称列表失败:', error);
     // 不显示错误消息，因为这不是关键功能
   } finally {
     editMaterialLoading.value = false;
@@ -2319,13 +2265,12 @@ const handleEditMaterialChange = async (materialType, materialName) => {
         // 显示成功消息
         ElMessage.success(`已自动填入${materialName}的单价：￥${price.unitPrice}`);
       } else {
-        console.log(`材料"${materialName}"没有设置单价`);
+        // 材料没有设置单价，静默处理
       }
     } else {
-      console.log(`未找到材料"${materialName}"的价格信息:`, res.data.message);
+      // 未找到材料价格信息，静默处理
     }
   } catch (error) {
-    console.error('获取材料单价失败:', error);
     // 不显示错误消息，让用户可以手动输入单价
   }
 }
@@ -2415,7 +2360,7 @@ const calculateEditLaborCost = () => {
   // 设置计算结果
   editFormData.value.LaborCost = laborCost;
 
-  console.log(`编辑表单人工成本计算: 纸张数量=${length}米, 车间=${workshop}, 基础单价=${basePrice}元/千米, 计算结果=${laborCost}元`);
+
 
   // 人工成本变化后，触发总成本计算
   calculateEditTotalCost();
@@ -2477,7 +2422,7 @@ const calculateEditTotalCost = () => {
   // 四舍五入到2位小数，如果为0则保持0
   editFormData.value.TotalCost = totalCost === 0 ? 0 : Math.round(totalCost * 100) / 100;
 
-  console.log(`编辑表单总成本计算: 纸张=${paperCost}, 材料A=${materialACost}, 材料B=${materialBCost}, 材料C=${materialCCost}, 人工=${laborCost}, 总计=${editFormData.value.TotalCost}元`);
+
 
   // 总成本变化后，触发主责人考核计算
   calculateEditMainPersonAssessment();
@@ -2501,7 +2446,6 @@ const calculateEditMainPersonAssessment = () => {
   // 如果总成本为0或负数，主责人考核金额为0
   if (totalCost <= 0) {
     editFormData.value.MainPersonAssessment = 0;
-    console.log(`编辑表单主责人考核计算: 总成本=${totalCost}元, 考核金额=0元 (总成本≤0)`);
     return;
   }
 
@@ -2516,7 +2460,7 @@ const calculateEditMainPersonAssessment = () => {
   // 四舍五入到2位小数
   editFormData.value.MainPersonAssessment = Math.round(assessmentAmount * 100) / 100;
 
-  console.log(`编辑表单主责人考核计算: 总成本=${totalCost}元, 考核金额=${editFormData.value.MainPersonAssessment}元 (${totalCost}×50%=${totalCost * 0.5}, 最低20元)`);
+
 }
 
 /**
@@ -2547,7 +2491,6 @@ const calculateEditMaterialCost = (spec, qty, unitPrice) => {
 
 // 处理不良类别变化（编辑表单）
 const handleEditCategoryChange = async (categoryObj) => {
-  console.log('编辑表单不良类别变化:', categoryObj)
 
   // 清空不良项选择
   if (editFormData.value) {
@@ -2561,16 +2504,13 @@ const handleEditCategoryChange = async (categoryObj) => {
 
   try {
     const token = localStorage.getItem('token')
-    console.log('请求不良项 - CategoryID:', categoryObj.ID)
     const response = await axios.get(`/api/complaint/defective-items/${categoryObj.ID}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
     // 参考新增投诉的实现，后端直接返回字符串数组
     editOptions.defectiveItems = response.data || []
-    console.log('获取不良项成功:', editOptions.defectiveItems)
   } catch (error) {
-    console.error('获取不良项失败:', error)
     editOptions.defectiveItems = []
     ElMessage.error('获取不良项失败: ' + (error.response?.data?.message || error.message))
   }
@@ -2683,7 +2623,6 @@ const editRecord = async (row) => {
       ElMessage.error(response.data.message || '获取记录详情失败')
     }
   } catch (error) {
-    console.error('获取编辑数据失败:', error)
     ElMessage.error('获取编辑数据失败')
   } finally {
     editFormLoading.value = false
@@ -2799,7 +2738,7 @@ const saveEdit = async () => {
       }
     })
 
-    console.log('提交的数据:', submitData)
+
 
     const response = await axios.put(`/api/complaint/${submitData.ID}`, submitData, {
       headers: {
@@ -2820,14 +2759,6 @@ const saveEdit = async () => {
       ElMessage.error(response.data?.message || '更新失败')
     }
   } catch (error) {
-    console.error('保存编辑失败:', error)
-    console.error('错误详情:', {
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      data: error.response?.data,
-      message: error.message
-    })
-
     if (error.response?.status === 401) {
       ElMessage.error('登录已过期，请重新登录')
       localStorage.removeItem('token')
@@ -2850,7 +2781,6 @@ const saveEdit = async () => {
 const hasDataChanged = () => {
   // 如果原始数据为空或者没有ID，说明还没有正确初始化，不应该判断为有变更
   if (!originalFormData.value || !originalFormData.value.ID || !editFormData.value || !editFormData.value.ID) {
-    console.log('数据未初始化，无变更')
     return false
   }
 
@@ -2860,7 +2790,6 @@ const hasDataChanged = () => {
 
   // 检查字段数量是否相同
   if (originalKeys.length !== currentKeys.length) {
-    console.log('字段数量不同，有变更')
     return true
   }
 
@@ -2875,7 +2804,6 @@ const hasDataChanged = () => {
       const originalStr = JSON.stringify(originalValue)
       const currentStr = JSON.stringify(currentValue)
       if (originalStr !== currentStr) {
-        console.log(`字段 ${key} 对象值有变更:`, { original: originalStr, current: currentStr })
         return true
       }
     } else {
@@ -2884,13 +2812,11 @@ const hasDataChanged = () => {
       const currentStr = (currentValue === null || currentValue === undefined) ? '' : String(currentValue)
 
       if (originalStr !== currentStr) {
-        console.log(`字段 ${key} 值有变更:`, { original: originalStr, current: currentStr })
         return true
       }
     }
   }
 
-  console.log('数据无变更')
   return false
 }
 
@@ -2902,7 +2828,6 @@ const selectFile = async () => {
   try {
     // 使用File System Access API
     if ('showOpenFilePicker' in window) {
-      console.log('使用 File System Access API')
 
       const [fileHandle] = await window.showOpenFilePicker({
         multiple: false,
@@ -2931,12 +2856,6 @@ const selectFile = async () => {
       }
 
       // 检查是否有路径相关的属性
-      console.log('File properties:', {
-        name: file.name,
-        webkitRelativePath: file.webkitRelativePath,
-        handleName: fileHandle.name,
-        fileHandle: fileHandle
-      })
 
       // 由于浏览器安全限制，我们需要用户提供完整路径
       try {
@@ -2963,14 +2882,12 @@ const selectFile = async () => {
     }
   } catch (error) {
     if (error.name === 'AbortError') {
-      console.log('用户取消选择文件')
       return
     }
-    console.log('File System Access API 不支持或出错:', error)
+    // File System Access API 不支持或出错，静默处理
   }
 
   // 降级到传统的文件输入方法
-  console.log('使用传统文件输入方法')
   const input = document.createElement('input')
   input.type = 'file'
   input.accept = '*/*'
@@ -2981,13 +2898,7 @@ const selectFile = async () => {
     if (file) {
       selectedFile.value = file
 
-      console.log('传统方法选择的文件:', {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        lastModified: file.lastModified,
-        webkitRelativePath: file.webkitRelativePath
-      })
+
 
       // 提示用户输入完整路径
       try {
@@ -3054,14 +2965,12 @@ const showImagePreview = () => {
 
 // 图片加载错误处理
 const handleImageError = (event) => {
-  console.log('图片加载失败:', event.target.src)
   // 隐藏图片，显示占位符
   event.target.style.display = 'none'
 }
 
 // 图片加载成功处理
 const handleImageLoad = (event) => {
-  console.log('图片加载成功:', event.target.src)
   event.target.style.display = 'block'
 }
 
@@ -3074,13 +2983,7 @@ const handleFileDrop = async (event) => {
     const file = files[0]
     selectedFile.value = file
 
-    console.log('拖拽文件信息:', {
-      name: file.name,
-      size: file.size,
-      type: file.type,
-      lastModified: file.lastModified,
-      webkitRelativePath: file.webkitRelativePath
-    })
+
 
     // 尝试从拖拽事件获取更多路径信息
     let filePath = file.name
@@ -3092,7 +2995,6 @@ const handleFileDrop = async (event) => {
       if (item.webkitGetAsEntry) {
         const entry = item.webkitGetAsEntry()
         if (entry && entry.fullPath) {
-          console.log('文件条目路径:', entry.fullPath)
           filePath = entry.fullPath
         }
       }
@@ -3164,7 +3066,6 @@ const deleteRecord = async (row) => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('删除记录失败:', error)
       ElMessage.error('删除记录失败')
     }
   }
@@ -3577,7 +3478,6 @@ watch(pageCount, (val) => {
 
 // 监听编辑表单纸张数量和车间变化，自动计算人工成本
 watch(() => editFormData.value ? [editFormData.value.PaperQty, editFormData.value.Workshop] : [], (values) => {
-  console.log('编辑表单人工成本监听器触发:', values);
   if (editFormData.value) {
     calculateEditLaborCost();
   }
@@ -3599,7 +3499,6 @@ watch(() => editFormData.value ? [
   editFormData.value.MaterialCUnitPrice,
   editFormData.value.LaborCost
 ] : [], (values) => {
-  console.log('编辑表单总成本监听器触发:', values);
   if (editFormData.value) {
     calculateEditTotalCost();
   }
@@ -3607,7 +3506,6 @@ watch(() => editFormData.value ? [
 
 // 监听编辑表单总成本变化，自动计算主责人考核
 watch(() => editFormData.value ? editFormData.value.TotalCost : 0, (totalCost) => {
-  console.log('编辑表单主责人考核监听器触发:', totalCost);
   if (editFormData.value) {
     calculateEditMainPersonAssessment();
   }
@@ -3633,7 +3531,6 @@ function getChartTitle(type) {
 
 // 监听配置更新事件
 const handleConfigUpdate = (event) => {
-  console.log('收到配置更新事件:', event.detail)
   // 重新获取统计数据，保持当前选择的月份
   nextTick(() => {
     fetchStats()
@@ -3863,7 +3760,6 @@ const exportToExcel = async () => {
       ElMessage.warning('没有数据可导出')
     }
   } catch (error) {
-    console.error('导出Excel失败:', error)
     ElMessage.error('导出失败: ' + (error.response?.data?.message || error.message))
   } finally {
     exportLoading.value = false
@@ -4039,12 +3935,7 @@ const applyOptimalLayout = () => {
 
     // 调试信息（开发环境）
     if (process.env.NODE_ENV === 'development') {
-      console.log('智能布局应用:', {
-        queryCardWidth: layout.queryCardWidth,
-        tableMarginRight: layout.tableMarginRight,
-        screenWidth: window.innerWidth,
-        hasQueryCard: !!queryCard
-      })
+      // 智能布局应用完成
     }
   }
 }

@@ -559,7 +559,6 @@ const fetchData = async () => {
   try {
     const token = localStorage.getItem('token')
     if (!token) {
-      console.warn('未找到token，跳转到登录页')
       window.location.href = '/login'
       return
     }
@@ -585,7 +584,6 @@ const fetchData = async () => {
       ElMessage.error(response.data.message || '获取数据失败')
     }
   } catch (error) {
-    console.error('💥 获取材料价格数据失败:', error)
     ElMessage.error('获取数据失败')
   } finally {
     loading.value = false
@@ -648,7 +646,6 @@ const viewHistory = async (row) => {
   try {
     const token = localStorage.getItem('token')
     if (!token) {
-      console.warn('未找到token，跳转到登录页')
       window.location.href = '/login'
       return
     }
@@ -669,7 +666,6 @@ const viewHistory = async (row) => {
       ElMessage.error(response.data.message || '获取历史数据失败')
     }
   } catch (error) {
-    console.error('获取历史数据失败:', error)
     ElMessage.error('获取历史数据失败')
   } finally {
     historyLoading.value = false
@@ -707,7 +703,6 @@ const deleteItem = async (row) => {
 
     const token = localStorage.getItem('token')
     if (!token) {
-      console.warn('未找到token，跳转到登录页')
       window.location.href = '/login'
       return
     }
@@ -724,7 +719,6 @@ const deleteItem = async (row) => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('删除失败:', error)
       ElMessage.error('删除失败')
     }
   }
@@ -740,7 +734,6 @@ const submitForm = async () => {
 
     const token = localStorage.getItem('token')
     if (!token) {
-      console.warn('未找到token，跳转到登录页')
       window.location.href = '/login'
       return
     }
@@ -768,7 +761,6 @@ const submitForm = async () => {
       ElMessage.error(response.data.message || '操作失败')
     }
   } catch (error) {
-    console.error('提交失败:', error)
     ElMessage.error('操作失败')
   } finally {
     submitting.value = false
@@ -838,7 +830,6 @@ const handleFileChange = (file) => {
       previewData.value = parsedData
       ElMessage.success(`成功解析 ${parsedData.length} 条数据`)
     } catch (error) {
-      console.error('文件解析失败:', error)
       ElMessage.error('文件解析失败，请检查文件格式')
     }
   }
@@ -861,7 +852,6 @@ const confirmImport = async () => {
   try {
     const token = localStorage.getItem('token')
     if (!token) {
-      console.warn('未找到token，跳转到登录页')
       window.location.href = '/login'
       return
     }
@@ -885,7 +875,6 @@ const confirmImport = async () => {
       ElMessage.error(response.data.message || '导入失败')
     }
   } catch (error) {
-    console.error('导入失败:', error)
     ElMessage.error('导入失败')
   } finally {
     importing.value = false
@@ -921,7 +910,6 @@ const loadFilterOptions = async () => {
       ElMessage.error('加载筛选选项失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('加载筛选选项失败:', error)
     ElMessage.error('加载筛选选项失败')
   }
 }
@@ -1118,7 +1106,6 @@ const exportData = async (filters = {}) => {
       ElMessage.error('导出失败: ' + response.data.message)
     }
   } catch (error) {
-    console.error('导出失败:', error)
     ElMessage.error('导出失败')
   }
 }
@@ -1180,7 +1167,6 @@ const exportHistory = async () => {
 
     ElMessage.success('历史数据导出成功')
   } catch (error) {
-    console.error('导出历史数据失败:', error)
     ElMessage.error('导出失败')
   }
 }
@@ -1252,7 +1238,6 @@ const downloadTemplate = () => {
 
     ElMessage.success('模板下载成功')
   } catch (error) {
-    console.error('模板下载失败:', error)
     ElMessage.error('模板下载失败')
   }
 }

@@ -629,8 +629,6 @@ const loadData = async () => {
       complaintType: selectedComplaintType.value
     }
 
-    console.log('加载投诉分析数据:', params)
-
     const response = await axios.get('/api/complaint/analysis', { params })
 
     if (response.data.success) {
@@ -643,8 +641,6 @@ const loadData = async () => {
         complaintRate: 0
       }
 
-      console.log('投诉分析数据加载成功:', response.data)
-
       // 延迟更新图表，确保DOM已更新
       await nextTick()
       updateChart()
@@ -652,7 +648,6 @@ const loadData = async () => {
       ElMessage.error(response.data.message || '数据加载失败')
     }
   } catch (error) {
-    console.error('加载投诉分析数据失败:', error)
     ElMessage.error('数据加载失败')
   } finally {
     loading.value = false
@@ -661,13 +656,11 @@ const loadData = async () => {
 
 // 维度变化处理
 const handleDimensionChange = () => {
-  console.log('维度变化:', selectedDimension.value)
   loadData()
 }
 
 // 行点击处理（数据钻取）
 const handleRowClick = (row) => {
-  console.log('行点击事件:', row)
   // 实现数据钻取逻辑
   if (selectedDimension.value === 'time') {
     // 时间维度钻取到具体月份的详细数据
@@ -686,14 +679,11 @@ const handleRowClick = (row) => {
 
 // 行双击处理（显示详细信息）
 const handleRowDoubleClick = (row) => {
-  console.log('行双击事件:', row)
   ElMessage.info('双击功能需要在数据明细对话框中的表格上使用')
 }
 
 // 详细数据对话框中的行双击处理
 const handleDetailRowDoubleClick = async (row) => {
-  console.log('详细数据行双击事件:', row)
-
   if (!row.ID) {
     ElMessage.warning('无法获取记录ID')
     return
@@ -721,12 +711,10 @@ const handleDetailRowDoubleClick = async (row) => {
 
       detailDrawerTitle.value = `投诉记录 #${row.ID} 详细信息`
       detailDrawerVisible.value = true
-      console.log('获取详细记录成功:', response.data.data)
     } else {
       ElMessage.error(response.data.message || '获取详细记录失败')
     }
   } catch (error) {
-    console.error('获取详细记录失败:', error)
     ElMessage.error('获取详细记录失败')
   }
 }
@@ -734,7 +722,6 @@ const handleDetailRowDoubleClick = async (row) => {
 // 数据钻取方法
 const drillDownToTimeDetail = async (row) => {
   try {
-    console.log('时间钻取参数:', row)
     // 使用现有的投诉列表API进行数据钻取
     const response = await axios.get('/api/complaint/list', {
       params: {
@@ -746,7 +733,6 @@ const drillDownToTimeDetail = async (row) => {
       }
     })
 
-    console.log('时间钻取响应:', response.data)
     if (response.data.success) {
       // 显示详细数据对话框
       const records = response.data.data?.records || response.data.data || []
@@ -755,14 +741,12 @@ const drillDownToTimeDetail = async (row) => {
       ElMessage.error(response.data.message || '获取详细数据失败')
     }
   } catch (error) {
-    console.error('获取时间详细数据失败:', error)
     ElMessage.error('获取时间详细数据失败')
   }
 }
 
 const drillDownToWorkshopDetail = async (row) => {
   try {
-    console.log('车间钻取参数:', row)
     // 使用现有的投诉列表API进行数据钻取
     const response = await axios.get('/api/complaint/list', {
       params: {
@@ -774,7 +758,6 @@ const drillDownToWorkshopDetail = async (row) => {
       }
     })
 
-    console.log('车间钻取响应:', response.data)
     if (response.data.success) {
       const records = response.data.data?.records || response.data.data || []
       showDetailDialog(`${row.workshop} 车间详细数据`, records)
@@ -782,14 +765,12 @@ const drillDownToWorkshopDetail = async (row) => {
       ElMessage.error(response.data.message || '获取详细数据失败')
     }
   } catch (error) {
-    console.error('获取车间详细数据失败:', error)
     ElMessage.error('获取车间详细数据失败')
   }
 }
 
 const drillDownToCategoryDetail = async (row) => {
   try {
-    console.log('类别钻取参数:', row)
     // 使用现有的投诉列表API进行数据钻取
     const response = await axios.get('/api/complaint/list', {
       params: {
@@ -801,7 +782,6 @@ const drillDownToCategoryDetail = async (row) => {
       }
     })
 
-    console.log('类别钻取响应:', response.data)
     if (response.data.success) {
       const records = response.data.data?.records || response.data.data || []
       showDetailDialog(`${row.category} 类别详细数据`, records)
@@ -809,14 +789,12 @@ const drillDownToCategoryDetail = async (row) => {
       ElMessage.error(response.data.message || '获取详细数据失败')
     }
   } catch (error) {
-    console.error('获取类别详细数据失败:', error)
     ElMessage.error('获取类别详细数据失败')
   }
 }
 
 const drillDownToCustomerDetail = async (row) => {
   try {
-    console.log('客户钻取参数:', row)
     // 使用现有的投诉列表API进行数据钻取
     const response = await axios.get('/api/complaint/list', {
       params: {
@@ -828,7 +806,6 @@ const drillDownToCustomerDetail = async (row) => {
       }
     })
 
-    console.log('客户钻取响应:', response.data)
     if (response.data.success) {
       const records = response.data.data?.records || response.data.data || []
       showDetailDialog(`${row.customer} 客户详细数据`, records)
@@ -836,7 +813,6 @@ const drillDownToCustomerDetail = async (row) => {
       ElMessage.error(response.data.message || '获取详细数据失败')
     }
   } catch (error) {
-    console.error('获取客户详细数据失败:', error)
     ElMessage.error('获取客户详细数据失败')
   }
 }
@@ -861,7 +837,6 @@ const showDetailDialog = (title, data) => {
   detailDialogTitle.value = title
   detailDialogData.value = data || []
   detailDialogVisible.value = true
-  console.log(`${title}:`, data)
 }
 
 // 表格行样式
@@ -904,12 +879,10 @@ const fetchExportFields = async () => {
 
     if (res.data.success) {
       exportFields.value = res.data.data
-      console.log('获取到字段信息:', exportFields.value.length, '个字段')
     } else {
       ElMessage.error('获取字段信息失败')
     }
   } catch (error) {
-    console.error('获取字段信息失败:', error)
     ElMessage.error('获取字段信息失败: ' + (error.response?.data?.message || error.message))
   }
 }
@@ -1064,7 +1037,6 @@ const updateChart = () => {
           option = getCustomerChartOption()
           break
         default:
-          console.warn('未知的图表维度:', selectedDimension.value)
           option = getEmptyChartOption()
       }
     }
@@ -1073,7 +1045,6 @@ const updateChart = () => {
       chartInstance.value.setOption(option, true)
     }
   } catch (error) {
-    console.error('更新图表失败:', error)
     // 发生错误时显示空状态
     if (chartInstance.value) {
       chartInstance.value.setOption(getEmptyChartOption(), true)
@@ -1367,7 +1338,6 @@ const exportData = () => {
   }
 
   // 这里可以实现数据导出功能
-  console.log('导出数据:', tableData.value)
   ElMessage.info('数据导出功能开发中')
 }
 
@@ -1390,7 +1360,6 @@ const initChart = () => {
         }
         resizeTimer = setTimeout(() => {
           if (chartInstance.value) {
-            console.log('窗口大小变化，重新调整图表尺寸')
             chartInstance.value.resize()
           }
         }, 100) // 100ms防抖
@@ -1409,10 +1378,9 @@ const initChart = () => {
       // 在组件卸载时清理
       window.addEventListener('beforeunload', cleanup)
     } catch (error) {
-      console.error('图表初始化失败:', error)
+      // 图表初始化失败，静默处理
     }
   } else {
-    console.warn('图表容器DOM未准备好，延迟初始化')
     setTimeout(() => {
       initChart()
     }, 100)
@@ -1429,7 +1397,7 @@ onMounted(async () => {
       await loadData()
     }, 200)
   } catch (error) {
-    console.error('组件初始化失败:', error)
+    // 组件初始化失败，静默处理
   }
 })
 </script>

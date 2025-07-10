@@ -192,7 +192,6 @@ const loadConfig = async (showMessage = false) => {
       }
     }
   } catch (error) {
-    console.error('加载网站配置失败:', error)
     if (showMessage) {
       ElMessage.error('加载配置失败')
     }
@@ -224,7 +223,6 @@ const saveConfig = async () => {
       ElMessage.error(response.data.message || '保存失败')
     }
   } catch (error) {
-    console.error('保存网站配置失败:', error)
     ElMessage.error('保存配置失败')
   } finally {
     isSubmitting.value = false
@@ -320,7 +318,6 @@ const uploadLogo = async (options) => {
       ElMessage.error(response.data.message || 'LOGO上传失败')
     }
   } catch (error) {
-    console.error('LOGO上传失败:', error)
     ElMessage.error('LOGO上传失败')
   } finally {
     logoUploading.value = false
@@ -356,7 +353,6 @@ const uploadFavicon = async (options) => {
       ElMessage.error(response.data.message || '网站图标上传失败')
     }
   } catch (error) {
-    console.error('网站图标上传失败:', error)
     ElMessage.error('网站图标上传失败')
   } finally {
     faviconUploading.value = false

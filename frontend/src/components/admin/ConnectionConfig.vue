@@ -197,7 +197,6 @@ const loadConfigs = async () => {
       dbConfigs.value = response.data.data
     }
   } catch (error) {
-    console.error('加载配置失败:', error)
     ElMessage.error('加载配置失败')
   } finally {
     isLoadingConfigs.value = false
@@ -285,7 +284,6 @@ const saveConfig = async () => {
           ElMessage.error(response.data.message || '保存失败')
         }
       } catch (error) {
-        console.error('保存配置失败:', error)
         ElMessage.error('保存配置失败')
       } finally {
         isSubmitting.value = false
@@ -307,7 +305,6 @@ const testConnection = async () => {
           ElMessage.error(response.data.message || '连接测试失败')
         }
       } catch (error) {
-        console.error('连接测试失败:', error)
         ElMessage.error('连接测试失败')
       } finally {
         isTesting.value = false
@@ -336,7 +333,6 @@ const deleteConfig = async () => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('删除配置失败:', error)
       ElMessage.error('删除配置失败')
     }
   }

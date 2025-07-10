@@ -460,33 +460,27 @@ const fetchOptions = async () => {
     options.defectiveCategories = data.defectiveCategories || [];
     options.defectiveItems = []; // 初始为空，根据不良类别动态加载
 
-    console.log('获取下拉选项成功:', options);
   } catch (error) {
-    console.error('获取下拉选项失败:', error);
     ElMessage.error('获取下拉选项失败: ' + (error.response?.data?.message || error.message));
   }
 }
 
 const handleCategoryChange = async (selectedCategory) => {
-  console.log('不良类别变化:', selectedCategory);
   form.value.DefectiveItem = '';
   options.defectiveItems = [];
   if (selectedCategory && selectedCategory.ID) {
     try {
       const token = localStorage.getItem('token');
-      console.log('请求不良项 - CategoryID:', selectedCategory.ID);
       const res = await axios.get(`/api/complaint/defective-items/${selectedCategory.ID}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // 后端直接返回字符串数组，无需转换
       options.defectiveItems = res.data || [];
-      console.log('获取不良项成功:', options.defectiveItems);
     } catch (error) {
-      console.error('获取不良项失败:', error);
       ElMessage.error('获取不良项失败: ' + (error.response?.data?.message || error.message));
     }
   } else {
-    console.log('没有选择有效的不良类别或缺少ID');
+    // 没有选择有效的不良类别或缺少ID，静默处理
   }
 }
 
@@ -584,7 +578,6 @@ const loadEditData = async (id) => {
       router.push('/')
     }
   } catch (error) {
-    console.error('加载编辑数据失败:', error)
     ElMessage.error('加载数据失败')
     router.push('/')
   } finally {
