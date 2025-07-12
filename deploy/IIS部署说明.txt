@@ -1,0 +1,44 @@
+DMS-QA系统 IIS部署配置文件说明
+=====================================
+
+📁 可用的配置文件：
+
+1. frontend/dist/web.config
+   - 完整版配置文件（已包含在编译结果中）
+   - 包含URL重写、MIME类型、安全头、压缩等完整配置
+   - 推荐使用
+
+2. deploy/web.config  
+   - 完整版配置文件（独立文件）
+   - 与上面内容相同，方便单独下载使用
+
+3. deploy/web-simple.config
+   - 简化版配置文件
+   - 只包含基本的URL重写和MIME类型
+   - 如果完整版有兼容性问题时使用
+
+🚀 部署步骤：
+
+1. 确保已安装URL重写模块
+   - 下载：rewrite_amd64_zh-CN.msi
+   - 安装后重启IIS
+
+2. 复制编译文件
+   - 将 frontend/dist/ 目录下所有文件复制到IIS网站根目录
+   - 确保 web.config 文件在根目录
+
+3. 重启IIS站点
+
+4. 测试访问
+   - http://your-server/
+   - http://your-server/login
+   - http://your-server/admin/dashboard
+
+✅ 如果遇到问题：
+
+- 500错误：检查web.config语法，尝试使用简化版
+- 404错误：确认URL重写模块已安装
+- 静态文件问题：检查MIME类型配置
+
+📞 技术支持：
+参考 docs/IIS部署指南.md 获取详细说明

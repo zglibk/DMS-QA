@@ -2,10 +2,10 @@ const sql = require('mssql');
 
 // 数据库配置
 const config = {
-  server: '192.168.1.57',
-  database: 'DMS-QA',
-  user: 'sa',
-  password: 'Qa369*',
+  server: process.env.DB_SERVER || 'localhost',
+  database: process.env.DB_NAME || 'DMS-QA',
+  user: process.env.DB_USER || 'sa',
+  password: process.env.DB_PASSWORD || 'Qa369*',
   options: {
     encrypt: false,
     trustServerCertificate: true,
