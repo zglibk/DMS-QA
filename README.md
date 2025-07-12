@@ -66,9 +66,16 @@ DMS-QA/
 ├── server/            # 后端项目
 │   ├── routes/        # 路由
 │   ├── middleware/    # 中间件
+│   ├── scripts/       # 自动值守脚本
+│   │   ├── README.md                      # 部署说明文档
+│   │   ├── install-services-english.ps1   # 一键安装脚本
+│   │   ├── test-paths.ps1                 # 环境检测脚本
+│   │   ├── service-manager.ps1            # 服务管理器
+│   │   └── health-monitor.ps1             # 健康监控器
 │   ├── db.js         # 数据库配置
 │   ├── app.js        # 应用入口
 │   └── package.json
+├── docs/              # 文档目录
 └── README.md
 ```
 
@@ -77,6 +84,7 @@ DMS-QA/
 > 🔄 **持续更新**: 系统功能持续迭代中，新特性和优化不断加入。
 
 ### v2.2.0 新增功能 ✨
+- 🚀 **自动值守方案** - 完整的 Windows 服务自动值守解决方案，实现开机自启动和异常自动恢复
 - 📊 **材料价格管理** - 支持供应商材料价格管理，历史价格追踪
 - 🎨 **登录页面美化** - 新增波浪动画效果和浮动光晕，提升视觉体验
 - 📝 **详细代码注释** - 为前后端所有核心文件添加详细中文注释，便于理解和维护
@@ -93,12 +101,46 @@ DMS-QA/
 - 📱 **响应式设计** - 适配各种设备屏幕
 - 🎨 **现代化 UI 界面** - 基于 Element Plus 的美观界面
 - 📈 **数据统计分析** - 实时的业务数据展示
+- 🛡️ **自动值守服务** - Windows 服务化部署，支持开机自启动和异常自动恢复
 
 ### 开发中功能 🚧
 - 📋 **报表生成** - 自定义报表和数据导出
 - 🔔 **消息通知** - 实时消息推送系统
 - 👥 **多角色权限** - 更细粒度的权限控制
 - 🔍 **全文搜索** - 高级搜索和筛选功能
+
+## 部署方案
+
+### 🚀 自动值守部署（推荐）
+
+**适用场景**: 生产环境、需要无人值守的服务器环境
+
+使用 NSSM 将 Nginx 和 Node.js 转换为 Windows 服务，实现：
+- ✅ **开机自启动** - 系统重启后自动启动服务
+- ✅ **异常自动恢复** - 服务崩溃时自动重启
+- ✅ **无人值守** - 无需手动干预即可持续运行
+- ✅ **日志管理** - 自动日志轮转和管理
+
+#### 快速部署
+```powershell
+# 以管理员身份运行 PowerShell
+cd "server/scripts"
+
+# 设置执行策略（首次运行）
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+
+# 环境检测
+.\test-paths.ps1
+
+# 一键安装服务
+.\install-services-english.ps1
+```
+
+📖 **详细说明**: 请参阅 [自动值守部署指南](server/scripts/README.md)
+
+### 🛠️ 开发环境部署
+
+**适用场景**: 开发调试、功能测试
 
 ## 快速开始
 
@@ -227,7 +269,12 @@ npm run dev
 
 ### 访问应用
 
+#### 开发环境
 - 前端地址: http://localhost:5173
+- 后端 API: http://localhost:3001
+
+#### 生产环境（自动值守部署）
+- 前端地址: http://localhost （通过 Nginx 代理）
 - 后端 API: http://localhost:3001
 
 ## 开发说明
@@ -238,7 +285,46 @@ npm run dev
 - ✅ **核心功能**: 用户认证、投诉管理、数据统计等核心功能已完成
 - ✅ **系统配置**: 动态配置、LOGO管理等系统设置功能已实现
 - ✅ **Excel导入**: 完整的Excel数据导入和处理功能已上线
+- ✅ **自动值守**: Windows 服务化部署方案已完成，支持生产环境无人值守
 - 🚧 **持续优化**: UI/UX优化、性能提升、新功能开发持续进行中
+
+### 自动值守部署
+
+#### 🚀 Windows 服务化部署
+
+系统提供完整的 Windows 服务自动值守解决方案：
+
+**核心特性**:
+- ✅ **开机自启动**: 系统重启后自动启动服务
+- ✅ **异常自动恢复**: 服务崩溃时自动重启
+- ✅ **无人值守**: 无需手动干预即可持续运行
+- ✅ **日志管理**: 自动日志轮转和管理
+- ✅ **服务监控**: 实时监控服务状态和系统资源
+
+**部署要求**:
+- Windows 10/11 或 Windows Server
+- 管理员权限
+- PowerShell 执行策略设置
+
+**快速部署**:
+```powershell
+# 以管理员身份运行 PowerShell
+cd "server/scripts"
+Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
+.\install-services-english.ps1
+```
+
+**服务管理**:
+```powershell
+# 查看服务状态
+Get-Service -Name "DMS-QA-*"
+
+# 启动/停止服务
+Start-Service -Name "DMS-QA-Nginx","DMS-QA-Backend"
+Stop-Service -Name "DMS-QA-Nginx","DMS-QA-Backend"
+```
+
+📖 **详细文档**: [自动值守部署指南](server/scripts/README.md)
 
 ### 数据库配置
 
@@ -261,6 +347,7 @@ npm run dev
 | 数据统计 | ✅ 完成 | 90% | 基础统计完成，图表优化中 |
 | Excel导入 | ✅ 完成 | 95% | 功能完整，细节优化中 |
 | 系统配置 | ✅ 完成 | 90% | 基础配置完成，扩展功能开发中 |
+| 自动值守 | ✅ 完成 | 100% | Windows 服务化部署，支持生产环境 |
 | 报表功能 | 🚧 开发中 | 30% | 基础框架搭建中 |
 | 消息通知 | 📋 计划中 | 0% | 需求分析阶段 |
 
