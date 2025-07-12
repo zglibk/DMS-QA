@@ -671,23 +671,42 @@ const handleMaterialChange = async (materialType, materialName) => {
       const price = Array.isArray(priceData) ? priceData[0] : priceData;
 
       if (price && price.unitPrice !== null && price.unitPrice !== undefined) {
-        // 缓存价格信息
-        priceCache[cacheKey] = price;
+        // 检查价格是否为0
+        if (price.unitPrice === 0) {
+          // 价格为0时的提示
+          ElMessage.warning(`材料"${materialName}"的单价为0，请联系管理员新增或更新价格信息`);
+          // 清空价格字段
+          clearMaterialPrice(materialType);
+        } else {
+          // 缓存价格信息
+          priceCache[cacheKey] = price;
 
-        // 设置单价
-        setMaterialPrice(materialType, price);
+          // 设置单价
+          setMaterialPrice(materialType, price);
 
-        // 如果是纸张，触发人工成本计算
-        if (materialType === 'Paper') {
-          calculateLaborCost();
+          // 如果是纸张，触发人工成本计算
+          if (materialType === 'Paper') {
+            calculateLaborCost();
+          }
+
+          // 显示成功消息
+          ElMessage.success(`已自动填入${materialName}的单价：￥${price.unitPrice}`);
         }
-
-        // 显示成功消息
-        ElMessage.success(`已自动填入${materialName}的单价：￥${price.unitPrice}`);
+      } else {
+        // 价格为null或undefined时的提示
+        ElMessage.warning(`未找到材料"${materialName}"的价格信息，请联系管理员新增价格数据`);
+        // 清空价格字段
+        clearMaterialPrice(materialType);
       }
+    } else {
+      ElMessage.warning(`未找到材料"${materialName}"的价格信息，请联系管理员新增价格数据`);
+      // 清空价格字段
+      clearMaterialPrice(materialType);
     }
   } catch (error) {
-    // 不显示错误消息，让用户可以手动输入单价
+    ElMessage.warning(`获取材料"${materialName}"价格失败，请联系管理员新增价格数据`);
+    // 清空价格字段
+    clearMaterialPrice(materialType);
   }
 }
 
@@ -708,6 +727,27 @@ const setMaterialPrice = (materialType, priceInfo) => {
   const priceField = priceFieldMap[materialType];
   if (priceField && priceInfo.unitPrice !== null) {
     form.value[priceField] = priceInfo.unitPrice;
+    // 单价变化后，触发总成本计算
+    calculateTotalCost();
+  }
+}
+
+/**
+ * 清空材料单价
+ *
+ * @param {string} materialType - 材料类型
+ */
+const clearMaterialPrice = (materialType) => {
+  const priceFieldMap = {
+    'Paper': 'PaperUnitPrice',
+    'MaterialA': 'MaterialAUnitPrice',
+    'MaterialB': 'MaterialBUnitPrice',
+    'MaterialC': 'MaterialCUnitPrice'
+  };
+
+  const priceField = priceFieldMap[materialType];
+  if (priceField) {
+    form.value[priceField] = 0;
     // 单价变化后，触发总成本计算
     calculateTotalCost();
   }

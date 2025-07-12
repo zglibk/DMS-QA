@@ -2251,27 +2251,42 @@ const handleEditMaterialChange = async (materialType, materialName) => {
       const price = Array.isArray(priceData) ? priceData[0] : priceData;
 
       if (price && price.unitPrice !== null && price.unitPrice !== undefined) {
-        // 缓存价格信息
-        editPriceCache[cacheKey] = price;
+        // 检查价格是否为0
+        if (price.unitPrice === 0) {
+          // 价格为0时的提示
+          ElMessage.warning(`材料"${materialName}"的单价为0，请联系管理员新增或更新价格信息`);
+          // 清空价格字段
+          clearEditMaterialPrice(materialType);
+        } else {
+          // 缓存价格信息
+          editPriceCache[cacheKey] = price;
 
-        // 设置单价
-        setEditMaterialPrice(materialType, price);
+          // 设置单价
+          setEditMaterialPrice(materialType, price);
 
-        // 如果是纸张，触发人工成本计算
-        if (materialType === 'Paper') {
-          calculateEditLaborCost();
+          // 如果是纸张，触发人工成本计算
+          if (materialType === 'Paper') {
+            calculateEditLaborCost();
+          }
+
+          // 显示成功消息
+          ElMessage.success(`已自动填入${materialName}的单价：￥${price.unitPrice}`);
         }
-
-        // 显示成功消息
-        ElMessage.success(`已自动填入${materialName}的单价：￥${price.unitPrice}`);
       } else {
-        // 材料没有设置单价，静默处理
+        // 价格为null或undefined时的提示
+        ElMessage.warning(`未找到材料"${materialName}"的价格信息，请联系管理员新增价格数据`);
+        // 清空价格字段
+        clearEditMaterialPrice(materialType);
       }
     } else {
-      // 未找到材料价格信息，静默处理
+      ElMessage.warning(`未找到材料"${materialName}"的价格信息，请联系管理员新增价格数据`);
+      // 清空价格字段
+      clearEditMaterialPrice(materialType);
     }
   } catch (error) {
-    // 不显示错误消息，让用户可以手动输入单价
+    ElMessage.warning(`获取材料"${materialName}"价格失败，请联系管理员新增价格数据`);
+    // 清空价格字段
+    clearEditMaterialPrice(materialType);
   }
 }
 
@@ -2292,6 +2307,27 @@ const setEditMaterialPrice = (materialType, priceInfo) => {
   const priceField = priceFieldMap[materialType];
   if (priceField && priceInfo.unitPrice !== null && editFormData.value) {
     editFormData.value[priceField] = priceInfo.unitPrice;
+    // 单价变化后，触发总成本计算
+    calculateEditTotalCost();
+  }
+}
+
+/**
+ * 清空编辑表单材料单价
+ *
+ * @param {string} materialType - 材料类型
+ */
+const clearEditMaterialPrice = (materialType) => {
+  const priceFieldMap = {
+    'Paper': 'PaperUnitPrice',
+    'MaterialA': 'MaterialAUnitPrice',
+    'MaterialB': 'MaterialBUnitPrice',
+    'MaterialC': 'MaterialCUnitPrice'
+  };
+
+  const priceField = priceFieldMap[materialType];
+  if (priceField && editFormData.value) {
+    editFormData.value[priceField] = 0;
     // 单价变化后，触发总成本计算
     calculateEditTotalCost();
   }
