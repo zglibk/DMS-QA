@@ -116,7 +116,7 @@
             <template #default>
               <p><strong>数据库服务器IP:</strong> {{ serverIP }}</p>
               <p><strong>文件服务器端口:</strong> 8080</p>
-              <p><strong>访问基础URL:</strong> {{ accessMethods.http?.baseUrl || 'http://192.168.1.57:8080/files' }}</p>
+              <p><strong>访问基础URL:</strong> {{ accessMethods.http?.baseUrl || 'http://localhost:8080/files' }}</p>
             </template>
           </el-alert>
         </el-tab-pane>
@@ -243,7 +243,7 @@ const loadConfig = async () => {
 }
 
 const testConnection = async () => {
-  const testUrl = accessMethods.value.http?.baseUrl || 'http://192.168.1.57:8080'
+  const testUrl = accessMethods.value.http?.baseUrl || 'http://localhost:8080'
   try {
     ElMessage.info('正在测试连接...')
     // 这里可以添加实际的连接测试逻辑

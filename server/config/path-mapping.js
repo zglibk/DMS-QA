@@ -19,21 +19,21 @@ module.exports = {
         // Excel临时路径模式 - 匹配2025年异常汇总下的文件，去掉中间的月份和不良图片目录
         tempPattern: /C:\\Users\\[^\\]+\\AppData\\Roaming\\Microsoft\\Excel\\2025年异常汇总\\[^\\]+\\不良图片\\(.+)/i,
         // 对应的网络共享路径 - 直接映射到不良图片&资料目录下
-        networkPath: '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\2025年异常汇总\\不良图片&资料\\$1',
+        networkPath: `\\\\${process.env.FILE_SERVER_IP || 'localhost'}\\工作\\品质部\\生产异常周报考核统计\\2025年异常汇总\\不良图片&资料\\$1`,
         description: 'Excel临时文件映射到tj_server共享盘的不良图片&资料目录'
       },
       {
         // Excel临时路径模式 - 匹配2025年异常汇总下的其他文件
         tempPattern: /C:\\Users\\[^\\]+\\AppData\\Roaming\\Microsoft\\Excel\\2025年异常汇总\\(.+)/i,
         // 对应的网络共享路径
-        networkPath: '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\2025年异常汇总\\不良图片&资料\\$1',
+        networkPath: `\\\\${process.env.FILE_SERVER_IP || 'localhost'}\\工作\\品质部\\生产异常周报考核统计\\2025年异常汇总\\不良图片&资料\\$1`,
         description: 'Excel临时文件映射到tj_server共享盘的不良图片&资料目录（通用）'
       },
       {
         // 通用Excel临时路径模式（备用）
         tempPattern: /C:\\Users\\[^\\]+\\AppData\\Roaming\\Microsoft\\Excel\\(.+)/i,
         // 对应的网络共享路径
-        networkPath: '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\$1',
+        networkPath: `\\\\${process.env.FILE_SERVER_IP || 'localhost'}\\工作\\品质部\\生产异常周报考核统计\\$1`,
         description: 'Excel临时文件通用映射到tj_server共享盘'
       }
     ],
@@ -41,9 +41,9 @@ module.exports = {
     // 网络路径映射
     networkPaths: [
       {
-        pattern: /^\\\\tj_server\\工作\\(.+)/i,
+        pattern: new RegExp(`^\\\\\\\\${process.env.FILE_SERVER_IP || 'localhost'}\\\\工作\\\\(.+)`, 'i'),
         localMount: null, // 如果有本地挂载点可以配置
-        description: 'tj_server共享盘访问'
+        description: '文件服务器共享盘访问'
       }
     ]
   },

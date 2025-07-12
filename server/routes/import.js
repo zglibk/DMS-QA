@@ -2138,10 +2138,10 @@ router.get('/path-mapping-config', async (req, res) => {
   let connection;
   try {
     // 临时返回默认配置，避免数据库连接问题
-    const serverIP = '192.168.1.57';
-    const fileStoragePath = 'D:\\DMSData\\IMG-VIDEO';
-    const fileServerPort = 8080;
-    const fileUrlPrefix = '/files';
+    const serverIP = process.env.FILE_SERVER_IP || 'localhost';
+    const fileStoragePath = process.env.FILE_STORAGE_PATH || 'D:\\DMSData\\IMG-VIDEO';
+    const fileServerPort = process.env.FILE_SERVER_PORT || 8080;
+    const fileUrlPrefix = process.env.FILE_URL_PREFIX || '/files';
 
     // 返回默认的路径映射配置
     const pathMappings = [
@@ -2149,14 +2149,14 @@ router.get('/path-mapping-config', async (req, res) => {
         id: 1,
         name: '默认映射',
         localPattern: 'file:///C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel',
-        targetPattern: '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计',
+        targetPattern: `\\\\${serverIP}\\工作\\品质部\\生产异常周报考核统计`,
         description: '默认路径映射配置',
         isActive: true,
         createdAt: new Date(),
         updatedAt: new Date(),
         // 为了兼容现有的导入功能，也提供正则表达式格式
         local: /file:\/\/\/C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel(.+)/,
-        network: '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计'
+        network: `\\\\${serverIP}\\工作\\品质部\\生产异常周报考核统计`
       }
     ];
 

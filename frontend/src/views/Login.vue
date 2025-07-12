@@ -41,7 +41,7 @@
           <el-button size="small" type="info">API地址设置</el-button>
         </template>
         <div style="display:flex;align-items:center;gap:8px;">
-          <el-input v-model="apiBaseInput" placeholder="如 http://192.168.1.57:3001" style="width:220px" />
+          <el-input v-model="apiBaseInput" placeholder="如 http://localhost:3001" style="width:220px" />
           <el-button size="small" type="primary" @click="saveApiBase">保存</el-button>
         </div>
         <div style="margin-top:8px;font-size:12px;color:#888;">当前：{{ apiBaseCurrent }}</div>

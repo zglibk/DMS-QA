@@ -36,10 +36,10 @@ const sql = require('mssql');
  * 注意：生产环境应使用环境变量存储敏感信息
  */
 const config = {
-  user: 'sa',                    // 数据库用户名
-  password: 'Qa369*',            // 数据库密码
-  server: '192.168.1.57',        // 数据库服务器IP
-  database: 'DMS-QA',            // 数据库名称
+  user: process.env.DB_USER || 'sa',                    // 数据库用户名
+  password: process.env.DB_PASSWORD || 'Qa369*',       // 数据库密码
+  server: process.env.DB_SERVER || '192.168.1.57',     // 数据库服务器IP（默认连接远程）
+  database: process.env.DB_NAME || 'DMS-QA',           // 数据库名称
   options: {
     encrypt: false,              // 不使用SSL加密（内网环境）
     trustServerCertificate: true, // 信任服务器证书

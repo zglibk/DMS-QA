@@ -21,7 +21,10 @@
   "license": "Apache-2.0",
   "_scripts_comment": "项目脚本命令",
   "scripts": {
-    "start": "node app.js"
+    "start": "node app.js",
+    "build": "echo 'Backend build completed - Node.js project ready for deployment'",
+    "dev": "node app.js",
+    "prod": "NODE_ENV=production node app.js"
   },
   "_dependencies_comment": "生产环境依赖包",
   "dependencies": {
@@ -35,6 +38,7 @@
     "mssql": "^10.0.1",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^4.2.0",
+    "sqlite3": "^5.1.7",
     "uuid": "^11.1.0",
     "xlsx": "^0.18.5"
   },

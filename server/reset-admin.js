@@ -2,10 +2,10 @@ const sql = require('mssql');
 const bcrypt = require('bcryptjs');
 
 const config = {
-  user: 'sa',
-  password: 'Qa369*',
-  server: '192.168.1.57',
-  database: 'DMS-QA',
+  user: process.env.DB_USER || 'sa',
+  password: process.env.DB_PASSWORD || 'Qa369*',
+  server: process.env.DB_SERVER || 'localhost',
+  database: process.env.DB_NAME || 'DMS-QA',
   options: {
     encrypt: false,
     trustServerCertificate: true,

@@ -89,7 +89,7 @@
       <div class="form-section">
         <h4>数据库配置</h4>
         <el-form-item label="服务器地址" prop="Host">
-          <el-input v-model="dbConfig.Host" placeholder="如：192.168.1.57" />
+          <el-input v-model="dbConfig.Host" placeholder="如：localhost" />
         </el-form-item>
 
         <el-form-item label="端口" prop="Port">

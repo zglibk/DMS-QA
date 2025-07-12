@@ -560,18 +560,27 @@ async function fetchTrendData(token) {
       params: { year: currentYear }
     })
 
-    if (response.data.success && response.data.data) {
+    if (response.data.success && response.data.data && Array.isArray(response.data.data)) {
       const data = response.data.data
       trendData.value = {
-        months: data.map(item => `${item.StatMonth}月`),
-        passRates: data.map(item => parseFloat(item.FirstPassRate || 0)),
+        months: data.map(item => item && item.StatMonth ? `${item.StatMonth}月` : ''),
+        passRates: data.map(item => item && item.FirstPassRate ? parseFloat(item.FirstPassRate) : 0),
         // 客诉率 = 客诉数量 / 发货批次 * 100
         complaintRates: data.map(item => {
+          if (!item) return 0
           const deliveryBatches = parseInt(item.DeliveryBatches || 0)
           const customerComplaints = parseInt(item.CustomerComplaints || 0)
           return deliveryBatches > 0 ? parseFloat((customerComplaints / deliveryBatches * 100).toFixed(2)) : 0
         }),
-        complaintCounts: data.map(item => parseInt(item.CustomerComplaints || 0))
+        complaintCounts: data.map(item => item && item.CustomerComplaints ? parseInt(item.CustomerComplaints) : 0)
+      }
+    } else {
+      // 如果没有数据，使用默认空数据
+      trendData.value = {
+        months: [],
+        passRates: [],
+        complaintRates: [],
+        complaintCounts: []
       }
     }
   } catch (error) {
@@ -591,6 +600,20 @@ async function fetchTrendData(token) {
 
 // 初始化图表
 function initCharts() {
+  // 确保数据已经初始化
+  if (!trendData.value) {
+    trendData.value = {
+      months: [],
+      passRates: [],
+      complaintRates: [],
+      complaintCounts: []
+    }
+  }
+
+  if (!unitStats.value) {
+    unitStats.value = []
+  }
+
   initQualityTrendChart()
   initComplaintTrendChart()
   initUnitStatsChart()
@@ -598,8 +621,13 @@ function initCharts() {
 
 // 初始化质量趋势图表
 function initQualityTrendChart() {
-  if (qualityTrendChart.value) {
+  if (qualityTrendChart.value && trendData.value) {
     qualityChartInstance = echarts.init(qualityTrendChart.value)
+
+    // 确保数据存在，避免 undefined 错误
+    const months = trendData.value.months || []
+    const passRates = trendData.value.passRates || []
+    const complaintRates = trendData.value.complaintRates || []
 
     const option = {
       title: {
@@ -626,9 +654,10 @@ function initQualityTrendChart() {
           color: '#333'
         },
         formatter: function(params) {
+          if (!params || params.length === 0) return ''
           let result = `<div style="font-weight: bold; margin-bottom: 5px;">${params[0].axisValue}</div>`
           params.forEach(param => {
-            const color = param.color.borderColor || param.color
+            const color = param.color && param.color.borderColor ? param.color.borderColor : param.color
             result += `<div style="margin: 3px 0;">
               <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${color}; margin-right: 8px;"></span>
               ${param.seriesName}: <strong>${param.value}${param.seriesName.includes('率') ? '%' : ''}</strong>
@@ -649,7 +678,7 @@ function initQualityTrendChart() {
       },
       xAxis: {
         type: 'category',
-        data: trendData.value.months,
+        data: months,
         axisLine: {
           show: false
         },
@@ -709,7 +738,7 @@ function initQualityTrendChart() {
           name: '一次交检合格率',
           type: 'line',
           yAxisIndex: 0,
-          data: trendData.value.passRates,
+          data: passRates,
           lineStyle: {
             color: '#67c23a',
             width: 3
@@ -752,7 +781,7 @@ function initQualityTrendChart() {
           name: '客诉率',
           type: 'line',
           yAxisIndex: 1,
-          data: trendData.value.complaintRates,
+          data: complaintRates,
           lineStyle: {
             color: '#f56c6c',
             width: 3
@@ -800,8 +829,12 @@ function initQualityTrendChart() {
 
 // 初始化投诉趋势图表
 function initComplaintTrendChart() {
-  if (complaintTrendChart.value) {
+  if (complaintTrendChart.value && trendData.value) {
     complaintChartInstance = echarts.init(complaintTrendChart.value)
+
+    // 确保数据存在，避免 undefined 错误
+    const months = trendData.value.months || []
+    const complaintCounts = trendData.value.complaintCounts || []
 
     const option = {
       title: {
@@ -822,9 +855,10 @@ function initComplaintTrendChart() {
           color: '#333'
         },
         formatter: function(params) {
+          if (!params || params.length === 0) return ''
           let result = `<div style="font-weight: bold; margin-bottom: 5px;">${params[0].axisValue}</div>`
           params.forEach(param => {
-            const color = param.color.borderColor || param.color
+            const color = param.color && param.color.borderColor ? param.color.borderColor : param.color
             result += `<div style="margin: 3px 0;">
               <span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${color}; margin-right: 8px;"></span>
               ${param.seriesName}: <strong>${param.value}</strong>
@@ -845,7 +879,7 @@ function initComplaintTrendChart() {
       },
       xAxis: {
         type: 'category',
-        data: trendData.value.months,
+        data: months,
         axisLine: {
           show: false
         },
@@ -880,7 +914,7 @@ function initComplaintTrendChart() {
         {
           name: '投诉总数',
           type: 'line',
-          data: trendData.value.complaintCounts,
+          data: complaintCounts,
           lineStyle: {
             color: '#e6a23c',
             width: 3
@@ -928,8 +962,14 @@ function initComplaintTrendChart() {
 
 // 初始化单位统计横道图
 function initUnitStatsChart() {
-  if (unitStatsChart.value) {
+  if (unitStatsChart.value && unitStats.value) {
     unitStatsChartInstance = echarts.init(unitStatsChart.value)
+
+    // 确保数据存在，避免 undefined 错误
+    const units = unitStats.value || []
+    const unitNames = units.map(item => item && item.unit ? item.unit : '')
+    const innerData = units.map(item => item && typeof item.inner !== 'undefined' ? item.inner : 0)
+    const outerData = units.map(item => item && typeof item.outer !== 'undefined' ? item.outer : 0)
 
     const option = {
       title: {
@@ -983,7 +1023,7 @@ function initUnitStatsChart() {
       },
       yAxis: {
         type: 'category',
-        data: unitStats.value.map(item => item.unit),
+        data: unitNames,
         axisLine: {
           show: false
         },
@@ -1001,7 +1041,7 @@ function initUnitStatsChart() {
           name: '内诉',
           type: 'bar',
           stack: 'total',
-          data: unitStats.value.map(item => item.inner),
+          data: innerData,
           itemStyle: {
             color: '#67c23a'
           }
@@ -1010,7 +1050,7 @@ function initUnitStatsChart() {
           name: '客诉',
           type: 'bar',
           stack: 'total',
-          data: unitStats.value.map(item => item.outer),
+          data: outerData,
           itemStyle: {
             color: '#f56c6c'
           }

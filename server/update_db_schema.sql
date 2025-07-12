@@ -69,7 +69,7 @@ BEGIN
         [ExcelTempPath],
         [NetworkSharePath]
     ) VALUES (
-        '192.168.1.57',
+        'localhost',
         'DMS-QA',
         'sa',
         'Qa369*',
@@ -82,7 +82,7 @@ BEGIN
         8080,
         '/files',
         'file:///C:\Users\TJ\AppData\Roaming\Microsoft\Excel',
-        '\\tj_server\工作\品质部\生产异常周报考核统计'
+        '\\localhost\工作\品质部\生产异常周报考核统计'
     );
     PRINT 'Inserted default configuration record';
 END

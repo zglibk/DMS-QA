@@ -4565,6 +4565,26 @@ body::-webkit-scrollbar-thumb:hover {
   gap: 1rem;
 }
 
+/* 统计卡片容器响应式布局 */
+.stat-row-flex {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  justify-content: flex-start;
+}
+
+/* 针对1366*768分辨率的统计卡片容器优化 */
+@media (max-width: 1366px) and (min-width: 1201px) {
+  .stat-row-flex {
+    gap: 0.75rem; /* 减小卡片间距 */
+  }
+
+  .stat-row-flex .stat-card {
+    max-width: 300px; /* 进一步限制最大宽度 */
+    min-width: 280px; /* 设置最小宽度确保内容不被压缩 */
+  }
+}
+
 .stat-row-flex .stat-card:hover {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   transform: translateY(-3px);
@@ -6037,13 +6057,29 @@ body::-webkit-scrollbar-thumb:hover {
 
   /* 平板设备下统计卡片调整 */
   .stat-row-flex .stat-card {
-    max-width: 350px; /* 平板设备适中的最大宽度 */
-    height: 8rem; /* 增加平板设备高度 */
-    padding: 1rem 0.5rem; /* 增加内边距 */
+    max-width: 320px; /* 平板设备适中的最大宽度，针对1366*768优化 */
+    height: 7rem; /* 适中的高度，避免过高 */
+    padding: 0.75rem 0.5rem; /* 适中的内边距 */
   }
 
   .carousel-page .stat-card {
-    max-width: 350px; /* 轮播图内卡片也适配平板 */
+    max-width: 320px; /* 轮播图内卡片也适配平板 */
+  }
+
+  /* 针对1366*768分辨率的特殊优化 */
+  .stat-row-flex .stat-card.special-layout {
+    height: 6.5rem; /* 特殊布局卡片高度稍微减小 */
+    padding: 0.6rem 0.4rem;
+  }
+
+  .stat-row-flex .stat-card .card-icon {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 8px;
+  }
+
+  .stat-row-flex .stat-card .card-icon .el-icon {
+    font-size: 20px;
   }
 
   .stat-row-flex .stat-card .stat-title {
@@ -6820,5 +6856,128 @@ body.el-popup-parent--hidden {
 
 .complaint-rate-card .card-icon .el-icon {
   color: #f56c6c;
+}
+
+/* 特殊布局卡片样式 */
+.special-layout {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 1rem;
+}
+
+.card-content-vertical {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.card-title-row {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #606266;
+  line-height: 1.2;
+}
+
+.card-percentage-row {
+  font-size: 1.75rem;
+  font-weight: bold;
+  color: #303133;
+  line-height: 1;
+}
+
+.card-detail-row {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.75rem;
+  color: #909399;
+  line-height: 1.2;
+}
+
+.card-detail-row span {
+  white-space: nowrap;
+}
+
+/* 响应式调整特殊布局卡片 */
+@media (max-width: 1366px) and (min-width: 1201px) {
+  .special-layout .card-content-vertical {
+    gap: 0.3rem;
+  }
+
+  .special-layout .card-title-row {
+    font-size: 0.8rem;
+    line-height: 1.1;
+  }
+
+  .special-layout .card-percentage-row {
+    font-size: 1.6rem;
+    line-height: 1;
+  }
+
+  .special-layout .card-detail-row {
+    font-size: 0.7rem;
+    gap: 0.75rem;
+    line-height: 1.1;
+  }
+
+  /* 针对1366*768分辨率优化卡片图标 */
+  .special-layout .card-icon {
+    width: 42px;
+    height: 42px;
+    flex-shrink: 0;
+  }
+
+  .special-layout .card-icon .el-icon {
+    font-size: 20px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .special-layout .card-content-vertical {
+    gap: 0.2rem;
+  }
+
+  .special-layout .card-title-row {
+    font-size: 0.75rem;
+  }
+
+  .special-layout .card-percentage-row {
+    font-size: 1.25rem;
+  }
+
+  .special-layout .card-detail-row {
+    font-size: 0.65rem;
+    gap: 0.5rem;
+    flex-direction: column;
+  }
+}
+
+@media (max-width: 768px) {
+  .special-layout {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.75rem;
+  }
+
+  .special-layout .card-content-vertical {
+    gap: 0.5rem;
+  }
+
+  .special-layout .card-title-row {
+    font-size: 0.875rem;
+  }
+
+  .special-layout .card-percentage-row {
+    font-size: 1.5rem;
+  }
+
+  .special-layout .card-detail-row {
+    font-size: 0.75rem;
+    gap: 1rem;
+    flex-direction: row;
+    justify-content: center;
+  }
 }
 </style>

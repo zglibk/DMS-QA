@@ -31,12 +31,12 @@ function generateBlobUrl() {
 
 ```javascript
 module.exports = {
-  serverIP: '192.168.1.57',
+  serverIP: process.env.FILE_SERVER_IP || 'localhost',
   pathMappings: [
     {
       name: 'Windows C Drive',
       local: /^[Cc]:\\/,
-      network: '//192.168.1.57/C$/',
+      network: `//${process.env.FILE_SERVER_IP || 'localhost'}/C$/`,
       description: '将C:\\路径映射到网络共享C$'
     },
     // ... 更多映射规则
@@ -44,7 +44,7 @@ module.exports = {
   accessMethods: {
     http: {
       enabled: true,
-      baseUrl: 'http://192.168.1.57:8080/files'
+      baseUrl: `http://${process.env.FILE_SERVER_IP || 'localhost'}:${process.env.FILE_SERVER_PORT || 8080}/files`
     }
   }
 }
@@ -65,7 +65,7 @@ function convertToNetworkPath(localPath) {
   // 示例转换：
   // C:\Users\Documents\图片\产品缺陷.jpg
   // ↓
-  // http://192.168.1.57:8080/files/C$/Users/Documents/图片/%E4%BA%A7%E5%93%81%E7%BC%BA%E9%99%B7.jpg
+  // http://localhost:8080/files/C$/Users/Documents/图片/%E4%BA%A7%E5%93%81%E7%BC%BA%E9%99%B7.jpg
 }
 ```
 
