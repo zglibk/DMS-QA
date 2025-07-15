@@ -362,18 +362,27 @@ const showImagePreview = async (fileServiceUrl) => {
   resetTransform()
 
   try {
-    const response = await apiService.get(fileServiceUrl, {
-      responseType: 'blob'
-    })
+    // 检查URL类型
+    if (fileServiceUrl.startsWith('/files/attachments/')) {
+      // 直接使用HTTP URL
+      console.log('使用直接HTTP URL:', fileServiceUrl)
+      imageUrl.value = fileServiceUrl
+      imageLoading.value = false
+    } else {
+      // 使用API获取blob
+      console.log('通过API获取图片:', fileServiceUrl)
+      const response = await apiService.get(fileServiceUrl, {
+        responseType: 'blob'
+      })
 
-    const blob = response.data
-    imageUrl.value = URL.createObjectURL(blob)
-
+      const blob = response.data
+      imageUrl.value = URL.createObjectURL(blob)
+      imageLoading.value = false
+    }
   } catch (error) {
     console.error('获取图片数据失败:', error)
     imageError.value = true
     ElMessage.error('图片加载失败')
-  } finally {
     imageLoading.value = false
   }
 }

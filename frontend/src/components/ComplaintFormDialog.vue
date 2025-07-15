@@ -2,7 +2,7 @@
   <div class="complaint-form-dialog">
     <!-- 固定标题栏 -->
     <div class="dialog-header">
-      <h2 class="dialog-title">新增投诉</h2>
+      <h2 class="dialog-title">{{ props.editData ? '编辑投诉' : '新增投诉' }}</h2>
     </div>
 
     <!-- 表单内容区域 -->
@@ -135,9 +135,41 @@
           </el-col>
           <el-col :span="24">
             <el-form-item label="附件文件">
-              <el-input v-model="form.AttachmentFile" readonly style="width: 400px" />
-              <el-button @click="selectFile" style="margin-left: 10px">选择文件</el-button>
-              <img v-if="isImage(form.AttachmentFile)" :src="form.AttachmentFile" alt="图片预览" style="max-width: 100px; max-height: 100px; margin-left: 10px; cursor: pointer;" @click="handlePreviewImg(form.AttachmentFile)" />
+              <div class="attachment-field">
+                <div class="attachment-input-section">
+                  <el-input v-model="form.AttachmentFile" readonly style="width: 400px" placeholder="请选择附件文件" />
+                  <el-button @click="selectFile" :loading="fileUploading" style="margin-left: 10px">
+                    {{ fileUploading ? '上传中...' : '选择文件' }}
+                  </el-button>
+                </div>
+                <!-- 图片预览区域 -->
+                <div class="attachment-preview-section" style="margin-top: 15px;">
+                  <div class="preview-container">
+                    <!-- 图片预览 -->
+                    <div
+                      v-if="selectedFileInfo && selectedFileInfo.isImage"
+                      class="image-preview-box"
+                    >
+                      <ImagePreview
+                        :key="`complaint-preview-${selectedFileInfo.previewUrl}-${Date.now()}`"
+                        :file-path="selectedFileInfo.previewUrl"
+                        :record-id="null"
+                        width="146px"
+                        height="116px"
+                      />
+                    </div>
+                    <!-- 非图片文件或错误状态 -->
+                    <div v-else-if="selectedFileInfo && !selectedFileInfo.isImage" class="file-preview-box">
+                      <el-icon class="file-icon"><Document /></el-icon>
+                      <span class="file-name">{{ selectedFileInfo.fileName }}</span>
+                    </div>
+                    <!-- 空状态 -->
+                    <div v-else class="empty-preview-box">
+                      <el-empty description="暂无附件" :image-size="60" />
+                    </div>
+                  </div>
+                </div>
+              </div>
             </el-form-item>
           </el-col>
           <el-col :span="24">
@@ -467,6 +499,78 @@
     </el-form>
     </div> <!-- 关闭 dialog-content -->
 
+
+
+    <!-- 文件上传预览确认对话框 -->
+    <el-dialog
+      v-model="previewDialogVisible"
+      title="文件上传预览"
+      width="500px"
+      :close-on-click-modal="false"
+      :append-to-body="true"
+      center
+      class="file-upload-preview-dialog"
+    >
+      <div v-if="pendingFile" class="file-preview-content">
+        <!-- 文件基本信息 -->
+        <div class="file-info-section">
+          <h4>文件信息</h4>
+          <div class="file-details">
+            <div class="detail-item">
+              <span class="label">文件名：</span>
+              <span class="value">{{ pendingFile.fileName }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">文件大小：</span>
+              <span class="value">{{ formatFileSize(pendingFile.fileSize) }}</span>
+            </div>
+            <div class="detail-item">
+              <span class="label">文件类型：</span>
+              <span class="value">{{ pendingFile.fileType || '未知' }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 图片预览 -->
+        <div v-if="pendingFile.isImage && pendingFile.previewUrl" class="image-preview-section">
+          <h4>图片预览</h4>
+          <div class="preview-image-container">
+            <img :src="pendingFile.previewUrl" :alt="pendingFile.fileName" class="preview-image" />
+          </div>
+        </div>
+
+        <!-- 非图片文件 -->
+        <div v-else class="non-image-section">
+          <h4>文件预览</h4>
+          <div class="file-icon-container">
+            <el-icon class="large-file-icon"><Document /></el-icon>
+            <p>{{ pendingFile.fileName }}</p>
+          </div>
+        </div>
+
+        <!-- 确认提示 -->
+        <div class="confirm-section">
+          <el-alert
+            title="确认上传"
+            :description="'文件将被上传到服务器路径: uploads/attachments/' + new Date().getFullYear() + '年异常汇总/' +
+              String(new Date().getMonth() + 1).padStart(2, '0') + '月份/'"
+            type="info"
+            :closable="false"
+            show-icon
+          />
+        </div>
+      </div>
+
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelUpload">取消</el-button>
+          <el-button type="primary" @click="confirmUpload" :loading="fileUploading">
+            {{ fileUploading ? '上传中...' : '确认上传' }}
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
+
     <!-- 图片预览遮罩和弹窗 -->
     <div v-if="showPreview" class="img-preview-mask" @click.self="showPreview = false">
       <div class="img-preview-box">
@@ -488,10 +592,19 @@
  * 4. 文件上传和附件管理
  */
 
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, nextTick } from 'vue'
 import axios from 'axios'
-import { CircleClose, Close, RefreshLeft, Check } from '@element-plus/icons-vue'
+import { CircleClose, Close, RefreshLeft, Check, Document } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
+import ImagePreview from './ImagePreview.vue'
+
+// 定义props
+const props = defineProps({
+  editData: {
+    type: Object,
+    default: null
+  }
+})
 
 // 定义事件
 const emit = defineEmits(['success', 'cancel'])
@@ -961,18 +1074,27 @@ const submitForm = () => {
         loading.value = true
         const token = localStorage.getItem('token');
 
-        const res = await axios.post('/api/complaint', submissionData, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        let res
+        if (props.editData && props.editData.ID) {
+          // 编辑模式：使用PUT请求更新
+          res = await axios.put(`/api/complaint/${props.editData.ID}`, submissionData, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        } else {
+          // 新增模式：使用POST请求创建
+          res = await axios.post('/api/complaint', submissionData, {
+            headers: { Authorization: `Bearer ${token}` }
+          });
+        }
 
         if (res.data && res.data.success) {
-          ElMessage.success(res.data.message || '投诉登记成功');
+          ElMessage.success(res.data.message || (props.editData ? '投诉记录更新成功' : '投诉登记成功'));
           emit('success');
         } else {
-          ElMessage.error(res.data.message || '投诉登记失败');
+          ElMessage.error(res.data.message || (props.editData ? '投诉记录更新失败' : '投诉登记失败'));
         }
       } catch (error) {
-        ElMessage.error(error.response?.data?.message || '投诉登记失败');
+        ElMessage.error(error.response?.data?.message || (props.editData ? '投诉记录更新失败' : '投诉登记失败'));
       } finally {
         loading.value = false
       }
@@ -985,17 +1107,335 @@ const resetForm = () => {
   options.defectiveItems = [];
 }
 
-// 附件选择与图片预览
+// 附件选择与图片预览相关变量
+const selectedFileInfo = ref(null)
+const fileUploading = ref(false)
+const previewDialogVisible = ref(false)
+const pendingFile = ref(null)
+
+// 判断是否为图片文件
+const isImageFile = (fileName) => {
+  if (!fileName) return false
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
+  const extension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'))
+  return imageExtensions.includes(extension)
+}
+
+// 判断文件路径类型并生成正确的预览URL
+const getFilePreviewUrl = (filePath) => {
+  if (!filePath || filePath === '' || filePath === null || filePath === undefined) {
+    console.log('ComplaintFormDialog getFilePreviewUrl: 路径为空，返回null')
+    return null
+  }
+
+  console.log('=== ComplaintFormDialog getFilePreviewUrl 调试信息 ===')
+  console.log('输入路径:', filePath)
+  console.log('路径类型:', typeof filePath)
+
+  try {
+    // 确保filePath是字符串
+    const pathStr = String(filePath).trim()
+    if (!pathStr) {
+      console.log('路径转换为字符串后为空')
+      return null
+    }
+
+    // 判断是否为服务器上传的文件
+    // 1. 包含file_时间戳格式
+    // 2. 或者路径以uploads/开头（相对路径）
+    // 3. 或者不包含网络路径特征（如\\tj_server\）
+    const hasFilePrefix = pathStr.includes('file_') && /file_\d+_/.test(pathStr)
+    const isRelativePath = pathStr.startsWith('uploads/') || pathStr.startsWith('./uploads/') || pathStr.startsWith('/uploads/')
+    const isNetworkPath = pathStr.includes('\\\\') || pathStr.includes('tj_server') || pathStr.includes('工作\\品质部')
+
+    console.log('路径分析:', {
+      hasFilePrefix,
+      isRelativePath,
+      isNetworkPath,
+      pathLength: pathStr.length
+    })
+
+    const isServerUpload = hasFilePrefix || isRelativePath || !isNetworkPath
+
+    console.log('判断结果: isServerUpload =', isServerUpload)
+
+    if (isServerUpload) {
+      // 服务器上传的文件，使用后端API
+      const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+      const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
+      const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
+      const finalUrl = `${backendUrl}/files/attachments/${encodedPath}`
+      console.log('生成服务器URL:', finalUrl)
+      console.log('================================================')
+      return finalUrl
+    } else {
+      // 网络共享路径的文件，使用网络地址前缀
+      const networkPrefix = 'http://192.168.1.57/shared-files' // 根据实际情况调整
+      const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
+      const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
+      const finalUrl = `${networkPrefix}/${encodedPath}`
+      console.log('生成网络URL:', finalUrl)
+      console.log('================================================')
+      return finalUrl
+    }
+  } catch (error) {
+    console.error('ComplaintFormDialog getFilePreviewUrl 处理错误:', error)
+    return null
+  }
+}
+
+// 格式化文件大小
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+// 附件选择（先预览，再确认上传）
 const selectFile = async () => {
   const input = document.createElement('input')
   input.type = 'file'
-  input.onchange = e => {
+  input.accept = '*/*' // 接受所有文件类型
+
+  input.onchange = async (e) => {
     const file = e.target.files[0]
     if (file) {
-      form.value.AttachmentFile = URL.createObjectURL(file)
+      // 创建文件预览信息
+      const fileInfo = {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        isImage: isImageFile(file.name),
+        previewUrl: null,
+        file: file
+      }
+
+      // 如果是图片，创建预览URL
+      if (fileInfo.isImage) {
+        fileInfo.previewUrl = URL.createObjectURL(file)
+      }
+
+      // 保存待上传文件信息并显示预览对话框
+      pendingFile.value = fileInfo
+      previewDialogVisible.value = true
     }
   }
+
   input.click()
+}
+
+// 确认上传文件
+const confirmUpload = async () => {
+  if (!pendingFile.value) return
+
+  try {
+    fileUploading.value = true
+    previewDialogVisible.value = false
+
+    const file = pendingFile.value.file
+
+    // 清理所有旧的文件信息和缓存
+    selectedFileInfo.value = null
+    form.value.AttachmentFile = ''
+
+    // 创建FormData对象
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('type', 'attachment') // 标识为附件文件
+
+    // 上传文件到服务器
+    const token = localStorage.getItem('token')
+    const response = await axios.post('/api/upload/complaint-attachment', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    // 打印服务器响应，用于调试
+    console.log('服务器上传响应:', response.data)
+
+    if (response.data && response.data.success) {
+      // 清理旧的预览URL和文件信息
+      if (pendingFile.value && pendingFile.value.previewUrl && pendingFile.value.previewUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(pendingFile.value.previewUrl)
+      }
+
+      // 清空旧的文件信息
+      selectedFileInfo.value = null
+
+      // 服务器返回相对路径，设置到表单字段
+      form.value.AttachmentFile = response.data.relativePath
+
+      // 创建文件信息对象
+      const fileInfo = {
+        fileName: response.data.originalName, // 使用服务器返回的原始文件名
+        fileSize: file.size,
+        fileType: file.type,
+        isImage: isImageFile(response.data.filename), // 使用服务器返回的实际文件名判断
+        previewUrl: null, // 先设为null，后面会设置正确的预览URL
+        relativePath: response.data.relativePath,
+        serverPath: response.data.serverPath,
+        filename: response.data.filename, // 保存服务器返回的文件名
+        file: file,
+        uploaded: true
+      }
+
+      // 如果是图片，设置预览URL
+      if (fileInfo.isImage) {
+        fileInfo.previewUrl = getFilePreviewUrl(response.data.relativePath)
+
+        console.log('=== 文件上传成功 ===')
+        console.log('服务器返回数据:', response.data)
+        console.log('构建的预览URL:', fileInfo.previewUrl)
+        console.log('相对路径:', response.data.relativePath)
+        console.log('实际文件名:', response.data.filename)
+        console.log('文件类型判断: 服务器上传文件')
+        console.log('==================')
+      }
+
+      // 立即更新selectedFileInfo，确保显示最新的文件信息
+      selectedFileInfo.value = fileInfo
+
+      // 强制更新DOM
+      nextTick(() => {
+        console.log('DOM已更新，当前文件信息:', selectedFileInfo.value)
+      })
+
+      selectedFileInfo.value = fileInfo
+
+      ElMessage.success('文件上传成功')
+      console.log('文件上传成功:', {
+        fileName: file.name,
+        relativePath: response.data.relativePath,
+        serverPath: response.data.serverPath,
+        previewUrl: fileInfo.previewUrl
+      })
+    } else {
+      throw new Error(response.data?.message || '文件上传失败')
+    }
+  } catch (error) {
+    console.error('文件上传失败:', error)
+    ElMessage.error(error.response?.data?.message || error.message || '文件上传失败')
+
+    // 上传失败时，仍然显示本地预览（但不保存到表单）
+    const fileInfo = {
+      ...pendingFile.value,
+      uploadFailed: true
+    }
+
+    selectedFileInfo.value = fileInfo
+  } finally {
+    fileUploading.value = false
+    pendingFile.value = null
+  }
+}
+
+// 取消上传
+const cancelUpload = () => {
+  previewDialogVisible.value = false
+  // 清理预览URL
+  if (pendingFile.value && pendingFile.value.previewUrl) {
+    URL.revokeObjectURL(pendingFile.value.previewUrl)
+  }
+  pendingFile.value = null
+}
+
+// 通用文件选择函数（直接上传，不显示预览对话框）
+const selectAndUploadFile = async () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '*/*' // 接受所有文件类型
+
+  input.onchange = async (e) => {
+    const file = e.target.files[0]
+    if (file) {
+      try {
+        fileUploading.value = true
+        await uploadFileToServer(file)
+      } finally {
+        fileUploading.value = false
+      }
+    }
+  }
+
+  input.click()
+}
+
+// 通用文件上传处理函数
+const uploadFileToServer = async (file) => {
+  try {
+    // 清理所有旧的文件信息和缓存
+    selectedFileInfo.value = null
+    form.value.AttachmentFile = ''
+
+    // 创建FormData对象
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('type', 'attachment') // 标识为附件文件
+
+    // 上传文件到服务器
+    const token = localStorage.getItem('token')
+    const response = await axios.post('/api/upload/complaint-attachment', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    console.log('服务器上传响应:', response.data)
+
+    if (response.data && response.data.success) {
+      // 服务器返回相对路径，设置到表单字段
+      form.value.AttachmentFile = response.data.relativePath
+
+      // 创建文件信息对象
+      const fileInfo = {
+        fileName: response.data.originalName, // 使用服务器返回的原始文件名
+        fileSize: file.size,
+        fileType: file.type,
+        isImage: isImageFile(response.data.filename), // 使用服务器返回的实际文件名判断
+        previewUrl: null, // 先设为null，后面会设置正确的预览URL
+        relativePath: response.data.relativePath,
+        serverPath: response.data.serverPath,
+        filename: response.data.filename, // 保存服务器返回的文件名
+        file: file,
+        uploaded: true
+      }
+
+      // 如果是图片，设置预览URL
+      if (fileInfo.isImage) {
+        fileInfo.previewUrl = getFilePreviewUrl(response.data.relativePath)
+
+        console.log('=== 文件上传成功 ===')
+        console.log('服务器返回数据:', response.data)
+        console.log('构建的预览URL:', fileInfo.previewUrl)
+        console.log('相对路径:', response.data.relativePath)
+        console.log('实际文件名:', response.data.filename)
+        console.log('文件类型判断: 服务器上传文件')
+        console.log('==================')
+      }
+
+      // 立即更新selectedFileInfo，确保显示最新的文件信息
+      selectedFileInfo.value = fileInfo
+
+      // 强制更新DOM
+      nextTick(() => {
+        console.log('DOM已更新，当前文件信息:', selectedFileInfo.value)
+      })
+
+      ElMessage.success('文件上传成功')
+      return true
+    } else {
+      throw new Error(response.data?.message || '文件上传失败')
+    }
+  } catch (error) {
+    console.error('文件上传失败:', error)
+    ElMessage.error(error.response?.data?.message || error.message || '文件上传失败')
+    return false
+  }
 }
 
 const isImage = (path) => {
@@ -1065,6 +1505,53 @@ watch(() => form.value.TotalCost, () => {
   calculateMainPersonAssessment();
 })
 
+// 处理编辑数据的初始化
+const initializeEditData = () => {
+  if (props.editData) {
+    // 复制编辑数据到表单
+    Object.keys(form.value).forEach(key => {
+      if (props.editData[key] !== undefined) {
+        form.value[key] = props.editData[key]
+      }
+    })
+
+    // 处理现有附件文件
+    if (props.editData.AttachmentFile) {
+      const filePath = props.editData.AttachmentFile
+      const fileName = filePath.split(/[\/\\]/).pop() || filePath
+
+      // 判断文件类型并创建文件信息
+      const isImage = isImageFile(fileName)
+
+      selectedFileInfo.value = {
+        fileName: fileName,
+        fileSize: 0, // 现有文件大小未知
+        fileType: isImage ? 'image/*' : 'application/octet-stream',
+        isImage: isImage,
+        previewUrl: isImage ? getFilePreviewUrl(filePath) : null,
+        relativePath: filePath,
+        serverPath: null,
+        filename: fileName,
+        file: null,
+        uploaded: true,
+        isExisting: true // 标记为现有文件
+      }
+
+      console.log('=== 编辑模式文件初始化 ===')
+      console.log('文件路径:', filePath)
+      console.log('文件名:', fileName)
+      console.log('是否图片:', isImage)
+      console.log('预览URL:', selectedFileInfo.value.previewUrl)
+      console.log('========================')
+    }
+  }
+}
+
+// 监听编辑数据变化
+watch(() => props.editData, () => {
+  initializeEditData()
+}, { immediate: true, deep: true })
+
 /**
  * 组件挂载时的初始化操作
  */
@@ -1079,6 +1566,9 @@ onMounted(async () => {
   calculateLaborCost();
   calculateTotalCost();
   calculateMainPersonAssessment();
+
+  // 初始化编辑数据
+  initializeEditData();
 })
 </script>
 
@@ -1367,6 +1857,180 @@ onMounted(async () => {
   background: #ecf5ff;
   color: #409eff;
 }
+
+/* 附件预览样式 */
+.attachment-field {
+  width: 100%;
+}
+
+.attachment-input-section {
+  display: flex;
+  align-items: center;
+}
+
+.attachment-preview-section {
+  width: 100%;
+}
+
+.preview-container {
+  width: 150px;
+  height: 120px;
+  border: 2px dashed #dcdfe6;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+  transition: all 0.3s ease;
+}
+
+.preview-container:hover {
+  border-color: #409eff;
+  background: #f0f9ff;
+}
+
+.image-preview-box {
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.file-preview-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  gap: 8px;
+}
+
+.file-icon {
+  font-size: 32px;
+  color: #409eff;
+}
+
+.file-name {
+  font-size: 12px;
+  text-align: center;
+  word-break: break-all;
+  max-width: 120px;
+}
+
+.empty-preview-box {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 文件上传预览对话框样式 */
+.file-upload-preview-dialog {
+  border-radius: 12px;
+}
+
+.file-preview-content {
+  padding: 20px 0;
+}
+
+.file-info-section,
+.image-preview-section,
+.non-image-section,
+.confirm-section {
+  margin-bottom: 20px;
+}
+
+.file-info-section h4,
+.image-preview-section h4,
+.non-image-section h4 {
+  margin: 0 0 12px 0;
+  color: #303133;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.file-details {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 16px;
+  border: 1px solid #e9ecef;
+}
+
+.detail-item {
+  display: flex;
+  margin-bottom: 8px;
+}
+
+.detail-item:last-child {
+  margin-bottom: 0;
+}
+
+.detail-item .label {
+  font-weight: 600;
+  color: #606266;
+  min-width: 80px;
+}
+
+.detail-item .value {
+  color: #303133;
+  word-break: break-all;
+}
+
+.preview-image-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e9ecef;
+}
+
+.preview-image {
+  max-width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.file-icon-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 40px 20px;
+  border: 1px solid #e9ecef;
+}
+
+.large-file-icon {
+  font-size: 48px;
+  color: #409eff;
+  margin-bottom: 12px;
+}
+
+.file-icon-container p {
+  margin: 0;
+  color: #606266;
+  font-size: 14px;
+  text-align: center;
+  word-break: break-all;
+}
+
+.confirm-section {
+  margin-top: 20px;
+}
+
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+
 
 .material-tabs :deep(.el-tabs__item.is-active) {
   background: #409eff;

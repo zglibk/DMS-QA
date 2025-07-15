@@ -1063,9 +1063,9 @@
                           readonly
                           class="attachment-input"
                         />
-                        <el-button type="primary" @click="selectFile" class="select-file-btn">
-                          <el-icon><Document /></el-icon>
-                          选择文件
+                        <el-button type="primary" @click="selectFile" :loading="fileUploading" class="select-file-btn">
+                          <el-icon v-if="!fileUploading"><Document /></el-icon>
+                          {{ fileUploading ? '上传中...' : '选择文件' }}
                         </el-button>
                         <div
                           class="file-drop-zone"
@@ -1078,14 +1078,14 @@
                         </div>
                         <!-- 图片预览区域 -->
                         <div class="image-preview-area">
-                          <div v-if="editFormData[field.key] && isImageFile(editFormData[field.key])" class="image-preview" @dblclick="showImagePreview">
-                            <img
-                              :src="getImagePreviewUrl(editFormData[field.key])"
-                              alt="预览图"
-                              @error="handleImageError"
-                              @load="handleImageLoad"
-                            />
-                          </div>
+                          <ImagePreview
+                            v-if="editFormData[field.key]"
+                            :key="`${editFormData.ID}-${field.key}-${editFormData[field.key]}`"
+                            :file-path="editFormData[field.key]"
+                            :record-id="editFormData.ID"
+                            width="200px"
+                            height="150px"
+                          />
                           <div v-else class="image-placeholder">
                             <div class="placeholder-content">
                               <el-icon class="placeholder-icon"><Picture /></el-icon>
@@ -1124,21 +1124,7 @@
       </template>
     </el-dialog>
 
-    <!-- 图片预览对话框 -->
-    <el-dialog
-      v-model="showImageDialog"
-      title="图片预览"
-      width="80%"
-      :close-on-click-modal="true"
-      :modal="true"
-      :append-to-body="true"
-      class="image-preview-dialog"
-      center
-    >
-      <div class="image-preview-container">
-        <img :src="previewImageUrl" alt="预览图片" class="preview-image" />
-      </div>
-    </el-dialog>
+
 
     <!-- Excel导出字段选择对话框 -->
     <el-dialog
@@ -1256,6 +1242,7 @@ import QualityMetricsChart from '@/components/QualityMetricsChart.vue'
 import ComplaintAnalysisChart from '@/components/ComplaintAnalysisChart.vue'
 import AppLayout from '@/components/common/AppLayout.vue'
 import AttachmentViewer from '@/components/AttachmentViewer.vue'
+import ImagePreview from '@/components/ImagePreview.vue'
 import ComplaintFormDialog from '../components/ComplaintFormDialog.vue'
 import * as echarts from 'echarts'
 import { useUserStore } from '../store/user'
@@ -2856,6 +2843,121 @@ const hasDataChanged = () => {
 // 文件选择功能
 const selectedFile = ref(null)
 const selectedFileHandle = ref(null)
+const fileUploading = ref(false)
+
+// 判断是否为图片文件
+const isImageFile = (fileName) => {
+  if (!fileName) return false
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
+  const extension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'))
+  return imageExtensions.includes(extension)
+}
+
+// 判断文件路径类型并生成正确的预览URL
+const getFilePreviewUrl = (filePath) => {
+  if (!filePath || filePath === '' || filePath === null || filePath === undefined) {
+    console.log('getFilePreviewUrl: 路径为空，返回null')
+    return null
+  }
+
+  console.log('=== getFilePreviewUrl 调试信息 ===')
+  console.log('输入路径:', filePath)
+  console.log('路径类型:', typeof filePath)
+
+  try {
+    // 确保filePath是字符串
+    const pathStr = String(filePath).trim()
+    if (!pathStr) {
+      console.log('路径转换为字符串后为空')
+      return null
+    }
+
+    // 判断是否为服务器上传的文件
+    // 1. 包含file_时间戳格式
+    // 2. 或者路径以uploads/开头（相对路径）
+    // 3. 或者不包含网络路径特征（如\\tj_server\）
+    const hasFilePrefix = pathStr.includes('file_') && /file_\d+_/.test(pathStr)
+    const isRelativePath = pathStr.startsWith('uploads/') || pathStr.startsWith('./uploads/') || pathStr.startsWith('/uploads/')
+    const isNetworkPath = pathStr.includes('\\\\') || pathStr.includes('tj_server') || pathStr.includes('工作\\品质部')
+
+    console.log('路径分析:', {
+      hasFilePrefix,
+      isRelativePath,
+      isNetworkPath,
+      pathLength: pathStr.length
+    })
+
+    const isServerUpload = hasFilePrefix || isRelativePath || !isNetworkPath
+
+    console.log('判断结果: isServerUpload =', isServerUpload)
+
+    if (isServerUpload) {
+      // 服务器上传的文件，使用后端API
+      const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+      const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
+      const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
+      const finalUrl = `${backendUrl}/files/attachments/${encodedPath}`
+      console.log('生成服务器URL:', finalUrl)
+      console.log('================================')
+      return finalUrl
+    } else {
+      // 网络共享路径的文件，使用网络地址前缀
+      const networkPrefix = 'http://192.168.1.57/shared-files' // 根据实际情况调整
+      const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
+      const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
+      const finalUrl = `${networkPrefix}/${encodedPath}`
+      console.log('生成网络URL:', finalUrl)
+      console.log('================================')
+      return finalUrl
+    }
+  } catch (error) {
+    console.error('getFilePreviewUrl 处理错误:', error)
+    return null
+  }
+}
+
+// 上传文件到服务器
+const uploadFileToServer = async (file) => {
+  try {
+    // 创建FormData对象
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('type', 'attachment') // 标识为附件文件
+
+    // 上传文件到服务器
+    const token = localStorage.getItem('token')
+    const response = await axios.post('/api/upload/complaint-attachment', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        'Authorization': `Bearer ${token}`
+      }
+    })
+
+    console.log('服务器上传响应:', response.data)
+
+    if (response.data && response.data.success) {
+      // 更新表单字段
+      editFormData.value.AttachmentFile = response.data.relativePath
+
+      // 强制刷新组件 - 通过nextTick确保DOM更新
+      await nextTick()
+
+      ElMessage.success('文件上传成功')
+      console.log('文件上传成功:', {
+        fileName: file.name,
+        relativePath: response.data.relativePath,
+        serverPath: response.data.serverPath
+      })
+      return true
+    } else {
+      throw new Error(response.data?.message || '文件上传失败')
+    }
+  } catch (error) {
+    console.error('文件上传失败:', error)
+    ElMessage.error(error.response?.data?.message || error.message || '文件上传失败')
+    return false
+  }
+}
 
 const selectFile = async () => {
   try {
@@ -2874,6 +2976,32 @@ const selectFile = async () => {
       const file = await fileHandle.getFile()
       selectedFile.value = file
       selectedFileHandle.value = fileHandle
+
+      // 询问用户是否要上传到服务器
+      try {
+        await ElMessageBox.confirm(
+          `已选择文件: ${file.name}\n\n选择处理方式:`,
+          '文件处理选项',
+          {
+            confirmButtonText: '上传到服务器',
+            cancelButtonText: '仅设置路径',
+            type: 'info'
+          }
+        )
+
+        // 用户选择上传到服务器
+        try {
+          fileUploading.value = true
+          const success = await uploadFileToServer(file)
+          if (success) {
+            return // 上传成功，直接返回
+          }
+        } finally {
+          fileUploading.value = false
+        }
+      } catch {
+        // 用户选择仅设置路径，继续原有逻辑
+      }
 
       // 尝试构建更完整的路径信息
       let filePath = file.name
@@ -2958,54 +3086,7 @@ const selectFile = async () => {
   input.click()
 }
 
-// 判断是否为图片文件
-const isImageFile = (filePath) => {
-  if (!filePath) return false
-  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
-  const extension = filePath.toLowerCase().substring(filePath.lastIndexOf('.'))
-  return imageExtensions.includes(extension)
-}
-
-// 获取图片预览URL
-const getImagePreviewUrl = (filePath) => {
-  if (!filePath) return ''
-
-  // 如果有选择的文件对象，使用URL.createObjectURL创建预览URL
-  if (selectedFile.value && selectedFile.value.name === filePath) {
-    return URL.createObjectURL(selectedFile.value)
-  }
-
-  // 如果是完整路径，直接使用
-  if (filePath.startsWith('http') || filePath.startsWith('file://')) {
-    return filePath
-  }
-
-  // 否则假设是相对路径，需要根据实际情况调整
-  return `file:///${filePath}`
-}
-
-// 图片预览相关
-const showImageDialog = ref(false)
-const previewImageUrl = ref('')
-
-// 显示图片预览
-const showImagePreview = () => {
-  if (editFormData.value.AttachmentFile && isImageFile(editFormData.value.AttachmentFile)) {
-    previewImageUrl.value = getImagePreviewUrl(editFormData.value.AttachmentFile)
-    showImageDialog.value = true
-  }
-}
-
-// 图片加载错误处理
-const handleImageError = (event) => {
-  // 隐藏图片，显示占位符
-  event.target.style.display = 'none'
-}
-
-// 图片加载成功处理
-const handleImageLoad = (event) => {
-  event.target.style.display = 'block'
-}
+// 注意：图片预览功能已移至ImagePreview组件中处理
 
 // 处理文件拖拽
 const handleFileDrop = async (event) => {
