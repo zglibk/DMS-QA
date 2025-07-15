@@ -7,6 +7,7 @@ const router = express.Router();
 // 确保上传目录存在
 const uploadDir = path.join(__dirname, '../uploads');
 const siteImagesDir = path.join(uploadDir, 'site-images');
+const attachmentDir = path.join(uploadDir, 'attachments');
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -16,7 +17,11 @@ if (!fs.existsSync(siteImagesDir)) {
   fs.mkdirSync(siteImagesDir, { recursive: true });
 }
 
-// 配置multer存储
+if (!fs.existsSync(attachmentDir)) {
+  fs.mkdirSync(attachmentDir, { recursive: true });
+}
+
+// 配置multer存储 - 网站图片
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, siteImagesDir);
@@ -30,7 +35,42 @@ const storage = multer.diskStorage({
   }
 });
 
-// 文件过滤器
+// 配置multer存储 - 投诉附件
+const attachmentStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // 创建按年月分组的目录结构
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const dayDir = path.join(attachmentDir, `${year}年异常汇总`, `${month}月份`);
+
+    // 确保目录存在
+    if (!fs.existsSync(dayDir)) {
+      fs.mkdirSync(dayDir, { recursive: true });
+    }
+
+    cb(null, dayDir);
+  },
+  filename: function (req, file, cb) {
+    // 保持原始文件名，但添加时间戳避免冲突
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+
+    // 处理文件名，确保中文字符正确编码
+    let baseName = path.basename(file.originalname, ext);
+
+    // 如果文件名包含非ASCII字符，使用更安全的命名方式
+    if (/[^\x00-\x7F]/.test(baseName)) {
+      // 使用时间戳和随机字符串作为文件名
+      const randomStr = Math.random().toString(36).substring(2, 8);
+      baseName = `file_${timestamp}_${randomStr}`;
+    }
+
+    cb(null, `${baseName}${ext}`);
+  }
+});
+
+// 文件过滤器 - 网站图片
 const fileFilter = (req, file, cb) => {
   // 检查文件类型
   if (file.mimetype.startsWith('image/')) {
@@ -40,12 +80,27 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// 创建multer实例
+// 文件过滤器 - 投诉附件（允许所有文件类型）
+const attachmentFileFilter = (req, file, cb) => {
+  // 允许所有文件类型，但限制文件大小
+  cb(null, true);
+};
+
+// 创建multer实例 - 网站图片
 const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
     fileSize: 5 * 1024 * 1024, // 5MB限制
+  }
+});
+
+// 创建multer实例 - 投诉附件
+const attachmentUpload = multer({
+  storage: attachmentStorage,
+  fileFilter: attachmentFileFilter,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB限制
   }
 });
 
@@ -187,6 +242,68 @@ router.use((error, req, res, next) => {
     success: false,
     message: error.message || '上传失败'
   });
+});
+
+// 投诉附件上传接口
+router.post('/complaint-attachment', attachmentUpload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: '没有上传文件'
+      });
+    }
+
+    const file = req.file;
+    const type = req.body.type || 'attachment';
+
+    // 计算相对路径（相对于attachments目录）
+    let relativePath = path.relative(attachmentDir, file.path);
+
+    // 服务器完整路径
+    const serverPath = file.path;
+
+    // 构建标准化的相对路径（用于数据库存储和HTTP访问）
+    // 将所有反斜杠替换为正斜杠，并确保没有多余的斜杠
+    const normalizedPath = relativePath.replace(/\\/g, '/').replace(/\/\//g, '/');
+
+    console.log(`投诉附件上传成功:`, {
+      originalName: file.originalname,
+      filename: file.filename,
+      size: file.size,
+      relativePath: normalizedPath,
+      serverPath: serverPath,
+      destination: file.destination
+    });
+
+    res.json({
+      success: true,
+      message: '文件上传成功',
+      filename: file.filename,
+      originalName: file.originalname,
+      size: file.size,
+      relativePath: normalizedPath,
+      serverPath: serverPath,
+      uploadTime: new Date()
+    });
+
+  } catch (error) {
+    console.error('投诉附件上传失败:', error);
+
+    // 如果有临时文件，删除它
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('删除临时文件失败:', unlinkError);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || '文件上传失败'
+    });
+  }
 });
 
 module.exports = router;
