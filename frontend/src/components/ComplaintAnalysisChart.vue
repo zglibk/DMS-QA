@@ -558,23 +558,43 @@ const tableColumns = computed(() => {
 const getBaseChartOption = () => ({
   tooltip: {
     trigger: 'axis',
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderColor: '#E4E7ED',
-    borderWidth: 1,
-    textStyle: { color: '#606266' }
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderColor: '#3498db',
+    borderWidth: 2,
+    borderRadius: 12,
+    textStyle: {
+      color: '#2c3e50',
+      fontSize: 13,
+      fontFamily: 'Microsoft YaHei, Arial, sans-serif'
+    },
+    padding: [16, 20],
+    shadowColor: 'rgba(52, 152, 219, 0.3)',
+    shadowBlur: 20,
+    shadowOffsetY: 8
   },
   legend: {
-    bottom: 10,
+    bottom: 15,
     left: 'center',
-    textStyle: { fontSize: 12, color: '#606266' },
-    itemGap: 20
+    textStyle: {
+      fontSize: 13,
+      color: '#2c3e50',
+      fontWeight: '600',
+      fontFamily: 'Microsoft YaHei, Arial, sans-serif'
+    },
+    itemGap: 30,
+    itemWidth: 20,
+    itemHeight: 14
   },
   grid: {
-    left: '5%',
-    right: '5%',
-    bottom: '15%',
-    top: '8%',
-    containLabel: true
+    left: '6%',
+    right: '6%',
+    bottom: '18%',
+    top: '12%',
+    containLabel: true,
+    backgroundColor: 'rgba(248, 249, 250, 0.5)',
+    borderColor: 'rgba(189, 195, 199, 0.3)',
+    borderWidth: 2,
+    borderRadius: 8
   }
 })
 
@@ -1079,28 +1099,31 @@ const getTimeChartOption = () => {
         data: innerData,
         smooth: true,
         symbol: 'circle',
-        symbolSize: 8,
+        symbolSize: 10,
         lineStyle: {
-          width: 3,
-          shadowColor: 'rgba(245, 124, 0, 0.3)',
-          shadowBlur: 10
+          width: 4,
+          color: '#f39c12',
+          shadowColor: 'rgba(243, 156, 18, 0.4)',
+          shadowBlur: 15,
+          shadowOffsetY: 5
         },
         itemStyle: {
-          color: '#f57c00',
-          borderWidth: 2,
+          color: '#f39c12',
+          borderWidth: 3,
           borderColor: '#fff',
-          shadowColor: 'rgba(245, 124, 0, 0.5)',
-          shadowBlur: 5
+          shadowColor: 'rgba(243, 156, 18, 0.5)',
+          shadowBlur: 12
         },
         label: {
           show: true,
           position: 'top',
           fontSize: 12,
-          fontWeight: 'bold',
-          color: '#f57c00',
-          backgroundColor: 'rgba(255, 255, 255, 0.8)',
-          borderRadius: 4,
-          padding: [2, 6]
+          fontWeight: '700',
+          color: '#2c3e50',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: 6,
+          padding: [4, 8],
+          fontFamily: 'Microsoft YaHei, Arial, sans-serif'
         }
       },
       {
@@ -1109,28 +1132,31 @@ const getTimeChartOption = () => {
         data: outerData,
         smooth: true,
         symbol: 'circle',
-        symbolSize: 8,
+        symbolSize: 10,
         lineStyle: {
-          width: 3,
-          shadowColor: 'rgba(211, 47, 47, 0.3)',
-          shadowBlur: 10
+          width: 4,
+          color: '#e74c3c',
+          shadowColor: 'rgba(231, 76, 60, 0.4)',
+          shadowBlur: 15,
+          shadowOffsetY: 5
         },
         itemStyle: {
-          color: '#d32f2f',
-          borderWidth: 2,
+          color: '#e74c3c',
+          borderWidth: 3,
           borderColor: '#fff',
-          shadowColor: 'rgba(211, 47, 47, 0.5)',
-          shadowBlur: 5
+          shadowColor: 'rgba(231, 76, 60, 0.5)',
+          shadowBlur: 12
         },
         label: {
           show: true,
           position: 'top',
           fontSize: 12,
-          fontWeight: 'bold',
-          color: '#d32f2f',
-          backgroundColor: 'rgba(255, 255, 255, 0.8)',
-          borderRadius: 4,
-          padding: [2, 6]
+          fontWeight: '700',
+          color: '#2c3e50',
+          backgroundColor: 'rgba(255, 255, 255, 0.95)',
+          borderRadius: 6,
+          padding: [4, 8],
+          fontFamily: 'Microsoft YaHei, Arial, sans-serif'
         }
       }
     ]
@@ -1164,17 +1190,26 @@ const getWorkshopChartOption = () => {
         data: innerData,
         stack: 'total',
         itemStyle: {
-          color: '#f57c00',
-          borderRadius: [0, 0, 4, 4],
-          shadowColor: 'rgba(245, 124, 0, 0.3)',
-          shadowBlur: 8
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: '#f39c12' },
+              { offset: 1, color: '#f1c40f' }
+            ]
+          },
+          borderRadius: [0, 0, 6, 6],
+          shadowColor: 'rgba(243, 156, 18, 0.4)',
+          shadowBlur: 12,
+          shadowOffsetY: 4
         },
         label: {
           show: true,
           position: 'inside',
           fontSize: 12,
-          fontWeight: 'bold',
-          color: '#fff'
+          fontWeight: '700',
+          color: '#fff',
+          fontFamily: 'Microsoft YaHei, Arial, sans-serif'
         }
       },
       {
@@ -1183,17 +1218,26 @@ const getWorkshopChartOption = () => {
         data: outerData,
         stack: 'total',
         itemStyle: {
-          color: '#d32f2f',
-          borderRadius: [4, 4, 0, 0],
-          shadowColor: 'rgba(211, 47, 47, 0.3)',
-          shadowBlur: 8
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: '#e74c3c' },
+              { offset: 1, color: '#c0392b' }
+            ]
+          },
+          borderRadius: [6, 6, 0, 0],
+          shadowColor: 'rgba(231, 76, 60, 0.4)',
+          shadowBlur: 12,
+          shadowOffsetY: 4
         },
         label: {
           show: true,
           position: 'inside',
           fontSize: 12,
-          fontWeight: 'bold',
-          color: '#fff'
+          fontWeight: '700',
+          color: '#fff',
+          fontFamily: 'Microsoft YaHei, Arial, sans-serif'
         }
       }
     ]

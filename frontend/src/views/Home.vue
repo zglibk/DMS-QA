@@ -779,14 +779,10 @@
             <span class="section-title">附件信息</span>
           </div>
           <div class="section-content">
-            <div class="attachment-info">
-              <el-icon class="file-icon"><Document /></el-icon>
-              <span class="file-name">{{ detailData.AttachmentFile }}</span>
-              <el-button type="primary"  link>
-                <el-icon><Download /></el-icon>
-                下载
-              </el-button>
-            </div>
+            <AttachmentViewer
+              :record-id="detailData.ID"
+              :show-path-info="true"
+            />
           </div>
         </div>
       </div>
@@ -1259,6 +1255,7 @@ import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
 import QualityMetricsChart from '@/components/QualityMetricsChart.vue'
 import ComplaintAnalysisChart from '@/components/ComplaintAnalysisChart.vue'
 import AppLayout from '@/components/common/AppLayout.vue'
+import AttachmentViewer from '@/components/AttachmentViewer.vue'
 import ComplaintFormDialog from '../components/ComplaintFormDialog.vue'
 import * as echarts from 'echarts'
 import { useUserStore } from '../store/user'

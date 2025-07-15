@@ -1015,7 +1015,6 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
 
           // 然后进行路径映射转换
           const excelTempPath = 'C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel';
-          const networkSharePath = '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计';
 
           // 移除file:///前缀进行比较
           let cleanHyperlink = hyperlink;
@@ -1026,19 +1025,25 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
           // 检查是否匹配Excel临时路径
           if (cleanHyperlink.startsWith(excelTempPath)) {
             // 提取相对路径部分
-            const relativePath = cleanHyperlink.substring(excelTempPath.length);
-            // 构建网络共享路径
-            const networkPath = networkSharePath + relativePath.replace(/\//g, '\\');
+            let relativePath = cleanHyperlink.substring(excelTempPath.length);
+            // 移除开头的反斜杠
+            relativePath = relativePath.replace(/^\\+/, '');
+            // 统一使用反斜杠
+            relativePath = relativePath.replace(/\//g, '\\');
+
+            // 修复HTML实体编码问题
+            relativePath = relativePath.replace(/&amp;/g, '&');
 
             console.log('路径映射转换:', {
               original: hyperlink,
               excelTempPath: excelTempPath,
               relativePath: relativePath,
-              networkPath: networkPath
+              finalPath: relativePath
             });
 
-            require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 路径映射转换: ${hyperlink} -> file:///${networkPath}\n`);
-            hyperlink = `file:///${networkPath}`;
+            require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 路径映射转换: ${hyperlink} -> ${relativePath}\n`);
+            // 统一使用相对路径格式，不添加file:///前缀
+            hyperlink = relativePath;
           }
         } catch (e3) {
           console.log('路径处理失败:', e3.message);
@@ -1058,8 +1063,19 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
             }
           }
 
-          // 重新构建完整路径
-          hyperlink = 'file:///' + filePath;
+          // 修复HTML实体编码问题
+          filePath = filePath.replace(/&amp;/g, '&');
+
+          // 检查是否是网络路径，如果是则转换为相对路径格式
+          const networkSharePath = '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\';
+          if (filePath.startsWith(networkSharePath)) {
+            // 提取相对路径部分
+            const relativePath = filePath.substring(networkSharePath.length);
+            hyperlink = relativePath;
+          } else {
+            // 保持原有格式但移除file:///前缀
+            hyperlink = filePath;
+          }
         }
 
         // 方法4：处理相对路径格式的超链接
@@ -1069,28 +1085,32 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
 
           // 根据提供的信息，实际文件在网络共享位置
           // ../../TJ/AppData/Roaming/Microsoft/Excel/2025年异常汇总
-          // 应该转换为 \\tj_server\工作\品质部\生产异常周报考核统计\2025年异常汇总
+          // 应该转换为相对路径格式：2025年异常汇总\...
 
-          let absolutePath;
+          let finalPath;
           if (relativePath.includes('TJ/AppData/Roaming/Microsoft/Excel/')) {
             // 提取Excel路径后的部分
             const excelPathIndex = relativePath.indexOf('TJ/AppData/Roaming/Microsoft/Excel/');
             const afterExcelPath = relativePath.substring(excelPathIndex + 'TJ/AppData/Roaming/Microsoft/Excel/'.length);
 
-            // 转换为网络共享路径
-            absolutePath = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${afterExcelPath.replace(/\//g, '\\')}`;
+            // 转换为相对路径格式，统一使用反斜杠
+            finalPath = afterExcelPath.replace(/\//g, '\\');
+            // 修复HTML实体编码问题
+            finalPath = finalPath.replace(/&amp;/g, '&');
           } else {
-            // 如果不匹配预期格式，使用原来的逻辑作为后备
-            absolutePath = `C:\\Users\\${relativePath.replace(/\//g, '\\')}`;
+            // 如果不匹配预期格式，保持原有逻辑
+            finalPath = relativePath.replace(/\//g, '\\');
+            finalPath = finalPath.replace(/&amp;/g, '&');
           }
 
           console.log('相对路径转换:', {
             original: hyperlink,
             relativePath: relativePath,
-            converted: absolutePath
+            finalPath: finalPath
           });
-          require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 相对路径转换: ${hyperlink} -> ${absolutePath}\n`);
-          hyperlink = `file:///${absolutePath}`;
+          require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 相对路径转换: ${hyperlink} -> ${finalPath}\n`);
+          // 统一使用相对路径格式
+          hyperlink = finalPath;
         }
 
         const debugInfo = {
@@ -1147,6 +1167,9 @@ function normalizeAttachmentPath(pathValue) {
 
   let normalizedPath = pathValue.trim();
 
+  // 修复HTML实体编码问题（&amp; -> &）
+  normalizedPath = normalizedPath.replace(/&amp;/g, '&');
+
   // 处理格式1：file:///\\tj_server\工作\品质部\生产异常周报考核统计\2025年异常汇总\...
   if (normalizedPath.startsWith('file:///\\\\tj_server\\工作\\')) {
     // 移除file:///前缀，保留网络路径
@@ -1189,19 +1212,74 @@ function processAttachmentPath(hyperlinkInfo) {
     return null;
   }
 
-  const originalPath = hyperlinkInfo.hyperlink;
+  let originalPath = hyperlinkInfo.hyperlink;
+
+  // 修复HTML实体编码问题（&amp; -> &）
+  originalPath = originalPath.replace(/&amp;/g, '&');
+
+  // 统一路径格式处理
+  let processedPath = originalPath;
+
+  // 移除file:///前缀（如果存在）
+  if (processedPath.startsWith('file:///')) {
+    processedPath = processedPath.substring(8);
+  }
+
+  // 检查是否是本地Excel临时路径，需要转换为网络路径
+  const excelTempPath = 'C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel';
+  const networkSharePath = '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计';
+
+  if (processedPath.startsWith(excelTempPath)) {
+    // 提取相对路径部分
+    const relativePath = processedPath.substring(excelTempPath.length);
+    // 构建网络共享路径，统一格式为相对路径
+    const networkRelativePath = relativePath.replace(/^\\+/, '').replace(/\//g, '\\');
+
+    // 检查是否是2025年异常汇总路径，需要特殊处理
+    if (networkRelativePath.startsWith('2025年异常汇总\\')) {
+      // 移除前缀，只保留相对路径
+      const finalPath = networkRelativePath;
+
+      console.log('路径转换:', {
+        original: originalPath,
+        processed: processedPath,
+        relativePath: relativePath,
+        finalPath: finalPath
+      });
+
+      return {
+        originalPath: originalPath,
+        blobUrl: finalPath, // 统一使用相对路径格式
+        fileName: hyperlinkInfo.text || extractFileNameFromPath(originalPath),
+        isConverted: true,
+        copyMode: false,
+        needsCopy: false
+      };
+    }
+  }
+
+  // 如果已经是相对路径格式，直接使用
+  if (!processedPath.includes(':\\') && !processedPath.startsWith('\\\\')) {
+    return {
+      originalPath: originalPath,
+      blobUrl: processedPath, // 保持相对路径格式
+      fileName: hyperlinkInfo.text || extractFileNameFromPath(originalPath),
+      isConverted: false,
+      copyMode: false,
+      needsCopy: false
+    };
+  }
 
   // 检查是否是本地文件路径
-  const isLocalPath = originalPath.startsWith('file:///') ||
-                     originalPath.match(/^[A-Za-z]:\\/) ||
-                     originalPath.startsWith('./') ||
-                     originalPath.startsWith('../');
+  const isLocalPath = processedPath.match(/^[A-Za-z]:\\/) ||
+                     processedPath.startsWith('./') ||
+                     processedPath.startsWith('../');
 
   if (isLocalPath) {
     // 标记为需要拷贝的本地文件
     return {
       originalPath: originalPath,
-      blobUrl: originalPath, // 保持原路径，等待异步拷贝处理
+      blobUrl: processedPath, // 保持原路径，等待异步拷贝处理
       fileName: hyperlinkInfo.text || extractFileNameFromPath(originalPath),
       isConverted: false,
       copyMode: false,

@@ -76,7 +76,7 @@ class ApiService {
     this.axiosInstance.interceptors.request.use(
       (config) => {
         // 添加认证token（如果有）
-        const token = localStorage.getItem('authToken')
+        const token = localStorage.getItem('token')
         if (token) {
           config.headers.Authorization = `Bearer ${token}`
         }
@@ -144,7 +144,7 @@ class ApiService {
         // 处理认证错误
         if (error.response?.status === 401) {
           console.log('🔐 认证失败，清除token')
-          localStorage.removeItem('authToken')
+          localStorage.removeItem('token')
           // 可以在这里触发重新登录
         }
 

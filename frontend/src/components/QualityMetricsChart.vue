@@ -175,13 +175,15 @@ const chartOption = ref({
     left: 'center',
     top: '2%',
     textStyle: {
-      fontSize: 16,
+      fontSize: 18,
       fontWeight: '600',
-      color: '#303133'
+      color: '#2c3e50',
+      fontFamily: 'Microsoft YaHei, Arial, sans-serif'
     },
     subtextStyle: {
-      color: '#909399',
-      fontSize: 12
+      color: '#7f8c8d',
+      fontSize: 13,
+      fontFamily: 'Microsoft YaHei, Arial, sans-serif'
     }
   },
   tooltip: {
@@ -189,41 +191,45 @@ const chartOption = ref({
     axisPointer: {
       type: 'cross',
       crossStyle: {
-        color: '#C0C4CC',
-        width: 1,
-        type: 'dashed'
+        color: '#bdc3c7',
+        width: 2,
+        type: 'solid',
+        opacity: 0.6
       },
       lineStyle: {
-        color: '#C0C4CC',
-        width: 1,
-        type: 'dashed'
+        color: '#3498db',
+        width: 2,
+        type: 'solid',
+        opacity: 0.8
       }
     },
-    backgroundColor: 'rgba(255, 255, 255, 0.96)',
-    borderColor: '#E4E7ED',
-    borderWidth: 1,
-    borderRadius: 6,
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderColor: '#3498db',
+    borderWidth: 2,
+    borderRadius: 12,
     textStyle: {
-      color: '#606266',
-      fontSize: 12,
-      lineHeight: 20
+      color: '#2c3e50',
+      fontSize: 13,
+      lineHeight: 22,
+      fontFamily: 'Microsoft YaHei, Arial, sans-serif'
     },
-    padding: [12, 16],
-    shadowColor: 'rgba(0, 0, 0, 0.12)',
-    shadowBlur: 12,
-    shadowOffsetY: 4,
+    padding: [16, 20],
+    shadowColor: 'rgba(52, 152, 219, 0.3)',
+    shadowBlur: 20,
+    shadowOffsetY: 8,
     formatter: function(params) {
-      let result = `<div style="font-weight: 600; margin-bottom: 8px; color: #303133; font-size: 13px;">${params[0].axisValue}</div>`
+      let result = `<div style="font-weight: 700; margin-bottom: 12px; color: #2c3e50; font-size: 15px; text-align: center; border-bottom: 2px solid #ecf0f1; padding-bottom: 8px;">${params[0].axisValue}</div>`
       params.forEach(param => {
         const unit = param.seriesName.includes('率') ? '%' : '批次'
         const value = param.seriesName.includes('率') ?
-          parseFloat(param.value).toFixed(2) : param.value
+          parseFloat(param.value).toFixed(1) : param.value
         const colorStyle = param.seriesName.includes('率') ?
-          'border-radius: 50%;' : 'border-radius: 2px;'
-        result += `<div style="margin: 6px 0; display: flex; align-items: center; font-size: 12px;">
-          <span style="display: inline-block; width: 10px; height: 10px; background: ${param.color}; margin-right: 10px; ${colorStyle}"></span>
-          <span style="flex: 1; color: #606266;">${param.seriesName}:</span>
-          <span style="font-weight: 600; margin-left: 12px; color: #303133;">${value}${unit}</span>
+          'border-radius: 50%; box-shadow: 0 2px 8px rgba(0,0,0,0.15);' : 'border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.15);'
+        const valueColor = param.seriesName.includes('率') ? '#e67e22' : '#3498db'
+        result += `<div style="margin: 10px 0; display: flex; align-items: center; font-size: 13px; padding: 4px 0;">
+          <span style="display: inline-block; width: 12px; height: 12px; background: ${param.color}; margin-right: 12px; ${colorStyle}"></span>
+          <span style="flex: 1; color: #7f8c8d; font-weight: 500;">${param.seriesName}:</span>
+          <span style="font-weight: 700; margin-left: 16px; color: ${valueColor}; font-size: 14px;">${value}${unit}</span>
         </div>`
       })
       return result
@@ -233,52 +239,53 @@ const chartOption = ref({
     data: [
       {
         name: '交检批次',
-        icon: 'rect',
-        itemStyle: { color: '#409EFF' }
+        icon: 'roundRect',
+        itemStyle: { color: '#3498db' }
       },
       {
         name: '发货批次',
-        icon: 'rect',
-        itemStyle: { color: '#67C23A' }
+        icon: 'roundRect',
+        itemStyle: { color: '#2ecc71' }
       },
       {
         name: '一次交检合格率',
         icon: 'circle',
-        itemStyle: { color: '#E6A23C' }
+        itemStyle: { color: '#e67e22' }
       },
       {
         name: '交货批次合格率',
         icon: 'circle',
-        itemStyle: { color: '#F56C6C' }
+        itemStyle: { color: '#e74c3c' }
       }
     ],
-    bottom: 10,
+    bottom: 15,
     left: 'center',
     textStyle: {
-      fontSize: 12,
-      color: '#606266',
-      fontWeight: '500'
+      fontSize: 13,
+      color: '#2c3e50',
+      fontWeight: '600',
+      fontFamily: 'Microsoft YaHei, Arial, sans-serif'
     },
-    itemWidth: 18,
-    itemHeight: 12,
-    itemGap: 25,
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    borderRadius: 6,
+    itemWidth: 20,
+    itemHeight: 14,
+    itemGap: 30,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
+    borderRadius: 8,
     padding: [6, 12],
     shadowColor: 'rgba(0, 0, 0, 0.08)',
     shadowBlur: 6,
     shadowOffsetY: 2
   },
   grid: {
-    left: '5%',
+    left: '6%',
     right: '12%',
-    bottom: '18%',
-    top: '12%',
+    bottom: '20%',
+    top: '15%',
     containLabel: true,
-    backgroundColor: 'rgba(250, 250, 250, 0.3)',
-    borderColor: 'rgba(220, 223, 230, 0.3)',
-    borderWidth: 1,
-    borderRadius: 4
+    backgroundColor: 'rgba(248, 249, 250, 0.5)',
+    borderColor: 'rgba(189, 195, 199, 0.3)',
+    borderWidth: 2,
+    borderRadius: 8
   },
   xAxis: {
     type: 'category',
@@ -287,23 +294,25 @@ const chartOption = ref({
     axisLine: {
       show: true,
       lineStyle: {
-        color: '#E4E7ED',
-        width: 1
+        color: '#bdc3c7',
+        width: 2
       }
     },
     axisLabel: {
-      fontSize: 12,
-      color: '#606266',
-      fontWeight: '500',
+      fontSize: 13,
+      color: '#2c3e50',
+      fontWeight: '600',
       rotate: 0,
-      margin: 12
+      margin: 15,
+      fontFamily: 'Microsoft YaHei, Arial, sans-serif'
     },
     axisTick: {
       show: true,
       lineStyle: {
-        color: '#E4E7ED'
+        color: '#bdc3c7',
+        width: 2
       },
-      length: 4
+      length: 6
     },
     splitLine: {
       show: false
@@ -322,16 +331,18 @@ const chartOption = ref({
       },
       splitLine: {
         lineStyle: {
-          color: '#F2F6FC',
+          color: '#ecf0f1',
           type: 'solid',
-          width: 1
+          width: 2,
+          opacity: 0.8
         }
       },
       nameTextStyle: {
-        color: '#909399',
-        fontSize: 12,
-        fontWeight: '500',
-        padding: [0, 0, 0, 10]
+        color: '#7f8c8d',
+        fontSize: 13,
+        fontWeight: '600',
+        padding: [0, 0, 0, 15],
+        fontFamily: 'Microsoft YaHei, Arial, sans-serif'
       }
     },
     {
@@ -348,10 +359,11 @@ const chartOption = ref({
         show: false
       },
       nameTextStyle: {
-        color: '#909399',
-        fontSize: 12,
-        fontWeight: '500',
-        padding: [0, 10, 0, 0]
+        color: '#7f8c8d',
+        fontSize: 13,
+        fontWeight: '600',
+        padding: [0, 15, 0, 0],
+        fontFamily: 'Microsoft YaHei, Arial, sans-serif'
       },
       min: 98,
       max: 100
@@ -363,25 +375,29 @@ const chartOption = ref({
       type: 'bar',
       yAxisIndex: 0,
       data: [],
-      barWidth: '28%',
+      barWidth: '32%',
       itemStyle: {
         color: {
           type: 'linear',
           x: 0, y: 0, x2: 0, y2: 1,
           colorStops: [
-            { offset: 0, color: '#409EFF' },
-            { offset: 1, color: '#79BBFF' }
+            { offset: 0, color: '#3498db' },
+            { offset: 1, color: '#5dade2' }
           ]
         },
-        borderRadius: [4, 4, 0, 0]
+        borderRadius: [6, 6, 0, 0],
+        shadowColor: 'rgba(52, 152, 219, 0.4)',
+        shadowBlur: 10,
+        shadowOffsetY: 4
       },
       label: {
         show: true,
         position: 'top',
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#409EFF',
-        formatter: '{c}'
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#2c3e50',
+        formatter: '{c}',
+        fontFamily: 'Microsoft YaHei, Arial, sans-serif'
       },
       emphasis: {
         itemStyle: {
@@ -401,25 +417,29 @@ const chartOption = ref({
       type: 'bar',
       yAxisIndex: 0,
       data: [],
-      barWidth: '28%',
+      barWidth: '32%',
       itemStyle: {
         color: {
           type: 'linear',
           x: 0, y: 0, x2: 0, y2: 1,
           colorStops: [
-            { offset: 0, color: '#67C23A' },
-            { offset: 1, color: '#95D475' }
+            { offset: 0, color: '#2ecc71' },
+            { offset: 1, color: '#58d68d' }
           ]
         },
-        borderRadius: [4, 4, 0, 0]
+        borderRadius: [6, 6, 0, 0],
+        shadowColor: 'rgba(46, 204, 113, 0.4)',
+        shadowBlur: 10,
+        shadowOffsetY: 4
       },
       label: {
         show: true,
         position: 'top',
-        fontSize: 11,
-        fontWeight: '600',
-        color: '#67C23A',
-        formatter: '{c}'
+        fontSize: 12,
+        fontWeight: '700',
+        color: '#2c3e50',
+        formatter: '{c}',
+        fontFamily: 'Microsoft YaHei, Arial, sans-serif'
       },
       emphasis: {
         itemStyle: {
@@ -441,31 +461,32 @@ const chartOption = ref({
       data: [],
       smooth: true,
       symbol: 'circle',
-      symbolSize: 8,
+      symbolSize: 10,
       lineStyle: {
-        width: 3,
-        color: '#E6A23C',
-        shadowColor: 'rgba(230, 162, 60, 0.3)',
-        shadowBlur: 10,
-        shadowOffsetY: 3
+        width: 4,
+        color: '#e67e22',
+        shadowColor: 'rgba(230, 126, 34, 0.4)',
+        shadowBlur: 15,
+        shadowOffsetY: 5
       },
       itemStyle: {
-        color: '#E6A23C',
+        color: '#e67e22',
         borderColor: '#FFFFFF',
-        borderWidth: 2,
-        shadowColor: 'rgba(230, 162, 60, 0.4)',
-        shadowBlur: 8
+        borderWidth: 3,
+        shadowColor: 'rgba(230, 126, 34, 0.5)',
+        shadowBlur: 12
       },
       label: {
         show: true,
         position: 'top',
         formatter: '{c}%',
-        fontSize: 11,
-        color: '#E6A23C',
-        fontWeight: '600',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        padding: [2, 6],
-        borderRadius: 4
+        fontSize: 12,
+        color: '#2c3e50',
+        fontWeight: '700',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        padding: [4, 8],
+        borderRadius: 6,
+        fontFamily: 'Microsoft YaHei, Arial, sans-serif'
       },
       emphasis: {
         focus: 'series',
@@ -487,16 +508,16 @@ const chartOption = ref({
       data: [],
       smooth: true,
       symbol: 'circle',
-      symbolSize: 8,
+      symbolSize: 10,
       lineStyle: {
-        width: 3,
-        color: '#F56C6C',
-        shadowColor: 'rgba(245, 108, 108, 0.3)',
-        shadowBlur: 10,
-        shadowOffsetY: 3
+        width: 4,
+        color: '#e74c3c',
+        shadowColor: 'rgba(231, 76, 60, 0.4)',
+        shadowBlur: 15,
+        shadowOffsetY: 5
       },
       itemStyle: {
-        color: '#F56C6C',
+        color: '#e74c3c',
         borderColor: '#FFFFFF',
         borderWidth: 2,
         shadowColor: 'rgba(245, 108, 108, 0.4)',

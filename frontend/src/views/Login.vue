@@ -49,6 +49,16 @@
       </el-popover>
     </div>
     <div class="login-center-wrap">
+      <!-- 左侧插画区域 -->
+      <div class="login-illustration">
+        <InteractiveIllustration />
+        <div class="illustration-text">
+          <h3>DMS质量管理系统</h3>
+          <p>现代化的生产质量管理平台</p>
+        </div>
+      </div>
+
+      <!-- 右侧登录表单 -->
       <div class="login-box">
         <div class="logo-container">
           <img :src="siteConfig?.logoBase64Img || '/logo.png'" alt="Logo" class="logo" @error="handleLogoError" />
@@ -126,6 +136,8 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '../store/user'
 // 网站配置管理
 import { useSiteConfig } from '../composables/useSiteConfig'
+// 交互式插画组件
+import InteractiveIllustration from '../components/InteractiveIllustration.vue'
 
 /**
  * 响应式数据定义
@@ -291,8 +303,44 @@ const saveApiBase = () => {
   min-height: 0;
   transition: min-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   z-index: 2;
+  gap: 4rem;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 2rem;
 }
 
+/* 左侧插画区域 */
+.login-illustration {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 500px;
+  max-width: 500px;
+}
+
+.illustration-text {
+  text-align: center;
+  margin-top: 2rem;
+  color: #ffffff;
+}
+
+.illustration-text h3 {
+  font-size: 1.8rem;
+  font-weight: 600;
+  margin: 0 0 0.5rem 0;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.illustration-text p {
+  font-size: 1.1rem;
+  margin: 0;
+  opacity: 0.9;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* 右侧登录表单 */
 .login-box {
   background-color: white;
   padding: 2.5rem 2.5rem 2.5rem 2.5rem;
@@ -308,6 +356,7 @@ const saveApiBase = () => {
   align-items: center;
   margin-bottom: 0;
   font-size: 1.1rem;
+  flex-shrink: 0;
 }
 .logo-container {
   position: absolute;
@@ -574,7 +623,14 @@ const saveApiBase = () => {
 }
 @media (max-width: 900px) {
   .login-container-flex { flex-direction: column; }
-  .login-center-wrap { flex-direction: column; align-items: center; }
+  .login-center-wrap { flex-direction: column; align-items: center; gap: 2rem; }
+  .login-illustration {
+    max-width: 90vw;
+    min-height: 300px;
+    transform: scale(0.8);
+  }
+  .illustration-text h3 { font-size: 1.5rem; }
+  .illustration-text p { font-size: 1rem; }
   .login-box { width: 95vw; min-width: 0; margin-bottom: 0; font-size: 1rem; }
   .logo-container { min-width: 16vw; min-height: 16vw; max-width: 22vw; max-height: 22vw; }
   .logo { max-width: 12vw; max-height: 12vw; }

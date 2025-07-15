@@ -1395,4 +1395,335 @@ router.get('/analysis', async (req, res) => {
   }
 });
 
+// ===================== 附件路径处理 =====================
+// GET /api/complaint/attachment-path/:id
+// 参数: id - 投诉记录ID
+// 返回: { success, path, displayPath, isAccessible }
+router.get('/attachment-path/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    let pool = await sql.connect(await getDynamicConfig());
+    const result = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT AttachmentFile FROM ComplaintRegister WHERE ID = @id');
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '记录不存在'
+      });
+    }
+
+    const attachmentFile = result.recordset[0].AttachmentFile;
+
+    if (!attachmentFile) {
+      return res.json({
+        success: true,
+        path: null,
+        displayPath: '无附件',
+        isAccessible: false
+      });
+    }
+
+    // 使用标准化路径处理函数
+    const pathInfo = normalizeAttachmentPath(attachmentFile);
+
+    if (pathInfo) {
+      return res.json({
+        success: true,
+        path: pathInfo.networkPath,
+        displayPath: pathInfo.displayPath,
+        isAccessible: pathInfo.isAccessible,
+        type: pathInfo.type
+      });
+    } else {
+      return res.json({
+        success: true,
+        path: attachmentFile,
+        displayPath: attachmentFile,
+        isAccessible: false,
+        type: 'unknown'
+      });
+    }
+
+  } catch (err) {
+    console.error('获取附件路径失败:', err);
+    res.status(500).json({
+      success: false,
+      message: '获取附件路径失败: ' + err.message
+    });
+  }
+});
+
+// 标准化路径处理函数 - 统一处理数据库中的两种路径格式
+function normalizeAttachmentPath(pathValue) {
+  if (!pathValue || typeof pathValue !== 'string') {
+    return null;
+  }
+
+  let normalizedPath = pathValue.trim();
+
+  // 修复HTML实体编码问题（&amp; -> &）
+  normalizedPath = normalizedPath.replace(/&amp;/g, '&');
+
+  // 处理格式1：file:///\\tj_server\工作\品质部\生产异常周报考核统计\2025年异常汇总\...
+  if (normalizedPath.startsWith('file:///\\\\tj_server\\工作\\')) {
+    // 移除file:///前缀，保留网络路径
+    normalizedPath = normalizedPath.substring(8); // 移除'file:///'
+    return {
+      type: 'network_path',
+      originalPath: pathValue,
+      networkPath: normalizedPath,
+      isAccessible: true,
+      displayPath: normalizedPath.replace(/\\\\/g, '\\')
+    };
+  }
+
+  // 处理格式2：2025年异常汇总\3月份\不良图片\...（相对路径）
+  if (!normalizedPath.includes(':\\') && !normalizedPath.startsWith('\\\\')) {
+    // 构建完整的网络路径
+    const fullNetworkPath = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${normalizedPath}`;
+    return {
+      type: 'relative_path',
+      originalPath: pathValue,
+      networkPath: fullNetworkPath,
+      isAccessible: true,
+      displayPath: fullNetworkPath
+    };
+  }
+
+  // 处理其他格式（本地路径等）
+  return {
+    type: 'other',
+    originalPath: pathValue,
+    networkPath: normalizedPath,
+    isAccessible: false,
+    displayPath: normalizedPath
+  };
+}
+
+// ===================== 文件访问服务 =====================
+// GET /api/complaint/file/:id
+// 参数: id - 投诉记录ID
+// 返回: 文件内容流或错误信息
+router.get('/file/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log(`=== 文件访问服务 ===`);
+    console.log(`投诉记录ID: ${id}`);
+
+    let pool = await sql.connect(await getDynamicConfig());
+    const result = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT AttachmentFile FROM ComplaintRegister WHERE ID = @id');
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '记录不存在'
+      });
+    }
+
+    const attachmentFile = result.recordset[0].AttachmentFile;
+
+    if (!attachmentFile) {
+      return res.status(404).json({
+        success: false,
+        message: '该记录无附件文件'
+      });
+    }
+
+    // 使用标准化路径处理函数
+    const pathInfo = normalizeAttachmentPath(attachmentFile);
+
+    if (!pathInfo || !pathInfo.isAccessible) {
+      return res.status(404).json({
+        success: false,
+        message: '附件路径无效或不可访问'
+      });
+    }
+
+    // 获取网络路径
+    let networkPath = pathInfo.networkPath;
+    console.log(`网络路径: ${networkPath}`);
+
+    // 对于网络路径，我们直接使用原始路径
+    // Node.js 可以直接访问 UNC 网络路径
+    let localPath = networkPath;
+
+    console.log(`尝试访问网络路径: ${localPath}`);
+
+    console.log(`本地路径: ${localPath}`);
+
+    const fs = require('fs');
+    const path = require('path');
+
+    // 检查文件是否存在
+    if (!fs.existsSync(localPath)) {
+      console.log(`文件不存在: ${localPath}`);
+      return res.status(404).json({
+        success: false,
+        message: '文件不存在'
+      });
+    }
+
+    // 获取文件信息
+    const stat = fs.statSync(localPath);
+    if (stat.isDirectory()) {
+      return res.status(400).json({
+        success: false,
+        message: '路径指向的是文件夹，不是文件'
+      });
+    }
+
+    // 设置响应头
+    const ext = path.extname(localPath).toLowerCase();
+    const mimeTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.webp': 'image/webp',
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      '.txt': 'text/plain',
+      '.mp4': 'video/mp4',
+      '.avi': 'video/x-msvideo',
+      '.mov': 'video/quicktime'
+    };
+
+    const mimeType = mimeTypes[ext] || 'application/octet-stream';
+    const fileName = path.basename(localPath);
+
+    res.setHeader('Content-Type', mimeType);
+    res.setHeader('Content-Length', stat.size);
+
+    // 对于图片和PDF，使用inline显示；其他文件使用attachment下载
+    if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
+      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+    } else {
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    }
+
+    console.log(`开始传输文件: ${fileName}, 大小: ${stat.size} bytes, MIME: ${mimeType}`);
+
+    // 创建文件流并发送
+    const fileStream = fs.createReadStream(localPath);
+    fileStream.pipe(res);
+
+    fileStream.on('error', (error) => {
+      console.error('文件流错误:', error);
+      if (!res.headersSent) {
+        res.status(500).json({
+          success: false,
+          message: '文件读取失败'
+        });
+      }
+    });
+
+    fileStream.on('end', () => {
+      console.log(`文件传输完成: ${fileName}`);
+    });
+
+  } catch (error) {
+    console.error('文件访问失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '文件访问失败: ' + error.message
+    });
+  }
+});
+
+// ===================== 打开文件夹 =====================
+// POST /api/complaint/open-folder
+// 参数: { recordId, openFile }
+// 返回: { success, message }
+router.post('/open-folder', async (req, res) => {
+  const { recordId, openFile = false } = req.body;
+
+  console.log(`=== 打开文件夹服务 ===`);
+  console.log(`投诉记录ID: ${recordId}`);
+  console.log(`是否选中文件: ${openFile}`);
+
+  if (!recordId) {
+    return res.status(400).json({
+      success: false,
+      message: '缺少投诉记录ID'
+    });
+  }
+
+  try {
+    // 获取投诉记录的附件路径
+    let pool = await sql.connect(await getDynamicConfig());
+    const result = await pool.request()
+      .input('id', sql.Int, recordId)
+      .query('SELECT AttachmentPath FROM Complaint WHERE ID = @id');
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '投诉记录不存在'
+      });
+    }
+
+    const attachmentPath = result.recordset[0].AttachmentPath;
+    if (!attachmentPath) {
+      return res.status(400).json({
+        success: false,
+        message: '该记录没有附件路径'
+      });
+    }
+
+    // 构建完整的网络路径
+    const fullPath = attachmentPath.startsWith('\\\\')
+      ? attachmentPath
+      : `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\2025年异常汇总\\${attachmentPath}`;
+
+    console.log(`完整路径: ${fullPath}`);
+
+    // 使用child_process执行Windows命令打开文件夹
+    const { exec } = require('child_process');
+
+    let command;
+    if (openFile) {
+      // 打开文件夹并选中文件
+      command = `explorer /select,"${fullPath}"`;
+    } else {
+      // 只打开文件夹（获取文件夹路径）
+      const folderPath = fullPath.substring(0, fullPath.lastIndexOf('\\'));
+      command = `explorer "${folderPath}"`;
+    }
+
+    console.log(`执行命令: ${command}`);
+
+    exec(command, (error, stdout, stderr) => {
+      if (error) {
+        console.error('执行命令失败:', error);
+        return res.status(500).json({
+          success: false,
+          message: '打开文件夹失败: ' + error.message
+        });
+      }
+
+      console.log('文件夹打开成功');
+      res.json({
+        success: true,
+        message: '文件夹已打开'
+      });
+    });
+
+  } catch (error) {
+    console.error('打开文件夹失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '打开文件夹失败: ' + error.message
+    });
+  }
+});
+
 module.exports = router;
