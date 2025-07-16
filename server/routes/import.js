@@ -1034,16 +1034,25 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
             // 修复HTML实体编码问题
             relativePath = relativePath.replace(/&amp;/g, '&');
 
-            console.log('路径映射转换:', {
+            // 构建完整的HTTP URL而不是相对路径
+            const serverIP = process.env.SERVER_IP || '192.168.1.57';
+            const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
+
+            // 将路径转换为URL编码格式
+            const pathParts = relativePath.split('\\').filter(part => part.trim() !== '');
+            const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
+            const httpUrl = `http://${serverIP}:${fileServerPort}/shared-files/${encodedPath}`;
+
+            console.log('路径映射转换为HTTP URL:', {
               original: hyperlink,
               excelTempPath: excelTempPath,
               relativePath: relativePath,
-              finalPath: relativePath
+              httpUrl: httpUrl
             });
 
-            require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 路径映射转换: ${hyperlink} -> ${relativePath}\n`);
-            // 统一使用相对路径格式，不添加file:///前缀
-            hyperlink = relativePath;
+            require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 路径映射转换: ${hyperlink} -> ${httpUrl}\n`);
+            // 使用完整的HTTP URL
+            hyperlink = httpUrl;
           }
         } catch (e3) {
           console.log('路径处理失败:', e3.message);
@@ -1225,6 +1234,9 @@ function processAttachmentPath(hyperlinkInfo) {
     processedPath = processedPath.substring(8);
   }
 
+  // 统一路径分隔符为反斜杠
+  processedPath = processedPath.replace(/\//g, '\\');
+
   // 检查是否是本地Excel临时路径，需要转换为网络路径
   const excelTempPath = 'C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel';
   const networkSharePath = '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计';
@@ -1237,19 +1249,26 @@ function processAttachmentPath(hyperlinkInfo) {
 
     // 检查是否是2025年异常汇总路径，需要特殊处理
     if (networkRelativePath.startsWith('2025年异常汇总\\')) {
-      // 移除前缀，只保留相对路径
-      const finalPath = networkRelativePath;
+      // 构建完整的HTTP URL而不是相对路径
+      const serverIP = process.env.SERVER_IP || '192.168.1.57';
+      const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
 
-      console.log('路径转换:', {
+      // 将路径转换为URL编码格式
+      const pathParts = networkRelativePath.split('\\').filter(part => part.trim() !== '');
+      const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
+      const httpUrl = `http://${serverIP}:${fileServerPort}/shared-files/${encodedPath}`;
+
+      console.log('路径转换为HTTP URL:', {
         original: originalPath,
         processed: processedPath,
         relativePath: relativePath,
-        finalPath: finalPath
+        networkRelativePath: networkRelativePath,
+        httpUrl: httpUrl
       });
 
       return {
         originalPath: originalPath,
-        blobUrl: finalPath, // 统一使用相对路径格式
+        blobUrl: httpUrl, // 使用完整的HTTP URL
         fileName: hyperlinkInfo.text || extractFileNameFromPath(originalPath),
         isConverted: true,
         copyMode: false,

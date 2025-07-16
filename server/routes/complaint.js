@@ -1482,15 +1482,29 @@ function normalizeAttachmentPath(pathValue) {
 
   // 处理格式2：2025年异常汇总\3月份\不良图片\...（相对路径）
   if (!normalizedPath.includes(':\\') && !normalizedPath.startsWith('\\\\')) {
-    // 构建完整的网络路径
-    const fullNetworkPath = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${normalizedPath}`;
-    return {
-      type: 'relative_path',
-      originalPath: pathValue,
-      networkPath: fullNetworkPath,
-      isAccessible: true,
-      displayPath: fullNetworkPath
-    };
+    // 检查是否只是文件名（没有路径分隔符）
+    if (!normalizedPath.includes('\\') && !normalizedPath.includes('/')) {
+      // 纯文件名，尝试在默认的不良图片目录中查找
+      const defaultPath = `2025年异常汇总\\不良图片&资料`;
+      const fullNetworkPath = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${defaultPath}\\${normalizedPath}`;
+      return {
+        type: 'filename_only',
+        originalPath: pathValue,
+        networkPath: fullNetworkPath,
+        isAccessible: true,
+        displayPath: fullNetworkPath
+      };
+    } else {
+      // 包含路径的相对路径
+      const fullNetworkPath = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${normalizedPath}`;
+      return {
+        type: 'relative_path',
+        originalPath: pathValue,
+        networkPath: fullNetworkPath,
+        isAccessible: true,
+        displayPath: fullNetworkPath
+      };
+    }
   }
 
   // 处理其他格式（本地路径等）
@@ -1518,19 +1532,26 @@ router.get('/file/:id', async (req, res) => {
       .input('id', sql.Int, id)
       .query('SELECT AttachmentFile FROM ComplaintRegister WHERE ID = @id');
 
+    console.log(`数据库查询结果:`, result.recordset);
+
     if (result.recordset.length === 0) {
+      console.log(`❌ 记录不存在: ID=${id}`);
       return res.status(404).json({
         success: false,
-        message: '记录不存在'
+        message: `投诉记录ID ${id} 不存在`
       });
     }
 
     const attachmentFile = result.recordset[0].AttachmentFile;
+    console.log(`附件文件路径: "${attachmentFile}"`);
+    console.log(`附件文件类型: ${typeof attachmentFile}`);
+    console.log(`附件文件长度: ${attachmentFile ? attachmentFile.length : 'null'}`);
 
     if (!attachmentFile) {
+      console.log(`❌ 该记录无附件文件: ID=${id}`);
       return res.status(404).json({
         success: false,
-        message: '该记录无附件文件'
+        message: `投诉记录ID ${id} 无附件文件`
       });
     }
 

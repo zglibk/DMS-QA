@@ -143,6 +143,7 @@ app.use('/api/admin/material-prices', materialPriceRouter);
  * 路由说明：
  * - /files/attachments: 访问投诉记录的附件文件
  * - /files/site-images: 访问网站配置的图片文件
+ * - /shared-files: 访问网络共享盘的文件（通过HTTP代理）
  *
  * 安全考虑：
  * - 文件路径限制在指定目录内
@@ -150,6 +151,9 @@ app.use('/api/admin/material-prices', materialPriceRouter);
  */
 app.use('/files/attachments', express.static(path.join(__dirname, 'uploads/attachments')));
 app.use('/files/site-images', express.static(path.join(__dirname, 'uploads/site-images')));
+
+// 添加共享文件访问路由
+app.use('/shared-files', require('./routes/shared-files'));
 
 /**
  * 全局错误处理
