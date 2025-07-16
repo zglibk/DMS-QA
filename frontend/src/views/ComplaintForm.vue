@@ -127,9 +127,26 @@
             </el-col>
             <el-col :span="24">
               <el-form-item label="附件文件">
-                <el-input v-model="form.AttachmentFile" readonly style="width: 80%" />
-                <el-button @click="selectFile">选择文件</el-button>
-                <img v-if="isImage(form.AttachmentFile)" :src="form.AttachmentFile" alt="图片预览" style="max-width: 100px; max-height: 100px; margin-left: 10px; cursor: pointer;" @click="handlePreviewImg(form.AttachmentFile)" />
+                <div class="attachment-field">
+                  <div class="attachment-input-section">
+                    <el-input v-model="form.AttachmentFile" readonly style="width: 80%" />
+                    <el-button @click="selectFile">选择文件</el-button>
+                  </div>
+                  <!-- 图片预览区域 -->
+                  <div class="attachment-preview-section" style="margin-top: 10px;">
+                    <div v-if="isImage(form.AttachmentFile)" class="image-preview-box">
+                      <ImagePreview
+                        :key="`form-preview-${form.AttachmentFile}-${currentRecordId}`"
+                        :file-path="form.AttachmentFile"
+                        :record-id="currentRecordId"
+                        width="100px"
+                        height="100px"
+                        @click="handlePreviewImg(form.AttachmentFile)"
+                        style="cursor: pointer;"
+                      />
+                    </div>
+                  </div>
+                </div>
               </el-form-item>
             </el-col>
             <el-col :span="24">
@@ -346,7 +363,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, watch } from 'vue'
+import { ref, reactive, onMounted, watch, computed } from 'vue'
 import axios from 'axios'
 import { useRouter } from 'vue-router'
 import { CircleClose } from '@element-plus/icons-vue'
@@ -355,6 +372,7 @@ import { useUserStore } from '../store/user'
 import { storeToRefs } from 'pinia'
 import { useSiteConfig } from '../composables/useSiteConfig'
 import AppLayout from '@/components/common/AppLayout.vue'
+import ImagePreview from '@/components/ImagePreview.vue'
 
 // 网站配置
 const { siteConfig, loadSiteConfig } = useSiteConfig()
@@ -438,6 +456,11 @@ const username = ref('admin')
 const isEditMode = ref(false)
 const editId = ref(null)
 const loading = ref(false)
+
+// 当前记录ID（用于图片预览）
+const currentRecordId = computed(() => {
+  return isEditMode.value ? editId.value : null
+})
 
 const userStore = useUserStore()
 const { user } = storeToRefs(userStore)

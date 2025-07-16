@@ -228,9 +228,12 @@ const loadImage = async () => {
   console.log('props.filePath:', props.filePath)
   console.log('isImage.value:', isImage.value)
 
-  // 严格检查filePath
-  if (!props.filePath || props.filePath === '' || props.filePath === null || props.filePath === undefined) {
-    console.log('ImagePreview: filePath为空，不加载图片')
+  // 检查filePath和recordId
+  const hasFilePath = props.filePath && props.filePath !== '' && props.filePath !== null && props.filePath !== undefined
+  const hasRecordId = props.recordId && props.recordId !== null && props.recordId !== undefined
+
+  if (!hasFilePath && !hasRecordId) {
+    console.log('ImagePreview: filePath和recordId都为空，不加载图片')
     loading.value = false
     error.value = false
     imageUrl.value = null
@@ -249,6 +252,16 @@ const loadImage = async () => {
   error.value = false
 
   try {
+    // 如果没有filePath但有recordId，直接通过API获取
+    if (!hasFilePath && hasRecordId) {
+      console.log('没有filePath但有recordId，通过API获取图片')
+      const url = await imagePreviewService.getImageUrlByPath('', props.recordId)
+      console.log('API返回的URL:', url)
+      imageUrl.value = url
+      loading.value = false
+      return
+    }
+
     const pathStr = String(props.filePath).trim()
     console.log('处理后的路径:', pathStr)
 

@@ -2853,6 +2853,27 @@ const isImageFile = (fileName) => {
   return imageExtensions.includes(extension)
 }
 
+// 智能获取API基础URL - 使用现有的环境管理系统
+const getApiBaseUrl = () => {
+  // 使用axios的当前baseURL，这个已经通过smartApiDetector智能设置了
+  if (axios.defaults.baseURL) {
+    console.log('使用axios默认baseURL:', axios.defaults.baseURL)
+    return axios.defaults.baseURL
+  }
+
+  // 降级方案：使用localStorage中保存的api-base
+  const savedApiBase = localStorage.getItem('api-base')
+  if (savedApiBase) {
+    console.log('使用localStorage中的api-base:', savedApiBase)
+    return savedApiBase
+  }
+
+  // 最后降级：使用环境变量
+  const envApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+  console.log('使用环境变量VITE_API_BASE_URL:', envApiBase)
+  return envApiBase
+}
+
 // 判断文件路径类型并生成正确的预览URL
 const getFilePreviewUrl = (filePath) => {
   if (!filePath || filePath === '' || filePath === null || filePath === undefined) {
@@ -2892,8 +2913,8 @@ const getFilePreviewUrl = (filePath) => {
     console.log('判断结果: isServerUpload =', isServerUpload)
 
     if (isServerUpload) {
-      // 服务器上传的文件，使用后端API
-      const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+      // 服务器上传的文件，使用智能检测的后端API地址
+      const backendUrl = getApiBaseUrl()
       const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
       const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
       const finalUrl = `${backendUrl}/files/attachments/${encodedPath}`

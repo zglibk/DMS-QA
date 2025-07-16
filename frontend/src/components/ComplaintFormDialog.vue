@@ -151,9 +151,9 @@
                       class="image-preview-box"
                     >
                       <ImagePreview
-                        :key="`complaint-preview-${selectedFileInfo.previewUrl}-${Date.now()}`"
+                        :key="`complaint-preview-${selectedFileInfo.previewUrl || 'api'}-${props.editData?.ID || 'new'}-${Date.now()}`"
                         :file-path="selectedFileInfo.previewUrl"
-                        :record-id="null"
+                        :record-id="selectedFileInfo.previewUrl ? null : props.editData?.ID"
                         width="146px"
                         height="116px"
                       />
@@ -1121,8 +1121,29 @@ const isImageFile = (fileName) => {
   return imageExtensions.includes(extension)
 }
 
+// 智能获取API基础URL - 使用现有的环境管理系统
+const getApiBaseUrl = () => {
+  // 使用axios的当前baseURL，这个已经通过smartApiDetector智能设置了
+  if (axios.defaults.baseURL) {
+    console.log('ComplaintFormDialog 使用axios默认baseURL:', axios.defaults.baseURL)
+    return axios.defaults.baseURL
+  }
+
+  // 降级方案：使用localStorage中保存的api-base
+  const savedApiBase = localStorage.getItem('api-base')
+  if (savedApiBase) {
+    console.log('ComplaintFormDialog 使用localStorage中的api-base:', savedApiBase)
+    return savedApiBase
+  }
+
+  // 最后降级：使用环境变量
+  const envApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+  console.log('ComplaintFormDialog 使用环境变量VITE_API_BASE_URL:', envApiBase)
+  return envApiBase
+}
+
 // 判断文件路径类型并生成正确的预览URL
-const getFilePreviewUrl = (filePath) => {
+const getFilePreviewUrl = (filePath, recordId = null) => {
   if (!filePath || filePath === '' || filePath === null || filePath === undefined) {
     console.log('ComplaintFormDialog getFilePreviewUrl: 路径为空，返回null')
     return null
@@ -1130,6 +1151,7 @@ const getFilePreviewUrl = (filePath) => {
 
   console.log('=== ComplaintFormDialog getFilePreviewUrl 调试信息 ===')
   console.log('输入路径:', filePath)
+  console.log('记录ID:', recordId)
   console.log('路径类型:', typeof filePath)
 
   try {
@@ -1140,28 +1162,31 @@ const getFilePreviewUrl = (filePath) => {
       return null
     }
 
-    // 判断是否为服务器上传的文件
-    // 1. 包含file_时间戳格式
-    // 2. 或者路径以uploads/开头（相对路径）
-    // 3. 或者不包含网络路径特征（如\\tj_server\）
+    // 如果是blob URL，直接返回
+    if (pathStr.startsWith('blob:')) {
+      console.log('检测到blob URL，直接返回')
+      return pathStr
+    }
+
+    // 如果是HTTP URL，直接返回
+    if (pathStr.startsWith('http://') || pathStr.startsWith('https://')) {
+      console.log('检测到HTTP URL，直接返回')
+      return pathStr
+    }
+
+    // 判断是否为新上传的文件（包含file_时间戳格式或uploads/路径）
     const hasFilePrefix = pathStr.includes('file_') && /file_\d+_/.test(pathStr)
-    const isRelativePath = pathStr.startsWith('uploads/') || pathStr.startsWith('./uploads/') || pathStr.startsWith('/uploads/')
-    const isNetworkPath = pathStr.includes('\\\\') || pathStr.includes('tj_server') || pathStr.includes('工作\\品质部')
+    const isUploadsPath = pathStr.startsWith('uploads/') || pathStr.startsWith('./uploads/') || pathStr.startsWith('/uploads/')
 
     console.log('路径分析:', {
       hasFilePrefix,
-      isRelativePath,
-      isNetworkPath,
+      isUploadsPath,
       pathLength: pathStr.length
     })
 
-    const isServerUpload = hasFilePrefix || isRelativePath || !isNetworkPath
-
-    console.log('判断结果: isServerUpload =', isServerUpload)
-
-    if (isServerUpload) {
-      // 服务器上传的文件，使用后端API
-      const backendUrl = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+    if (hasFilePrefix || isUploadsPath) {
+      // 新上传的文件，使用静态文件服务
+      const backendUrl = getApiBaseUrl()
       const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
       const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
       const finalUrl = `${backendUrl}/files/attachments/${encodedPath}`
@@ -1169,14 +1194,11 @@ const getFilePreviewUrl = (filePath) => {
       console.log('================================================')
       return finalUrl
     } else {
-      // 网络共享路径的文件，使用网络地址前缀
-      const networkPrefix = 'http://192.168.1.57/shared-files' // 根据实际情况调整
-      const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
-      const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
-      const finalUrl = `${networkPrefix}/${encodedPath}`
-      console.log('生成网络URL:', finalUrl)
+      // 现有的数据库记录文件，需要通过API访问
+      // 这些文件可能是网络共享路径或相对路径，需要后端处理
+      console.log('检测到现有数据库文件，返回null让ImagePreview组件通过API处理')
       console.log('================================================')
-      return finalUrl
+      return null // 返回null，让ImagePreview组件通过recordId和API获取
     }
   } catch (error) {
     console.error('ComplaintFormDialog getFilePreviewUrl 处理错误:', error)
@@ -1528,7 +1550,7 @@ const initializeEditData = () => {
         fileSize: 0, // 现有文件大小未知
         fileType: isImage ? 'image/*' : 'application/octet-stream',
         isImage: isImage,
-        previewUrl: isImage ? getFilePreviewUrl(filePath) : null,
+        previewUrl: isImage ? getFilePreviewUrl(filePath, props.editData?.ID) : null,
         relativePath: filePath,
         serverPath: null,
         filename: fileName,

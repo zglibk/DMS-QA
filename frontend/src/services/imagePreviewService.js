@@ -33,28 +33,94 @@ class ImagePreviewService {
     }
 
     const cacheKey = `record_${recordId}`
-    
+    console.log(`=== imagePreviewService.getImageUrlByRecordId ===`)
+    console.log(`记录ID: ${recordId}`)
+    console.log(`缓存键: ${cacheKey}`)
+
     // 检查缓存
     if (this.cache.has(cacheKey)) {
-      return this.cache.get(cacheKey)
+      const cachedUrl = this.cache.get(cacheKey)
+      console.log(`使用缓存URL: ${cachedUrl}`)
+      return cachedUrl
     }
 
     try {
+      console.log(`调用API: /api/complaint/file/${recordId}`)
+
       // 通过后端API获取图片数据
       const response = await apiService.get(`/api/complaint/file/${recordId}`, {
         responseType: 'blob'
       })
 
+      console.log(`API响应状态: ${response.status}`)
+      console.log(`响应头Content-Type: ${response.headers['content-type']}`)
+      console.log(`Blob大小: ${response.data.size} bytes`)
+      console.log(`Blob类型: ${response.data.type}`)
+
       const blob = response.data
+
+      // 检查blob是否有效
+      if (!blob || blob.size === 0) {
+        throw new Error('API返回的文件数据为空')
+      }
+
+      // 检查是否是图片类型
+      if (!blob.type.startsWith('image/')) {
+        console.warn(`警告: Blob类型不是图片: ${blob.type}`)
+        // 如果后端返回的Content-Type不正确，但文件确实是图片，我们仍然尝试创建URL
+      }
+
+      // 尝试读取blob的前几个字节来验证是否是图片
+      const arrayBuffer = await blob.slice(0, 10).arrayBuffer()
+      const uint8Array = new Uint8Array(arrayBuffer)
+      const header = Array.from(uint8Array).map(b => b.toString(16).padStart(2, '0')).join(' ')
+      console.log(`文件头部字节: ${header}`)
+
+      // 检查是否是JPEG文件 (FF D8 FF)
+      if (uint8Array[0] === 0xFF && uint8Array[1] === 0xD8 && uint8Array[2] === 0xFF) {
+        console.log('✓ 确认是JPEG文件格式')
+      } else {
+        console.warn('⚠ 文件头部不是JPEG格式')
+      }
+
       const imageUrl = URL.createObjectURL(blob)
-      
+      console.log(`创建的Blob URL: ${imageUrl}`)
+
+      // 测试blob URL是否可以访问
+      try {
+        const testResponse = await fetch(imageUrl, { method: 'HEAD' })
+        console.log(`Blob URL测试结果: ${testResponse.status}`)
+      } catch (testError) {
+        console.error('Blob URL测试失败:', testError)
+      }
+
       // 缓存URL
       this.cache.set(cacheKey, imageUrl)
-      
+      console.log(`已缓存图片URL`)
+
       return imageUrl
     } catch (error) {
       console.error('获取图片失败:', error)
-      throw new Error('图片加载失败')
+      console.error('错误详情:', {
+        message: error.message,
+        status: error.response?.status,
+        statusText: error.response?.statusText,
+        data: error.response?.data
+      })
+
+      // 根据不同的错误状态提供更具体的错误信息
+      let errorMessage = '图片加载失败'
+      if (error.response?.status === 404) {
+        errorMessage = '记录不存在或该记录无附件文件'
+      } else if (error.response?.status === 500) {
+        errorMessage = '服务器内部错误，请稍后重试'
+      } else if (error.message.includes('Network Error')) {
+        errorMessage = '网络连接失败，请检查网络连接'
+      } else {
+        errorMessage = '图片加载失败: ' + error.message
+      }
+
+      throw new Error(errorMessage)
     }
   }
 
@@ -65,13 +131,14 @@ class ImagePreviewService {
    * @returns {Promise<string>} 图片的Blob URL
    */
   async getImageUrlByPath(filePath, recordId) {
-    if (!filePath || !this.isImageFile(filePath)) {
-      throw new Error('无效的图片文件路径')
-    }
-
-    // 如果有recordId，优先使用记录ID方式获取
+    // 如果有recordId，优先使用记录ID方式获取（即使filePath为空）
     if (recordId) {
       return await this.getImageUrlByRecordId(recordId)
+    }
+
+    // 如果没有recordId，则需要有效的filePath
+    if (!filePath || !this.isImageFile(filePath)) {
+      throw new Error('无效的图片文件路径')
     }
 
     // 如果是HTTP URL，直接返回
