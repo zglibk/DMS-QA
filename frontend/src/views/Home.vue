@@ -2922,11 +2922,11 @@ const getFilePreviewUrl = (filePath) => {
       console.log('================================')
       return finalUrl
     } else {
-      // 网络共享路径的文件，使用网络地址前缀
-      const networkPrefix = 'http://192.168.1.57/shared-files' // 根据实际情况调整
+      // 网络共享路径的文件，使用动态检测的后端地址
+      const backendUrl = getApiBaseUrl()
       const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
       const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
-      const finalUrl = `${networkPrefix}/${encodedPath}`
+      const finalUrl = `${backendUrl}/shared-files/${encodedPath}`
       console.log('生成网络URL:', finalUrl)
       console.log('================================')
       return finalUrl

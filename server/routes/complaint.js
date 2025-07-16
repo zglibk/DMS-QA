@@ -1486,7 +1486,8 @@ function normalizeAttachmentPath(pathValue) {
     if (!normalizedPath.includes('\\') && !normalizedPath.includes('/')) {
       // 纯文件名，尝试在默认的不良图片目录中查找
       const defaultPath = `2025年异常汇总\\不良图片&资料`;
-      const fullNetworkPath = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${defaultPath}\\${normalizedPath}`;
+      const serverIP = process.env.FILE_SERVER_IP || 'tj_server';
+      const fullNetworkPath = `\\\\${serverIP}\\工作\\品质部\\生产异常周报考核统计\\${defaultPath}\\${normalizedPath}`;
       return {
         type: 'filename_only',
         originalPath: pathValue,
@@ -1496,7 +1497,8 @@ function normalizeAttachmentPath(pathValue) {
       };
     } else {
       // 包含路径的相对路径
-      const fullNetworkPath = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${normalizedPath}`;
+      const serverIP = process.env.FILE_SERVER_IP || 'tj_server';
+      const fullNetworkPath = `\\\\${serverIP}\\工作\\品质部\\生产异常周报考核统计\\${normalizedPath}`;
       return {
         type: 'relative_path',
         originalPath: pathValue,

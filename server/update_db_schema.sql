@@ -31,8 +31,8 @@ UPDATE [dbo].[DbConfig]
 SET [ExcelTempPath] = 'file:///C:\Users\TJ\AppData\Roaming\Microsoft\Excel'
 WHERE [ExcelTempPath] IS NULL OR [ExcelTempPath] = '';
 
-UPDATE [dbo].[DbConfig] 
-SET [NetworkSharePath] = '\\tj_server\工作\品质部\生产异常周报考核统计'
+UPDATE [dbo].[DbConfig]
+SET [NetworkSharePath] = '\\localhost\工作\品质部\生产异常周报考核统计'
 WHERE [NetworkSharePath] IS NULL OR [NetworkSharePath] = '';
 
 -- 确保 FileStoragePath 有默认值

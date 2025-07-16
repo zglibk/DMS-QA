@@ -1035,7 +1035,8 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
             relativePath = relativePath.replace(/&amp;/g, '&');
 
             // 构建完整的HTTP URL而不是相对路径
-            const serverIP = process.env.SERVER_IP || '192.168.1.57';
+            // 使用环境变量或默认值，避免硬编码IP地址
+            const serverIP = process.env.SERVER_IP || process.env.DB_SERVER || 'localhost';
             const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
 
             // 将路径转换为URL编码格式
@@ -1250,7 +1251,8 @@ function processAttachmentPath(hyperlinkInfo) {
     // 检查是否是2025年异常汇总路径，需要特殊处理
     if (networkRelativePath.startsWith('2025年异常汇总\\')) {
       // 构建完整的HTTP URL而不是相对路径
-      const serverIP = process.env.SERVER_IP || '192.168.1.57';
+      // 使用环境变量或默认值，避免硬编码IP地址
+      const serverIP = process.env.SERVER_IP || process.env.DB_SERVER || 'localhost';
       const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
 
       // 将路径转换为URL编码格式

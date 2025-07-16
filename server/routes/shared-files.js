@@ -19,8 +19,8 @@ const fs = require('fs');
 const path = require('path');
 const mime = require('mime-types');
 
-// 网络共享盘的基础路径
-const NETWORK_SHARE_BASE = '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计';
+// 网络共享盘的基础路径 - 使用环境变量配置
+const NETWORK_SHARE_BASE = `\\\\${process.env.FILE_SERVER_IP || 'tj_server'}\\工作\\品质部\\生产异常周报考核统计`;
 
 // 支持的文件类型
 const SUPPORTED_FILE_TYPES = [

@@ -89,7 +89,7 @@ SET
     [FileServerPort] = ISNULL([FileServerPort], 8080),
     [FileUrlPrefix] = ISNULL([FileUrlPrefix], '/files'),
     [ExcelTempPath] = ISNULL([ExcelTempPath], 'file:///C:\Users\TJ\AppData\Roaming\Microsoft\Excel'),
-    [NetworkSharePath] = ISNULL([NetworkSharePath], '\\tj_server\工作\品质部\生产异常周报考核统计')
+    [NetworkSharePath] = ISNULL([NetworkSharePath], '\\localhost\工作\品质部\生产异常周报考核统计')
 
 PRINT '✓ 默认值设置完成'
 
