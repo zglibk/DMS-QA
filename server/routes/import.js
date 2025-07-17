@@ -1076,12 +1076,31 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
           // 修复HTML实体编码问题
           filePath = filePath.replace(/&amp;/g, '&');
 
-          // 检查是否是网络路径，如果是则转换为相对路径格式
-          const networkSharePath = '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\';
+          // 检查是否是网络路径，统一转换为HTTP URL
+          const serverIP = process.env.FILE_SERVER_IP || 'tj_server';
+          const networkSharePath = `\\\\${serverIP}\\工作\\品质部\\生产异常周报考核统计\\`;
+
           if (filePath.startsWith(networkSharePath)) {
             // 提取相对路径部分
             const relativePath = filePath.substring(networkSharePath.length);
-            hyperlink = relativePath;
+
+            // 构建完整的HTTP URL
+            const apiServerIP = process.env.SERVER_IP || process.env.DB_SERVER || 'localhost';
+            const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
+
+            // 将路径转换为URL编码格式
+            const pathParts = relativePath.split('\\').filter(part => part.trim() !== '');
+            const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
+            const httpUrl = `http://${apiServerIP}:${fileServerPort}/shared-files/${encodedPath}`;
+
+            console.log('网络路径转换为HTTP URL:', {
+              original: hyperlink,
+              filePath: filePath,
+              relativePath: relativePath,
+              httpUrl: httpUrl
+            });
+
+            hyperlink = httpUrl;
           } else {
             // 保持原有格式但移除file:///前缀
             hyperlink = filePath;
@@ -1113,14 +1132,24 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
             finalPath = finalPath.replace(/&amp;/g, '&');
           }
 
-          console.log('相对路径转换:', {
+          // 构建完整的HTTP URL
+          const serverIP = process.env.SERVER_IP || process.env.DB_SERVER || 'localhost';
+          const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
+
+          // 将路径转换为URL编码格式
+          const pathParts = finalPath.split('\\').filter(part => part.trim() !== '');
+          const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
+          const httpUrl = `http://${serverIP}:${fileServerPort}/shared-files/${encodedPath}`;
+
+          console.log('相对路径转换为HTTP URL:', {
             original: hyperlink,
             relativePath: relativePath,
-            finalPath: finalPath
+            finalPath: finalPath,
+            httpUrl: httpUrl
           });
-          require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 相对路径转换: ${hyperlink} -> ${finalPath}\n`);
-          // 统一使用相对路径格式
-          hyperlink = finalPath;
+          require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 相对路径转换: ${hyperlink} -> ${httpUrl}\n`);
+          // 统一使用HTTP URL格式
+          hyperlink = httpUrl;
         }
 
         const debugInfo = {
@@ -1279,11 +1308,41 @@ function processAttachmentPath(hyperlinkInfo) {
     }
   }
 
-  // 如果已经是相对路径格式，直接使用
+  // 如果已经是相对路径格式，也转换为HTTP URL
   if (!processedPath.includes(':\\') && !processedPath.startsWith('\\\\')) {
+    // 修复HTML实体编码问题
+    let cleanPath = processedPath.replace(/&amp;/g, '&');
+
+    // 如果看起来像是2025年异常汇总的路径，转换为HTTP URL
+    if (cleanPath.includes('2025年异常汇总')) {
+      const serverIP = process.env.SERVER_IP || process.env.DB_SERVER || 'localhost';
+      const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
+
+      // 将路径转换为URL编码格式
+      const pathParts = cleanPath.split('\\').filter(part => part.trim() !== '');
+      const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
+      const httpUrl = `http://${serverIP}:${fileServerPort}/shared-files/${encodedPath}`;
+
+      console.log('相对路径转换为HTTP URL:', {
+        original: originalPath,
+        cleanPath: cleanPath,
+        httpUrl: httpUrl
+      });
+
+      return {
+        originalPath: originalPath,
+        blobUrl: httpUrl, // 使用完整的HTTP URL
+        fileName: hyperlinkInfo.text || extractFileNameFromPath(originalPath),
+        isConverted: true,
+        copyMode: false,
+        needsCopy: false
+      };
+    }
+
+    // 其他相对路径保持原格式
     return {
       originalPath: originalPath,
-      blobUrl: processedPath, // 保持相对路径格式
+      blobUrl: cleanPath, // 使用清理后的路径
       fileName: hyperlinkInfo.text || extractFileNameFromPath(originalPath),
       isConverted: false,
       copyMode: false,
