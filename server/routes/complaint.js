@@ -1395,66 +1395,9 @@ router.get('/analysis', async (req, res) => {
   }
 });
 
-// ===================== 附件路径处理 =====================
-// GET /api/complaint/attachment-path/:id
-// 参数: id - 投诉记录ID
-// 返回: { success, path, displayPath, isAccessible }
-router.get('/attachment-path/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    let pool = await sql.connect(await getDynamicConfig());
-    const result = await pool.request()
-      .input('id', sql.Int, id)
-      .query('SELECT AttachmentFile FROM ComplaintRegister WHERE ID = @id');
-
-    if (result.recordset.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '记录不存在'
-      });
-    }
-
-    const attachmentFile = result.recordset[0].AttachmentFile;
-
-    if (!attachmentFile) {
-      return res.json({
-        success: true,
-        path: null,
-        displayPath: '无附件',
-        isAccessible: false
-      });
-    }
-
-    // 使用标准化路径处理函数
-    const pathInfo = normalizeAttachmentPath(attachmentFile);
-
-    if (pathInfo) {
-      return res.json({
-        success: true,
-        path: pathInfo.networkPath,
-        displayPath: pathInfo.displayPath,
-        isAccessible: pathInfo.isAccessible,
-        type: pathInfo.type
-      });
-    } else {
-      return res.json({
-        success: true,
-        path: attachmentFile,
-        displayPath: attachmentFile,
-        isAccessible: false,
-        type: 'unknown'
-      });
-    }
-
-  } catch (err) {
-    console.error('获取附件路径失败:', err);
-    res.status(500).json({
-      success: false,
-      message: '获取附件路径失败: ' + err.message
-    });
-  }
-});
+// ===================== 旧的附件路径处理（已废弃）=====================
+// 注意：此路由已被下面的新版本替代，使用convertRelativePathToServerPath函数
+// 删除此重复路由，避免与新版本冲突
 
 // 标准化路径处理函数 - 统一处理数据库中的两种路径格式
 function normalizeAttachmentPath(pathValue) {
@@ -1519,148 +1462,9 @@ function normalizeAttachmentPath(pathValue) {
   };
 }
 
-// ===================== 文件访问服务 =====================
-// GET /api/complaint/file/:id
-// 参数: id - 投诉记录ID
-// 返回: 文件内容流或错误信息
-router.get('/file/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    console.log(`=== 文件访问服务 ===`);
-    console.log(`投诉记录ID: ${id}`);
-
-    let pool = await sql.connect(await getDynamicConfig());
-    const result = await pool.request()
-      .input('id', sql.Int, id)
-      .query('SELECT AttachmentFile FROM ComplaintRegister WHERE ID = @id');
-
-    console.log(`数据库查询结果:`, result.recordset);
-
-    if (result.recordset.length === 0) {
-      console.log(`❌ 记录不存在: ID=${id}`);
-      return res.status(404).json({
-        success: false,
-        message: `投诉记录ID ${id} 不存在`
-      });
-    }
-
-    const attachmentFile = result.recordset[0].AttachmentFile;
-    console.log(`附件文件路径: "${attachmentFile}"`);
-    console.log(`附件文件类型: ${typeof attachmentFile}`);
-    console.log(`附件文件长度: ${attachmentFile ? attachmentFile.length : 'null'}`);
-
-    if (!attachmentFile) {
-      console.log(`❌ 该记录无附件文件: ID=${id}`);
-      return res.status(404).json({
-        success: false,
-        message: `投诉记录ID ${id} 无附件文件`
-      });
-    }
-
-    // 使用标准化路径处理函数
-    const pathInfo = normalizeAttachmentPath(attachmentFile);
-
-    if (!pathInfo || !pathInfo.isAccessible) {
-      return res.status(404).json({
-        success: false,
-        message: '附件路径无效或不可访问'
-      });
-    }
-
-    // 获取网络路径
-    let networkPath = pathInfo.networkPath;
-    console.log(`网络路径: ${networkPath}`);
-
-    // 对于网络路径，我们直接使用原始路径
-    // Node.js 可以直接访问 UNC 网络路径
-    let localPath = networkPath;
-
-    console.log(`尝试访问网络路径: ${localPath}`);
-
-    console.log(`本地路径: ${localPath}`);
-
-    const fs = require('fs');
-    const path = require('path');
-
-    // 检查文件是否存在
-    if (!fs.existsSync(localPath)) {
-      console.log(`文件不存在: ${localPath}`);
-      return res.status(404).json({
-        success: false,
-        message: '文件不存在'
-      });
-    }
-
-    // 获取文件信息
-    const stat = fs.statSync(localPath);
-    if (stat.isDirectory()) {
-      return res.status(400).json({
-        success: false,
-        message: '路径指向的是文件夹，不是文件'
-      });
-    }
-
-    // 设置响应头
-    const ext = path.extname(localPath).toLowerCase();
-    const mimeTypes = {
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png',
-      '.gif': 'image/gif',
-      '.bmp': 'image/bmp',
-      '.webp': 'image/webp',
-      '.pdf': 'application/pdf',
-      '.doc': 'application/msword',
-      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      '.xls': 'application/vnd.ms-excel',
-      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      '.txt': 'text/plain',
-      '.mp4': 'video/mp4',
-      '.avi': 'video/x-msvideo',
-      '.mov': 'video/quicktime'
-    };
-
-    const mimeType = mimeTypes[ext] || 'application/octet-stream';
-    const fileName = path.basename(localPath);
-
-    res.setHeader('Content-Type', mimeType);
-    res.setHeader('Content-Length', stat.size);
-
-    // 对于图片和PDF，使用inline显示；其他文件使用attachment下载
-    if (mimeType.startsWith('image/') || mimeType === 'application/pdf') {
-      res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
-    } else {
-      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
-    }
-
-    console.log(`开始传输文件: ${fileName}, 大小: ${stat.size} bytes, MIME: ${mimeType}`);
-
-    // 创建文件流并发送
-    const fileStream = fs.createReadStream(localPath);
-    fileStream.pipe(res);
-
-    fileStream.on('error', (error) => {
-      console.error('文件流错误:', error);
-      if (!res.headersSent) {
-        res.status(500).json({
-          success: false,
-          message: '文件读取失败'
-        });
-      }
-    });
-
-    fileStream.on('end', () => {
-      console.log(`文件传输完成: ${fileName}`);
-    });
-
-  } catch (error) {
-    console.error('文件访问失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '文件访问失败: ' + error.message
-    });
-  }
-});
+// ===================== 旧的文件访问服务（已废弃）=====================
+// 注意：此路由已被下面的新版本替代，使用convertRelativePathToServerPath函数
+// 删除此重复路由，避免与新版本冲突
 
 // ===================== 打开文件夹 =====================
 // POST /api/complaint/open-folder
@@ -1748,5 +1552,307 @@ router.post('/open-folder', async (req, res) => {
     });
   }
 });
+
+// ===================== 获取附件文件路径信息 =====================
+// GET /api/complaint/attachment-path/:id
+// 参数: id (投诉记录ID)
+// 返回: { success, path, displayPath, isAccessible, type }
+router.get('/attachment-path/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ success: false, message: '无效的记录ID' });
+    }
+
+    let pool = await sql.connect(await getDynamicConfig());
+
+    const result = await pool.request()
+      .input('ID', sql.Int, parseInt(id))
+      .query('SELECT AttachmentFile FROM ComplaintRegister WHERE ID = @ID');
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '记录不存在' });
+    }
+
+    const attachmentFile = result.recordset[0].AttachmentFile;
+
+    if (!attachmentFile) {
+      return res.json({
+        success: true,
+        path: null,
+        displayPath: '无附件文件',
+        isAccessible: false,
+        type: 'none'
+      });
+    }
+
+    // 将相对路径转换为服务器路径
+    const serverPath = await convertRelativePathToServerPath(attachmentFile);
+
+    res.json({
+      success: true,
+      path: attachmentFile, // 原始相对路径
+      displayPath: serverPath.displayPath, // 显示路径
+      serverPath: serverPath.fullPath, // 服务器完整路径
+      isAccessible: serverPath.isAccessible,
+      type: 'relative_path'
+    });
+
+  } catch (error) {
+    console.error('获取附件路径失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取附件路径失败: ' + error.message
+    });
+  }
+});
+
+// ===================== 获取附件文件内容 =====================
+// GET /api/complaint/file/:id
+// 参数: id (投诉记录ID)
+// 返回: 文件内容流
+router.get('/file/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ success: false, message: '无效的记录ID' });
+    }
+
+    let pool = await sql.connect(await getDynamicConfig());
+
+    const result = await pool.request()
+      .input('ID', sql.Int, parseInt(id))
+      .query('SELECT AttachmentFile FROM ComplaintRegister WHERE ID = @ID');
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '记录不存在' });
+    }
+
+    const attachmentFile = result.recordset[0].AttachmentFile;
+
+    if (!attachmentFile) {
+      return res.status(404).json({ success: false, message: '无附件文件' });
+    }
+
+    // 将相对路径转换为服务器文件路径
+    const serverPath = await convertRelativePathToServerPath(attachmentFile);
+
+    if (!serverPath.isAccessible) {
+      return res.status(404).json({ success: false, message: '文件不存在或无法访问' });
+    }
+
+    const fs = require('fs');
+    const path = require('path');
+
+    // 检查文件是否存在
+    if (!fs.existsSync(serverPath.fullPath)) {
+      return res.status(404).json({ success: false, message: '文件不存在' });
+    }
+
+    // 获取文件信息
+    const stat = fs.statSync(serverPath.fullPath);
+    const fileName = path.basename(serverPath.fullPath);
+    const ext = path.extname(fileName).toLowerCase();
+
+    // 设置响应头
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+
+    // 根据文件类型设置Content-Type
+    const mimeTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.webp': 'image/webp',
+      '.pdf': 'application/pdf',
+      '.doc': 'application/msword',
+      '.docx': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      '.xls': 'application/vnd.ms-excel',
+      '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    };
+
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+
+    // 创建文件流并发送
+    const fileStream = fs.createReadStream(serverPath.fullPath);
+    fileStream.pipe(res);
+
+    fileStream.on('error', (error) => {
+      console.error('文件流错误:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: '文件读取失败' });
+      }
+    });
+
+  } catch (error) {
+    console.error('获取文件失败:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: '获取文件失败: ' + error.message
+      });
+    }
+  }
+});
+
+// 辅助函数：将相对路径转换为服务器路径
+async function convertRelativePathToServerPath(relativePath) {
+  if (!relativePath) {
+    return {
+      fullPath: null,
+      displayPath: '无附件文件',
+      isAccessible: false
+    };
+  }
+
+  const path = require('path');
+  const fs = require('fs');
+
+  // 服务器存储基础路径 - 使用相对于当前工作目录的路径
+  const baseServerPath = path.join(__dirname, '..', 'uploads', 'attachments');
+
+  console.log(`=== 路径转换调试信息 ===`);
+  console.log(`原始路径: ${relativePath}`);
+  console.log(`基础路径: ${baseServerPath}`);
+
+  // 处理特殊情况：如果只是"不良图片"这样的简单路径
+  if (relativePath === '不良图片' || relativePath === '不良图片&资料') {
+    // 查找最新的月份目录
+    const yearDir = path.join(baseServerPath, '2025年异常汇总');
+    if (fs.existsSync(yearDir)) {
+      const monthDirs = fs.readdirSync(yearDir).filter(dir => {
+        const fullPath = path.join(yearDir, dir);
+        return fs.statSync(fullPath).isDirectory();
+      }).sort().reverse(); // 按名称倒序，获取最新月份
+
+      if (monthDirs.length > 0) {
+        const latestMonthPath = path.join(yearDir, monthDirs[0]);
+        console.log(`使用最新月份目录: ${latestMonthPath}`);
+        return {
+          fullPath: latestMonthPath,
+          displayPath: `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\2025年异常汇总\\${monthDirs[0]}`,
+          isAccessible: true
+        };
+      }
+    }
+  }
+
+  // 尝试直接路径匹配
+  let fullPath = path.join(baseServerPath, relativePath);
+  let isAccessible = fs.existsSync(fullPath);
+
+  console.log(`直接路径匹配: ${fullPath}, 存在: ${isAccessible}`);
+
+  // 如果直接路径不存在，尝试路径映射
+  if (!isAccessible) {
+    // 尝试将"不良图片&资料"路径映射到实际的月份目录
+    if (relativePath.includes('不良图片&资料')) {
+      // 提取文件名
+      const fileName = path.basename(relativePath);
+      console.log(`提取文件名: ${fileName}`);
+
+      // 在所有月份目录中查找文件
+      const yearDir = path.join(baseServerPath, '2025年异常汇总');
+      if (fs.existsSync(yearDir)) {
+        const monthDirs = fs.readdirSync(yearDir).filter(dir => {
+          const fullPath = path.join(yearDir, dir);
+          return fs.statSync(fullPath).isDirectory();
+        });
+
+        for (const monthDir of monthDirs) {
+          const searchPath = path.join(yearDir, monthDir, fileName);
+          console.log(`搜索路径: ${searchPath}`);
+          if (fs.existsSync(searchPath)) {
+            fullPath = searchPath;
+            isAccessible = true;
+            console.log(`找到文件: ${fullPath}`);
+            break;
+          }
+        }
+      }
+    }
+  }
+
+  // 构建显示路径（HTTP访问路径格式）
+  // 将服务器本地路径转换为HTTP访问路径
+  let displayPath;
+  if (isAccessible && fullPath) {
+    // 提取相对于uploads目录的路径
+    const uploadsDir = path.join(__dirname, '..', 'uploads');
+    const relativePath = path.relative(uploadsDir, fullPath);
+    // 转换为URL路径格式，并进行URL编码
+    const urlPath = relativePath.split(path.sep).map(part => encodeURIComponent(part)).join('/');
+    displayPath = `/files/${urlPath}`;
+    console.log(`生成HTTP访问路径: ${displayPath}`);
+  } else {
+    // 如果文件不存在，仍然显示原始的网络路径作为参考
+    displayPath = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${relativePath}`;
+    console.log(`文件不存在，使用网络路径: ${displayPath}`);
+  }
+
+  console.log(`最终结果:
+    完整路径: ${fullPath}
+    文件存在: ${isAccessible}
+    显示路径: ${displayPath}`);
+  console.log(`=== 路径转换完成 ===`);
+
+  return {
+    fullPath: fullPath,
+    displayPath: displayPath,
+    isAccessible: isAccessible
+  };
+}
+
+// 获取流水号API
+router.get('/sequence-number', async (req, res) => {
+  try {
+    const { date, editId } = req.query
+
+    if (!date) {
+      return res.status(400).json({
+        success: false,
+        message: '日期参数不能为空'
+      })
+    }
+
+    console.log(`获取流水号请求: 日期=${date}, 编辑ID=${editId}`)
+
+    // 查询指定日期的记录数量
+    let query = 'SELECT COUNT(*) as count FROM ComplaintRegister WHERE CAST(Date as DATE) = @date'
+
+    const pool = await sql.connect(await getDynamicConfig())
+    const request = pool.request()
+    request.input('date', sql.Date, date)
+
+    // 如果是编辑模式，排除当前记录
+    if (editId) {
+      query += ' AND ID != @editId'
+      request.input('editId', sql.Int, editId)
+    }
+
+    const result = await request.query(query)
+    const count = result.recordset[0].count
+    const sequenceNumber = count + 1
+
+    console.log(`日期 ${date} 的记录数量: ${count}, 流水号: ${sequenceNumber}`)
+
+    res.json({
+      success: true,
+      sequenceNumber: sequenceNumber
+    })
+
+  } catch (error) {
+    console.error('获取流水号失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取流水号失败: ' + error.message
+    })
+  }
+})
 
 module.exports = router;

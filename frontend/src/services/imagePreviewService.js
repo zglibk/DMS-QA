@@ -17,6 +17,12 @@ class ImagePreviewService {
    */
   isImageFile(filePath) {
     if (!filePath) return false
+
+    // 如果是blob URL，直接认为是图片（因为我们只为图片创建blob URL）
+    if (filePath.startsWith('blob:')) {
+      return true
+    }
+
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
     const extension = filePath.toLowerCase().substring(filePath.lastIndexOf('.'))
     return imageExtensions.includes(extension)
@@ -37,11 +43,40 @@ class ImagePreviewService {
     console.log(`记录ID: ${recordId}`)
     console.log(`缓存键: ${cacheKey}`)
 
-    // 检查缓存
+    // 检查缓存并验证有效性
     if (this.cache.has(cacheKey)) {
       const cachedUrl = this.cache.get(cacheKey)
-      console.log(`使用缓存URL: ${cachedUrl}`)
-      return cachedUrl
+      console.log(`发现缓存URL: ${cachedUrl}`)
+
+      // 验证blob URL是否仍然有效
+      if (cachedUrl.startsWith('blob:')) {
+        try {
+          // 尝试创建一个Image对象来验证blob URL是否有效
+          const testImg = new Image()
+          const isValid = await new Promise((resolve) => {
+            testImg.onload = () => resolve(true)
+            testImg.onerror = () => resolve(false)
+            testImg.src = cachedUrl
+            // 设置超时，避免长时间等待
+            setTimeout(() => resolve(false), 1000)
+          })
+
+          if (isValid) {
+            console.log(`缓存URL有效，使用缓存: ${cachedUrl}`)
+            return cachedUrl
+          } else {
+            console.log(`缓存URL已失效，清理缓存: ${cachedUrl}`)
+            this.clearCache(cacheKey)
+          }
+        } catch (error) {
+          console.log(`缓存URL验证失败，清理缓存: ${cachedUrl}`)
+          this.clearCache(cacheKey)
+        }
+      } else {
+        // 非blob URL直接使用
+        console.log(`使用缓存URL: ${cachedUrl}`)
+        return cachedUrl
+      }
     }
 
     try {

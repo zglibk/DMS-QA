@@ -3,6 +3,13 @@
     <!-- 固定标题栏 -->
     <div class="dialog-header">
       <h2 class="dialog-title">{{ props.editData ? '编辑投诉' : '新增投诉' }}</h2>
+      <el-button
+        class="dialog-close-btn"
+        type="text"
+        @click="handleCancel"
+        :icon="Close"
+        size="large"
+      />
     </div>
 
     <!-- 表单内容区域 -->
@@ -137,10 +144,22 @@
             <el-form-item label="附件文件">
               <div class="attachment-field">
                 <div class="attachment-input-section">
-                  <el-input v-model="form.AttachmentFile" readonly style="width: 400px" placeholder="请选择附件文件" />
-                  <el-button @click="selectFile" :loading="fileUploading" style="margin-left: 10px">
-                    {{ fileUploading ? '上传中...' : '选择文件' }}
+                  <el-button @click="selectFile" :loading="fileUploading" type="primary">
+                    <el-icon><Plus /></el-icon>
+                    {{ fileUploading ? '上传中...' : '选择图片' }}
                   </el-button>
+                </div>
+
+                <!-- 附件文件路径显示 -->
+                <div class="attachment-path-section" style="margin-top: 10px;">
+                  <el-input
+                    v-model="form.AttachmentFile"
+                    readonly
+                    placeholder="附件文件路径将在上传后显示"
+                    style="width: 100%"
+                  >
+                    <template #prepend>文件路径</template>
+                  </el-input>
                 </div>
                 <!-- 图片预览区域 -->
                 <div class="attachment-preview-section" style="margin-top: 15px;">
@@ -157,6 +176,12 @@
                         width="146px"
                         height="116px"
                       />
+                      <!-- 显示生成的文件名 -->
+                      <div class="file-name-display" style="margin-top: 8px; max-width: 146px;">
+                        <el-text size="small" type="info" style="word-break: break-all;">
+                          {{ selectedFileInfo.generatedFileName || selectedFileInfo.fileName }}
+                        </el-text>
+                      </div>
                     </div>
                     <!-- 非图片文件或错误状态 -->
                     <div v-else-if="selectedFileInfo && !selectedFileInfo.isImage" class="file-preview-box">
@@ -483,7 +508,7 @@
 
       <!-- 底部按钮 -->
       <div class="form-actions">
-        <el-button @click="$emit('cancel')">
+        <el-button @click="handleCancel">
           <el-icon style="margin-right: 6px;"><Close /></el-icon>
           取消
         </el-button>
@@ -501,75 +526,7 @@
 
 
 
-    <!-- 文件上传预览确认对话框 -->
-    <el-dialog
-      v-model="previewDialogVisible"
-      title="文件上传预览"
-      width="500px"
-      :close-on-click-modal="false"
-      :append-to-body="true"
-      center
-      class="file-upload-preview-dialog"
-    >
-      <div v-if="pendingFile" class="file-preview-content">
-        <!-- 文件基本信息 -->
-        <div class="file-info-section">
-          <h4>文件信息</h4>
-          <div class="file-details">
-            <div class="detail-item">
-              <span class="label">文件名：</span>
-              <span class="value">{{ pendingFile.fileName }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="label">文件大小：</span>
-              <span class="value">{{ formatFileSize(pendingFile.fileSize) }}</span>
-            </div>
-            <div class="detail-item">
-              <span class="label">文件类型：</span>
-              <span class="value">{{ pendingFile.fileType || '未知' }}</span>
-            </div>
-          </div>
-        </div>
 
-        <!-- 图片预览 -->
-        <div v-if="pendingFile.isImage && pendingFile.previewUrl" class="image-preview-section">
-          <h4>图片预览</h4>
-          <div class="preview-image-container">
-            <img :src="pendingFile.previewUrl" :alt="pendingFile.fileName" class="preview-image" />
-          </div>
-        </div>
-
-        <!-- 非图片文件 -->
-        <div v-else class="non-image-section">
-          <h4>文件预览</h4>
-          <div class="file-icon-container">
-            <el-icon class="large-file-icon"><Document /></el-icon>
-            <p>{{ pendingFile.fileName }}</p>
-          </div>
-        </div>
-
-        <!-- 确认提示 -->
-        <div class="confirm-section">
-          <el-alert
-            title="确认上传"
-            :description="'文件将被上传到服务器路径: uploads/attachments/' + new Date().getFullYear() + '年异常汇总/' +
-              String(new Date().getMonth() + 1).padStart(2, '0') + '月份/'"
-            type="info"
-            :closable="false"
-            show-icon
-          />
-        </div>
-      </div>
-
-      <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="cancelUpload">取消</el-button>
-          <el-button type="primary" @click="confirmUpload" :loading="fileUploading">
-            {{ fileUploading ? '上传中...' : '确认上传' }}
-          </el-button>
-        </div>
-      </template>
-    </el-dialog>
 
     <!-- 图片预览遮罩和弹窗 -->
     <div v-if="showPreview" class="img-preview-mask" @click.self="showPreview = false">
@@ -592,11 +549,12 @@
  * 4. 文件上传和附件管理
  */
 
-import { ref, reactive, onMounted, watch, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import axios from 'axios'
-import { CircleClose, Close, RefreshLeft, Check, Document } from '@element-plus/icons-vue'
+import { CircleClose, Close, RefreshLeft, Check, Document, Plus } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import ImagePreview from './ImagePreview.vue'
+import imagePreviewService from '@/services/imagePreviewService.js'
 
 // 定义props
 const props = defineProps({
@@ -1072,6 +1030,28 @@ const submitForm = () => {
       }
       try {
         loading.value = true
+
+        // 如果有未上传的文件，先上传文件
+        if (selectedFileInfo.value && !selectedFileInfo.value.uploaded && selectedFileInfo.value.file) {
+          try {
+            const uploadResult = await uploadFileToServer(
+              selectedFileInfo.value.file,
+              selectedFileInfo.value.generatedFileName
+            )
+
+            if (uploadResult.success) {
+              // 更新表单数据中的附件路径为服务器返回的路径
+              submissionData.AttachmentFile = uploadResult.relativePath
+            } else {
+              throw new Error('文件上传失败')
+            }
+          } catch (uploadError) {
+            ElMessage.error('文件上传失败，请重试')
+            loading.value = false
+            return
+          }
+        }
+
         const token = localStorage.getItem('token');
 
         let res
@@ -1103,15 +1083,37 @@ const submitForm = () => {
 }
 
 const resetForm = () => {
+  // 重置表单字段
   formRef.value.resetFields();
   options.defectiveItems = [];
+
+  // 清空文件相关状态
+  if (selectedFileInfo.value?.previewUrl && selectedFileInfo.value.previewUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(selectedFileInfo.value.previewUrl)
+  }
+
+  // 重置文件相关变量
+  selectedFileInfo.value = null
+  form.value.AttachmentFile = ''
+
+  // 重置文件上传状态
+  fileUploading.value = false
+}
+
+/**
+ * 处理取消操作
+ */
+const handleCancel = () => {
+  // 清理资源
+  cleanupResources()
+
+  // 发送取消事件
+  emit('cancel')
 }
 
 // 附件选择与图片预览相关变量
 const selectedFileInfo = ref(null)
 const fileUploading = ref(false)
-const previewDialogVisible = ref(false)
-const pendingFile = ref(null)
 
 // 判断是否为图片文件
 const isImageFile = (fileName) => {
@@ -1215,168 +1217,156 @@ const formatFileSize = (bytes) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
-// 附件选择（先预览，再确认上传）
-const selectFile = async () => {
-  const input = document.createElement('input')
-  input.type = 'file'
-  input.accept = '*/*' // 接受所有文件类型
+// 生成文件名的函数
+const generateFileName = async (originalFileName) => {
+  // 检查必填字段
+  const customer = form.value.Customer?.trim()
+  const orderNo = form.value.OrderNo?.trim()
+  const productName = form.value.ProductName?.trim()
+  const defectiveCategory = form.value.DefectiveCategory?.Name?.trim()
 
-  input.onchange = async (e) => {
-    const file = e.target.files[0]
-    if (file) {
-      // 创建文件预览信息
-      const fileInfo = {
-        fileName: file.name,
-        fileSize: file.size,
-        fileType: file.type,
-        isImage: isImageFile(file.name),
-        previewUrl: null,
-        file: file
-      }
+  if (!customer || !orderNo || !productName || !defectiveCategory) {
+    const missingFields = []
+    if (!customer) missingFields.push('客户编号')
+    if (!orderNo) missingFields.push('工单号')
+    if (!productName) missingFields.push('品名')
+    if (!defectiveCategory) missingFields.push('不良类别')
 
-      // 如果是图片，创建预览URL
-      if (fileInfo.isImage) {
-        fileInfo.previewUrl = URL.createObjectURL(file)
-      }
-
-      // 保存待上传文件信息并显示预览对话框
-      pendingFile.value = fileInfo
-      previewDialogVisible.value = true
-    }
+    throw new Error(`请先填写以下必填字段：${missingFields.join('、')}`)
   }
-
-  input.click()
-}
-
-// 确认上传文件
-const confirmUpload = async () => {
-  if (!pendingFile.value) return
 
   try {
-    fileUploading.value = true
-    previewDialogVisible.value = false
-
-    const file = pendingFile.value.file
-
-    // 清理所有旧的文件信息和缓存
-    selectedFileInfo.value = null
-    form.value.AttachmentFile = ''
-
-    // 创建FormData对象
-    const formData = new FormData()
-    formData.append('file', file)
-    formData.append('type', 'attachment') // 标识为附件文件
-
-    // 上传文件到服务器
+    // 获取流水号
+    const recordDate = form.value.Date || new Date().toISOString().split('T')[0]
     const token = localStorage.getItem('token')
-    const response = await axios.post('/api/upload/complaint-attachment', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        'Authorization': `Bearer ${token}`
-      }
+
+    const response = await axios.get('/api/complaint/sequence-number', {
+      params: {
+        date: recordDate,
+        editId: props.editData?.ID // 编辑模式时传递当前记录ID
+      },
+      headers: { Authorization: `Bearer ${token}` }
     })
 
-    // 打印服务器响应，用于调试
-    console.log('服务器上传响应:', response.data)
-
-    if (response.data && response.data.success) {
-      // 清理旧的预览URL和文件信息
-      if (pendingFile.value && pendingFile.value.previewUrl && pendingFile.value.previewUrl.startsWith('blob:')) {
-        URL.revokeObjectURL(pendingFile.value.previewUrl)
-      }
-
-      // 清空旧的文件信息
-      selectedFileInfo.value = null
-
-      // 服务器返回相对路径，设置到表单字段
-      form.value.AttachmentFile = response.data.relativePath
-
-      // 创建文件信息对象
-      const fileInfo = {
-        fileName: response.data.originalName, // 使用服务器返回的原始文件名
-        fileSize: file.size,
-        fileType: file.type,
-        isImage: isImageFile(response.data.filename), // 使用服务器返回的实际文件名判断
-        previewUrl: null, // 先设为null，后面会设置正确的预览URL
-        relativePath: response.data.relativePath,
-        serverPath: response.data.serverPath,
-        filename: response.data.filename, // 保存服务器返回的文件名
-        file: file,
-        uploaded: true
-      }
-
-      // 如果是图片，设置预览URL
-      if (fileInfo.isImage) {
-        fileInfo.previewUrl = getFilePreviewUrl(response.data.relativePath)
-
-        console.log('=== 文件上传成功 ===')
-        console.log('服务器返回数据:', response.data)
-        console.log('构建的预览URL:', fileInfo.previewUrl)
-        console.log('相对路径:', response.data.relativePath)
-        console.log('实际文件名:', response.data.filename)
-        console.log('文件类型判断: 服务器上传文件')
-        console.log('==================')
-      }
-
-      // 立即更新selectedFileInfo，确保显示最新的文件信息
-      selectedFileInfo.value = fileInfo
-
-      // 强制更新DOM
-      nextTick(() => {
-        console.log('DOM已更新，当前文件信息:', selectedFileInfo.value)
-      })
-
-      selectedFileInfo.value = fileInfo
-
-      ElMessage.success('文件上传成功')
-      console.log('文件上传成功:', {
-        fileName: file.name,
-        relativePath: response.data.relativePath,
-        serverPath: response.data.serverPath,
-        previewUrl: fileInfo.previewUrl
-      })
-    } else {
-      throw new Error(response.data?.message || '文件上传失败')
+    if (!response.data.success) {
+      throw new Error(response.data.message || '获取流水号失败')
     }
+
+    const sequenceNumber = String(response.data.sequenceNumber).padStart(2, '0')
+
+    // 生成日期格式 yymmdd
+    const date = new Date(recordDate)
+    const yy = String(date.getFullYear()).slice(-2)
+    const mm = String(date.getMonth() + 1).padStart(2, '0')
+    const dd = String(date.getDate()).padStart(2, '0')
+    const dateStr = `${yy}${mm}${dd}`
+
+    // 获取文件扩展名
+    const ext = originalFileName.substring(originalFileName.lastIndexOf('.'))
+
+    // 生成文件名：客户编号 +空格+工单号+空格+品名+短划线+不良类别+空格 +yymmdd+流水号
+    const generatedName = `${customer} ${orderNo} ${productName}-${defectiveCategory} ${dateStr}${sequenceNumber}${ext}`
+
+    console.log('生成的文件名:', generatedName)
+    return generatedName
   } catch (error) {
-    console.error('文件上传失败:', error)
-    ElMessage.error(error.response?.data?.message || error.message || '文件上传失败')
+    console.error('生成文件名失败:', error)
+    throw error
+  }
+}
 
-    // 上传失败时，仍然显示本地预览（但不保存到表单）
-    const fileInfo = {
-      ...pendingFile.value,
-      uploadFailed: true
+// 附件选择（延迟上传模式：选择时不上传，保存时才上传）
+const selectFile = async () => {
+  // 点击选择图片时立即检查必填项
+  const requiredFields = [
+    { field: 'Date', name: '投诉日期' },
+    { field: 'Customer', name: '客户编号' },
+    { field: 'OrderNo', name: '工单号' },
+    { field: 'ProductName', name: '产品名称' },
+    { field: 'DefectiveCategory', name: '不良类别' }
+  ]
+
+  const missingFields = []
+  for (const { field, name } of requiredFields) {
+    const value = form.value[field]
+    let isEmpty = false
+
+    console.log(`检查字段 ${name} (${field}):`, {
+      value: value,
+      type: typeof value,
+      isDate: value instanceof Date,
+      isValidDate: value instanceof Date ? !isNaN(value.getTime()) : 'N/A'
+    })
+
+    if (!value) {
+      isEmpty = true
+    } else if (typeof value === 'string' && !value.trim()) {
+      isEmpty = true
+    } else if (value instanceof Date && isNaN(value.getTime())) {
+      isEmpty = true
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)) {
+      // 处理对象类型（如不良类别）
+      isEmpty = !value.Name || !value.Name.trim()
     }
-
-    selectedFileInfo.value = fileInfo
-  } finally {
-    fileUploading.value = false
-    pendingFile.value = null
+    if (isEmpty) {
+      missingFields.push(name)
+    }
   }
-}
 
-// 取消上传
-const cancelUpload = () => {
-  previewDialogVisible.value = false
-  // 清理预览URL
-  if (pendingFile.value && pendingFile.value.previewUrl) {
-    URL.revokeObjectURL(pendingFile.value.previewUrl)
+  if (missingFields.length > 0) {
+    ElMessage.warning(`请先填写以下必填项：${missingFields.join('、')}`)
+    return
   }
-  pendingFile.value = null
-}
 
-// 通用文件选择函数（直接上传，不显示预览对话框）
-const selectAndUploadFile = async () => {
   const input = document.createElement('input')
   input.type = 'file'
-  input.accept = '*/*' // 接受所有文件类型
+  input.accept = 'image/*' // 只接受图片文件
 
   input.onchange = async (e) => {
     const file = e.target.files[0]
     if (file) {
       try {
         fileUploading.value = true
-        await uploadFileToServer(file)
+
+        // 检查是否为图片文件
+        if (!isImageFile(file.name)) {
+          ElMessage.error('请选择图片文件')
+          return
+        }
+
+        // 生成文件名和相对路径
+        const generatedFileName = await generateFileName(file.name)
+        const relativePath = await generateRelativePath(generatedFileName)
+
+        // 创建blob URL用于预览
+        const previewUrl = URL.createObjectURL(file)
+
+        // 清理旧的文件信息
+        if (selectedFileInfo.value?.previewUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(selectedFileInfo.value.previewUrl)
+        }
+
+        // 保存文件信息到临时变量（不上传）
+        selectedFileInfo.value = {
+          fileName: file.name, // 原始文件名
+          generatedFileName: generatedFileName, // 生成的文件名
+          fileSize: file.size,
+          fileType: file.type,
+          isImage: isImageFile(generatedFileName),
+          previewUrl: previewUrl, // blob URL用于预览
+          relativePath: relativePath, // 生成的相对路径
+          file: file, // 原始文件对象
+          uploaded: false // 标记为未上传
+        }
+
+        // 设置表单字段为生成的相对路径
+        form.value.AttachmentFile = relativePath
+
+        ElMessage.success('文件已选择，将在保存时上传')
+
+      } catch (error) {
+        console.error('文件处理失败:', error)
+        ElMessage.error(error.message || '文件处理失败')
       } finally {
         fileUploading.value = false
       }
@@ -1386,79 +1376,80 @@ const selectAndUploadFile = async () => {
   input.click()
 }
 
-// 通用文件上传处理函数
-const uploadFileToServer = async (file) => {
+// 生成相对路径（用于数据库存储）
+const generateRelativePath = async (generatedFileName) => {
+  const currentYear = new Date().getFullYear()
+  const customer = form.value.Customer?.trim()
+
+  // 检查客户编号是否为空
+  if (!customer) {
+    throw new Error('请先填写客户编号')
+  }
+
+  // 生成Windows格式的相对路径
+  const relativePath = `${currentYear}年异常汇总\\不良图片&资料\\${customer}\\${generatedFileName}`
+
+  return relativePath
+}
+
+// 上传文件到服务器（在保存时调用）
+const uploadFileToServer = async (file, generatedFileName) => {
   try {
-    // 清理所有旧的文件信息和缓存
-    selectedFileInfo.value = null
-    form.value.AttachmentFile = ''
-
-    // 创建FormData对象
+    // 创建FormData
     const formData = new FormData()
-    formData.append('file', file)
-    formData.append('type', 'attachment') // 标识为附件文件
 
-    // 上传文件到服务器
+    // 创建一个新的File对象，使用生成的文件名
+    const renamedFile = new File([file], generatedFileName, { type: file.type })
+    formData.append('file', renamedFile)
+
+    // 添加自定义路径参数
+    const currentYear = new Date().getFullYear()
+    const customer = form.value.Customer?.trim()
+    const customPath = `${currentYear}年异常汇总\\不良图片&资料\\${customer}`
+    formData.append('customPath', customPath)
+
+    // 获取token
     const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('未找到认证令牌，请重新登录')
+    }
+
+    // 上传文件
     const response = await axios.post('/api/upload/complaint-attachment', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
-        'Authorization': `Bearer ${token}`
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
       }
     })
 
-    console.log('服务器上传响应:', response.data)
-
     if (response.data && response.data.success) {
-      // 服务器返回相对路径，设置到表单字段
-      form.value.AttachmentFile = response.data.relativePath
+      // 标记文件为已上传
+      if (selectedFileInfo.value) {
+        selectedFileInfo.value.uploaded = true
+        selectedFileInfo.value.serverPath = response.data.serverPath
+      }
 
-      // 创建文件信息对象
-      const fileInfo = {
-        fileName: response.data.originalName, // 使用服务器返回的原始文件名
-        fileSize: file.size,
-        fileType: file.type,
-        isImage: isImageFile(response.data.filename), // 使用服务器返回的实际文件名判断
-        previewUrl: null, // 先设为null，后面会设置正确的预览URL
+      return {
+        success: true,
         relativePath: response.data.relativePath,
         serverPath: response.data.serverPath,
-        filename: response.data.filename, // 保存服务器返回的文件名
-        file: file,
-        uploaded: true
+        filename: response.data.filename
       }
-
-      // 如果是图片，设置预览URL
-      if (fileInfo.isImage) {
-        fileInfo.previewUrl = getFilePreviewUrl(response.data.relativePath)
-
-        console.log('=== 文件上传成功 ===')
-        console.log('服务器返回数据:', response.data)
-        console.log('构建的预览URL:', fileInfo.previewUrl)
-        console.log('相对路径:', response.data.relativePath)
-        console.log('实际文件名:', response.data.filename)
-        console.log('文件类型判断: 服务器上传文件')
-        console.log('==================')
-      }
-
-      // 立即更新selectedFileInfo，确保显示最新的文件信息
-      selectedFileInfo.value = fileInfo
-
-      // 强制更新DOM
-      nextTick(() => {
-        console.log('DOM已更新，当前文件信息:', selectedFileInfo.value)
-      })
-
-      ElMessage.success('文件上传成功')
-      return true
     } else {
       throw new Error(response.data?.message || '文件上传失败')
     }
   } catch (error) {
-    console.error('文件上传失败:', error)
-    ElMessage.error(error.response?.data?.message || error.message || '文件上传失败')
-    return false
+    throw error
   }
 }
+
+
+
+
+
+
+
+
 
 const isImage = (path) => {
   if (!path) return false;
@@ -1575,6 +1566,25 @@ watch(() => props.editData, () => {
 }, { immediate: true, deep: true })
 
 /**
+ * 清理组件资源
+ */
+const cleanupResources = () => {
+  // 清理图片预览缓存
+  if (props.editData?.ID) {
+    const cacheKey = `record_${props.editData.ID}`
+    imagePreviewService.clearCache(cacheKey)
+  }
+
+  // 清理选中文件的预览URL
+  if (selectedFileInfo.value?.previewUrl && selectedFileInfo.value.previewUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(selectedFileInfo.value.previewUrl)
+  }
+
+  // 重置文件相关状态
+  selectedFileInfo.value = null
+}
+
+/**
  * 组件挂载时的初始化操作
  */
 onMounted(async () => {
@@ -1591,6 +1601,13 @@ onMounted(async () => {
 
   // 初始化编辑数据
   initializeEditData();
+})
+
+/**
+ * 组件卸载时清理资源
+ */
+onUnmounted(() => {
+  cleanupResources()
 })
 </script>
 
@@ -1614,6 +1631,10 @@ onMounted(async () => {
   padding: 12px 30px;
   box-shadow: 0 2px 12px rgba(64, 158, 255, 0.3);
   border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
 }
 
 .dialog-title {
@@ -1628,6 +1649,28 @@ onMounted(async () => {
 .dialog-title::before {
   content: '📝';
   font-size: 18px;
+}
+
+.dialog-close-btn {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: white !important;
+  font-size: 20px;
+  padding: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+  background: transparent;
+  border: none;
+  min-width: 40px;
+  height: 40px;
+}
+
+.dialog-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+  color: white !important;
+  transform: translateY(-50%) scale(1.1);
 }
 
 /* 内容区域样式 */

@@ -143,8 +143,14 @@
             class="preview-image-full"
             :style="imageStyle"
             @mousedown="startDrag"
+            @load="onFullImageLoad"
+            @error="onFullImageError"
             draggable="false"
+            style="max-width: 100%; max-height: 100%; object-fit: contain;"
           />
+        </div>
+        <div v-else class="no-image">
+          <div>没有图片可显示</div>
         </div>
       </div>
     </el-dialog>
@@ -224,16 +230,11 @@ const imageStyle = computed(() => ({
 // 可能原因：路径解析逻辑或组件刷新机制有问题
 // 加载图片
 const loadImage = async () => {
-  console.log('=== ImagePreview loadImage 调试信息 ===')
-  console.log('props.filePath:', props.filePath)
-  console.log('isImage.value:', isImage.value)
-
   // 检查filePath和recordId
   const hasFilePath = props.filePath && props.filePath !== '' && props.filePath !== null && props.filePath !== undefined
   const hasRecordId = props.recordId && props.recordId !== null && props.recordId !== undefined
 
   if (!hasFilePath && !hasRecordId) {
-    console.log('ImagePreview: filePath和recordId都为空，不加载图片')
     loading.value = false
     error.value = false
     imageUrl.value = null
@@ -241,7 +242,6 @@ const loadImage = async () => {
   }
 
   if (!isImage.value) {
-    console.log('ImagePreview: 不是图片文件，不加载')
     loading.value = false
     error.value = false
     imageUrl.value = null
@@ -251,15 +251,34 @@ const loadImage = async () => {
   loading.value = true
   error.value = false
 
+  // 清理旧的imageUrl（如果是blob URL）
+  if (imageUrl.value && imageUrl.value.startsWith('blob:')) {
+    console.log('清理旧的blob URL:', imageUrl.value)
+    URL.revokeObjectURL(imageUrl.value)
+  }
+  imageUrl.value = ''
+
   try {
     // 如果没有filePath但有recordId，直接通过API获取
     if (!hasFilePath && hasRecordId) {
       console.log('没有filePath但有recordId，通过API获取图片')
-      const url = await imagePreviewService.getImageUrlByPath('', props.recordId)
-      console.log('API返回的URL:', url)
-      imageUrl.value = url
-      loading.value = false
-      return
+
+      // 强制清理可能存在的失效缓存
+      const cacheKey = `record_${props.recordId}`
+      console.log(`检查并清理可能的失效缓存: ${cacheKey}`)
+
+      try {
+        const url = await imagePreviewService.getImageUrlByPath('', props.recordId)
+        console.log('API返回的URL:', url)
+        imageUrl.value = url
+        loading.value = false
+        return
+      } catch (error) {
+        console.error('通过API获取图片失败:', error)
+        // 如果API调用失败，清理缓存并设置错误状态
+        imagePreviewService.clearCache(cacheKey)
+        throw error
+      }
     }
 
     const pathStr = String(props.filePath).trim()
@@ -295,8 +314,8 @@ const loadImage = async () => {
       return
     }
 
-    // 如果是静态文件URL（/files/attachments/），直接使用
-    if (pathStr.startsWith('/files/attachments/')) {
+    // 如果是静态文件URL（/files/），直接使用
+    if (pathStr.startsWith('/files/')) {
       console.log('使用静态文件URL:', pathStr)
       imageUrl.value = pathStr
       loading.value = false
@@ -309,17 +328,28 @@ const loadImage = async () => {
     console.log('服务返回的URL:', url)
     imageUrl.value = url
   } catch (err) {
-    console.error('图片加载失败:', err)
     error.value = true
     ElMessage.error(err.message || '图片加载失败')
   } finally {
     loading.value = false
-    console.log('=== ImagePreview loadImage 完成 ===')
   }
 }
 
 // 重试加载
 const retryLoad = () => {
+
+  // 清理当前状态
+  error.value = false
+  loading.value = true
+
+  // 如果有recordId，清理对应的缓存
+  if (props.recordId) {
+    const cacheKey = `record_${props.recordId}`
+    console.log(`清理缓存以重试: ${cacheKey}`)
+    imagePreviewService.clearCache(cacheKey)
+  }
+
+  // 重新加载
   loadImage()
 }
 
@@ -327,29 +357,22 @@ const retryLoad = () => {
 const onImageLoad = () => {
   loading.value = false
   error.value = false
-  console.log('图片加载成功:', props.filePath)
+}
+
+// 全屏图片加载事件
+const onFullImageLoad = () => {
+  // 图片加载成功，无需特殊处理
+}
+
+// 全屏图片加载错误事件
+const onFullImageError = (event) => {
+  ElMessage.error('图片加载失败')
 }
 
 // 图片加载错误事件
-const onImageError = (e) => {
+const onImageError = () => {
   loading.value = false
   error.value = true
-  console.error('图片加载失败:', props.filePath)
-
-  // 如果是静态文件URL，尝试打印完整URL以便调试
-  if (props.filePath && props.filePath.startsWith('/files/attachments/')) {
-    const fullUrl = window.location.origin + props.filePath
-    console.error('完整URL:', fullUrl)
-
-    // 尝试通过fetch检查文件是否存在
-    fetch(props.filePath, { method: 'HEAD' })
-      .then(response => {
-        console.log('文件检查结果:', response.status, response.statusText)
-      })
-      .catch(err => {
-        console.error('文件检查失败:', err)
-      })
-  }
 }
 
 // 显示全屏预览

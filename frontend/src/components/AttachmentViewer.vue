@@ -14,54 +14,26 @@
         </el-tag>
       </div>
 
+      <!-- 图片预览区域 -->
+      <div v-if="isImageFile" class="image-preview-section">
+        <ImagePreview
+          :key="`attachment-viewer-${previewUrl || 'api'}-${props.recordId}-${attachmentViewerInstanceId}`"
+          :file-path="previewUrl || attachmentPath"
+          :record-id="previewUrl ? null : props.recordId"
+          width="300px"
+          height="200px"
+        />
+      </div>
+
+      <!-- 操作按钮 -->
       <div class="attachment-actions">
-        <!-- 如果是文件，显示打开文件按钮 -->
         <el-button
-          v-if="isFile"
-          type="primary"
-          @click="openAttachment"
-          :loading="loading"
-        >
-          <el-icon><FolderOpened /></el-icon>
-          打开文件
-        </el-button>
-
-        <!-- 如果是文件夹，显示打开文件夹按钮 -->
-        <el-button
-          v-if="isFolder"
-          type="primary"
-          @click="openFolderDirect"
-          :loading="loading"
-        >
-          <el-icon><Folder /></el-icon>
-          打开文件夹
-        </el-button>
-
-        <!-- 如果是文件，显示打开所在文件夹按钮 -->
-        <el-button
-          v-if="isFile"
-          type="info"
-          @click="openFolder"
-          :loading="loading"
-        >
-          <el-icon><Folder /></el-icon>
-          打开所在文件夹
-        </el-button>
-
-        <el-button
-          type="success"
           @click="copyPath"
+          :disabled="!attachmentPath"
         >
           <el-icon><CopyDocument /></el-icon>
           复制路径
         </el-button>
-      </div>
-
-      <!-- 路径信息 -->
-      <div class="path-info" v-if="showPathInfo">
-        <el-text size="small" type="info">
-          路径: {{ displayPath }}
-        </el-text>
       </div>
     </div>
 
@@ -70,144 +42,16 @@
       <el-text type="info">无附件</el-text>
     </div>
 
-    <!-- 图片预览对话框 -->
-    <el-dialog
-      v-model="imagePreviewVisible"
-      :title="''"
-      :width="isFullscreen ? '100%' : '60%'"
-      :close-on-click-modal="true"
-      :close-on-press-escape="true"
-      :append-to-body="true"
-      :lock-scroll="false"
-      :fullscreen="isFullscreen"
-      :show-close="false"
-      center
-      class="image-preview-dialog"
-      :class="{ 'fullscreen-dialog': isFullscreen }"
-      top="10vh"
-      :style="{ height: isFullscreen ? '100vh' : '80vh' }"
-    >
-      <!-- 标题栏 -->
-      <div class="image-header">
-        <div class="image-title">{{ fileName }}</div>
-      </div>
-
-      <!-- 工具栏 -->
-      <div class="image-toolbar">
-        <div class="toolbar-center">
-          <!-- 缩放控制 -->
-          <div class="tool-group">
-            <el-tooltip content="缩小" placement="top">
-              <el-button
-                size="small"
-                circle
-                @click="zoomOut"
-                :disabled="scale <= 0.1"
-                class="tool-btn zoom-out-btn"
-              >
-                <el-icon><ZoomOut /></el-icon>
-              </el-button>
-            </el-tooltip>
-            <span class="zoom-display">{{ Math.round(scale * 100) }}%</span>
-            <el-tooltip content="放大" placement="top">
-              <el-button
-                size="small"
-                circle
-                @click="zoomIn"
-                :disabled="scale >= 5"
-                class="tool-btn zoom-in-btn"
-              >
-                <el-icon><ZoomIn /></el-icon>
-              </el-button>
-            </el-tooltip>
-          </div>
-
-          <!-- 旋转控制 -->
-          <div class="tool-group">
-            <el-tooltip content="向左旋转" placement="top">
-              <el-button size="small" circle @click="rotateLeft" class="tool-btn rotate-left-btn">
-                <el-icon><RefreshLeft /></el-icon>
-              </el-button>
-            </el-tooltip>
-            <el-tooltip content="向右旋转" placement="top">
-              <el-button size="small" circle @click="rotateRight" class="tool-btn rotate-right-btn">
-                <el-icon><RefreshRight /></el-icon>
-              </el-button>
-            </el-tooltip>
-          </div>
-
-          <!-- 功能按钮 -->
-          <div class="tool-group">
-            <el-tooltip content="重置" placement="top">
-              <el-button size="small" circle @click="resetTransform" class="tool-btn reset-btn">
-                <el-icon><Refresh /></el-icon>
-              </el-button>
-            </el-tooltip>
-            <el-tooltip :content="isFullscreen ? '退出全屏' : '全屏'" placement="top">
-              <el-button size="small" circle @click="toggleFullscreen" class="tool-btn fullscreen-btn">
-                <el-icon><FullScreen v-if="!isFullscreen" /><Aim v-else /></el-icon>
-              </el-button>
-            </el-tooltip>
-            <!-- 全屏模式下的关闭按钮 -->
-            <el-tooltip content="关闭" placement="top" v-if="isFullscreen">
-              <el-button
-                size="small"
-                circle
-                @click="closePreview"
-                class="tool-btn close-btn-fullscreen"
-                type="danger"
-              >
-                <el-icon><Close /></el-icon>
-              </el-button>
-            </el-tooltip>
-          </div>
-        </div>
-      </div>
-
-      <div class="image-preview-container" :class="{ 'fullscreen-container': isFullscreen }">
-        <div v-if="imageLoading" class="image-loading">
-          <el-icon class="is-loading"><Loading /></el-icon>
-          <span>正在加载图片...</span>
-        </div>
-        <div v-else-if="imageError" class="image-error">
-          <el-icon><Warning /></el-icon>
-          <span>图片加载失败，请检查文件是否存在</span>
-        </div>
-        <div v-else-if="imageUrl" class="image-wrapper" @wheel="handleWheel">
-          <img
-            :src="imageUrl"
-            class="preview-image"
-            :style="imageStyle"
-            @load="onImageLoad"
-            @error="onImageError"
-            @mousedown="startDrag"
-            draggable="false"
-          />
-        </div>
-      </div>
-    </el-dialog>
-
-    <!-- 外部关闭按钮 - 只在非全屏模式下显示 -->
-    <teleport to="body">
-      <div
-        v-if="imagePreviewVisible && !isFullscreen"
-        class="external-close-btn"
-        @click="closePreview"
-      >
-        <el-icon><Close /></el-icon>
-      </div>
-    </teleport>
+    <!-- 旧的图片预览对话框已删除，现在使用ImagePreview组件 -->
   </div>
 </template>
 
 <script setup>
 import { ref, computed, watch } from 'vue'
 import { ElMessage } from 'element-plus'
-import {
-  Document, Picture, FolderOpened, Folder, CopyDocument, Loading, Warning,
-  ZoomOut, ZoomIn, RefreshLeft, RefreshRight, Refresh, FullScreen, Aim, Close
-} from '@element-plus/icons-vue'
+import { CopyDocument } from '@element-plus/icons-vue'
 import apiService from '@/services/apiService'
+import ImagePreview from './ImagePreview.vue'
 
 const props = defineProps({
   recordId: {
@@ -225,26 +69,90 @@ const attachmentPath = ref('')
 const displayPath = ref('')
 const isAccessible = ref(false)
 const pathType = ref('')
+const attachmentViewerInstanceId = ref(0) // 组件实例标识
 
-// 图片预览相关状态
-const imagePreviewVisible = ref(false)
-const imageUrl = ref('')
-const imageLoading = ref(false)
-const imageError = ref(false)
+// 获取API基础URL
+const getApiBaseUrl = () => {
+  const protocol = window.location.protocol
+  const hostname = window.location.hostname
+  const port = window.location.port
 
-// 图片变换状态
-const scale = ref(1)
-const rotation = ref(0)
-const translateX = ref(0)
-const translateY = ref(0)
-const isFullscreen = ref(false)
+  // 检查是否为本地开发环境
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    return `${protocol}//${hostname}:3000`
+  }
 
-// 拖拽状态
-const isDragging = ref(false)
-const dragStartX = ref(0)
-const dragStartY = ref(0)
-const dragStartTranslateX = ref(0)
-const dragStartTranslateY = ref(0)
+  // 生产环境，使用当前域名和端口
+  return port ? `${protocol}//${hostname}:${port}` : `${protocol}//${hostname}`
+}
+
+// 判断文件路径类型并生成正确的预览URL（参考编辑对话框的逻辑）
+const getFilePreviewUrl = (filePath, recordId = null) => {
+  if (!filePath || filePath === '' || filePath === null || filePath === undefined) {
+    console.log('AttachmentViewer getFilePreviewUrl: 路径为空，返回null')
+    return null
+  }
+
+  console.log('=== AttachmentViewer getFilePreviewUrl 调试信息 ===')
+  console.log('输入路径:', filePath)
+  console.log('记录ID:', recordId)
+  console.log('路径类型:', typeof filePath)
+
+  try {
+    const pathStr = String(filePath).trim()
+
+    // 检查是否为blob URL（本地预览）
+    if (pathStr.startsWith('blob:')) {
+      console.log('检测到blob URL，直接返回')
+      console.log('================================================')
+      return pathStr
+    }
+
+    // 检查是否为HTTP/HTTPS URL（完整URL）
+    if (pathStr.startsWith('http://') || pathStr.startsWith('https://')) {
+      console.log('检测到完整HTTP URL，直接返回')
+      console.log('================================================')
+      return pathStr
+    }
+
+    // 检查是否为服务器静态文件路径（/files/开头）
+    if (pathStr.startsWith('/files/')) {
+      console.log('检测到服务器静态文件路径，直接返回')
+      console.log('================================================')
+      return pathStr
+    }
+
+    // 检查是否为新上传的文件路径
+    const hasFilePrefix = pathStr.includes('file:') || pathStr.includes('File:')
+    const isUploadsPath = pathStr.includes('uploads') || pathStr.includes('attachments')
+
+    if (hasFilePrefix || isUploadsPath) {
+      // 新上传的文件，使用静态文件服务
+      const backendUrl = getApiBaseUrl()
+      const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
+      const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
+      const finalUrl = `${backendUrl}/files/attachments/${encodedPath}`
+      console.log('生成服务器URL:', finalUrl)
+      console.log('================================================')
+      return finalUrl
+    } else {
+      // 现有的数据库记录文件，需要通过API访问
+      // 这些文件可能是网络共享路径或相对路径，需要后端处理
+      console.log('检测到现有数据库文件，返回null让ImagePreview组件通过API处理')
+      console.log('================================================')
+      return null // 返回null，让ImagePreview组件通过recordId和API获取
+    }
+  } catch (error) {
+    console.error('AttachmentViewer getFilePreviewUrl 处理错误:', error)
+    return null
+  }
+}
+
+// 计算预览URL
+const previewUrl = computed(() => {
+  if (!attachmentPath.value) return null
+  return getFilePreviewUrl(attachmentPath.value, props.recordId)
+})
 
 // 计算文件名
 const fileName = computed(() => {
@@ -273,20 +181,17 @@ const isFolder = computed(() => {
   return !isFile.value && !!attachmentPath.value
 })
 
-// 图片样式计算属性
-const imageStyle = computed(() => {
-  return {
-    transform: `scale(${scale.value}) rotate(${rotation.value}deg) translate(${translateX.value}px, ${translateY.value}px)`,
-    transition: isDragging.value ? 'none' : 'transform 0.3s ease',
-    cursor: isDragging.value ? 'grabbing' : 'grab'
-  }
-})
+// 旧的图片样式计算属性已删除
 
 // 获取附件路径信息
 const fetchAttachmentPath = async () => {
   if (!props.recordId) return
 
   loading.value = true
+  // 递增实例ID，确保每次获取数据都创建新的ImagePreview组件
+  attachmentViewerInstanceId.value++
+  console.log(`AttachmentViewer实例ID: ${attachmentViewerInstanceId.value}`)
+
   try {
     const response = await apiService.get(`/api/complaint/attachment-path/${props.recordId}`)
 
@@ -295,6 +200,21 @@ const fetchAttachmentPath = async () => {
       displayPath.value = response.data.displayPath || ''
       isAccessible.value = response.data.isAccessible || false
       pathType.value = response.data.type || ''
+
+      console.log('附件路径信息:', {
+        path: attachmentPath.value,
+        displayPath: displayPath.value,
+        isAccessible: isAccessible.value,
+        type: pathType.value,
+        previewUrl: previewUrl.value
+      })
+
+      console.log('ImagePreview参数（修复后）:', {
+        filePath: previewUrl.value || attachmentPath.value,
+        recordId: previewUrl.value ? null : props.recordId,
+        key: `attachment-viewer-${previewUrl.value || 'api'}-${props.recordId}-${attachmentViewerInstanceId.value}`,
+        explanation: previewUrl.value ? '使用previewUrl' : '使用attachmentPath让ImagePreview通过API获取'
+      })
     } else {
       ElMessage.error(response.data.message || '获取附件信息失败')
     }
@@ -314,18 +234,16 @@ const openAttachment = async () => {
   }
 
   try {
-    // 方案1：尝试通过后端文件服务访问（推荐）
-    const fileServiceUrl = `/api/complaint/file/${props.recordId}`
-
     // 检查是否是图片文件
     const isImage = /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(attachmentPath.value)
 
     if (isImage) {
-      // 对于图片，在对话框中显示
-      showImagePreview(fileServiceUrl)
+      // 对于图片，现在使用ImagePreview组件显示，这里提示用户查看上方预览
+      ElMessage.info('图片预览已显示在上方，点击可查看大图')
     } else {
-      // 对于非图片文件，直接下载或在新窗口打开
+      // 对于非图片文件，使用API方式下载
       ElMessage.info('正在打开文件...')
+      const fileServiceUrl = `/api/complaint/file/${props.recordId}`
       window.open(fileServiceUrl, '_blank')
       ElMessage.success('文件已在新窗口中打开')
     }
@@ -334,239 +252,74 @@ const openAttachment = async () => {
     console.error('打开文件失败:', error)
     ElMessage.error('打开文件失败')
 
-    // 方案2：如果后端服务失败，回退到file://协议（可能不工作）
-    try {
-      const fullPath = pathType.value === 'relative_path'
-        ? `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${attachmentPath.value}`
-        : attachmentPath.value
-
-      const fileUrl = `file:///${fullPath.replace(/\\/g, '/')}`
-      window.open(fileUrl, '_blank')
-
-      ElMessage.warning('已尝试使用本地协议打开文件，如果无法打开请手动访问路径')
-    } catch (fallbackError) {
-      console.error('回退方案也失败:', fallbackError)
-      ElMessage.error('所有打开方式都失败，请手动复制路径访问文件')
-    }
-  }
-}
-
-// 显示图片预览对话框
-const showImagePreview = async (fileServiceUrl) => {
-  imagePreviewVisible.value = true
-  imageLoading.value = true
-  imageError.value = false
-  imageUrl.value = ''
-
-  // 重置变换状态
-  resetTransform()
-
-  try {
-    // 检查URL类型
-    if (fileServiceUrl.startsWith('/files/attachments/')) {
-      // 直接使用HTTP URL
-      console.log('使用直接HTTP URL:', fileServiceUrl)
-      imageUrl.value = fileServiceUrl
-      imageLoading.value = false
+    // 回退方案：提示用户手动访问网络路径
+    if (displayPath.value) {
+      try {
+        await navigator.clipboard.writeText(displayPath.value)
+        ElMessage.warning(`无法自动打开文件，路径已复制到剪贴板：${displayPath.value}`)
+      } catch (clipboardError) {
+        ElMessage.error(`无法打开文件，请手动访问路径：${displayPath.value}`)
+      }
     } else {
-      // 使用API获取blob
-      console.log('通过API获取图片:', fileServiceUrl)
-      const response = await apiService.get(fileServiceUrl, {
-        responseType: 'blob'
-      })
-
-      const blob = response.data
-      imageUrl.value = URL.createObjectURL(blob)
-      imageLoading.value = false
-    }
-  } catch (error) {
-    console.error('获取图片数据失败:', error)
-    imageError.value = true
-    ElMessage.error('图片加载失败')
-    imageLoading.value = false
-  }
-}
-
-// 图片加载成功事件
-const onImageLoad = () => {
-  imageLoading.value = false
-  imageError.value = false
-}
-
-// 图片加载失败事件
-const onImageError = () => {
-  imageLoading.value = false
-  imageError.value = true
-}
-
-// 缩放功能
-const zoomIn = () => {
-  scale.value = Math.min(scale.value * 1.2, 5)
-}
-
-const zoomOut = () => {
-  scale.value = Math.max(scale.value / 1.2, 0.1)
-}
-
-const resetZoom = () => {
-  scale.value = 1
-}
-
-// 旋转功能
-const rotateLeft = () => {
-  rotation.value -= 90
-}
-
-const rotateRight = () => {
-  rotation.value += 90
-}
-
-// 重置所有变换
-const resetTransform = () => {
-  scale.value = 1
-  rotation.value = 0
-  translateX.value = 0
-  translateY.value = 0
-}
-
-// 全屏切换
-const toggleFullscreen = () => {
-  isFullscreen.value = !isFullscreen.value
-}
-
-// 鼠标滚轮缩放
-const handleWheel = (event) => {
-  event.preventDefault()
-  const delta = event.deltaY > 0 ? -1 : 1
-  const zoomFactor = 1.1
-
-  if (delta > 0) {
-    scale.value = Math.min(scale.value * zoomFactor, 5)
-  } else {
-    scale.value = Math.max(scale.value / zoomFactor, 0.1)
-  }
-}
-
-// 拖拽功能
-const startDrag = (event) => {
-  event.preventDefault()
-  isDragging.value = true
-  dragStartX.value = event.clientX
-  dragStartY.value = event.clientY
-  dragStartTranslateX.value = translateX.value
-  dragStartTranslateY.value = translateY.value
-
-  document.addEventListener('mousemove', onDrag)
-  document.addEventListener('mouseup', stopDrag)
-}
-
-const onDrag = (event) => {
-  if (!isDragging.value) return
-
-  const deltaX = event.clientX - dragStartX.value
-  const deltaY = event.clientY - dragStartY.value
-
-  translateX.value = dragStartTranslateX.value + deltaX
-  translateY.value = dragStartTranslateY.value + deltaY
-}
-
-const stopDrag = () => {
-  isDragging.value = false
-  document.removeEventListener('mousemove', onDrag)
-  document.removeEventListener('mouseup', stopDrag)
-}
-
-// 关闭预览
-const closePreview = () => {
-  // 如果是全屏模式，先退出全屏
-  if (isFullscreen.value) {
-    isFullscreen.value = false
-  }
-  imagePreviewVisible.value = false
-  // 清理blob URL
-  if (imageUrl.value) {
-    URL.revokeObjectURL(imageUrl.value)
-    imageUrl.value = ''
-  }
-}
-
-// 直接打开文件夹（当路径本身就是文件夹时）
-const openFolderDirect = async () => {
-  if (!attachmentPath.value) {
-    ElMessage.warning('无有效的附件路径')
-    return
-  }
-
-  try {
-    // 构建完整的网络路径
-    const fullPath = pathType.value === 'relative_path'
-      ? `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${attachmentPath.value}`
-      : attachmentPath.value
-
-    // 使用file://协议打开文件夹
-    const folderUrl = `file:///${fullPath.replace(/\\/g, '/')}`
-    window.open(folderUrl, '_blank')
-
-    ElMessage.success('正在打开文件夹...')
-  } catch (error) {
-    console.error('打开文件夹失败:', error)
-    ElMessage.error('打开文件夹失败')
-  }
-}
-
-// 打开文件所在文件夹
-const openFolder = async () => {
-  if (!attachmentPath.value) {
-    ElMessage.warning('无有效的附件路径')
-    return
-  }
-
-  try {
-    ElMessage.info('正在尝试打开文件夹...')
-
-    // 尝试通过后端API打开文件夹
-    const response = await apiService.post('/api/complaint/open-folder', {
-      recordId: props.recordId,
-      openFile: false // 只打开文件夹，不选中文件
-    })
-
-    if (response.data.success) {
-      ElMessage.success('文件夹已打开')
-    } else {
-      throw new Error(response.data.message || '打开文件夹失败')
-    }
-  } catch (error) {
-    console.error('打开文件夹失败:', error)
-
-    // 回退方案：复制路径并提示用户手动打开
-    try {
-      const fullPath = pathType.value === 'relative_path'
-        ? `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${attachmentPath.value}`
-        : attachmentPath.value
-
-      const folderPath = fullPath.substring(0, fullPath.lastIndexOf('\\'))
-      await navigator.clipboard.writeText(folderPath)
-
-      ElMessage.warning('无法自动打开文件夹，文件夹路径已复制到剪贴板，请手动打开')
-    } catch (clipboardError) {
-      ElMessage.error('打开文件夹失败，请使用"复制路径"功能手动访问')
+      ElMessage.error('无法获取文件路径信息')
     }
   }
 }
+
+
+
+
 
 // 复制路径到剪贴板
 const copyPath = async () => {
-  if (!displayPath.value) {
+  if (!attachmentPath.value) {
     ElMessage.warning('无有效的路径信息')
     return
   }
-  
+
   try {
-    await navigator.clipboard.writeText(displayPath.value)
+    // 构建完整的网络路径用于复制
+    let pathToCopy = ''
+
+    if (pathType.value === 'relative_path') {
+      // 相对路径，构建完整网络路径
+      pathToCopy = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${attachmentPath.value}`
+    } else {
+      // 其他类型，直接使用原路径
+      pathToCopy = attachmentPath.value
+    }
+
+    console.log('复制路径调试信息:', {
+      attachmentPath: attachmentPath.value,
+      pathType: pathType.value,
+      pathToCopy: pathToCopy
+    })
+
+    await navigator.clipboard.writeText(pathToCopy)
     ElMessage.success('路径已复制到剪贴板')
+    console.log('已复制路径:', pathToCopy)
   } catch (error) {
     console.error('复制路径失败:', error)
-    ElMessage.error('复制路径失败')
+
+    // 如果clipboard API失败，尝试使用fallback方法
+    try {
+      const textArea = document.createElement('textarea')
+      const pathToCopy = pathType.value === 'relative_path'
+        ? `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${attachmentPath.value}`
+        : attachmentPath.value
+
+      textArea.value = pathToCopy
+      document.body.appendChild(textArea)
+      textArea.select()
+      document.execCommand('copy')
+      document.body.removeChild(textArea)
+
+      ElMessage.success('路径已复制到剪贴板')
+      console.log('使用fallback方法复制路径:', pathToCopy)
+    } catch (fallbackError) {
+      console.error('fallback复制方法也失败:', fallbackError)
+      ElMessage.error('复制路径失败，请手动复制')
+    }
   }
 }
 
@@ -626,6 +379,24 @@ watch(() => props.recordId, fetchAttachmentPath, { immediate: true })
   background: #f8f9fa;
   border-radius: 6px;
   border: 1px dashed #e9ecef;
+}
+
+/* 图片预览区域样式 */
+.image-preview-section {
+  margin: 16px 0;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e9ecef;
+}
+
+.image-preview-section :deep(.image-preview-wrapper) {
+  width: 100%;
+}
+
+.image-preview-section :deep(.image-preview-container) {
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 /* 图片预览对话框样式 */

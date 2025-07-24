@@ -70,6 +70,83 @@ const attachmentStorage = multer.diskStorage({
   }
 });
 
+// 配置multer存储 - 自定义路径投诉附件
+const customPathAttachmentStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    console.log('=== Multer destination 调试信息 ===');
+    console.log('req.body:', req.body);
+    console.log('req.headers:', req.headers);
+
+    // 在multer的destination函数中，req.body可能还没有被完全解析
+    // 我们先使用默认路径，稍后在路由处理中移动文件
+    const defaultDir = path.join(attachmentDir, 'temp');
+
+    // 确保临时目录存在
+    if (!fs.existsSync(defaultDir)) {
+      fs.mkdirSync(defaultDir, { recursive: true });
+      console.log(`创建临时目录: ${defaultDir}`);
+    }
+
+    console.log(`文件将临时保存到: ${defaultDir}`);
+    console.log('================================');
+    cb(null, defaultDir);
+  },
+  filename: function (req, file, cb) {
+    // 处理文件名编码问题
+    let filename = file.originalname;
+
+    console.log('=== 文件名编码处理 ===');
+    console.log('原始文件名:', filename);
+    console.log('文件名Buffer:', Buffer.from(filename));
+    console.log('文件名编码检测:', filename.split('').map(char => char.charCodeAt(0)));
+
+    try {
+      // 检查是否包含中文字符的编码问题
+      // 如果文件名看起来像是被错误编码的，尝试修复
+      if (filename.includes('é') || filename.includes('\\x') || /[\u00C0-\u00FF]/.test(filename)) {
+        console.log('检测到可能的编码问题，尝试修复...');
+
+        // 尝试多种编码修复方法
+        const methods = [
+          () => Buffer.from(filename, 'latin1').toString('utf8'),
+          () => Buffer.from(filename, 'binary').toString('utf8'),
+          () => decodeURIComponent(escape(filename))
+        ];
+
+        for (let i = 0; i < methods.length; i++) {
+          try {
+            const fixedName = methods[i]();
+            console.log(`方法${i + 1}修复结果:`, fixedName);
+
+            // 检查修复后的文件名是否合理（包含正常的中文字符）
+            if (fixedName && fixedName !== filename && !/[\u00C0-\u00FF]/.test(fixedName)) {
+              filename = fixedName;
+              console.log('编码修复成功:', filename);
+              break;
+            }
+          } catch (e) {
+            console.log(`方法${i + 1}失败:`, e.message);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('文件名编码修复失败:', error);
+    }
+
+    // 如果文件名仍然有问题，使用时间戳作为备用
+    if (!filename || filename.includes('é') || filename.includes('\\x')) {
+      console.log('使用备用文件名策略');
+      const timestamp = Date.now();
+      const ext = path.extname(file.originalname) || '.jpg';
+      filename = `file_${timestamp}${ext}`;
+    }
+
+    console.log(`最终使用文件名: ${filename}`);
+    console.log('====================');
+    cb(null, filename);
+  }
+});
+
 // 文件过滤器 - 网站图片
 const fileFilter = (req, file, cb) => {
   // 检查文件类型
@@ -98,6 +175,15 @@ const upload = multer({
 // 创建multer实例 - 投诉附件
 const attachmentUpload = multer({
   storage: attachmentStorage,
+  fileFilter: attachmentFileFilter,
+  limits: {
+    fileSize: 20 * 1024 * 1024, // 20MB限制
+  }
+});
+
+// 创建multer实例 - 自定义路径投诉附件
+const customPathAttachmentUpload = multer({
+  storage: customPathAttachmentStorage,
   fileFilter: attachmentFileFilter,
   limits: {
     fileSize: 20 * 1024 * 1024, // 20MB限制
@@ -244,8 +330,8 @@ router.use((error, req, res, next) => {
   });
 });
 
-// 投诉附件上传接口
-router.post('/complaint-attachment', attachmentUpload.single('file'), (req, res) => {
+// 投诉附件上传接口（支持自定义路径）
+router.post('/complaint-attachment', customPathAttachmentUpload.single('file'), (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({
@@ -255,7 +341,37 @@ router.post('/complaint-attachment', attachmentUpload.single('file'), (req, res)
     }
 
     const file = req.file;
-    const type = req.body.type || 'attachment';
+    const customPath = req.body.customPath;
+
+    console.log('=== 路由处理阶段调试 ===');
+    console.log('file.path (当前位置):', file.path);
+    console.log('customPath (来自请求):', customPath);
+
+    // 如果有自定义路径，将文件移动到正确位置
+    if (customPath && customPath.trim()) {
+      const targetDir = path.join(attachmentDir, customPath.trim());
+      const targetPath = path.join(targetDir, file.filename);
+
+      console.log('目标目录:', targetDir);
+      console.log('目标路径:', targetPath);
+
+      // 确保目标目录存在
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+        console.log(`创建目标目录: ${targetDir}`);
+      }
+
+      // 移动文件到正确位置
+      fs.renameSync(file.path, targetPath);
+      console.log(`文件已移动: ${file.path} -> ${targetPath}`);
+
+      // 更新file对象的路径
+      file.path = targetPath;
+      file.destination = targetDir;
+    }
+
+    console.log('最终文件路径:', file.path);
+    console.log('========================');
 
     // 计算相对路径（相对于attachments目录）
     let relativePath = path.relative(attachmentDir, file.path);
@@ -263,17 +379,29 @@ router.post('/complaint-attachment', attachmentUpload.single('file'), (req, res)
     // 服务器完整路径
     const serverPath = file.path;
 
-    // 构建标准化的相对路径（用于数据库存储和HTTP访问）
-    // 将所有反斜杠替换为正斜杠，并确保没有多余的斜杠
-    const normalizedPath = relativePath.replace(/\\/g, '/').replace(/\/\//g, '/');
+    console.log('=== 详细路径计算调试 ===');
+    console.log('attachmentDir:', attachmentDir);
+    console.log('file.path:', file.path);
+    console.log('file.destination:', file.destination);
+    console.log('file.filename:', file.filename);
+    console.log('customPath from request:', customPath);
+    console.log('计算的relativePath:', relativePath);
+
+    // 保持Windows路径格式（用于数据库存储，匹配现有的路径格式）
+    // 确保使用反斜杠作为路径分隔符
+    const windowsPath = relativePath.replace(/\//g, '\\');
+
+    console.log('最终windowsPath:', windowsPath);
+    console.log('========================');
 
     console.log(`投诉附件上传成功:`, {
       originalName: file.originalname,
       filename: file.filename,
       size: file.size,
-      relativePath: normalizedPath,
+      relativePath: windowsPath,
       serverPath: serverPath,
-      destination: file.destination
+      destination: file.destination,
+      customPath: customPath
     });
 
     res.json({
@@ -282,7 +410,7 @@ router.post('/complaint-attachment', attachmentUpload.single('file'), (req, res)
       filename: file.filename,
       originalName: file.originalname,
       size: file.size,
-      relativePath: normalizedPath,
+      relativePath: windowsPath,
       serverPath: serverPath,
       uploadTime: new Date()
     });
