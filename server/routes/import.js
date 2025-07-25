@@ -425,24 +425,34 @@ const convertValue = (value, type, fieldKey = null, worksheet = null, cellAddres
     return null;
   }
 
-  // 特殊处理：附件文件字段的超链接提取
+  // 特殊处理：附件文件字段的超链接提取 - 存储相对路径
   if (fieldKey === 'AttachmentFile' && worksheet && cellAddress) {
     const hyperlinkInfo = extractHyperlinkFromCell(worksheet, cellAddress);
     if (hyperlinkInfo) {
-      const processedPath = processAttachmentPath(hyperlinkInfo);
-      if (processedPath) {
-        // 返回blob URL格式的路径
-        let result = processedPath.blobUrl;
+      // 提取相对路径用于数据库存储
+      const relativePath = extractRelativePath(hyperlinkInfo.hyperlink);
+      if (relativePath) {
         // 检查长度限制
+        let result = relativePath;
         if (FIELD_LENGTH_LIMITS[fieldKey] && result.length > FIELD_LENGTH_LIMITS[fieldKey]) {
           result = result.substring(0, FIELD_LENGTH_LIMITS[fieldKey]);
         }
         return result;
       }
     }
-    // 如果没有超链接，返回原始文本值
+    // 如果没有超链接，尝试从文本值提取相对路径
+    if (value && typeof value === 'string') {
+      const relativePath = extractRelativePath(value);
+      if (relativePath) {
+        let result = relativePath;
+        if (FIELD_LENGTH_LIMITS[fieldKey] && result.length > FIELD_LENGTH_LIMITS[fieldKey]) {
+          result = result.substring(0, FIELD_LENGTH_LIMITS[fieldKey]);
+        }
+        return result;
+      }
+    }
+    // 如果无法提取相对路径，返回原始文本值
     let result = String(value).trim();
-    // 检查长度限制
     if (FIELD_LENGTH_LIMITS[fieldKey] && result.length > FIELD_LENGTH_LIMITS[fieldKey]) {
       result = result.substring(0, FIELD_LENGTH_LIMITS[fieldKey]);
     }
@@ -943,6 +953,85 @@ function generateBlobUrl() {
   return `blob:http://localhost:5173/${uuid}`;
 }
 
+// 智能中文编码修复函数
+function fixChineseEncoding(text) {
+  if (!text || typeof text !== 'string') {
+    return text;
+  }
+
+  // 检测是否包含常见的UTF-8编码错误字符
+  const hasEncodingIssues = text.includes('å') || text.includes('æ') || text.includes('è') ||
+                            text.includes('ä') || text.includes('ç') || text.includes('ï¼') ||
+                            text.includes('ï¼') || text.includes('â');
+  if (!hasEncodingIssues) {
+    return text;
+  }
+
+  console.log('检测到编码问题，尝试修复:', text);
+
+  try {
+    // 方法1：尝试从Latin-1转换为UTF-8
+    const buffer = Buffer.from(text, 'latin1');
+    const utf8Fixed = buffer.toString('utf8');
+
+    // 检查修复结果是否合理（不包含替换字符�）
+    if (utf8Fixed !== text && !utf8Fixed.includes('�')) {
+      console.log('编码修复成功 (Latin-1->UTF-8):', {
+        original: text,
+        fixed: utf8Fixed
+      });
+      return utf8Fixed;
+    }
+  } catch (error) {
+    console.warn('Buffer编码转换失败:', error.message);
+  }
+
+  // 方法2：使用扩展的字符映射表
+  const encodingMap = {
+    // 基础汉字
+    'å¹´': '年', 'æ': '月', 'æ¥': '日', 'æ¶': '时', 'åé': '分钟',
+    'ä¸': '不', 'è¯': '良', 'å¾ç': '图片', 'èµæ': '资料',
+    'æ±æ»': '汇总', 'ç»è®¡': '统计', 'è²å·®': '色差', 'ç¼ºé·': '缺陷',
+
+    // 扩展映射 - 根据实际案例
+    'å¼å¸¸': '异常', 'åè¾¾': '商达', 'ç»´å°¼å°': '维尼尔',
+    'ç½å­': '罐子', 'æ¡ç ': '条码', 'æ ç­¾': '标签',
+    'å·¥æ²¹': '光油', 'æ¨¡å¾': '模图', 'é«ç': '高盖',
+    'åæ¨¡': '刀模', 'æ¹éç½çº¿': '批量白线', 'æ ç­¾è´´é': '标签贴错',
+
+    // 标点符号
+    'ï¼': '（',
+    'ï¼': '）',
+    'ï¼': '，',
+    'ï¼': '。',
+    'ï¼': '：',
+    'ï¼': '；',
+    'ï¼': '？',
+    'ï¼': '！',
+    'â': '-'
+  };
+
+  let fixed = text;
+  for (const [encoded, decoded] of Object.entries(encodingMap)) {
+    if (fixed.includes(encoded)) {
+      fixed = fixed.replace(new RegExp(encoded, 'g'), decoded);
+    }
+  }
+
+  if (fixed !== text) {
+    console.log('编码修复成功 (字符映射):', {
+      original: text,
+      fixed: fixed
+    });
+    return fixed;
+  }
+
+  console.log('无法修复编码问题:', text);
+  return text;
+}
+
+
+
 // 提取Excel单元格中的超链接
 function extractHyperlinkFromCell(worksheet, cellAddress) {
   const cell = worksheet[cellAddress];
@@ -969,94 +1058,46 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
           }
         }
 
-        // 方法2.5：中文编码修复和路径映射转换
+        // TODO: 中文编码修复仍存在问题，需要进一步调试
+        // 方法3：使用智能中文编码修复函数
         try {
-          // 首先尝试修复中文编码问题
-          if (hyperlink.includes('å') || hyperlink.includes('æ') || hyperlink.includes('è') ||
-              hyperlink.includes('ä¸') || hyperlink.includes('ä»') || hyperlink.includes('ç')) {
-            console.log('检测到中文编码问题，尝试修复...');
-            try {
-              // 方法1：尝试从Latin-1转换为UTF-8
-              const buffer = Buffer.from(hyperlink, 'latin1');
-              const fixedHyperlink = buffer.toString('utf8');
-              if (fixedHyperlink !== hyperlink && !fixedHyperlink.includes('�')) {
-                console.log('中文编码修复成功 (Latin-1->UTF-8):', {
-                  original: hyperlink,
-                  fixed: fixedHyperlink
-                });
-                hyperlink = fixedHyperlink;
-              } else {
-                // 方法2：尝试手动字符替换
-                let manualFixed = hyperlink
-                  .replace(/å¹´/g, '年')
-                  .replace(/æä»½/g, '月份')
-                  .replace(/ä¸æ/g, '上午')
-                  .replace(/ä¸å/g, '下午')
-                  .replace(/ä¸/g, '不')
-                  .replace(/è¯/g, '良')
-                  .replace(/å¾ç/g, '图片')
-                  .replace(/è²å·®/g, '色差')
-                  .replace(/ç¼ºé·/g, '缺陷')
-                  .replace(/æ±æ»/g, '汇总')
-                  .replace(/ç»è®¡/g, '统计');
+          console.log('原始超链接:', hyperlink);
+          hyperlink = fixChineseEncoding(hyperlink);
+          console.log('编码修复后超链接:', hyperlink);
+        } catch (encodingError) {
+          console.log('智能编码修复失败:', encodingError.message);
+        }
 
-                if (manualFixed !== hyperlink) {
-                  console.log('中文编码修复成功 (手动替换):', {
-                    original: hyperlink,
-                    fixed: manualFixed
-                  });
-                  hyperlink = manualFixed;
-                }
-              }
-            } catch (encodingError) {
-              console.log('中文编码修复失败:', encodingError.message);
-            }
-          }
+        // 然后进行路径映射转换 - 统一转换为相对路径格式
+        const excelTempPath = 'C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel';
 
-          // 然后进行路径映射转换
-          const excelTempPath = 'C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel';
+        // 移除file:///前缀进行比较
+        let cleanHyperlink = hyperlink;
+        if (cleanHyperlink.startsWith('file:///')) {
+          cleanHyperlink = cleanHyperlink.substring(8);
+        }
 
-          // 移除file:///前缀进行比较
-          let cleanHyperlink = hyperlink;
-          if (cleanHyperlink.startsWith('file:///')) {
-            cleanHyperlink = cleanHyperlink.substring(8);
-          }
+        // 检查是否匹配Excel临时路径
+        if (cleanHyperlink.startsWith(excelTempPath)) {
+          // 提取相对路径部分
+          let relativePath = cleanHyperlink.substring(excelTempPath.length);
+          // 移除开头的反斜杠
+          relativePath = relativePath.replace(/^\\+/, '');
+          // 统一使用反斜杠
+          relativePath = relativePath.replace(/\//g, '\\');
 
-          // 检查是否匹配Excel临时路径
-          if (cleanHyperlink.startsWith(excelTempPath)) {
-            // 提取相对路径部分
-            let relativePath = cleanHyperlink.substring(excelTempPath.length);
-            // 移除开头的反斜杠
-            relativePath = relativePath.replace(/^\\+/, '');
-            // 统一使用反斜杠
-            relativePath = relativePath.replace(/\//g, '\\');
+          // 修复HTML实体编码问题
+          relativePath = relativePath.replace(/&amp;/g, '&');
 
-            // 修复HTML实体编码问题
-            relativePath = relativePath.replace(/&amp;/g, '&');
+          console.log('路径映射转换为相对路径:', {
+            original: hyperlink,
+            excelTempPath: excelTempPath,
+            relativePath: relativePath
+          });
 
-            // 构建完整的HTTP URL而不是相对路径
-            // 使用环境变量或默认值，避免硬编码IP地址
-            const serverIP = process.env.SERVER_IP || process.env.DB_SERVER || 'localhost';
-            const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
-
-            // 将路径转换为URL编码格式
-            const pathParts = relativePath.split('\\').filter(part => part.trim() !== '');
-            const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
-            const httpUrl = `http://${serverIP}:${fileServerPort}/shared-files/${encodedPath}`;
-
-            console.log('路径映射转换为HTTP URL:', {
-              original: hyperlink,
-              excelTempPath: excelTempPath,
-              relativePath: relativePath,
-              httpUrl: httpUrl
-            });
-
-            require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 路径映射转换: ${hyperlink} -> ${httpUrl}\n`);
-            // 使用完整的HTTP URL
-            hyperlink = httpUrl;
-          }
-        } catch (e3) {
-          console.log('路径处理失败:', e3.message);
+          require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 路径映射转换: ${hyperlink} -> ${relativePath}\n`);
+          // 使用相对路径格式，与历史数据保持一致
+          hyperlink = relativePath;
         }
 
         // 方法3：处理file:///协议的路径
@@ -1076,7 +1117,7 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
           // 修复HTML实体编码问题
           filePath = filePath.replace(/&amp;/g, '&');
 
-          // 检查是否是网络路径，统一转换为HTTP URL
+          // 检查是否是网络路径，统一转换为相对路径格式
           const serverIP = process.env.FILE_SERVER_IP || 'tj_server';
           const networkSharePath = `\\\\${serverIP}\\工作\\品质部\\生产异常周报考核统计\\`;
 
@@ -1084,23 +1125,14 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
             // 提取相对路径部分
             const relativePath = filePath.substring(networkSharePath.length);
 
-            // 构建完整的HTTP URL
-            const apiServerIP = process.env.SERVER_IP || process.env.DB_SERVER || 'localhost';
-            const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
-
-            // 将路径转换为URL编码格式
-            const pathParts = relativePath.split('\\').filter(part => part.trim() !== '');
-            const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
-            const httpUrl = `http://${apiServerIP}:${fileServerPort}/shared-files/${encodedPath}`;
-
-            console.log('网络路径转换为HTTP URL:', {
+            console.log('网络路径转换为相对路径:', {
               original: hyperlink,
               filePath: filePath,
-              relativePath: relativePath,
-              httpUrl: httpUrl
+              relativePath: relativePath
             });
 
-            hyperlink = httpUrl;
+            // 使用相对路径格式，与历史数据保持一致
+            hyperlink = relativePath;
           } else {
             // 保持原有格式但移除file:///前缀
             hyperlink = filePath;
@@ -1132,24 +1164,14 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
             finalPath = finalPath.replace(/&amp;/g, '&');
           }
 
-          // 构建完整的HTTP URL
-          const serverIP = process.env.SERVER_IP || process.env.DB_SERVER || 'localhost';
-          const fileServerPort = process.env.FILE_SERVER_PORT || '3001';
-
-          // 将路径转换为URL编码格式
-          const pathParts = finalPath.split('\\').filter(part => part.trim() !== '');
-          const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/');
-          const httpUrl = `http://${serverIP}:${fileServerPort}/shared-files/${encodedPath}`;
-
-          console.log('相对路径转换为HTTP URL:', {
+          console.log('相对路径转换为相对路径格式:', {
             original: hyperlink,
             relativePath: relativePath,
-            finalPath: finalPath,
-            httpUrl: httpUrl
+            finalPath: finalPath
           });
-          require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 相对路径转换: ${hyperlink} -> ${httpUrl}\n`);
-          // 统一使用HTTP URL格式
-          hyperlink = httpUrl;
+          require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - 相对路径转换: ${hyperlink} -> ${finalPath}\n`);
+          // 使用相对路径格式，与历史数据保持一致
+          hyperlink = finalPath;
         }
 
         const debugInfo = {
@@ -1182,15 +1204,17 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
             console.warn('Buffer解码失败:', e.message);
           }
         }
-
       } catch (e) {
         console.warn('超链接解码失败，使用原链接:', e.message);
       }
     }
 
+    // 最终统一标准化路径格式
+    const standardizedPath = standardizeAttachmentPath(hyperlink);
+
     return {
       text: cell.v || '',
-      hyperlink: hyperlink,
+      hyperlink: standardizedPath || hyperlink,
       tooltip: cell.l.Tooltip || cell.l.tooltip || ''
     };
   }
@@ -1198,8 +1222,8 @@ function extractHyperlinkFromCell(worksheet, cellAddress) {
   return null;
 }
 
-// 标准化路径处理函数 - 统一处理数据库中的两种路径格式
-function normalizeAttachmentPath(pathValue) {
+// 统一的路径标准化函数 - 将所有路径格式转换为相对路径格式
+function standardizeAttachmentPath(pathValue) {
   if (!pathValue || typeof pathValue !== 'string') {
     return null;
   }
@@ -1209,40 +1233,104 @@ function normalizeAttachmentPath(pathValue) {
   // 修复HTML实体编码问题（&amp; -> &）
   normalizedPath = normalizedPath.replace(/&amp;/g, '&');
 
-  // 处理格式1：file:///\\tj_server\工作\品质部\生产异常周报考核统计\2025年异常汇总\...
-  if (normalizedPath.startsWith('file:///\\\\tj_server\\工作\\')) {
-    // 移除file:///前缀，保留网络路径
-    normalizedPath = normalizedPath.substring(8); // 移除'file:///'
-    return {
-      type: 'network_path',
-      originalPath: pathValue,
-      networkPath: normalizedPath,
-      isAccessible: true,
-      displayPath: normalizedPath.replace(/\\\\/g, '\\')
-    };
+  // 移除URL编码的&符号
+  normalizedPath = normalizedPath.replace(/%26/g, '&');
+
+  // 处理file:///协议前缀
+  if (normalizedPath.startsWith('file:///')) {
+    normalizedPath = normalizedPath.substring(8);
   }
 
-  // 处理格式2：2025年异常汇总\3月份\不良图片\...（相对路径）
+  // 统一路径分隔符为反斜杠
+  normalizedPath = normalizedPath.replace(/\//g, '\\');
+
+  // 处理Excel临时路径
+  const excelTempPath = 'C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel\\';
+  if (normalizedPath.startsWith(excelTempPath)) {
+    const relativePath = normalizedPath.substring(excelTempPath.length);
+    return relativePath;
+  }
+
+  // 处理网络共享路径
+  const networkSharePath = '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\';
+  if (normalizedPath.startsWith(networkSharePath)) {
+    const relativePath = normalizedPath.substring(networkSharePath.length);
+    return relativePath;
+  }
+
+  // 处理相对路径（../../TJ/AppData/...）
+  if (normalizedPath.includes('TJ\\AppData\\Roaming\\Microsoft\\Excel\\')) {
+    const excelIndex = normalizedPath.indexOf('TJ\\AppData\\Roaming\\Microsoft\\Excel\\');
+    const afterExcelPath = normalizedPath.substring(excelIndex + 'TJ\\AppData\\Roaming\\Microsoft\\Excel\\'.length);
+    return afterExcelPath;
+  }
+
+  // 如果已经是相对路径格式（不包含盘符和网络路径），直接返回
   if (!normalizedPath.includes(':\\') && !normalizedPath.startsWith('\\\\')) {
-    // 构建完整的网络路径
-    const fullNetworkPath = `\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\${normalizedPath}`;
-    return {
-      type: 'relative_path',
-      originalPath: pathValue,
-      networkPath: fullNetworkPath,
-      isAccessible: true,
-      displayPath: fullNetworkPath
-    };
+    return normalizedPath;
   }
 
-  // 处理其他格式（本地路径等）
-  return {
-    type: 'other',
-    originalPath: pathValue,
-    networkPath: normalizedPath,
-    isAccessible: false,
-    displayPath: normalizedPath
-  };
+  // 其他情况保持原样
+  return normalizedPath;
+}
+
+// 标准化路径处理函数 - 统一处理数据库中的两种路径格式（保持向后兼容）
+function normalizeAttachmentPath(pathValue) {
+  return standardizeAttachmentPath(pathValue);
+}
+
+// 提取相对路径函数 - 用于存储到数据库
+function extractRelativePath(filePath) {
+  if (!filePath || typeof filePath !== 'string') {
+    return null;
+  }
+
+  let processedPath = filePath;
+
+  // 修复HTML实体编码问题（&amp; -> &）
+  processedPath = processedPath.replace(/&amp;/g, '&');
+
+  // 移除file:///前缀（如果存在）
+  if (processedPath.startsWith('file:///')) {
+    processedPath = processedPath.substring(8);
+  }
+
+  // 统一路径分隔符为反斜杠
+  processedPath = processedPath.replace(/\//g, '\\');
+
+  // 检查是否包含"2025年异常汇总"
+  const targetPattern = '2025年异常汇总';
+  const targetIndex = processedPath.indexOf(targetPattern);
+
+  if (targetIndex !== -1) {
+    // 提取从"2025年异常汇总"开始的相对路径
+    const relativePath = processedPath.substring(targetIndex);
+    console.log(`提取相对路径: ${filePath} -> ${relativePath}`);
+    return relativePath;
+  }
+
+  // 如果不包含目标模式，检查其他可能的模式
+  const excelTempPath = 'C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel';
+  if (processedPath.startsWith(excelTempPath)) {
+    const relativePath = processedPath.substring(excelTempPath.length).replace(/^\\+/, '');
+    if (relativePath) {
+      console.log(`从Excel临时路径提取: ${filePath} -> ${relativePath}`);
+      return relativePath;
+    }
+  }
+
+  // 检查网络路径
+  const networkPattern = '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\';
+  if (processedPath.startsWith(networkPattern)) {
+    const relativePath = processedPath.substring(networkPattern.length);
+    if (relativePath) {
+      console.log(`从网络路径提取: ${filePath} -> ${relativePath}`);
+      return relativePath;
+    }
+  }
+
+  console.log(`无法提取相对路径: ${filePath}`);
+  return null;
 }
 
 // 处理附件文件路径转换（同步版本，用于现有代码）
@@ -1665,7 +1753,7 @@ router.post('/execute', upload.single('file'), async (req, res) => {
       );
     });
 
-    console.log(`导入执行 - Excel总行数: ${allDataRows.length}, 有效数据行数: ${dataRows.length}`);
+    console.log(`导入执行 - Excel总行数: ${allDataRows.length}, 有效数据行数: ${dataRows.length}, 过滤掉空行: ${allDataRows.length - dataRows.length}`);
     const fieldMapping = getFieldMapping();
 
     // 获取数据库连接
@@ -1673,8 +1761,9 @@ router.post('/execute', upload.single('file'), async (req, res) => {
 
     let successCount = 0;
     let errorCount = 0;
+    let skippedCount = 0; // 跳过的记录数（验证失败等）
     const errors = [];
-    const totalRows = dataRows.length;
+    const totalRows = dataRows.length; // 实际处理的行数
 
     // 初始化进度
     if (sessionId) {
@@ -1768,7 +1857,17 @@ router.post('/execute', upload.single('file'), async (req, res) => {
           });
           console.log(`跳过第 ${i + 2} 行 - ${errorMsg}`);
           errorCount++;
+          skippedCount++;
           continue;
+        }
+
+        // 验证附件路径：如果处理后的相对路径不包含斜杠，则将附件字段设为NULL
+        if (rowData.AttachmentFile && typeof rowData.AttachmentFile === 'string') {
+          const attachmentPath = rowData.AttachmentFile.trim();
+          if (attachmentPath && !attachmentPath.includes('\\') && !attachmentPath.includes('/')) {
+            console.log(`第${i + 2}行附件路径无效（不包含路径分隔符），将附件字段设为NULL: ${attachmentPath}`);
+            rowData.AttachmentFile = null; // 设置为NULL而不是跳过记录
+          }
         }
 
         // 添加详细日志以调试数据截断问题
@@ -1829,6 +1928,23 @@ router.post('/execute', upload.single('file'), async (req, res) => {
         updateProgress(sessionId, totalRows, totalRows, 'completed', `导入完成！成功 ${successCount} 条${errorCount > 0 ? `，失败 ${errorCount} 条` : ''}`);
       }
 
+      console.log(`导入统计详情:`);
+      console.log(`  Excel总行数: ${allDataRows.length}`);
+      console.log(`  过滤掉空行: ${allDataRows.length - dataRows.length}`);
+      console.log(`  实际处理行数: ${totalRows}`);
+      console.log(`  成功插入: ${successCount}`);
+      console.log(`  验证失败跳过: ${skippedCount}`);
+      console.log(`  插入失败: ${errorCount}`);
+      console.log(`  验证公式: 成功(${successCount}) + 跳过(${skippedCount}) + 失败(${errorCount}) = ${successCount + skippedCount + errorCount} (应等于${totalRows})`);
+
+      // 验证计数是否正确
+      const totalProcessed = successCount + skippedCount + errorCount;
+      if (totalProcessed !== totalRows) {
+        console.warn(`⚠️ 计数不匹配！实际处理: ${totalRows}, 统计总和: ${totalProcessed}, 差异: ${totalRows - totalProcessed}`);
+      } else {
+        console.log(`✅ 计数验证通过`);
+      }
+
     } catch (error) {
       // 回滚事务
       await transaction.rollback();
@@ -1850,8 +1966,10 @@ router.post('/execute', upload.single('file'), async (req, res) => {
       data: {
         successCount,
         errorCount,
+        totalProcessedRows: dataRows.length, // 实际处理的行数
+        totalExcelRows: allDataRows.length, // Excel中的总行数（包括空行）
+        filteredRows: allDataRows.length - dataRows.length, // 被过滤掉的空行数
         errors: errors.map(err => typeof err === 'string' ? err : err.error), // 兼容字符串和对象格式
-        totalRows: dataRows.length, // 总处理行数
         failedRows: errors // 详细的失败行信息（包含行号、错误信息、数据等）
       }
     });
@@ -2138,6 +2256,15 @@ router.post('/execute-with-copy', upload.single('file'), async (req, res) => {
             }
           }
 
+          // 验证附件路径：如果处理后的相对路径不包含斜杠，则将附件字段设为NULL
+          if (rowData.AttachmentFile && typeof rowData.AttachmentFile === 'string') {
+            const attachmentPath = rowData.AttachmentFile.trim();
+            if (attachmentPath && !attachmentPath.includes('\\') && !attachmentPath.includes('/')) {
+              console.log(`第${originalRowNumber}行附件路径无效（不包含路径分隔符），将附件字段设为NULL: ${attachmentPath}`);
+              rowData.AttachmentFile = null; // 设置为NULL而不是跳过记录
+            }
+          }
+
           // 插入数据库
           const columns = Object.keys(rowData);
           const values = Object.values(rowData);
@@ -2295,28 +2422,95 @@ router.get('/latest-records', async (req, res) => {
 router.get('/path-mapping-config', async (req, res) => {
   let connection;
   try {
-    // 临时返回默认配置，避免数据库连接问题
+    connection = await getConnection();
+
     const serverIP = process.env.FILE_SERVER_IP || 'localhost';
     const fileStoragePath = process.env.FILE_STORAGE_PATH || 'D:\\DMSData\\IMG-VIDEO';
     const fileServerPort = process.env.FILE_SERVER_PORT || 8080;
     const fileUrlPrefix = process.env.FILE_URL_PREFIX || '/files';
 
-    // 返回默认的路径映射配置
-    const pathMappings = [
-      {
-        id: 1,
-        name: '默认映射',
-        localPattern: 'file:///C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel',
-        targetPattern: `\\\\${serverIP}\\工作\\品质部\\生产异常周报考核统计`,
-        description: '默认路径映射配置',
-        isActive: true,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        // 为了兼容现有的导入功能，也提供正则表达式格式
-        local: /file:\/\/\/C:\\Users\\TJ\\AppData\\Roaming\\Microsoft\\Excel(.+)/,
-        network: `\\\\${serverIP}\\工作\\品质部\\生产异常周报考核统计`
-      }
-    ];
+    // 从数据库加载路径映射配置
+    let pathMappings = [];
+    try {
+      const mappingResult = await connection.request()
+        .query('SELECT ID, Name, LocalPattern, TargetPattern, Description, IsActive, CreatedAt, UpdatedAt FROM PathMappingConfig ORDER BY ID');
+
+      pathMappings = mappingResult.recordset.map(row => ({
+        id: row.ID,
+        name: row.Name,
+        localPattern: row.LocalPattern,
+        targetPattern: row.TargetPattern,
+        description: row.Description,
+        isActive: row.IsActive,
+        createdAt: row.CreatedAt,
+        updatedAt: row.UpdatedAt
+      }));
+    } catch (dbError) {
+      console.log('数据库查询失败，使用默认路径映射配置:', dbError.message);
+      // 使用默认配置
+      pathMappings = [
+        {
+          id: 1,
+          name: 'Excel临时文件映射',
+          localPattern: 'C:\\Users\\*\\AppData\\Roaming\\Microsoft\\Excel\\*',
+          targetPattern: `\\\\${serverIP}\\工作\\品质部\\生产异常周报考核统计\\*`,
+          description: 'Excel临时文件映射到tj_server共享盘',
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          id: 2,
+          name: '2025年异常汇总映射',
+          localPattern: '*2025年异常汇总\\*',
+          targetPattern: `D:\\WebServer\\backend\\uploads\\attachments\\2025年异常汇总\\*`,
+          description: '2025年异常汇总文件映射到服务器存储路径',
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        },
+        {
+          id: 3,
+          name: '服务器存储映射',
+          localPattern: '2025年异常汇总\\*',
+          targetPattern: `D:\\WebServer\\backend\\uploads\\attachments\\2025年异常汇总\\*`,
+          description: '相对路径到服务器存储路径的映射',
+          isActive: true,
+          createdAt: new Date(),
+          updatedAt: new Date()
+        }
+      ];
+    }
+
+    // 从数据库加载转换配置
+    let conversionConfig = {
+      autoConvert: true,
+      keepOriginal: false,
+      fileCopyMode: true,
+      validatePaths: false
+    };
+
+    try {
+      const configResult = await connection.request()
+        .query('SELECT ConfigKey, ConfigValue FROM ConversionConfig');
+
+      // 将数据库结果转换为对象
+      configResult.recordset.forEach(row => {
+        const key = row.ConfigKey;
+        const value = row.ConfigValue;
+
+        // 转换字符串值为布尔值
+        if (value === 'true' || value === 'false') {
+          conversionConfig[key] = value === 'true';
+        } else {
+          conversionConfig[key] = value;
+        }
+      });
+
+      console.log('从数据库加载转换配置:', conversionConfig);
+    } catch (dbError) {
+      console.log('数据库查询转换配置失败，使用默认配置:', dbError.message);
+    }
 
     const config = {
       serverIP: serverIP,
@@ -2325,6 +2519,7 @@ router.get('/path-mapping-config', async (req, res) => {
       fileUrlPrefix: fileUrlPrefix,
       supportedFileTypes: ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx', '.mp4', '.avi', '.mov'],
       pathMappings: pathMappings,
+      conversionConfig: conversionConfig,
       accessMethods: {
         http: {
           enabled: true,
@@ -2394,14 +2589,14 @@ router.put('/path-mapping-config', async (req, res) => {
           const request = transaction.request();
 
           if (mapping.id && typeof mapping.id === 'number' && existingIds.includes(mapping.id)) {
-            // 更新现有记录
+            // 更新现有记录 - 明确指定NVARCHAR类型处理中文
             await request
-              .input('ID', mapping.id)
-              .input('Name', mapping.name)
-              .input('LocalPattern', mapping.localPattern)
-              .input('TargetPattern', mapping.targetPattern)
-              .input('Description', mapping.description || '')
-              .input('IsActive', mapping.isActive !== false ? 1 : 0)
+              .input('ID', sql.Int, mapping.id)
+              .input('Name', sql.NVarChar, mapping.name)
+              .input('LocalPattern', sql.NVarChar, mapping.localPattern)
+              .input('TargetPattern', sql.NVarChar, mapping.targetPattern)
+              .input('Description', sql.NVarChar, mapping.description || '')
+              .input('IsActive', sql.Bit, mapping.isActive !== false ? 1 : 0)
               .query(`UPDATE PathMappingConfig SET
                         Name = @Name,
                         LocalPattern = @LocalPattern,
@@ -2413,13 +2608,13 @@ router.put('/path-mapping-config', async (req, res) => {
             processedIds.push(mapping.id);
             console.log(`更新映射配置 ID: ${mapping.id}, Name: ${mapping.name}`);
           } else {
-            // 插入新记录
+            // 插入新记录 - 明确指定NVARCHAR类型处理中文
             const insertResult = await request
-              .input('Name', mapping.name)
-              .input('LocalPattern', mapping.localPattern)
-              .input('TargetPattern', mapping.targetPattern)
-              .input('Description', mapping.description || '')
-              .input('IsActive', mapping.isActive !== false ? 1 : 0)
+              .input('Name', sql.NVarChar, mapping.name)
+              .input('LocalPattern', sql.NVarChar, mapping.localPattern)
+              .input('TargetPattern', sql.NVarChar, mapping.targetPattern)
+              .input('Description', sql.NVarChar, mapping.description || '')
+              .input('IsActive', sql.Bit, mapping.isActive !== false ? 1 : 0)
               .query(`INSERT INTO PathMappingConfig (Name, LocalPattern, TargetPattern, Description, IsActive, CreatedAt, UpdatedAt)
                       OUTPUT INSERTED.ID
                       VALUES (@Name, @LocalPattern, @TargetPattern, @Description, @IsActive, GETDATE(), GETDATE())`);
@@ -2436,6 +2631,41 @@ router.put('/path-mapping-config', async (req, res) => {
         await transaction.request()
           .query(`DELETE FROM PathMappingConfig WHERE ID IN (${toDeleteIds.join(',')})`);
         console.log(`删除映射配置 IDs: ${toDeleteIds.join(', ')}`);
+      }
+
+      // 保存转换配置
+      if (conversionConfig && typeof conversionConfig === 'object') {
+        console.log('保存转换配置:', conversionConfig);
+
+        for (const [key, value] of Object.entries(conversionConfig)) {
+          const stringValue = String(value);
+
+          // 检查配置项是否存在
+          const existingConfigResult = await transaction.request()
+            .input('ConfigKey', sql.NVarChar, key)
+            .query('SELECT ID FROM ConversionConfig WHERE ConfigKey = @ConfigKey');
+
+          if (existingConfigResult.recordset.length > 0) {
+            // 更新现有配置
+            await transaction.request()
+              .input('ConfigKey', sql.NVarChar, key)
+              .input('ConfigValue', sql.NVarChar, stringValue)
+              .query(`UPDATE ConversionConfig SET
+                        ConfigValue = @ConfigValue,
+                        UpdatedAt = GETDATE()
+                      WHERE ConfigKey = @ConfigKey`);
+            console.log(`更新转换配置: ${key} = ${stringValue}`);
+          } else {
+            // 插入新配置
+            await transaction.request()
+              .input('ConfigKey', sql.NVarChar, key)
+              .input('ConfigValue', sql.NVarChar, stringValue)
+              .input('Description', sql.NVarChar, `转换配置项: ${key}`)
+              .query(`INSERT INTO ConversionConfig (ConfigKey, ConfigValue, Description, CreatedAt, UpdatedAt)
+                      VALUES (@ConfigKey, @ConfigValue, @Description, GETDATE(), GETDATE())`);
+            console.log(`插入转换配置: ${key} = ${stringValue}`);
+          }
+        }
       }
 
       // 提交事务

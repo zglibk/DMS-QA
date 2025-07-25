@@ -228,6 +228,11 @@ router.get('/list', async (req, res) => {
         returnGoods !== undefined || isReprint !== undefined || timeRange ||
         period || category) {
 
+      // 如果用户指定了日期范围，重置whereClause以使用用户的日期范围
+      if (startDate || endDate) {
+        whereClause = 'WHERE 1=1'; // 重置为基础条件
+      }
+
       // 客户查询
       if (customer) {
         whereClause += ` AND Customer LIKE N'%${customer}%'`;
@@ -275,11 +280,21 @@ router.get('/list', async (req, res) => {
 
       // 日期范围查询
       if (startDate && endDate) {
+        console.log('=== 日期范围查询调试 ===');
+        console.log('startDate:', startDate, typeof startDate);
+        console.log('endDate:', endDate, typeof endDate);
         whereClause += ` AND Date >= '${startDate}' AND Date <= '${endDate}'`;
+        console.log('日期查询条件:', `Date >= '${startDate}' AND Date <= '${endDate}'`);
       } else if (startDate) {
+        console.log('=== 开始日期查询调试 ===');
+        console.log('startDate:', startDate, typeof startDate);
         whereClause += ` AND Date >= '${startDate}'`;
+        console.log('开始日期查询条件:', `Date >= '${startDate}'`);
       } else if (endDate) {
+        console.log('=== 结束日期查询调试 ===');
+        console.log('endDate:', endDate, typeof endDate);
         whereClause += ` AND Date <= '${endDate}'`;
+        console.log('结束日期查询条件:', `Date <= '${endDate}'`);
       }
 
       // 不良率范围查询
@@ -361,13 +376,25 @@ router.get('/list', async (req, res) => {
       WHERE T.RowNum BETWEEN ${offset + 1} AND ${offset + pageSize}
       ORDER BY T.RowNum`;
 
-    // console.log('执行SQL查询:', sqlQuery);
-    // console.log('查询范围:', `${offset + 1} 到 ${offset + pageSize}`);
+    console.log('=== SQL查询调试 ===');
+    console.log('完整WHERE子句:', whereClause);
+    console.log('执行SQL查询:', sqlQuery);
+    console.log('查询范围:', `${offset + 1} 到 ${offset + pageSize}`);
 
     const result = await pool.request().query(sqlQuery);
 
-    // console.log('查询结果数量:', result.recordset.length);
-    // console.log('总记录数:', total);
+    console.log('查询结果数量:', result.recordset.length);
+    console.log('总记录数:', total);
+
+    // 如果有日期范围查询，显示查询结果中的日期范围
+    if ((startDate || endDate) && result.recordset.length > 0) {
+      const dates = result.recordset.map(r => r.Date).sort();
+      console.log('查询结果日期范围:', {
+        最早日期: dates[0],
+        最晚日期: dates[dates.length - 1],
+        总记录数: dates.length
+      });
+    }
 
     res.json({
       success: true,

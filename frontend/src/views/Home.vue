@@ -809,6 +809,7 @@
       class="edit-dialog"
       center
       top="5vh"
+      @close="cleanupEditResources"
     >
       <template #header>
         <div class="edit-dialog-header">
@@ -1057,41 +1058,36 @@
                       </el-select>
                       <!-- 附件文件字段 - 特殊处理 -->
                       <div v-else-if="field.key === 'AttachmentFile'" class="attachment-field">
-                        <el-input
-                          v-model="editFormData[field.key]"
-                          placeholder="请选择附件文件"
-                          readonly
-                          class="attachment-input"
-                        />
-                        <el-button type="primary" @click="selectFile" :loading="fileUploading" class="select-file-btn">
-                          <el-icon v-if="!fileUploading"><Document /></el-icon>
-                          {{ fileUploading ? '上传中...' : '选择文件' }}
-                        </el-button>
-                        <div
-                          class="file-drop-zone"
-                          @drop="handleFileDrop"
-                          @dragover.prevent
-                          @dragenter.prevent
-                          title="或拖拽文件到此处"
-                        >
-                          <el-icon><Upload /></el-icon>
+                        <div class="attachment-input-section">
+                          <el-button @click="selectFile" :loading="editFileUploading" type="primary">
+                            <el-icon><Plus /></el-icon>
+                            {{ editFileUploading ? '上传中...' : '选择图片' }}
+                          </el-button>
                         </div>
+
+                        <!-- 附件文件路径显示 -->
+                        <div class="attachment-path-section" style="margin-top: 10px;">
+                          <el-input
+                            v-model="editFormData[field.key]"
+                            readonly
+                            placeholder="附件文件路径将在上传后显示"
+                            class="attachment-path-input"
+                          >
+                            <template #prepend>文件路径</template>
+                          </el-input>
+                        </div>
+
                         <!-- 图片预览区域 -->
-                        <div class="image-preview-area">
+                        <div class="image-preview-area" style="margin-top: 10px;">
                           <ImagePreview
-                            v-if="editFormData[field.key]"
-                            :key="`${editFormData.ID}-${field.key}-${editFormData[field.key]}`"
-                            :file-path="editFormData[field.key]"
-                            :record-id="editFormData.ID"
+                            v-if="shouldShowImagePreview(editSelectedFileInfo, editFormData[field.key])"
+                            :key="`edit-dialog-${editDialogInstanceId}-${editFormData.ID}-${field.key}-${editSelectedFileInfo?.fileName || 'existing'}`"
+                            :file-path="editSelectedFileInfo?.previewUrl || editFormData[field.key]"
+                            :record-id="editSelectedFileInfo?.previewUrl ? null : editFormData.ID"
                             width="200px"
                             height="150px"
                           />
-                          <div v-else class="image-placeholder">
-                            <div class="placeholder-content">
-                              <el-icon class="placeholder-icon"><Picture /></el-icon>
-                              <span class="placeholder-text">暂无图片</span>
-                            </div>
-                          </div>
+                          <el-empty v-else description="暂无图片" :image-size="80" />
                         </div>
                       </div>
                       <!-- 文本字段 -->
@@ -1281,6 +1277,11 @@ const editFormLoading = ref(false)
 const editFormRef = ref(null)
 const editSections = ref([])
 const activeTab = ref({})
+const editDialogInstanceId = ref(0) // 对话框实例标识，用于强制重新创建组件
+
+// 编辑对话框文件处理相关变量
+const editSelectedFileInfo = ref(null)
+const editFileUploading = ref(false)
 
 // 编辑表单下拉选项数据
 const editOptions = reactive({
@@ -1590,8 +1591,17 @@ const fetchTableData = async () => {
       if (advancedQuery.value.mainDept) params.mainDept = advancedQuery.value.mainDept
       if (advancedQuery.value.mainPerson) params.mainPerson = advancedQuery.value.mainPerson
       if (advancedQuery.value.dateRange && advancedQuery.value.dateRange.length === 2) {
+        // Element Plus日期选择器已配置value-format="YYYY-MM-DD"，直接使用字符串值
         params.startDate = advancedQuery.value.dateRange[0]
         params.endDate = advancedQuery.value.dateRange[1]
+
+        console.log('高级查询日期范围:', {
+          dateRange: advancedQuery.value.dateRange,
+          startDate: params.startDate,
+          endDate: params.endDate,
+          startDateType: typeof params.startDate,
+          endDateType: typeof params.endDate
+        })
       }
       if (advancedQuery.value.defectiveRateMin !== null) params.defectiveRateMin = advancedQuery.value.defectiveRateMin
       if (advancedQuery.value.defectiveRateMax !== null) params.defectiveRateMax = advancedQuery.value.defectiveRateMax
@@ -2606,6 +2616,32 @@ const editRecord = async (row) => {
 
       editFormData.value = formData
 
+      // 初始化文件信息
+      if (data.AttachmentFile) {
+        const filePath = data.AttachmentFile
+        const fileName = filePath.split(/[\/\\]/).pop() || filePath
+
+        // 判断文件类型
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
+        const extension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'))
+        const isImage = imageExtensions.includes(extension)
+
+        editSelectedFileInfo.value = {
+          fileName: fileName,
+          fileSize: 0, // 现有文件大小未知
+          fileType: isImage ? 'image/*' : 'application/octet-stream',
+          isImage: isImage,
+          previewUrl: null, // 现有文件使用API预览
+          relativePath: filePath,
+          serverPath: null,
+          file: null,
+          uploaded: true,
+          isExisting: true // 标记为现有文件
+        }
+      } else {
+        editSelectedFileInfo.value = null
+      }
+
       // 如果有不良类别，需要找到对应的不良类别对象并加载不良项
       if (data.DefectiveCategory) {
         // 从下拉选项中找到匹配的不良类别对象
@@ -2632,6 +2668,10 @@ const editRecord = async (row) => {
       activeTab.value = {
         '材料明细': 'paper'
       }
+
+      // 递增对话框实例ID，确保每次打开都创建新的组件实例
+      editDialogInstanceId.value++
+      console.log(`编辑对话框实例ID: ${editDialogInstanceId.value}`)
 
       showEditDialog.value = true
 
@@ -2758,7 +2798,26 @@ const saveEdit = async () => {
       }
     })
 
+    // 如果有未上传的文件，先上传文件
+    if (editSelectedFileInfo.value && !editSelectedFileInfo.value.uploaded && editSelectedFileInfo.value.file) {
+      try {
+        const uploadResult = await uploadEditFileToServer(
+          editSelectedFileInfo.value.file,
+          editSelectedFileInfo.value.generatedFileName
+        )
 
+        if (uploadResult.success) {
+          // 更新表单数据中的附件路径为服务器返回的路径
+          submitData.AttachmentFile = uploadResult.relativePath
+        } else {
+          throw new Error('文件上传失败')
+        }
+      } catch (uploadError) {
+        ElMessage.error('文件上传失败，请重试')
+        editFormLoading.value = false
+        return
+      }
+    }
 
     const response = await axios.put(`/api/complaint/${submitData.ID}`, submitData, {
       headers: {
@@ -2769,6 +2828,17 @@ const saveEdit = async () => {
 
     if (response.data && response.data.success) {
       ElMessage.success('更新成功')
+
+      // 清理图片预览缓存
+      if (editFormData.value.ID) {
+        const cacheKey = `record_${editFormData.value.ID}`
+        console.log(`保存成功后清理缓存: ${cacheKey}`)
+        // 导入imagePreviewService并清理缓存
+        import('@/services/imagePreviewService.js').then(module => {
+          module.default.clearCache(cacheKey)
+        })
+      }
+
       showEditDialog.value = false
       // 刷新表格数据和统计卡片
       await Promise.all([
@@ -2937,7 +3007,136 @@ const getFilePreviewUrl = (filePath) => {
   }
 }
 
-// 上传文件到服务器
+// 编辑对话框：生成文件名（与ComplaintFormDialog.vue保持一致）
+const generateEditFileName = async (originalFileName) => {
+  // 使用表单中的Date字段，而不是当前日期
+  const formDate = editFormData.value.Date
+  if (!formDate) {
+    throw new Error('请先选择投诉日期')
+  }
+
+  const date = new Date(formDate)
+  const year = date.getFullYear().toString().slice(-2)
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  const dateStr = `${year}${month}${day}`
+
+  // 获取文件扩展名
+  const fileExtension = originalFileName.substring(originalFileName.lastIndexOf('.'))
+
+  // 从表单数据获取信息
+  const customer = editFormData.value.Customer?.trim() || ''
+  const orderNo = editFormData.value.OrderNo?.trim() || ''
+  const productName = editFormData.value.ProductName?.trim() || ''
+
+  // 处理不良类别字段，可能是字符串或对象
+  let defectiveCategory = ''
+  if (editFormData.value.DefectiveCategory) {
+    if (typeof editFormData.value.DefectiveCategory === 'string') {
+      defectiveCategory = editFormData.value.DefectiveCategory.trim()
+    } else if (editFormData.value.DefectiveCategory.Name) {
+      defectiveCategory = editFormData.value.DefectiveCategory.Name.trim()
+    }
+  }
+
+  // 检查必填字段
+  if (!customer || !orderNo || !productName || !defectiveCategory) {
+    throw new Error('请先填写客户编号、工单号、产品名称和不良类别')
+  }
+
+  // 获取流水号
+  try {
+    const token = localStorage.getItem('token')
+    const response = await axios.get('/api/complaint/sequence-number', {
+      params: {
+        date: formDate, // 使用表单中的日期
+        editId: editFormData.value.ID // 编辑模式时排除当前记录
+      },
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
+
+    const sequenceNumber = String(response.data.sequenceNumber).padStart(2, '0')
+
+    // 生成文件名：客户编号 工单号 产品名称-不良类别 日期流水号.扩展名
+    const generatedFileName = `${customer} ${orderNo} ${productName}-${defectiveCategory} ${dateStr}${sequenceNumber}${fileExtension}`
+
+    return generatedFileName
+  } catch (error) {
+    console.error('获取流水号失败:', error)
+    // 如果获取流水号失败，使用01作为默认值
+    const generatedFileName = `${customer} ${orderNo} ${productName}-${defectiveCategory} ${dateStr}01${fileExtension}`
+    return generatedFileName
+  }
+}
+
+// 编辑对话框：生成相对路径（与ComplaintFormDialog.vue保持一致）
+const generateEditRelativePath = async (generatedFileName) => {
+  const currentYear = new Date().getFullYear()
+  const customer = editFormData.value.Customer?.trim()
+
+  // 检查客户编号是否为空
+  if (!customer) {
+    throw new Error('请先填写客户编号')
+  }
+
+  // 生成Windows格式的相对路径
+  const relativePath = `${currentYear}年异常汇总\\不良图片&资料\\${customer}\\${generatedFileName}`
+
+  return relativePath
+}
+
+// 编辑对话框：上传文件到服务器（在保存时调用）
+const uploadEditFileToServer = async (file, generatedFileName) => {
+  try {
+    // 创建FormData
+    const formData = new FormData()
+
+    // 创建一个新的File对象，使用生成的文件名
+    const renamedFile = new File([file], generatedFileName, { type: file.type })
+    formData.append('file', renamedFile)
+
+    // 添加自定义路径参数
+    const currentYear = new Date().getFullYear()
+    const customer = editFormData.value.Customer?.trim()
+    const customPath = `${currentYear}年异常汇总\\不良图片&资料\\${customer}`
+    formData.append('customPath', customPath)
+
+    // 获取token
+    const token = localStorage.getItem('token')
+    if (!token) {
+      throw new Error('未找到认证令牌，请重新登录')
+    }
+
+    // 上传文件
+    const response = await axios.post('/api/upload/complaint-attachment', formData, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+
+    if (response.data && response.data.success) {
+      // 标记文件为已上传
+      if (editSelectedFileInfo.value) {
+        editSelectedFileInfo.value.uploaded = true
+        editSelectedFileInfo.value.serverPath = response.data.serverPath
+      }
+
+      return {
+        success: true,
+        relativePath: response.data.relativePath,
+        serverPath: response.data.serverPath,
+        filename: response.data.filename
+      }
+    } else {
+      throw new Error(response.data?.message || '文件上传失败')
+    }
+  } catch (error) {
+    throw error
+  }
+}
+
+// 上传文件到服务器（旧版本，保留兼容性）
 const uploadFileToServer = async (file) => {
   try {
     // 创建FormData对象
@@ -2980,131 +3179,138 @@ const uploadFileToServer = async (file) => {
   }
 }
 
+// 编辑对话框：文件选择（延迟上传模式，与ComplaintFormDialog.vue保持一致）
 const selectFile = async () => {
-  try {
-    // 使用File System Access API
-    if ('showOpenFilePicker' in window) {
+  // 点击选择图片时立即检查必填项
+  const requiredFields = [
+    { field: 'Date', name: '投诉日期' },
+    { field: 'Customer', name: '客户编号' },
+    { field: 'OrderNo', name: '工单号' },
+    { field: 'ProductName', name: '产品名称' },
+    { field: 'DefectiveCategory', name: '不良类别' }
+  ]
 
-      const [fileHandle] = await window.showOpenFilePicker({
-        multiple: false,
-        types: [{
-          description: '所有文件',
-          accept: { '*/*': [] }
-        }],
-        excludeAcceptAllOption: false
-      })
+  const missingFields = []
+  for (const { field, name } of requiredFields) {
+    const value = editFormData.value[field]
+    let isEmpty = false
 
-      const file = await fileHandle.getFile()
-      selectedFile.value = file
-      selectedFileHandle.value = fileHandle
-
-      // 询问用户是否要上传到服务器
-      try {
-        await ElMessageBox.confirm(
-          `已选择文件: ${file.name}\n\n选择处理方式:`,
-          '文件处理选项',
-          {
-            confirmButtonText: '上传到服务器',
-            cancelButtonText: '仅设置路径',
-            type: 'info'
-          }
-        )
-
-        // 用户选择上传到服务器
-        try {
-          fileUploading.value = true
-          const success = await uploadFileToServer(file)
-          if (success) {
-            return // 上传成功，直接返回
-          }
-        } finally {
-          fileUploading.value = false
-        }
-      } catch {
-        // 用户选择仅设置路径，继续原有逻辑
-      }
-
-      // 尝试构建更完整的路径信息
-      let filePath = file.name
-
-      // 如果fileHandle有更多信息，尝试获取
-      if (fileHandle.name) {
-        filePath = fileHandle.name
-      }
-
-      // 尝试从文件对象获取更多路径信息
-      if (file.webkitRelativePath) {
-        filePath = file.webkitRelativePath
-      }
-
-      // 检查是否有路径相关的属性
-
-      // 由于浏览器安全限制，我们需要用户提供完整路径
-      try {
-        const { value } = await ElMessageBox.prompt(
-          `已选择文件: ${file.name}\n\n由于浏览器安全限制，请手动输入文件的完整路径:`,
-          '设置文件路径',
-          {
-            confirmButtonText: '确定',
-            cancelButtonText: '仅使用文件名',
-            inputValue: `C:\\Users\\Documents\\${file.name}`,
-            inputPlaceholder: '例如: C:\\Users\\Documents\\Pictures\\image.jpg',
-            inputType: 'text'
-          }
-        )
-        editFormData.value.AttachmentFile = value || file.name
-        ElMessage.success('文件路径设置成功')
-      } catch {
-        // 用户选择仅使用文件名
-        editFormData.value.AttachmentFile = file.name
-        ElMessage.success('文件选择成功（仅文件名）')
-      }
-
-      return
+    if (!value) {
+      isEmpty = true
+    } else if (typeof value === 'string' && !value.trim()) {
+      isEmpty = true
+    } else if (value instanceof Date && isNaN(value.getTime())) {
+      isEmpty = true
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value) && !(value instanceof Date)) {
+      // 处理对象类型（如不良类别）
+      isEmpty = !value.Name || !value.Name.trim()
     }
-  } catch (error) {
-    if (error.name === 'AbortError') {
-      return
+
+    if (isEmpty) {
+      missingFields.push(name)
     }
-    // File System Access API 不支持或出错，静默处理
   }
 
-  // 降级到传统的文件输入方法
+  if (missingFields.length > 0) {
+    ElMessage.warning(`请先填写以下必填项：${missingFields.join('、')}`)
+    return
+  }
+
   const input = document.createElement('input')
   input.type = 'file'
-  input.accept = '*/*'
-  input.multiple = false
+  input.accept = 'image/*' // 只接受图片文件
 
-  input.onchange = async (event) => {
-    const file = event.target.files[0]
+  input.onchange = async (e) => {
+    const file = e.target.files[0]
     if (file) {
-      selectedFile.value = file
-
-
-
-      // 提示用户输入完整路径
       try {
-        const { value } = await ElMessageBox.prompt(
-          `已选择文件: ${file.name}\n\n请输入文件的完整路径:`,
-          '设置文件路径',
-          {
-            confirmButtonText: '确定',
-            cancelButtonText: '仅使用文件名',
-            inputValue: `C:\\Users\\Documents\\${file.name}`,
-            inputPlaceholder: '例如: C:\\Users\\Documents\\Pictures\\image.jpg'
-          }
-        )
-        editFormData.value.AttachmentFile = value || file.name
-        ElMessage.success('文件路径设置成功')
-      } catch {
-        // 用户选择仅使用文件名
-        editFormData.value.AttachmentFile = file.name
-        ElMessage.success('文件选择成功（仅文件名）')
+        editFileUploading.value = true
+
+        // 检查是否为图片文件
+        const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
+        const extension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'))
+        if (!imageExtensions.includes(extension)) {
+          ElMessage.error('请选择图片文件')
+          return
+        }
+
+        // 生成文件名和相对路径
+        const generatedFileName = await generateEditFileName(file.name)
+        const relativePath = await generateEditRelativePath(generatedFileName)
+
+        // 创建blob URL用于预览
+        const previewUrl = URL.createObjectURL(file)
+
+        // 清理旧的文件信息
+        if (editSelectedFileInfo.value?.previewUrl?.startsWith('blob:')) {
+          URL.revokeObjectURL(editSelectedFileInfo.value.previewUrl)
+        }
+
+        // 保存文件信息到临时变量（不上传）
+        editSelectedFileInfo.value = {
+          fileName: file.name, // 原始文件名
+          generatedFileName: generatedFileName, // 生成的文件名
+          fileSize: file.size,
+          fileType: file.type,
+          isImage: true,
+          previewUrl: previewUrl, // blob URL用于预览
+          relativePath: relativePath, // 生成的相对路径
+          file: file, // 原始文件对象
+          uploaded: false // 标记为未上传
+        }
+
+        // 设置表单字段为生成的相对路径
+        editFormData.value.AttachmentFile = relativePath
+
+        ElMessage.success('文件已选择，将在保存时上传')
+
+      } catch (error) {
+        console.error('文件处理失败:', error)
+        ElMessage.error(error.message || '文件处理失败')
+      } finally {
+        editFileUploading.value = false
       }
     }
   }
 
   input.click()
+}
+
+// 判断是否应该显示图片预览
+const shouldShowImagePreview = (fileInfo, filePath) => {
+  // 如果有新选择的文件信息
+  if (fileInfo) {
+    return fileInfo.isImage && (fileInfo.previewUrl || filePath)
+  }
+
+  // 如果只有文件路径（现有文件）
+  if (filePath) {
+    const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
+    const extension = filePath.toLowerCase().substring(filePath.lastIndexOf('.'))
+    return imageExtensions.includes(extension)
+  }
+
+  return false
+}
+
+// 格式化日期为本地时区的YYYY-MM-DD格式，避免UTC转换导致的日期偏移
+const formatDateToLocal = (date) => {
+  const d = new Date(date)
+  return d.getFullYear() + '-' +
+    String(d.getMonth() + 1).padStart(2, '0') + '-' +
+    String(d.getDate()).padStart(2, '0')
+}
+
+// 清理编辑对话框资源
+const cleanupEditResources = () => {
+  // 清理选中文件的预览URL
+  if (editSelectedFileInfo.value?.previewUrl && editSelectedFileInfo.value.previewUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(editSelectedFileInfo.value.previewUrl)
+  }
+
+  // 重置文件相关状态
+  editSelectedFileInfo.value = null
+  editFileUploading.value = false
 }
 
 // 注意：图片预览功能已移至ImagePreview组件中处理
@@ -3159,11 +3365,25 @@ const handleFileDrop = async (event) => {
 
 // 取消编辑
 const cancelEdit = () => {
+  console.log('=== Home.vue cancelEdit 清理资源 ===')
+
+  // 清理图片预览缓存
+  if (editFormData.value.ID) {
+    const cacheKey = `record_${editFormData.value.ID}`
+    console.log(`清理编辑对话框缓存: ${cacheKey}`)
+    // 导入imagePreviewService并清理缓存
+    import('@/services/imagePreviewService.js').then(module => {
+      module.default.clearCache(cacheKey)
+    })
+  }
+
   showEditDialog.value = false
   editFormData.value = {}
   originalFormData.value = {}
   selectedFile.value = null // 清理文件选择状态
   selectedFileHandle.value = null // 清理文件句柄状态
+
+  console.log('=== 编辑对话框资源清理完成 ===')
 }
 
 // 删除记录
@@ -3653,8 +3873,11 @@ function getChartTitle(type) {
     const start = chartFilter.value.dateRange[0]
     const end = chartFilter.value.dateRange[1]
     if (start && end && start !== end) {
-      year = `${new Date(start).getFullYear()}-${(new Date(start).getMonth()+1).toString().padStart(2,'0')}`
-      month = `${new Date(end).getFullYear()}-${(new Date(end).getMonth()+1).toString().padStart(2,'0')}`
+      // 修复时区问题：使用本地时区方法获取日期组件
+      const startDate = new Date(start)
+      const endDate = new Date(end)
+      year = `${startDate.getFullYear()}-${(startDate.getMonth()+1).toString().padStart(2,'0')}`
+      month = `${endDate.getFullYear()}-${(endDate.getMonth()+1).toString().padStart(2,'0')}`
       return `${year} 至 ${month} 投诉${type}`
     }
   }
@@ -3700,8 +3923,17 @@ const exportToExcel = async () => {
       if (advancedQuery.value.mainDept) params.mainDept = advancedQuery.value.mainDept
       if (advancedQuery.value.mainPerson) params.mainPerson = advancedQuery.value.mainPerson
       if (advancedQuery.value.dateRange && advancedQuery.value.dateRange.length === 2) {
+        // Element Plus日期选择器已配置value-format="YYYY-MM-DD"，直接使用字符串值
         params.startDate = advancedQuery.value.dateRange[0]
         params.endDate = advancedQuery.value.dateRange[1]
+
+        console.log('导出功能日期范围:', {
+          dateRange: advancedQuery.value.dateRange,
+          startDate: params.startDate,
+          endDate: params.endDate,
+          startDateType: typeof params.startDate,
+          endDateType: typeof params.endDate
+        })
       }
       if (advancedQuery.value.defectiveRateMin !== null) params.defectiveRateMin = advancedQuery.value.defectiveRateMin
       if (advancedQuery.value.defectiveRateMax !== null) params.defectiveRateMax = advancedQuery.value.defectiveRateMax
@@ -6496,14 +6728,79 @@ body::-webkit-scrollbar-thumb:hover {
 /* 附件文件字段样式 */
 .attachment-field {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
+  flex-direction: column;
+  gap: 10px;
   width: 100%;
 }
 
-.attachment-input {
-  flex: 1;
-  min-width: 300px; /* 确保文本框有足够宽度 */
+.attachment-input-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.attachment-path-section {
+  width: 100%;
+}
+
+/* 编辑对话框附件路径input样式 - 使用最强权重和直接选择器 */
+.attachment-path-section {
+  width: 100% !important;
+}
+
+.attachment-path-section .attachment-path-input {
+  width: 100% !important;
+}
+
+/* 使用全局深度选择器，不依赖特定class */
+:deep(.attachment-path-section .el-input) {
+  width: 100% !important;
+}
+
+:deep(.attachment-path-section .el-input-group) {
+  width: 100% !important;
+  display: flex !important;
+}
+
+:deep(.attachment-path-section .el-input-group .el-input) {
+  flex: 1 !important;
+  width: auto !important;
+}
+
+:deep(.attachment-path-section .el-input-group .el-input__wrapper) {
+  flex: 1 !important;
+  width: auto !important;
+  min-width: 0 !important;
+}
+
+:deep(.attachment-path-section .el-input__wrapper) {
+  width: 100% !important;
+  flex: 1 !important;
+}
+
+:deep(.attachment-path-section .el-input__inner) {
+  width: 100% !important;
+  flex: 1 !important;
+}
+
+/* 针对有prepend的input组件特殊处理 */
+:deep(.attachment-path-section .el-input-group__prepend) {
+  flex-shrink: 0 !important;
+  white-space: nowrap !important;
+}
+
+:deep(.attachment-path-section .el-input-group__prepend + .el-input .el-input__wrapper) {
+  flex: 1 !important;
+  width: auto !important;
+}
+
+.edit-dialog :deep(.el-input-group__prepend) {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.edit-dialog :deep(.el-input-group__append) {
+  flex-shrink: 0;
 }
 
 .select-file-btn {
@@ -6538,10 +6835,27 @@ body::-webkit-scrollbar-thumb:hover {
 }
 
 .image-preview-area {
-  flex-shrink: 0;
-  width: 80px;
-  height: 80px;
+  width: 200px;
+  height: 150px;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #fafafa;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
+
+.image-preview-area .el-empty {
+  padding: 20px 10px;
+}
+
+.image-preview-area .el-empty__description {
+  font-size: 12px;
+  color: #909399;
+}
+
+
 
 .image-preview {
   width: 80px;
@@ -6575,25 +6889,7 @@ body::-webkit-scrollbar-thumb:hover {
   background: #fafafa;
 }
 
-.placeholder-content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #c0c4cc;
-}
 
-.placeholder-icon {
-  font-size: 24px;
-  margin-bottom: 4px;
-}
-
-.placeholder-text {
-  font-size: 10px;
-  color: #909399;
-  text-align: center;
-  line-height: 1.2;
-}
 
 /* 图片预览对话框样式 */
 .image-preview-dialog :deep(.el-dialog) {

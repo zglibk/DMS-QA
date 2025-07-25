@@ -476,6 +476,16 @@ const chartOption = ref({
         shadowColor: 'rgba(230, 126, 34, 0.5)',
         shadowBlur: 12
       },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(230, 126, 34, 0.3)' },
+            { offset: 1, color: 'rgba(230, 126, 34, 0.05)' }
+          ]
+        }
+      },
       label: {
         show: true,
         position: 'top',
@@ -522,6 +532,16 @@ const chartOption = ref({
         borderWidth: 2,
         shadowColor: 'rgba(245, 108, 108, 0.4)',
         shadowBlur: 8
+      },
+      areaStyle: {
+        color: {
+          type: 'linear',
+          x: 0, y: 0, x2: 0, y2: 1,
+          colorStops: [
+            { offset: 0, color: 'rgba(231, 76, 60, 0.3)' },
+            { offset: 1, color: 'rgba(231, 76, 60, 0.05)' }
+          ]
+        }
       },
       label: {
         show: true,
