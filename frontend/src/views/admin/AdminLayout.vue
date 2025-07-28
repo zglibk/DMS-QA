@@ -44,6 +44,10 @@
             <span v-show="!collapsed">用户列表</span>
           </el-menu-item>
         </el-sub-menu>
+        <el-menu-item index="/admin/rework-management">
+          <el-icon><Tools /></el-icon>
+          <span v-show="!collapsed">返工管理</span>
+        </el-menu-item>
         <el-sub-menu index="/admin/permission">
           <template #title>
             <el-icon><Setting /></el-icon>
@@ -107,6 +111,7 @@
             <el-breadcrumb-item v-if="route.path === '/admin/path-analysis'">路径格式分析</el-breadcrumb-item>
             <el-breadcrumb-item v-if="route.path === '/admin/file-copy-test'">文件拷贝测试</el-breadcrumb-item>
             <el-breadcrumb-item v-if="route.path === '/admin/system-config'">系统配置</el-breadcrumb-item>
+            <el-breadcrumb-item v-if="route.path === '/admin/rework-management'">返工管理</el-breadcrumb-item>
             <el-breadcrumb-item v-if="route.path === '/admin/profile'">用户中心</el-breadcrumb-item>
           </el-breadcrumb>
         </div>
@@ -507,4 +512,4 @@ onMounted(() => {
   .logo-text { font-size: 0.9rem; }
   .admin-main { padding: 0.5rem; }
 }
-</style> 
+</style>

@@ -248,8 +248,28 @@ const refreshDetails = () => {
   fetchRecentComplaints()
 }
 
+// 安全的日期格式化函数，避免时区转换问题
 const formatDate = (dateStr) => {
-  return new Date(dateStr).toLocaleDateString()
+  if (!dateStr) return ''
+  
+  // 如果已经是YYYY-MM-DD格式，直接返回
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr
+  }
+  
+  // 如果是其他格式，尝试解析并格式化
+  try {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+    
+    // 使用本地时区的年月日，避免UTC转换
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch (error) {
+    return dateStr
+  }
 }
 
 // 导航相关方法已移至 AppHeader 组件

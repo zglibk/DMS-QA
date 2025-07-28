@@ -154,7 +154,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Refresh, DataAnalysis, Grid, CircleCheck, Document, Box } from '@element-plus/icons-vue'
+import { Refresh, DataAnalysis, Grid, CircleCheck, Document, Box, Flag, Goods } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
 
@@ -258,6 +258,12 @@ const chartOption = ref({
         itemStyle: { color: '#e74c3c' }
       }
     ],
+    selected: {
+      '交检批次': false,
+      '发货批次': false,
+      '一次交检合格率': true,
+      '交货批次合格率': true
+    },
     bottom: 15,
     left: 'center',
     textStyle: {

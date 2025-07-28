@@ -52,6 +52,9 @@ const routes = [
   // 数据可视化页面
   { path: '/data-visualization', component: DataVisualization },
 
+  // 返工分析页面
+  { path: '/rework-analysis', component: () => import('../views/ReworkAnalysis.vue') },
+
   // 个人资料页面（懒加载）
   {
     path: '/profile',
@@ -122,6 +125,13 @@ const routes = [
       {
         path: 'home-card-config',
         component: () => import('../components/admin/HomeCardConfig.vue'),
+        meta: { requiresAuth: true }
+      },
+
+      // 返工管理页面
+      {
+        path: 'rework-management',
+        component: () => import('../views/admin/ReworkManagement.vue'),
         meta: { requiresAuth: true }
       }
     ]

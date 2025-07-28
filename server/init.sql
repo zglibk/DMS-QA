@@ -417,6 +417,27 @@ INSERT INTO [dbo].[PathMappingConfig] ([Name], [LocalPattern], [TargetPattern], 
 (N'Excel临时文件映射', N'C:\Users\*\AppData\Roaming\Microsoft\Excel\*', N'\\tj_server\工作\品质部\生产异常周报考核统计\*', N'Excel临时文件映射到tj_server共享盘'),
 (N'2025年异常汇总映射', N'*2025年异常汇总\*', N'\\tj_server\工作\品质部\生产异常周报考核统计\2025年异常汇总\不良图片&资料\*', N'2025年异常汇总文件映射');
 
+-- =====================================================
+-- 转换配置表 (ConversionConfig)
+-- 功能：管理路径转换相关的配置选项
+-- 用途：控制路径转换行为和开关设置
+-- =====================================================
+CREATE TABLE [dbo].[ConversionConfig] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,               -- 主键，自增ID
+    [ConfigKey] NVARCHAR(50) NOT NULL UNIQUE,         -- 配置键名
+    [ConfigValue] NVARCHAR(500),                      -- 配置值
+    [Description] NVARCHAR(200),                      -- 配置描述
+    [CreatedAt] DATETIME DEFAULT GETDATE(),           -- 创建时间
+    [UpdatedAt] DATETIME DEFAULT GETDATE()            -- 更新时间
+);
+
+-- 插入默认转换配置
+INSERT INTO [dbo].[ConversionConfig] ([ConfigKey], [ConfigValue], [Description]) VALUES
+(N'autoConvert', N'true', N'启用自动转换'),
+(N'keepOriginal', N'false', N'保留原始路径'),
+(N'fileCopyMode', N'true', N'启用文件拷贝模式'),
+(N'validatePaths', N'false', N'路径验证');
+
 -- 插入默认主页卡片配置
 INSERT INTO [dbo].[HomeCardConfig] ([ConfigKey], [ConfigValue], [Description]) VALUES
 (N'showTodayCount', N'true', N'是否显示今日投诉统计卡片'),
@@ -580,3 +601,199 @@ INSERT INTO [dbo].[MonthlyBatchStats] ([StatYear], [StatMonth], [InspectionBatch
 (2025, 6, 6014, 5710, N'2025年6月数据', N'admin', '2025-07-07 09:23:30.433');
 
 PRINT '月度批次统计表已创建并初始化完成。';
+
+-- =====================================================
+-- 生产不良返工登记表 (ProductionReworkRegister)
+-- 功能：记录生产过程中的不良品返工信息
+-- 用途：返工跟踪、成本核算、质量分析、责任追溯
+-- =====================================================
+CREATE TABLE [dbo].[ProductionReworkRegister] (
+    -- 基础信息字段
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+    [ReworkDate] DATE NOT NULL,                      -- 返工日期，必填
+    [CustomerCode] NVARCHAR(100) NOT NULL,           -- 客户编号，必填
+    [OrderNo] NVARCHAR(50) NOT NULL,                 -- 工单号，必填
+    [ProductName] NVARCHAR(100) NOT NULL,            -- 产品名称，必填
+    [ProductSpec] NVARCHAR(100),                     -- 产品规格
+    [TotalQty] INT NOT NULL,                         -- 总数量，必填
+    [DefectiveQty] INT NOT NULL,                     -- 不良数量，必填
+    [GoodQty] INT,                                   -- 良品数量
+    
+    -- 不良和返工信息
+    [DefectiveReason] NVARCHAR(500) NOT NULL,        -- 不良原因，必填
+    [DefectiveCategory] NVARCHAR(50),                -- 不良类别
+    [DefectiveDescription] NVARCHAR(500),            -- 不良描述
+    [ResponsiblePerson] NVARCHAR(50) NOT NULL,       -- 责任人，必填
+    [ResponsibleDept] NVARCHAR(50),                  -- 责任部门
+    [Workshop] NVARCHAR(50),                         -- 生产车间
+    
+    -- 返工信息
+    [ReworkPersonnel] NVARCHAR(200),                 -- 返工人员（可多人，逗号分隔）
+    [ReworkHours] DECIMAL(8,2),                      -- 返工工时
+    [ReworkMethod] NVARCHAR(500),                    -- 返工方法
+    [ReworkResult] NVARCHAR(500),                    -- 返工结果
+    [ReworkStatus] NVARCHAR(20) DEFAULT N'进行中',    -- 返工状态（进行中/已完成/已取消）
+    
+    -- 成本信息
+    [MaterialCost] DECIMAL(10,2) DEFAULT 0,          -- 材料成本
+    [LaborCost] DECIMAL(10,2) DEFAULT 0,             -- 人工成本
+    [OtherCost] DECIMAL(10,2) DEFAULT 0,             -- 其他成本
+    [TotalCost] DECIMAL(10,2) DEFAULT 0,             -- 总成本
+    
+    -- 质量信息
+    [QualityLevel] NVARCHAR(20),                     -- 质量等级（A/B/C/D）
+    [ReworkTimes] INT DEFAULT 1,                     -- 返工次数
+    [FinalResult] NVARCHAR(20),                      -- 最终结果（合格/报废/降级）
+    
+    -- 附件和备注
+    [AttachmentFiles] NVARCHAR(1000),                -- 附件文件路径（多个文件用分号分隔）
+    [Remarks] NVARCHAR(1000),                        -- 备注说明
+    [ProcessNotes] NVARCHAR(1000),                   -- 处理记录
+    
+    -- 审计信息
+    [CreatedBy] NVARCHAR(50) NOT NULL DEFAULT 'admin', -- 创建人
+    [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(),   -- 创建时间
+    [UpdatedBy] NVARCHAR(50),                           -- 更新人
+    [UpdatedAt] DATETIME,                               -- 更新时间
+    [ApprovedBy] NVARCHAR(50),                          -- 审批人
+    [ApprovedAt] DATETIME,                              -- 审批时间
+    [ApprovalStatus] NVARCHAR(20) DEFAULT N'待审批',     -- 审批状态（待审批/已审批/已拒绝）
+    
+    -- 统计分析字段
+    [DefectiveRate] AS (CAST(DefectiveQty AS DECIMAL(10,2)) / NULLIF(TotalQty, 0) * 100), -- 不良率（计算字段）
+    [ReworkEfficiency] AS (CAST(GoodQty AS DECIMAL(10,2)) / NULLIF(DefectiveQty, 0) * 100) -- 返工效率（计算字段）
+);
+
+-- 创建索引
+CREATE NONCLUSTERED INDEX IX_ReworkRegister_Date ON [dbo].[ProductionReworkRegister] (ReworkDate DESC);
+CREATE NONCLUSTERED INDEX IX_ReworkRegister_Customer ON [dbo].[ProductionReworkRegister] (CustomerCode);
+CREATE NONCLUSTERED INDEX IX_ReworkRegister_Order ON [dbo].[ProductionReworkRegister] (OrderNo);
+CREATE NONCLUSTERED INDEX IX_ReworkRegister_Status ON [dbo].[ProductionReworkRegister] (ReworkStatus, ApprovalStatus);
+CREATE NONCLUSTERED INDEX IX_ReworkRegister_Responsible ON [dbo].[ProductionReworkRegister] (ResponsiblePerson, ResponsibleDept);
+
+-- =====================================================
+-- 返工类别表 (ReworkCategory)
+-- 功能：管理返工类别信息
+-- 用途：返工记录的分类标准化
+-- =====================================================
+CREATE TABLE [dbo].[ReworkCategory] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,               -- 主键，自增ID
+    [Name] NVARCHAR(50) NOT NULL UNIQUE,              -- 类别名称，唯一
+    [Description] NVARCHAR(200),                      -- 类别描述
+    [IsActive] BIT DEFAULT 1,                         -- 是否启用
+    [CreatedAt] DATETIME DEFAULT GETDATE()            -- 创建时间
+);
+
+-- =====================================================
+-- 返工方法表 (ReworkMethod)
+-- 功能：管理标准返工方法
+-- 用途：返工方法的标准化管理
+-- =====================================================
+CREATE TABLE [dbo].[ReworkMethod] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,               -- 主键，自增ID
+    [Name] NVARCHAR(100) NOT NULL,                    -- 方法名称
+    [CategoryID] INT FOREIGN KEY REFERENCES ReworkCategory(ID), -- 所属类别
+    [Description] NVARCHAR(500),                      -- 方法描述
+    [StandardHours] DECIMAL(8,2),                     -- 标准工时
+    [StandardCost] DECIMAL(10,2),                     -- 标准成本
+    [IsActive] BIT DEFAULT 1,                         -- 是否启用
+    [CreatedAt] DATETIME DEFAULT GETDATE()            -- 创建时间
+);
+
+GO
+
+-- =====================================================
+-- 返工统计视图 (ReworkStatistics)
+-- 功能：提供返工数据的统计分析
+-- 用途：报表生成、趋势分析
+-- =====================================================
+CREATE VIEW [dbo].[ReworkStatistics] AS
+SELECT 
+    YEAR(ReworkDate) as StatYear,
+    MONTH(ReworkDate) as StatMonth,
+    COUNT(*) as TotalReworkCount,
+    SUM(DefectiveQty) as TotalDefectiveQty,
+    SUM(GoodQty) as TotalGoodQty,
+    SUM(TotalCost) as TotalReworkCost,
+    AVG(CAST(DefectiveQty AS DECIMAL(10,2)) / NULLIF(TotalQty, 0) * 100) as AvgDefectiveRate,
+    AVG(ReworkHours) as AvgReworkHours,
+    COUNT(CASE WHEN FinalResult = N'合格' THEN 1 END) as QualifiedCount,
+    COUNT(CASE WHEN FinalResult = N'报废' THEN 1 END) as ScrapCount,
+    COUNT(CASE WHEN FinalResult = N'降级' THEN 1 END) as DowngradeCount
+FROM ProductionReworkRegister
+GROUP BY YEAR(ReworkDate), MONTH(ReworkDate);
+
+GO
+
+-- =====================================================
+-- 年度返工汇总视图 (YearlyReworkSummary)
+-- 功能：提供年度返工数据汇总
+-- 用途：年度报告、KPI统计
+-- =====================================================
+CREATE VIEW [dbo].[YearlyReworkSummary] AS
+SELECT 
+    YEAR(ReworkDate) as StatYear,
+    COUNT(*) as YearlyReworkCount,
+    SUM(DefectiveQty) as YearlyDefectiveQty,
+    SUM(GoodQty) as YearlyGoodQty,
+    SUM(TotalCost) as YearlyReworkCost,
+    AVG(CAST(DefectiveQty AS DECIMAL(10,2)) / NULLIF(TotalQty, 0) * 100) as YearlyAvgDefectiveRate,
+    SUM(ReworkHours) as YearlyReworkHours,
+    COUNT(CASE WHEN FinalResult = N'合格' THEN 1 END) as YearlyQualifiedCount,
+    COUNT(CASE WHEN FinalResult = N'报废' THEN 1 END) as YearlyScrapCount
+FROM ProductionReworkRegister
+GROUP BY YEAR(ReworkDate);
+
+GO
+
+-- 插入返工类别初始数据
+INSERT INTO [dbo].[ReworkCategory] ([Name], [Description]) VALUES 
+(N'印刷返工', N'印刷过程中的质量问题返工'),
+(N'裁切返工', N'裁切工序的尺寸或质量问题返工'),
+(N'包装返工', N'包装工序的问题返工'),
+(N'材料返工', N'原材料问题导致的返工'),
+(N'设备返工', N'设备故障导致的返工'),
+(N'人为返工', N'操作失误导致的返工'),
+(N'其他返工', N'其他原因导致的返工');
+
+-- 插入返工方法初始数据
+INSERT INTO [dbo].[ReworkMethod] ([Name], [CategoryID], [Description], [StandardHours], [StandardCost]) VALUES 
+(N'重新印刷', 1, N'完全重新印刷产品', 2.0, 50.00),
+(N'局部修补', 1, N'对印刷缺陷进行局部修补', 0.5, 15.00),
+(N'重新裁切', 2, N'重新进行裁切工序', 1.0, 20.00),
+(N'尺寸调整', 2, N'对尺寸进行微调', 0.3, 8.00),
+(N'重新包装', 3, N'重新进行包装', 0.5, 10.00),
+(N'包装修复', 3, N'对包装进行修复', 0.2, 5.00),
+(N'材料更换', 4, N'更换不合格材料重新生产', 3.0, 80.00),
+(N'设备维修后重做', 5, N'设备维修后重新生产', 4.0, 100.00);
+
+PRINT '生产不良返工登记表及相关表结构已创建完成。';
+
+GO
+
+-- =====================================================
+-- 质量等级设定表 (QualityLevelSettings)
+-- 功能：存储质量等级的配置信息
+-- 用途：质量等级管理、返工记录分级
+-- =====================================================
+CREATE TABLE [dbo].[QualityLevelSettings] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+    [Grade] NVARCHAR(10) NOT NULL,                   -- 质量等级（如A、B、C、D）
+    [Title] NVARCHAR(50) NOT NULL,                   -- 等级名称（如优秀、良好等）
+    [Description] NVARCHAR(200) NOT NULL,           -- 等级描述
+    [Range] NVARCHAR(100) NOT NULL,                 -- 适用范围（如合格率范围）
+    [CreatedAt] DATETIME DEFAULT GETDATE(),         -- 创建时间
+    [UpdatedAt] DATETIME DEFAULT GETDATE()          -- 更新时间
+);
+
+-- 创建唯一索引以优化查询性能
+CREATE UNIQUE INDEX [IX_QualityLevelSettings_Grade] ON [dbo].[QualityLevelSettings] ([Grade]);
+
+-- 插入质量等级默认数据
+INSERT INTO [dbo].[QualityLevelSettings] ([Grade], [Title], [Description], [Range]) VALUES 
+(N'A', N'优秀', N'产品质量完全符合标准，无任何缺陷', N'合格率 ≥ 99%'),
+(N'B', N'良好', N'产品质量基本符合标准，存在轻微缺陷', N'合格率 95-99%'),
+(N'C', N'一般', N'产品质量勉强符合标准，存在明显缺陷', N'合格率 90-95%'),
+(N'D', N'不合格', N'产品质量不符合标准，存在严重缺陷', N'合格率 < 90%');
+
+PRINT '质量等级设定表已创建并初始化完成。';

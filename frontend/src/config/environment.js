@@ -119,10 +119,10 @@ class EnvironmentManager {
         },
         // API地址优先级（开发环境优先本地）
         apiUrls: [
-          'http://localhost:3002',           // 本地后端（SQLite临时版本）
           'http://localhost:3001',           // 本地后端（SQL Server版本）
-          'http://127.0.0.1:3002',          // 本地后端备用（SQLite）
+          'http://localhost:3002',           // 本地后端（SQLite临时版本）
           'http://127.0.0.1:3001',          // 本地后端备用（SQL Server）
+          'http://127.0.0.1:3002',          // 本地后端备用（SQLite）
           'http://192.168.1.57:3001',       // 远程后端
           'http://192.168.1.57/api',        // 远程后端（Nginx代理）
           'http://192.168.1.57:8081/api',   // 远程后端（8081端口）

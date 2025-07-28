@@ -47,7 +47,9 @@ const config = {
     useUTC: false,               // 不使用UTC时间
     requestTimeout: 30000,       // 请求超时时间（30秒）
     connectionTimeout: 30000,    // 连接超时时间（30秒）
-    parseJSON: true              // 自动解析JSON字段
+    parseJSON: true,             // 自动解析JSON字段
+    charset: 'utf8',             // 设置字符编码为UTF-8
+    collation: 'Chinese_PRC_CI_AS' // 设置中文排序规则
   },
   pool: {
     max: 10,                     // 连接池最大连接数
@@ -129,7 +131,9 @@ async function getDynamicConfig() {
           useUTC: false,
           requestTimeout: 30000,
           connectionTimeout: 30000,
-          parseJSON: true
+          parseJSON: true,
+          charset: 'utf8',             // 设置字符编码为UTF-8
+          collation: 'Chinese_PRC_CI_AS' // 设置中文排序规则
         },
         pool: {
           max: 10,

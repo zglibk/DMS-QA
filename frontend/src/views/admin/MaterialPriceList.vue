@@ -466,7 +466,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup name="MaterialPriceList">
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Upload, Download, Search, RefreshLeft, Edit, Delete, UploadFilled, Clock, Document } from '@element-plus/icons-vue'
@@ -672,16 +672,49 @@ const viewHistory = async (row) => {
   }
 }
 
-// 格式化日期
+// 安全的日期格式化函数，避免时区转换问题
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleDateString('zh-CN')
+  
+  // 如果已经是YYYY-MM-DD格式，直接返回
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr
+  }
+  
+  // 如果是其他格式，尝试解析并格式化
+  try {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+    
+    // 使用本地时区的年月日，避免UTC转换
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch (error) {
+    return dateStr
+  }
 }
 
-// 格式化日期时间
+// 安全的日期时间格式化函数
 const formatDateTime = (dateStr) => {
   if (!dateStr) return ''
-  return new Date(dateStr).toLocaleString('zh-CN')
+  
+  try {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+    
+    // 使用本地时区的年月日时分秒，避免UTC转换
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const seconds = String(date.getSeconds()).padStart(2, '0')
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  } catch (error) {
+    return dateStr
+  }
 }
 
 // 删除项目

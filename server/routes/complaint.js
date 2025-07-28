@@ -215,22 +215,41 @@ router.get('/list', async (req, res) => {
           const defaultStart = new Date(now.getFullYear(), now.getMonth() - 6, 1);
           timeStartDate = defaultStart.toISOString().split('T')[0];
       }
-      whereClause = `WHERE Date >= '${timeStartDate}'`;
+      whereClause = `WHERE CONVERT(VARCHAR(10), Date, 23) >= '${timeStartDate}'`;
     } else {
       // 默认显示近1年数据
       whereClause = 'WHERE Date >= DATEADD(year, -1, GETDATE()) AND Date <= GETDATE()';
     }
 
+    // 添加详细的参数调试日志
+    console.log('=== 查询参数调试 ===');
+    console.log('接收到的所有参数:', {
+      customer, orderNo, productName, workshop, complaintCategory, customerComplaintType,
+      defectiveCategory, mainDept, mainPerson, startDate, endDate,
+      defectiveRateMin, defectiveRateMax, returnGoods, isReprint, timeRange,
+      period, category, search, page, pageSize
+    });
+    console.log('初始WHERE条件:', whereClause);
+
     // 如果有高级查询参数或钻取参数，则使用高级查询
-    if (customer || orderNo || productName || workshop || complaintCategory || customerComplaintType ||
+    const hasAdvancedParams = customer || orderNo || productName || workshop || complaintCategory || customerComplaintType ||
         defectiveCategory || mainDept || mainPerson || startDate || endDate ||
         defectiveRateMin !== undefined || defectiveRateMax !== undefined ||
         returnGoods !== undefined || isReprint !== undefined || timeRange ||
-        period || category) {
+        period || category;
+    
+    console.log('是否有高级查询参数:', hasAdvancedParams);
+    console.log('日期参数检查:', { startDate: !!startDate, endDate: !!endDate, startDateValue: startDate, endDateValue: endDate });
+    
+    if (hasAdvancedParams) {
+      console.log('进入高级查询逻辑');
 
       // 如果用户指定了日期范围，重置whereClause以使用用户的日期范围
       if (startDate || endDate) {
+        console.log('用户指定了日期范围，重置whereClause');
+        console.log('重置前的WHERE条件:', whereClause);
         whereClause = 'WHERE 1=1'; // 重置为基础条件
+        console.log('重置后的WHERE条件:', whereClause);
       }
 
       // 客户查询
@@ -278,23 +297,120 @@ router.get('/list', async (req, res) => {
         whereClause += ` AND MainPerson = N'${mainPerson}'`;
       }
 
-      // 日期范围查询
+      // 日期范围查询 - 修复时区偏移问题和日期格式标准化
       if (startDate && endDate) {
         console.log('=== 日期范围查询调试 ===');
         console.log('startDate:', startDate, typeof startDate);
         console.log('endDate:', endDate, typeof endDate);
-        whereClause += ` AND Date >= '${startDate}' AND Date <= '${endDate}'`;
-        console.log('日期查询条件:', `Date >= '${startDate}' AND Date <= '${endDate}'`);
+        
+        // 安全的日期格式标准化函数，避免时区转换问题
+        function normalizeDate(dateStr) {
+          // 如果已经是标准格式，直接返回
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            return dateStr;
+          }
+          
+          // 如果是YYYY-M-D或YYYY/MM/DD等格式，尝试直接解析
+          if (typeof dateStr === 'string') {
+            // 处理YYYY-M-D格式
+            const match1 = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (match1) {
+              const [, year, month, day] = match1;
+              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            
+            // 处理YYYY/MM/DD格式
+            const match2 = dateStr.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+            if (match2) {
+              const [, year, month, day] = match2;
+              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+          }
+          
+          // 如果无法直接解析，返回原字符串
+          return dateStr;
+        }
+        
+        const normalizedStartDate = normalizeDate(startDate);
+        const normalizedEndDate = normalizeDate(endDate);
+        
+        console.log('标准化后的日期:', { normalizedStartDate, normalizedEndDate });
+        
+        // 使用CONVERT函数转换为字符串进行比较，避免时区影响（兼容SQL Server 2008R2）
+        whereClause += ` AND CONVERT(VARCHAR(10), Date, 23) >= '${normalizedStartDate}' AND CONVERT(VARCHAR(10), Date, 23) <= '${normalizedEndDate}'`;
+        console.log('日期查询条件:', `CONVERT(VARCHAR(10), Date, 23) >= '${normalizedStartDate}' AND CONVERT(VARCHAR(10), Date, 23) <= '${normalizedEndDate}'`);
       } else if (startDate) {
         console.log('=== 开始日期查询调试 ===');
         console.log('startDate:', startDate, typeof startDate);
-        whereClause += ` AND Date >= '${startDate}'`;
-        console.log('开始日期查询条件:', `Date >= '${startDate}'`);
+        
+        function normalizeDate(dateStr) {
+          // 如果已经是标准格式，直接返回
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            return dateStr;
+          }
+          
+          // 如果是YYYY-M-D或YYYY/MM/DD等格式，尝试直接解析
+          if (typeof dateStr === 'string') {
+            // 处理YYYY-M-D格式
+            const match1 = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (match1) {
+              const [, year, month, day] = match1;
+              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            
+            // 处理YYYY/MM/DD格式
+            const match2 = dateStr.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+            if (match2) {
+              const [, year, month, day] = match2;
+              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+          }
+          
+          // 如果无法直接解析，返回原字符串
+          return dateStr;
+        }
+        
+        const normalizedStartDate = normalizeDate(startDate);
+        console.log('标准化后的开始日期:', normalizedStartDate);
+        
+        whereClause += ` AND CONVERT(VARCHAR(10), Date, 23) >= '${normalizedStartDate}'`;
+        console.log('开始日期查询条件:', `CONVERT(VARCHAR(10), Date, 23) >= '${normalizedStartDate}'`);
       } else if (endDate) {
         console.log('=== 结束日期查询调试 ===');
         console.log('endDate:', endDate, typeof endDate);
-        whereClause += ` AND Date <= '${endDate}'`;
-        console.log('结束日期查询条件:', `Date <= '${endDate}'`);
+        
+        function normalizeDate(dateStr) {
+          // 如果已经是标准格式，直接返回
+          if (/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+            return dateStr;
+          }
+          
+          // 如果是YYYY-M-D或YYYY/MM/DD等格式，尝试直接解析
+          if (typeof dateStr === 'string') {
+            // 处理YYYY-M-D格式
+            const match1 = dateStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+            if (match1) {
+              const [, year, month, day] = match1;
+              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+            
+            // 处理YYYY/MM/DD格式
+            const match2 = dateStr.match(/^(\d{4})\/(\d{1,2})\/(\d{1,2})$/);
+            if (match2) {
+              const [, year, month, day] = match2;
+              return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+            }
+          }
+          
+          // 如果无法直接解析，返回原字符串
+          return dateStr;
+        }
+        
+        const normalizedEndDate = normalizeDate(endDate);
+        console.log('标准化后的结束日期:', normalizedEndDate);
+        
+        whereClause += ` AND CONVERT(VARCHAR(10), Date, 23) <= '${normalizedEndDate}'`;
+        console.log('结束日期查询条件:', `CONVERT(VARCHAR(10), Date, 23) <= '${normalizedEndDate}'`);
       }
 
       // 不良率范围查询
@@ -1125,56 +1241,56 @@ router.get('/analysis', async (req, res) => {
         const twoMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 1, 1);
         startDate = twoMonthsAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
-        dateCondition = `Date >= '${startDate}'`;
+        dateCondition = `CONVERT(VARCHAR(10), Date, 23) >= '${startDate}'`;
         break;
       case '3months':
         // 近3个月：当前月份 + 前2个月 = 3个月（7、6、5月）
         const threeMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 2, 1);
         startDate = threeMonthsAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
-        dateCondition = `Date >= '${startDate}'`;
+        dateCondition = `CONVERT(VARCHAR(10), Date, 23) >= '${startDate}'`;
         break;
       case '4months':
         // 近4个月：当前月份 + 前3个月 = 4个月（7、6、5、4月）
         const fourMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 3, 1);
         startDate = fourMonthsAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
-        dateCondition = `Date >= '${startDate}'`;
+        dateCondition = `CONVERT(VARCHAR(10), Date, 23) >= '${startDate}'`;
         break;
       case '5months':
         // 近5个月：当前月份 + 前4个月 = 5个月（7、6、5、4、3月）
         const fiveMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 4, 1);
         startDate = fiveMonthsAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
-        dateCondition = `Date >= '${startDate}'`;
+        dateCondition = `CONVERT(VARCHAR(10), Date, 23) >= '${startDate}'`;
         break;
       case '6months':
         // 近6个月：当前月份 + 前5个月 = 6个月（7、6、5、4、3、2月）
         const sixMonthsAgo = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         startDate = sixMonthsAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
-        dateCondition = `Date >= '${startDate}'`;
+        dateCondition = `CONVERT(VARCHAR(10), Date, 23) >= '${startDate}'`;
         break;
       case '1year':
         // 近1年：当前月份 + 前11个月 = 12个月
         const oneYearAgo = new Date(now.getFullYear(), now.getMonth() - 11, 1);
         startDate = oneYearAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
-        dateCondition = `Date >= '${startDate}'`;
+        dateCondition = `CONVERT(VARCHAR(10), Date, 23) >= '${startDate}'`;
         break;
       case '2years':
         // 近2年：当前月份 + 前23个月 = 24个月
         const twoYearsAgo = new Date(now.getFullYear(), now.getMonth() - 23, 1);
         startDate = twoYearsAgo.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
-        dateCondition = `Date >= '${startDate}'`;
+        dateCondition = `CONVERT(VARCHAR(10), Date, 23) >= '${startDate}'`;
         break;
       default:
         // 默认近6个月：当前月份 + 前5个月 = 6个月（7、6、5、4、3、2月）
         const defaultStart = new Date(now.getFullYear(), now.getMonth() - 5, 1);
         startDate = defaultStart.toISOString().split('T')[0];
         endDate = now.toISOString().split('T')[0];
-        dateCondition = `Date >= '${startDate}'`;
+        dateCondition = `CONVERT(VARCHAR(10), Date, 23) >= '${startDate}'`;
     }
 
     // 投诉类型条件

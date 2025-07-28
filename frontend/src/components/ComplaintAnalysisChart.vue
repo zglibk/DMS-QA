@@ -259,7 +259,7 @@
               <div class="date-cell">
                 <el-icon class="date-icon" size="14"><Calendar /></el-icon>
                 <span class="date-text">
-                  {{ scope.row.Date ? new Date(scope.row.Date).toLocaleDateString('zh-CN', { year: '2-digit', month: '2-digit', day: '2-digit' }) : '' }}
+                  {{ scope.row.Date ? formatDateSafe(scope.row.Date) : '' }}
                 </span>
               </div>
             </template>
@@ -452,6 +452,28 @@
                     <template v-else-if="field.key === 'Workshop'">
                       <el-tag type="info" size="small">{{ detailDrawerData[field.key] || '未指定' }}</el-tag>
                     </template>
+                    <template v-else-if="field.key === 'AttachmentFile'">
+                      <!-- 附件文件特殊处理 - 使用ImagePreview组件 -->
+                      <div class="attachment-field-drawer">
+                        <div v-if="detailDrawerData[field.key]" class="attachment-content">
+                          <div class="attachment-path">
+                            <span class="path-text">{{ detailDrawerData[field.key] }}</span>
+                          </div>
+                          <div class="attachment-preview">
+                            <ImagePreview
+                              :key="`drawer-${detailDrawerData.ID}-${field.key}`"
+                              :file-path="detailDrawerData[field.key]"
+                              :record-id="detailDrawerData.ID"
+                              width="200px"
+                              height="150px"
+                            />
+                          </div>
+                        </div>
+                        <div v-else class="no-attachment">
+                          <el-text type="info">无附件</el-text>
+                        </div>
+                      </div>
+                    </template>
                     <template v-else>
                       <span>{{ detailDrawerData[field.key] || '未填写' }}</span>
                     </template>
@@ -489,6 +511,7 @@ import {
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
+import ImagePreview from './ImagePreview.vue'
 
 // 响应式数据
 const chartRef = ref(null)
@@ -575,6 +598,7 @@ const getBaseChartOption = () => ({
   legend: {
     bottom: 15,
     left: 'center',
+    selectedMode: 'multiple', // 启用多选模式，允许点击图例切换显示/隐藏
     textStyle: {
       fontSize: 13,
       color: '#2c3e50',
@@ -907,15 +931,37 @@ const fetchExportFields = async () => {
   }
 }
 
-// 格式化日期
+// 安全的日期格式化函数，避免时区转换问题
+const formatDateSafe = (dateStr) => {
+  if (!dateStr) return ''
+  
+  // 如果已经是YYYY-MM-DD格式，直接返回
+  if (typeof dateStr === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateStr)) {
+    return dateStr
+  }
+  
+  // 如果是其他格式，尝试解析并格式化
+  try {
+    const date = new Date(dateStr)
+    if (isNaN(date.getTime())) return dateStr
+    
+    // 使用本地时区的年月日，避免UTC转换
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch (error) {
+    return dateStr
+  }
+}
+
+// 格式化日期（用于抽屉显示）
 const formatDate = (dateStr) => {
   if (!dateStr) return ''
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
+  
+  // 使用安全的日期格式化
+  const safeDate = formatDateSafe(dateStr)
+  return safeDate
 }
 
 // 格式化价格
@@ -1100,18 +1146,31 @@ const getTimeChartOption = () => {
         smooth: true,
         symbol: 'circle',
         symbolSize: 10,
+        // 添加面积填充
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(52, 152, 219, 0.6)' },
+              { offset: 1, color: 'rgba(52, 152, 219, 0.1)' }
+            ]
+          },
+          shadowColor: 'rgba(52, 152, 219, 0.3)',
+          shadowBlur: 20
+        },
         lineStyle: {
           width: 4,
-          color: '#f39c12',
-          shadowColor: 'rgba(243, 156, 18, 0.4)',
+          color: '#3498db',
+          shadowColor: 'rgba(52, 152, 219, 0.4)',
           shadowBlur: 15,
           shadowOffsetY: 5
         },
         itemStyle: {
-          color: '#f39c12',
+          color: '#3498db',
           borderWidth: 3,
           borderColor: '#fff',
-          shadowColor: 'rgba(243, 156, 18, 0.5)',
+          shadowColor: 'rgba(52, 152, 219, 0.5)',
           shadowBlur: 12
         },
         label: {
@@ -1133,18 +1192,31 @@ const getTimeChartOption = () => {
         smooth: true,
         symbol: 'circle',
         symbolSize: 10,
+        // 添加面积填充
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(155, 89, 182, 0.6)' },
+              { offset: 1, color: 'rgba(155, 89, 182, 0.1)' }
+            ]
+          },
+          shadowColor: 'rgba(155, 89, 182, 0.3)',
+          shadowBlur: 20
+        },
         lineStyle: {
           width: 4,
-          color: '#e74c3c',
-          shadowColor: 'rgba(231, 76, 60, 0.4)',
+          color: '#9b59b6',
+          shadowColor: 'rgba(155, 89, 182, 0.4)',
           shadowBlur: 15,
           shadowOffsetY: 5
         },
         itemStyle: {
-          color: '#e74c3c',
+          color: '#9b59b6',
           borderWidth: 3,
           borderColor: '#fff',
-          shadowColor: 'rgba(231, 76, 60, 0.5)',
+          shadowColor: 'rgba(155, 89, 182, 0.5)',
           shadowBlur: 12
         },
         label: {
@@ -1194,12 +1266,12 @@ const getWorkshopChartOption = () => {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: '#f39c12' },
-              { offset: 1, color: '#f1c40f' }
+              { offset: 0, color: '#3498db' },
+              { offset: 1, color: '#5dade2' }
             ]
           },
           borderRadius: [0, 0, 6, 6],
-          shadowColor: 'rgba(243, 156, 18, 0.4)',
+          shadowColor: 'rgba(52, 152, 219, 0.4)',
           shadowBlur: 12,
           shadowOffsetY: 4
         },
@@ -1222,12 +1294,12 @@ const getWorkshopChartOption = () => {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: '#e74c3c' },
-              { offset: 1, color: '#c0392b' }
+              { offset: 0, color: '#9b59b6' },
+              { offset: 1, color: '#8e44ad' }
             ]
           },
           borderRadius: [6, 6, 0, 0],
-          shadowColor: 'rgba(231, 76, 60, 0.4)',
+          shadowColor: 'rgba(155, 89, 182, 0.4)',
           shadowBlur: 12,
           shadowOffsetY: 4
         },
@@ -1248,68 +1320,98 @@ const getWorkshopChartOption = () => {
 const getCategoryChartOption = () => {
   const baseOption = getPieBaseChartOption()
   const data = chartData.value || []
-  const pieData = data.map(item => ({
+  
+  // 对数据进行排序和过滤，只显示前10个类别，避免图表过于凌乱
+  const sortedData = data
+    .filter(item => item.count > 0)
+    .sort((a, b) => (b.count || 0) - (a.count || 0))
+    .slice(0, 10)
+  
+  const pieData = sortedData.map(item => ({
     name: item.category || '',
     value: item.count || 0
   }))
 
   return {
     ...baseOption,
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderColor: '#E4E7ED',
+      borderWidth: 1,
+      textStyle: { color: '#606266', fontSize: 13 },
+      formatter: '{b}: {c} ({d}%)'
+    },
+    legend: {
+      bottom: 10,
+      left: 'center',
+      textStyle: { fontSize: 11, color: '#606266' },
+      itemGap: 15,
+      itemWidth: 12,
+      itemHeight: 12,
+      // 当类别过多时，使用滚动模式
+      type: pieData.length > 8 ? 'scroll' : 'plain',
+      pageIconColor: '#409EFF',
+      pageIconInactiveColor: '#C0C4CC',
+      pageTextStyle: { color: '#606266' }
+    },
     series: [{
       name: '投诉类别',
       type: 'pie',
-      radius: ['20%', '70%'],
-      center: ['50%', '45%'],
+      radius: ['25%', '65%'],
+      center: ['50%', '42%'],
       roseType: 'area',
+      avoidLabelOverlap: true,
       itemStyle: {
-        borderRadius: 8,
+        borderRadius: 6,
         borderWidth: 2,
         borderColor: '#fff',
-        shadowColor: 'rgba(0, 0, 0, 0.2)',
-        shadowBlur: 10
+        shadowColor: 'rgba(0, 0, 0, 0.15)',
+        shadowBlur: 8
       },
       data: pieData,
       label: {
-        show: true,
-        formatter: '{b}\n{c}\n{d}%',
-        fontSize: 12,
-        fontWeight: 'bold',
+        show: pieData.length <= 8, // 当类别数量较少时显示标签
+        position: 'outside',
+        formatter: function(params) {
+          // 简化标签格式，避免过长
+          const name = params.name.length > 6 ? params.name.substring(0, 6) + '...' : params.name
+          return `${name}\n${params.value}\n${params.percent}%`
+        },
+        fontSize: 10,
+        fontWeight: '600',
         color: '#333',
-        backgroundColor: 'rgba(255, 255, 255, 0.8)',
-        borderRadius: 4,
-        padding: [4, 8],
-        rich: {
-          name: {
-            fontSize: 12,
-            fontWeight: 'bold'
-          },
-          value: {
-            fontSize: 11,
-            color: '#666'
-          },
-          percent: {
-            fontSize: 11,
-            color: '#999'
-          }
-        }
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        borderRadius: 3,
+        padding: [3, 6],
+        distanceToLabelLine: 5
       },
       labelLine: {
-        show: true,
-        length: 15,
-        length2: 10,
+        show: pieData.length <= 8,
+        length: 12,
+        length2: 8,
         lineStyle: {
-          width: 2
-        }
+          width: 1.5,
+          color: '#999'
+        },
+        smooth: true
       },
       emphasis: {
         itemStyle: {
-          shadowBlur: 20,
+          shadowBlur: 15,
           shadowOffsetX: 0,
-          shadowColor: 'rgba(0, 0, 0, 0.5)'
+          shadowColor: 'rgba(0, 0, 0, 0.3)'
         },
         label: {
-          fontSize: 14,
-          fontWeight: 'bold'
+          show: true,
+          fontSize: 12,
+          fontWeight: 'bold',
+          formatter: function(params) {
+            return `${params.name}\n${params.value} (${params.percent}%)`
+          }
+        },
+        labelLine: {
+          show: true
         }
       }
     }]
@@ -2587,5 +2689,40 @@ onMounted(async () => {
   .drawer-subtitle {
     font-size: 11px;
   }
+}
+
+/* 抽屉对话框中的附件字段样式 */
+.attachment-field-drawer {
+  width: 100%;
+}
+
+.attachment-content {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.attachment-path {
+  background: #f5f7fa;
+  padding: 8px 12px;
+  border-radius: 4px;
+  border: 1px solid #e4e7ed;
+}
+
+.path-text {
+  font-size: 12px;
+  color: #606266;
+  word-break: break-all;
+  line-height: 1.4;
+}
+
+.attachment-preview {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.no-attachment {
+  color: #909399;
+  font-style: italic;
 }
 </style>

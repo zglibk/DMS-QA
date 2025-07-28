@@ -165,8 +165,9 @@ const fileName = computed(() => {
 
 // 判断是否为图片文件
 const isImageFile = computed(() => {
-  const name = fileName.value.toLowerCase()
-  return /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/.test(name)
+  const name = fileName.value
+  if (!name || typeof name !== 'string') return false
+  return /\.(jpg|jpeg|png|gif|bmp|webp|svg)$/i.test(name)
 })
 
 // 判断路径是否为文件（有文件扩展名）

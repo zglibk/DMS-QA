@@ -1267,7 +1267,6 @@ const generateFileName = async (originalFileName) => {
     // 生成文件名：客户编号 +空格+工单号+空格+品名+短划线+不良类别+空格 +yymmdd+流水号
     const generatedName = `${customer} ${orderNo} ${productName}-${defectiveCategory} ${dateStr}${sequenceNumber}${ext}`
 
-    console.log('生成的文件名:', generatedName)
     return generatedName
   } catch (error) {
     console.error('生成文件名失败:', error)
@@ -1549,13 +1548,6 @@ const initializeEditData = () => {
         uploaded: true,
         isExisting: true // 标记为现有文件
       }
-
-      console.log('=== 编辑模式文件初始化 ===')
-      console.log('文件路径:', filePath)
-      console.log('文件名:', fileName)
-      console.log('是否图片:', isImage)
-      console.log('预览URL:', selectedFileInfo.value.previewUrl)
-      console.log('========================')
     }
   }
 }

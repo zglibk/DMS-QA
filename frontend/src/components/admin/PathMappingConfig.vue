@@ -11,59 +11,94 @@
         <h4>路径映射规则</h4>
         
         <div class="mapping-list">
-          <div 
-            v-for="(mapping, index) in pathMappings" 
-            :key="index" 
+          <div
+            v-for="(mapping, index) in pathMappings"
+            :key="index"
             class="mapping-item"
           >
             <div class="mapping-header">
               <span class="mapping-name">{{ mapping.name }}</span>
-              <el-button 
-                type="danger" 
-                size="small" 
-                @click="removeMapping(index)"
-                :icon="Delete"
-              >
-                删除
-              </el-button>
+              <div class="mapping-actions">
+                <el-button
+                  type="primary"
+                  @click="editMapping(index)"
+                  :icon="Edit"
+                  :disabled="!isAdmin"
+                >
+                  编辑
+                </el-button>
+                <el-button
+                  type="danger"
+                  @click="confirmRemoveMapping(index)"
+                  :icon="Delete"
+                  :disabled="!isAdmin"
+                >
+                  删除
+                </el-button>
+              </div>
             </div>
-            
+
             <el-form :model="mapping" label-width="100px" class="mapping-form">
               <el-form-item label="规则名称">
-                <el-input v-model="mapping.name" placeholder="输入规则名称" />
+                <el-input
+                  v-model="mapping.name"
+                  placeholder="输入规则名称"
+                  :disabled="!isAdmin || (mapping.isEditing === false)"
+                />
               </el-form-item>
-              
+
               <el-form-item label="本地路径">
-                <el-input 
-                  v-model="mapping.localPattern" 
+                <el-input
+                  v-model="mapping.localPattern"
                   placeholder="如：C:\Users\*\AppData\Roaming\Microsoft\Excel\*"
+                  :disabled="!isAdmin || (mapping.isEditing === false)"
                 />
               </el-form-item>
-              
+
               <el-form-item label="目标路径">
-                <el-input 
-                  v-model="mapping.targetPattern" 
+                <el-input
+                  v-model="mapping.targetPattern"
                   placeholder="如：\\tj_server\工作\品质部\生产异常周报考核统计\*"
+                  :disabled="!isAdmin || (mapping.isEditing === false)"
                 />
               </el-form-item>
-              
+
               <el-form-item label="描述">
-                <el-input 
-                  v-model="mapping.description" 
+                <el-input
+                  v-model="mapping.description"
                   placeholder="规则描述"
                   type="textarea"
                   :rows="2"
+                  :disabled="!isAdmin || (mapping.isEditing === false)"
                 />
+              </el-form-item>
+
+              <!-- 编辑模式下的操作按钮 -->
+              <el-form-item v-if="mapping.isEditing" class="edit-actions">
+                <el-button
+                  type="success"
+                  @click="saveMapping(index)"
+                  :loading="isSubmitting"
+                >
+                  保存
+                </el-button>
+                <el-button
+                  @click="cancelEdit(index)"
+                  :disabled="isSubmitting"
+                >
+                  取消
+                </el-button>
               </el-form-item>
             </el-form>
           </div>
         </div>
         
-        <el-button 
-          type="primary" 
-          @click="addMapping" 
+        <el-button
+          type="primary"
+          @click="addMapping"
           :icon="Plus"
           style="margin-top: 16px"
+          :disabled="!isAdmin"
         >
           添加映射规则
         </el-button>
@@ -158,8 +193,9 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
-import { Plus, Delete } from '@element-plus/icons-vue'
+import { ElMessage, ElMessageBox } from 'element-plus'
+import { Plus, Delete, Edit } from '@element-plus/icons-vue'
+import { useUserStore } from '@/store/user'
 import axios from 'axios'
 
 // 响应式数据
@@ -169,19 +205,34 @@ const isLoading = ref(false)
 const testPath = ref('')
 const testResult = ref('')
 
+// 权限验证
+const isAdmin = ref(false)
+
 // 路径映射规则
 const pathMappings = ref([
   {
     name: 'Excel临时文件映射',
     localPattern: 'C:\\Users\\*\\AppData\\Roaming\\Microsoft\\Excel\\*',
     targetPattern: '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\*',
-    description: 'Excel临时文件映射到tj_server共享盘'
+    description: 'Excel临时文件映射到tj_server共享盘',
+    isEditing: false,
+    originalData: null
   },
   {
     name: '2025年异常汇总映射',
     localPattern: '*2025年异常汇总\\*',
-    targetPattern: '\\\\tj_server\\工作\\品质部\\生产异常周报考核统计\\2025年异常汇总\\不良图片&资料\\*',
-    description: '2025年异常汇总文件映射'
+    targetPattern: 'D:\\WebServer\\backend\\uploads\\attachments\\2025年异常汇总\\*',
+    description: '2025年异常汇总文件映射到服务器存储路径',
+    isEditing: false,
+    originalData: null
+  },
+  {
+    name: '服务器存储映射',
+    localPattern: '2025年异常汇总\\*',
+    targetPattern: 'D:\\WebServer\\backend\\uploads\\attachments\\2025年异常汇总\\*',
+    description: '相对路径到服务器存储路径的映射',
+    isEditing: false,
+    originalData: null
   }
 ])
 
@@ -193,21 +244,153 @@ const conversionConfig = reactive({
   validatePaths: false
 })
 
+// 检查用户权限（静默检查，不显示提示）
+const checkUserPermission = async (showMessage = false) => {
+  // 从userStore获取用户信息
+  const userStore = useUserStore()
+
+  // 确保获取最新的用户信息
+  try {
+    await userStore.fetchProfile()
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+    if (showMessage) {
+      ElMessage.error('获取用户信息失败')
+    }
+    return false
+  }
+
+  const userInfo = userStore.user
+  console.log('用户信息:', userInfo)
+
+  // 检查用户名是否为admin（忽略大小写）
+  // 检查Username字段（注意大小写）
+  isAdmin.value = userInfo.Username && userInfo.Username.toLowerCase() === 'admin'
+
+  console.log('是否为管理员:', isAdmin.value)
+
+  if (!isAdmin.value && showMessage) {
+    ElMessage.warning('只有管理员用户才能进行此操作')
+  }
+
+  return isAdmin.value
+}
+
+
+
 // 添加映射规则
-const addMapping = () => {
+const addMapping = async () => {
+  if (!(await checkUserPermission(true))) {
+    return
+  }
+
   pathMappings.value.push({
     id: null, // 新记录没有ID
     name: '新映射规则',
     localPattern: '',
     targetPattern: '',
     description: '',
-    isActive: true
+    isActive: true,
+    isEditing: true, // 新添加的规则默认为编辑状态
+    originalData: null
+  })
+}
+
+// 编辑映射规则
+const editMapping = async (index) => {
+  if (!(await checkUserPermission(true))) {
+    return
+  }
+
+  const mapping = pathMappings.value[index]
+  // 保存原始数据用于取消编辑
+  mapping.originalData = {
+    name: mapping.name,
+    localPattern: mapping.localPattern,
+    targetPattern: mapping.targetPattern,
+    description: mapping.description
+  }
+  mapping.isEditing = true
+}
+
+// 保存映射规则
+const saveMapping = async (index) => {
+  if (!(await checkUserPermission(true))) {
+    return
+  }
+
+  const mapping = pathMappings.value[index]
+
+  // 验证必填字段
+  if (!mapping.name || !mapping.localPattern || !mapping.targetPattern) {
+    ElMessage.error('请填写完整的映射规则信息')
+    return
+  }
+
+  try {
+    isSubmitting.value = true
+
+    // 这里可以调用API保存单个映射规则
+    // 暂时只更新本地状态
+    mapping.isEditing = false
+    mapping.originalData = null
+
+    ElMessage.success('映射规则保存成功')
+  } catch (error) {
+    ElMessage.error('保存失败: ' + error.message)
+  } finally {
+    isSubmitting.value = false
+  }
+}
+
+// 取消编辑
+const cancelEdit = (index) => {
+  const mapping = pathMappings.value[index]
+
+  if (mapping.originalData) {
+    // 恢复原始数据
+    mapping.name = mapping.originalData.name
+    mapping.localPattern = mapping.originalData.localPattern
+    mapping.targetPattern = mapping.originalData.targetPattern
+    mapping.description = mapping.originalData.description
+    mapping.originalData = null
+  } else {
+    // 如果是新添加的规则，直接删除
+    pathMappings.value.splice(index, 1)
+    return
+  }
+
+  mapping.isEditing = false
+}
+
+// 确认删除映射规则
+const confirmRemoveMapping = async (index) => {
+  if (!(await checkUserPermission(true))) {
+    return
+  }
+
+  const mapping = pathMappings.value[index]
+
+  ElMessageBox.confirm(
+    `确定要删除映射规则"${mapping.name}"吗？此操作不可恢复。`,
+    '确认删除',
+    {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+      confirmButtonClass: 'el-button--danger'
+    }
+  ).then(() => {
+    removeMapping(index)
+  }).catch(() => {
+    // 用户取消删除
   })
 }
 
 // 删除映射规则
 const removeMapping = (index) => {
   pathMappings.value.splice(index, 1)
+  ElMessage.success('映射规则删除成功')
 }
 
 // 测试路径转换
@@ -257,8 +440,16 @@ const loadConfig = async (showMessage = false) => {
           localPattern: mapping.localPattern,
           targetPattern: mapping.targetPattern,
           description: mapping.description,
-          isActive: mapping.isActive !== false
+          isActive: mapping.isActive !== false,
+          isEditing: false,
+          originalData: null
         }))
+      }
+
+      // 加载转换配置
+      if (config.conversionConfig) {
+        console.log('加载转换配置:', config.conversionConfig)
+        Object.assign(conversionConfig, config.conversionConfig)
       }
 
       if (showMessage) {
@@ -346,8 +537,9 @@ const resetConfig = () => {
   ElMessage.success('配置已重置为默认值')
 }
 
-// 组件挂载时加载配置
-onMounted(() => {
+// 组件挂载时加载配置和检查权限（静默）
+onMounted(async () => {
+  await checkUserPermission(false) // 静默检查权限，不显示提示
   loadConfig()
 })
 </script>
@@ -403,6 +595,13 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.mapping-actions {
+  display: flex;
+  gap: 8px;
 }
 
 .mapping-name {
@@ -412,6 +611,15 @@ onMounted(() => {
 
 .mapping-form {
   margin: 0;
+}
+
+.edit-actions {
+  margin-top: 16px;
+  text-align: right;
+}
+
+.edit-actions .el-button {
+  margin-left: 8px;
 }
 
 .form-item-tip {

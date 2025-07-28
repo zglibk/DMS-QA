@@ -368,6 +368,30 @@ const fetchOptions = async () => {
   }
 }
 
+// 安全的日期格式化函数
+const formatDateSafe = (dateValue) => {
+  if (!dateValue) return ''
+  
+  // 如果已经是YYYY-MM-DD格式的字符串，直接返回
+  if (typeof dateValue === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(dateValue)) {
+    return dateValue
+  }
+  
+  // 如果是Date对象或其他格式，进行安全转换
+  try {
+    const date = new Date(dateValue)
+    if (isNaN(date.getTime())) return dateValue
+    
+    // 使用本地时区的年月日，避免UTC转换
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch (error) {
+    return dateValue
+  }
+}
+
 // 获取投诉列表数据
 const fetchData = async () => {
   tableLoading.value = true
@@ -386,7 +410,12 @@ const fetchData = async () => {
     })
 
     if (response.data.success) {
-      tableData.value = response.data.data
+      // 对返回的数据进行日期格式化处理
+      const processedData = response.data.data.map(item => ({
+        ...item,
+        Date: formatDateSafe(item.Date)
+      }))
+      tableData.value = processedData
       total.value = response.data.total
     } else {
       ElMessage.error('获取数据失败: ' + response.data.message)

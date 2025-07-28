@@ -297,6 +297,20 @@ router.post('/preview', upload.single('file'), async (req, res) => {
     const headers = jsonData[0] || [];
     const previewData = jsonData.slice(1, 6); // 预览前5行数据
 
+    // 过滤掉完全空的行来计算有效数据行数（与validate API保持一致）
+    const allDataRows = jsonData.slice(1);
+    const validDataRows = allDataRows.filter(row => {
+      // 检查行是否有任何非空值
+      return row && row.some(cell =>
+        cell !== null &&
+        cell !== undefined &&
+        cell !== '' &&
+        String(cell).trim() !== ''
+      );
+    });
+
+    console.log(`Excel总行数: ${allDataRows.length}, 有效数据行数: ${validDataRows.length}`);
+
     // 删除临时文件
     fs.unlinkSync(req.file.path);
 
@@ -307,7 +321,7 @@ router.post('/preview', upload.single('file'), async (req, res) => {
         selectedSheet: sheetName,
         headers,
         previewData,
-        totalRows: jsonData.length - 1,
+        totalRows: validDataRows.length, // 使用过滤后的有效行数
         fileName: req.file.originalname
       }
     });
@@ -363,6 +377,20 @@ router.post('/preview-sheet', upload.single('file'), async (req, res) => {
     const headers = jsonData[0] || [];
     const previewData = jsonData.slice(1, 6); // 预览前5行数据
 
+    // 过滤掉完全空的行来计算有效数据行数（与validate API保持一致）
+    const allDataRows = jsonData.slice(1);
+    const validDataRows = allDataRows.filter(row => {
+      // 检查行是否有任何非空值
+      return row && row.some(cell =>
+        cell !== null &&
+        cell !== undefined &&
+        cell !== '' &&
+        String(cell).trim() !== ''
+      );
+    });
+
+    console.log(`Excel总行数: ${allDataRows.length}, 有效数据行数: ${validDataRows.length}`);
+
     // 删除临时文件
     fs.unlinkSync(req.file.path);
 
@@ -372,7 +400,7 @@ router.post('/preview-sheet', upload.single('file'), async (req, res) => {
         selectedSheet: sheetName,
         headers,
         previewData,
-        totalRows: jsonData.length - 1,
+        totalRows: validDataRows.length, // 使用过滤后的有效行数
         fileName: req.file.originalname
       }
     });

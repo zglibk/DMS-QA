@@ -16,7 +16,10 @@ class ImagePreviewService {
    * @returns {boolean}
    */
   isImageFile(filePath) {
-    if (!filePath) return false
+    // 如果没有文件路径，返回false
+    if (!filePath || typeof filePath !== 'string') {
+      return false
+    }
 
     // 如果是blob URL，直接认为是图片（因为我们只为图片创建blob URL）
     if (filePath.startsWith('blob:')) {

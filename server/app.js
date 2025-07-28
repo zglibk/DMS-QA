@@ -41,6 +41,7 @@ const importRouter = require('./routes/import');              // 数据导入路
 const uploadRouter = require('./routes/upload');              // 文件上传路由
 const qualityMetricsRouter = require('./routes/quality-metrics'); // 质量指标路由
 const materialPriceRouter = require('./routes/material-price'); // 材料价格路由
+const reworkRouter = require('./routes/rework');              // 返工登记路由
 
 /**
  * 创建Express应用实例
@@ -126,6 +127,7 @@ app.get('/api/test-connection', (req, res) => {
  * - /api/upload: 文件上传（附件、图片上传）
  * - /api/quality-metrics: 质量指标（统计分析、图表数据）
  * - /api/admin/material-prices: 材料价格管理（供应商价格）
+ * - /api/rework: 生产不良返工登记管理（增删改查、统计分析）
  */
 app.use('/api/complaint', complaintRouter);
 app.use('/api/auth', authRouter);
@@ -134,6 +136,7 @@ app.use('/api/import', importRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/quality-metrics', qualityMetricsRouter);
 app.use('/api/admin/material-prices', materialPriceRouter);
+app.use('/api/rework', reworkRouter);
 
 /**
  * 静态文件服务配置
@@ -151,6 +154,7 @@ app.use('/api/admin/material-prices', materialPriceRouter);
  */
 app.use('/files/attachments', express.static(path.join(__dirname, 'uploads/attachments')));
 app.use('/files/site-images', express.static(path.join(__dirname, 'uploads/site-images')));
+app.use('/files/rework-attachments', express.static(path.join(__dirname, 'uploads/rework-attachments')));
 
 // 添加共享文件访问路由
 app.use('/shared-files', require('./routes/shared-files'));
