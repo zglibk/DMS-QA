@@ -57,6 +57,22 @@
             <el-icon><Setting /></el-icon>
             <span v-show="!collapsed">权限管理</span>
           </template>
+          <el-menu-item index="/admin/department-management">
+            <el-icon><OfficeBuilding /></el-icon>
+            <span v-show="!collapsed">部门管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/position-management">
+            <el-icon><Briefcase /></el-icon>
+            <span v-show="!collapsed">岗位管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/role-management">
+            <el-icon><UserFilled /></el-icon>
+            <span v-show="!collapsed">角色管理</span>
+          </el-menu-item>
+          <el-menu-item index="/admin/menu-management">
+            <el-icon><Menu /></el-icon>
+            <span v-show="!collapsed">菜单管理</span>
+          </el-menu-item>
           <el-menu-item index="/admin/role-list">
             <el-icon><User /></el-icon>
             <span v-show="!collapsed">角色列表</span>
@@ -194,7 +210,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument, List, Money, Avatar } from '@element-plus/icons-vue'
+import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument, List, Money, Avatar, Briefcase, UserFilled, Menu } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import Profile from '../Profile.vue'

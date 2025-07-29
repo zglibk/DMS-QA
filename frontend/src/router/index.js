@@ -136,6 +136,34 @@ const routes = [
         path: 'person-management',
         component: () => import('../views/admin/PersonManagement.vue'),
         meta: { requiresAuth: true }
+      },
+
+      // 部门管理页面（懒加载 + 需要认证）
+      {
+        path: 'department-management',
+        component: () => import('../views/admin/DepartmentManagement.vue'),
+        meta: { requiresAuth: true }
+      },
+
+      // 岗位管理页面（懒加载 + 需要认证）
+      {
+        path: 'position-management',
+        component: () => import('../views/admin/PositionManagement.vue'),
+        meta: { requiresAuth: true }
+      },
+
+      // 角色管理页面（懒加载 + 需要认证）
+      {
+        path: 'role-management',
+        component: () => import('../views/admin/RoleManagement.vue'),
+        meta: { requiresAuth: true }
+      },
+
+      // 菜单管理页面（懒加载 + 需要认证）
+      {
+        path: 'menu-management',
+        component: () => import('../views/admin/MenuManagement.vue'),
+        meta: { requiresAuth: true }
       }
     ]
   }
