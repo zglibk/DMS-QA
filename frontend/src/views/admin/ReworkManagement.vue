@@ -9,17 +9,7 @@
         </h2>
         <p class="page-description">管理生产过程中的不良品返工记录，包括返工原因、责任人、成本统计等信息</p>
       </div>
-      <div class="header-actions">
-        <el-button type="primary" @click="showAddDialog" :icon="Plus">
-          新增返工记录
-        </el-button>
-        <el-button @click="exportData" :icon="Download" :loading="exportLoading">
-          导出数据
-        </el-button>
-        <el-button @click="refreshData" :icon="Refresh">
-          刷新
-        </el-button>
-      </div>
+
     </div>
 
     <!-- 搜索筛选区域 -->
@@ -35,7 +25,7 @@
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
             @change="handleSearch"
-            style="width: 18rem; min-width: 18rem"
+            style="width: 9rem; min-width: 9rem"
             popper-class="date-picker-popper"
           />
         </el-form-item>
@@ -115,81 +105,119 @@
 
     <!-- 数据表格 -->
     <el-card class="table-card" shadow="never">
+      <!-- 批量操作按钮区域 -->
+      <div class="table-actions">
+        <div class="actions-left">
+          <el-button type="primary" @click="showAddDialog" :icon="Plus">
+            新增
+          </el-button>
+
+          <el-button 
+            type="warning" 
+            @click="editSelectedRecord" 
+            :icon="Edit"
+            :disabled="selectedRows.length !== 1"
+          >
+            编辑
+          </el-button>
+          <el-button 
+            type="danger" 
+            @click="deleteSelectedRecords" 
+            :icon="Delete"
+            :disabled="selectedRows.length === 0"
+          >
+            删除
+          </el-button>
+        </div>
+        <div class="actions-right">
+          <span class="selection-info" v-if="selectedRows.length > 0">
+            已选择 {{ selectedRows.length }} 项
+          </span>
+          <el-button @click="exportData" :icon="Download" :loading="exportLoading">
+            导出数据
+          </el-button>
+          <el-button @click="refreshData" :icon="Refresh">
+            刷新
+          </el-button>
+        </div>
+      </div>
+      
       <el-table
         :data="tableData"
         v-loading="loading"
         stripe
         border
-        height="600"
         @selection-change="handleSelectionChange"
+        @row-dblclick="viewDetail"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="ID" label="ID" width="80" sortable />
-        <el-table-column prop="ReworkDate" label="返工日期" width="120" sortable>
+        <el-table-column prop="ID" label="ID" width="70" sortable />
+        <el-table-column prop="ReworkDate" label="返工日期" width="110" sortable>
           <template #default="{ row }">
             {{ formatDate(row.ReworkDate) }}
           </template>
         </el-table-column>
-        <el-table-column prop="CustomerCode" label="客户编号" width="120" />
-        <el-table-column prop="OrderNo" label="工单号" width="140" />
-        <el-table-column prop="ProductName" label="产品名称" width="150" show-overflow-tooltip />
-        <el-table-column prop="TotalQty" label="总数量" width="100" align="right" />
-        <el-table-column prop="DefectiveQty" label="不良数" width="100" align="right" />
-        <el-table-column prop="DefectiveRate" label="不良率" width="100" align="right">
+        <el-table-column prop="CustomerCode" label="客户编号" width="110" show-overflow-tooltip />
+        <el-table-column prop="OrderNo" label="工单号" width="130" show-overflow-tooltip />
+        <el-table-column prop="ProductName" label="产品名称" min-width="250" show-overflow-tooltip />
+        <el-table-column prop="TotalQty" label="总数量" width="90" align="right" />
+        <el-table-column prop="DefectiveQty" label="不良数" width="90" align="right" />
+        <el-table-column prop="DefectiveRate" label="不良率" width="90" align="right">
           <template #default="{ row }">
             <span :class="getDefectiveRateClass(row.DefectiveRate)">
               {{ row.DefectiveRate ? row.DefectiveRate.toFixed(2) + '%' : '-' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="DefectiveReason" label="不良原因" width="130" show-overflow-tooltip />
-        <el-table-column prop="ResponsiblePerson" label="责任人" width="90" />
-        <el-table-column prop="ReworkPersonnel" label="返工人员" width="100" />
-        <el-table-column prop="ReworkHours" label="返工工时" width="100" align="right">
+        <el-table-column prop="DefectiveReason" label="不良原因" width="140" show-overflow-tooltip />
+        <el-table-column prop="ResponsiblePerson" label="责任人" width="90" show-overflow-tooltip />
+        <el-table-column prop="ReworkCategory" label="返工类别" width="110" show-overflow-tooltip />
+        <el-table-column prop="ReworkPersonnel" label="返工人员" width="90" show-overflow-tooltip />
+        <el-table-column prop="ReworkHours" label="返工工时" width="90" align="right">
           <template #default="{ row }">
             {{ row.ReworkHours ? row.ReworkHours + 'h' : '-' }}
           </template>
         </el-table-column>
-        <el-table-column prop="TotalCost" label="总成本" width="120" align="right">
+        <el-table-column prop="TotalCost" label="总成本" width="110" align="right">
           <template #default="{ row }">
             <span class="cost-amount">
               {{ row.TotalCost ? '¥' + row.TotalCost.toFixed(2) : '-' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="ReworkStatus" label="状态" width="120">
+        <el-table-column prop="ReworkStatus" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="getStatusType(row.ReworkStatus)">
+            <el-tag :type="getStatusType(row.ReworkStatus)" size="small">
               {{ row.ReworkStatus }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" width="120" fixed="right">
           <template #default="{ row }">
             <el-button
-              type="primary"
+              text
               size="small"
               @click="viewDetail(row)"
               :icon="View"
-            >
-              查看
-            </el-button>
+              class="action-btn view-btn"
+              title="查看详情"
+            />
             <el-button
-              type="warning"
+              text
               size="small"
               @click="editRecord(row)"
               :icon="Edit"
-            >
-              编辑
-            </el-button>
+              class="action-btn edit-btn"
+              title="编辑"
+            />
             <el-button
-              type="danger"
+              text
               size="small"
               @click="deleteRecord(row)"
               :icon="Delete"
-            >
-              删除
-            </el-button>
+              class="action-btn delete-btn"
+              title="删除"
+            />
           </template>
         </el-table-column>
       </el-table>
@@ -213,12 +241,13 @@
       :title="dialogTitle"
       v-model="dialogVisible"
       width="60%"
-      height="90vh"
       :close-on-click-modal="false"
       :append-to-body="true"
       :lock-scroll="false"
-      @close="resetForm"
+      @close="() => { resetForm(); cleanupResources(); }"
+      @opened="forceDialogStyle"
       class="rework-dialog rework-dialog-global"
+      custom-class="force-dialog-height"
     >
       <div class="form-container">
         <el-form
@@ -426,7 +455,7 @@
                     <el-option
                       v-for="person in options.persons"
                       :key="person.Name"
-                      :label="person.Name"
+                      :label="person.IsActive ? person.Name : `${person.Name} (离职)`"
                       :value="person.Name"
                     />
                   </el-select>
@@ -463,12 +492,40 @@
             
             <el-row :gutter="24">
               <el-col :span="8">
+                <el-form-item label="返工类别" prop="reworkCategory">
+                  <el-select 
+                    v-model="formData.reworkCategory" 
+                    placeholder="请选择返工类别" 
+                    style="width: 100%"
+                    filterable
+                  >
+                    <el-option
+                      v-for="category in options.reworkCategories"
+                      :key="category.ID"
+                      :label="category.Name"
+                      :value="category.Name"
+                    />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="8">
                 <el-form-item label="返工人员" prop="reworkPersonnel">
-                  <el-input 
+                  <el-select 
                     v-model="formData.reworkPersonnel" 
-                    placeholder="请输入返工人员"
-                    :prefix-icon="Avatar"
-                  />
+                    placeholder="请选择返工人员" 
+                    style="width: 100%"
+                    filterable
+                    multiple
+                    collapse-tags
+                    collapse-tags-tooltip
+                  >
+                    <el-option
+                      v-for="person in options.persons"
+                      :key="person.Name"
+                      :label="person.IsActive ? `${person.Name} (${person.Department})` : `${person.Name} (${person.Department}) - 离职`"
+                      :value="person.Name"
+                    />
+                  </el-select>
                 </el-form-item>
               </el-col>
               <el-col :span="8">
@@ -479,12 +536,16 @@
                     :precision="2"
                     placeholder="返工工时"
                     style="width: 100%"
+                    @change="calculateLaborCost"
                     controls-position="right"
                   >
                     <template #suffix>小时</template>
                   </el-input-number>
                 </el-form-item>
               </el-col>
+            </el-row>
+
+            <el-row :gutter="24">
               <el-col :span="8">
                 <el-form-item label="返工状态">
                   <el-select 
@@ -500,6 +561,9 @@
                     />
                   </el-select>
                 </el-form-item>
+              </el-col>
+              <el-col :span="16">
+                <!-- 预留空间 -->
               </el-col>
             </el-row>
 
@@ -529,7 +593,23 @@
             </template>
             
             <el-row :gutter="24">
-              <el-col :span="8">
+              <el-col :span="6">
+                <el-form-item label="工时单价">
+                  <el-input-number
+                    v-model="hourlyRate"
+                    :min="0"
+                    :precision="2"
+                    placeholder="工时单价"
+                    style="width: 100%"
+                    @change="calculateLaborCost"
+                    controls-position="right"
+                  >
+                    <template #prefix>¥</template>
+                    <template #suffix>/小时</template>
+                  </el-input-number>
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
                 <el-form-item label="材料成本">
                   <el-input-number
                     v-model="formData.materialCost"
@@ -544,7 +624,7 @@
                   </el-input-number>
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
+              <el-col :span="6">
                 <el-form-item label="人工成本">
                   <el-input-number
                     v-model="formData.laborCost"
@@ -552,14 +632,14 @@
                     :precision="2"
                     placeholder="人工成本"
                     style="width: 100%"
-                    @change="calculateTotalCost"
+                    readonly
                     controls-position="right"
                   >
                     <template #prefix>¥</template>
                   </el-input-number>
                 </el-form-item>
               </el-col>
-              <el-col :span="8">
+              <el-col :span="6">
                 <el-form-item label="其他成本">
                   <el-input-number
                     v-model="formData.otherCost"
@@ -573,6 +653,27 @@
                     <template #prefix>¥</template>
                   </el-input-number>
                 </el-form-item>
+              </el-col>
+            </el-row>
+            
+            <el-row :gutter="24">
+              <el-col :span="6">
+                <el-form-item label="总成本">
+                  <el-input-number
+                    v-model="formData.totalCost"
+                    :min="0"
+                    :precision="2"
+                    placeholder="总成本"
+                    style="width: 100%"
+                    readonly
+                    controls-position="right"
+                  >
+                    <template #prefix>¥</template>
+                  </el-input-number>
+                </el-form-item>
+              </el-col>
+              <el-col :span="18">
+                <!-- 预留空间 -->
               </el-col>
             </el-row>
           </el-card>
@@ -682,28 +783,100 @@
             <el-row :gutter="24">
               <el-col :span="24">
                 <el-form-item label="附件上传">
-                  <el-upload
-                    ref="uploadRef"
-                    :action="uploadUrl"
-                    :file-list="fileList"
-                    :on-success="handleUploadSuccess"
-                    :on-remove="handleUploadRemove"
-                    :before-upload="beforeUpload"
-                    multiple
-                    :limit="5"
-                    drag
-                    class="upload-demo"
-                  >
-                    <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
-                    <div class="el-upload__text">
-                      将文件拖到此处，或<em>点击上传</em>
+                  <div class="file-upload-container">
+                    <!-- 文件路径显示 -->
+                    <div v-if="selectedFileInfo" class="file-info-section">
+                      <el-form-item label="附件文件路径">
+                        <el-input
+                          :value="selectedFileInfo.relativePath"
+                          readonly
+                          placeholder="暂无文件"
+                        >
+                          <template #prepend>
+                            <el-icon><Document /></el-icon>
+                          </template>
+                        </el-input>
+                      </el-form-item>
                     </div>
-                    <template #tip>
-                      <div class="el-upload__tip">
-                        支持 jpg/png/pdf/doc/xls 格式，单个文件不超过 10MB，最多 5 个文件
+                    
+                    <!-- 上传组件 -->
+                    <el-upload
+                      ref="uploadRef"
+                      :action="uploadUrl"
+                      :file-list="fileList"
+                      :on-change="handleFileChange"
+                      :on-success="handleUploadSuccess"
+                      :on-remove="handleUploadRemove"
+                      :before-upload="beforeUpload"
+                      :auto-upload="false"
+                      :limit="1"
+                      drag
+                      class="upload-demo"
+                    >
+                      <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+                      <div class="el-upload__text">
+                        将文件拖到此处，或<em>点击选择文件</em>
                       </div>
-                    </template>
-                  </el-upload>
+                      <template #tip>
+                        <div class="el-upload__tip">
+                          支持 jpg/png/pdf/doc/docx/xls/xlsx 格式，单个文件不超过 10MB
+                        </div>
+                      </template>
+                    </el-upload>
+                    
+                    <!-- 上传进度 -->
+                    <div v-if="fileUploading" class="upload-progress">
+                      <el-progress :percentage="uploadProgress" :show-text="true" />
+                      <p class="progress-text">正在上传文件...</p>
+                    </div>
+                    
+                    <!-- 文件预览 -->
+                    <div v-if="selectedFileInfo" class="file-preview">
+                      <el-form-item label="文件预览">
+                        <div class="preview-container">
+                          <!-- 图片预览 -->
+                          <div v-if="isImageFile(selectedFileInfo.fileName)" class="image-preview-content">
+                            <img 
+                              :src="selectedFileInfo.previewUrl" 
+                              :alt="selectedFileInfo.fileName"
+                              class="preview-image"
+                              @click="openImagePreview"
+                            />
+                            <div class="preview-actions">
+                              <el-button size="small" @click="openImagePreview">
+                                <el-icon><ZoomIn /></el-icon>
+                                查看大图
+                              </el-button>
+                            </div>
+                          </div>
+                          
+                          <!-- PDF预览 -->
+                          <div v-else-if="isPdfFile(selectedFileInfo.fileName)" class="pdf-preview-content">
+                            <div class="file-icon pdf-icon">
+                              <el-icon size="48"><Document /></el-icon>
+                            </div>
+                            <div class="preview-actions">
+                              <el-button size="small" @click="openPdfPreview">
+                                <el-icon><View /></el-icon>
+                                预览PDF
+                              </el-button>
+                            </div>
+                          </div>
+                          
+                          <!-- 文档预览 -->
+                          <div v-else class="document-preview-content">
+                            <div class="file-icon" :class="getFileIconClass(selectedFileInfo.fileName)">
+                              <el-icon size="48"><Document /></el-icon>
+                            </div>
+                            <div class="file-type-label">{{ getFileTypeLabel(selectedFileInfo.fileName) }}</div>
+                          </div>
+                          
+                          <p class="preview-filename">{{ selectedFileInfo.fileName }}</p>
+                          <p class="file-size">{{ formatFileSize(selectedFileInfo.file?.size) }}</p>
+                        </div>
+                      </el-form-item>
+                    </div>
+                  </div>
                 </el-form-item>
               </el-col>
             </el-row>
@@ -777,6 +950,9 @@
           <el-descriptions-item label="责任部门">
             {{ currentRecord.ResponsibleDept || '-' }}
           </el-descriptions-item>
+          <el-descriptions-item label="返工类别">
+            {{ currentRecord.ReworkCategory || '-' }}
+          </el-descriptions-item>
           <el-descriptions-item label="返工人员">
             {{ currentRecord.ReworkPersonnel }}
           </el-descriptions-item>
@@ -825,6 +1001,21 @@
           </el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">
             {{ currentRecord.Remarks || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="附件文件" :span="2">
+            <div v-if="currentRecord.AttachmentFiles">
+              <div v-for="(fileName, index) in currentRecord.AttachmentFiles.split(';').filter(name => name.trim())" :key="index" class="attachment-item">
+                <el-link 
+                  :href="`/uploads/${fileName}`" 
+                  target="_blank" 
+                  type="primary"
+                  :icon="Document"
+                >
+                  {{ fileName }}
+                </el-link>
+              </div>
+            </div>
+            <span v-else class="text-muted">无附件</span>
           </el-descriptions-item>
         </el-descriptions>
       </div>
@@ -931,6 +1122,30 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 图片预览对话框 -->
+    <el-dialog
+      v-model="imagePreviewVisible"
+      title="图片预览"
+      width="80%"
+      :close-on-click-modal="true"
+      :close-on-press-escape="true"
+      append-to-body
+      class="image-preview-dialog"
+    >
+      <div class="image-preview-wrapper">
+        <img 
+          :src="previewImageUrl" 
+          :alt="selectedFileInfo?.fileName"
+          class="preview-full-image"
+        />
+      </div>
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="imagePreviewVisible = false">关闭</el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -941,7 +1156,8 @@ import {
   Plus, Download, Refresh, Search, RefreshLeft, View, Edit, Delete,
   Tools, Upload, Document, Calendar, User, DocumentCopy, Box, SetUp,
   OfficeBuilding, DataAnalysis, Warning, UserFilled, Avatar, Money,
-  Medal, Files, UploadFilled, Close, Check, InfoFilled, Setting
+  Medal, Files, UploadFilled, Close, Check, InfoFilled, Setting,
+  ZoomIn
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 
@@ -958,6 +1174,11 @@ const currentRecord = ref(null)
 const formRef = ref(null)
 const uploadRef = ref(null)
 const fileList = ref([])
+
+// 文件上传相关状态
+const selectedFileInfo = ref(null)
+const fileUploading = ref(false)
+const uploadProgress = ref(0)
 const showQualityLevelDialog = ref(false)
 const savingAllLevels = ref(false)
 
@@ -1042,6 +1263,9 @@ const pagination = reactive({
   total: 0
 })
 
+// 工时单价（默认35元/小时）
+const hourlyRate = ref(35)
+
 // 表单数据
 const formData = reactive({
   reworkDate: '',
@@ -1057,16 +1281,19 @@ const formData = reactive({
   defectiveCategory: '',
   responsiblePerson: '',
   responsibleDept: '',
-  reworkPersonnel: '',
+  reworkCategory: '',
+  reworkPersonnel: [],
   reworkHours: null,
   reworkMethod: '',
   reworkStatus: '进行中',
   materialCost: null,
   laborCost: null,
   otherCost: null,
+  totalCost: null,
   qualityLevel: '',
   finalResult: '',
-  remarks: ''
+  remarks: '',
+  attachmentPath: ''
 })
 
 // 下拉选项数据
@@ -1075,6 +1302,7 @@ const options = reactive({
   departments: [],
   persons: [],
   defectiveCategories: [],
+  reworkCategories: [],
   reworkStatuses: [],
   qualityLevels: [],
   finalResults: []
@@ -1092,7 +1320,7 @@ const formRules = {
   defectiveReason: [{ required: true, message: '请输入不良原因', trigger: 'blur' }],
   defectiveCategory: [{ required: true, message: '请选择不良类别', trigger: 'change' }],
   responsiblePerson: [{ required: true, message: '请选择责任人', trigger: 'change' }],
-  reworkPersonnel: [{ required: true, message: '请输入返工人员', trigger: 'blur' }]
+  reworkPersonnel: [{ required: true, message: '请选择返工人员', trigger: 'change' }]
 }
 
 // 计算属性
@@ -1101,7 +1329,7 @@ const dialogTitle = computed(() => {
 })
 
 const uploadUrl = computed(() => {
-  return `${import.meta.env.VITE_API_BASE_URL}/api/rework`
+  return `${import.meta.env.VITE_API_BASE_URL}/api/upload/rework-attachment`
 })
 
 // 生命周期
@@ -1110,6 +1338,54 @@ onMounted(() => {
   loadOptions()
   initQualityLevels()
 })
+
+// 强制设置对话框样式
+const forceDialogStyle = () => {
+  nextTick(() => {
+    const dialog = document.querySelector('.rework-dialog-global')
+    if (dialog) {
+      dialog.style.height = '80vh'
+      dialog.style.maxHeight = '80vh'
+      dialog.style.margin = 'auto'
+      dialog.style.top = '50%'
+      dialog.style.transform = 'translateY(-50%)'
+      dialog.style.display = 'flex'
+      dialog.style.flexDirection = 'column'
+      
+      const body = dialog.querySelector('.el-dialog__body')
+      if (body) {
+        body.style.flex = '1'
+        body.style.overflowY = 'auto'
+        body.style.padding = '1rem'
+        body.style.margin = '0'
+        body.style.paddingBottom = '0'
+      }
+      
+      const footer = dialog.querySelector('.el-dialog__footer')
+      if (footer) {
+        footer.style.flexShrink = '0'
+        footer.style.padding = '0.5rem 1.5rem'
+        footer.style.margin = '0'
+        footer.style.background = '#fff'
+        footer.style.borderTop = '1px solid #ebeef5'
+      }
+      
+      // 强制设置form-container样式
+      const formContainer = dialog.querySelector('.form-container')
+      if (formContainer) {
+        formContainer.style.paddingBottom = '0'
+        formContainer.style.marginBottom = '0'
+        formContainer.style.setProperty('margin-bottom', '0', 'important')
+      }
+      
+      // 强制设置最后一个form-section样式
+      const lastFormSection = dialog.querySelector('.form-section:last-child')
+      if (lastFormSection) {
+        lastFormSection.style.marginBottom = '0'
+      }
+    }
+  })
+}
 
 // 方法定义
 const loadData = async () => {
@@ -1129,6 +1405,12 @@ const loadData = async () => {
     const response = await axios.get('/api/rework/list', { params })
     
     if (response.data.success) {
+      console.log('=== 前端调试 - 返工列表数据 ===', response.data.data)
+      // 检查第一条记录的ReworkCategory字段
+      if (response.data.data.length > 0) {
+        console.log('=== 前端调试 - 第一条记录的ReworkCategory ===', response.data.data[0].ReworkCategory)
+        console.log('=== 前端调试 - 第一条记录的完整数据 ===', response.data.data[0])
+      }
       tableData.value = response.data.data
       pagination.total = response.data.pagination.total
     } else {
@@ -1144,12 +1426,21 @@ const loadData = async () => {
 
 const loadOptions = async () => {
   try {
+    // 加载基础选项数据
     const response = await axios.get('/api/rework/options')
     if (response.data.success) {
       Object.assign(options, response.data.data)
     } else {
       console.error('加载选项数据失败:', response.data.message)
       ElMessage.error(response.data.message || '加载选项数据失败')
+    }
+    
+    // 加载返工类别数据
+    const categoriesResponse = await axios.get('/api/rework/rework-categories')
+    if (categoriesResponse.data.success) {
+      options.reworkCategories = categoriesResponse.data.data
+    } else {
+      console.error('加载返工类别数据失败:', categoriesResponse.data.message)
     }
   } catch (error) {
     console.error('加载选项数据失败:', error)
@@ -1174,8 +1465,70 @@ const resetSearch = () => {
   handleSearch()
 }
 
-const refreshData = () => {
-  loadData()
+const refreshData = async () => {
+  try {
+    ElMessage.info('正在刷新数据...')
+    
+    // 重置分页到第一页
+    pagination.current = 1
+    
+    // 创建不显示错误消息的加载函数
+    const loadDataSilent = async () => {
+      try {
+        loading.value = true
+        const params = {
+          page: pagination.current,
+          pageSize: pagination.pageSize,
+          ...searchForm
+        }
+        
+        if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+          params.startDate = searchForm.dateRange[0]
+          params.endDate = searchForm.dateRange[1]
+        }
+        
+        const response = await axios.get('/api/rework/list', { params })
+        
+        if (response.data.success) {
+          tableData.value = response.data.data
+          pagination.total = response.data.pagination.total
+        } else {
+          throw new Error(response.data.message || '获取数据失败')
+        }
+      } finally {
+        loading.value = false
+      }
+    }
+    
+    const loadOptionsSilent = async () => {
+      // 加载基础选项数据
+      const response = await axios.get('/api/rework/options')
+      if (response.data.success) {
+        Object.assign(options, response.data.data)
+      } else {
+        throw new Error(response.data.message || '加载选项数据失败')
+      }
+      
+      // 加载返工类别数据
+      const categoriesResponse = await axios.get('/api/rework/rework-categories')
+      if (categoriesResponse.data.success) {
+        options.reworkCategories = categoriesResponse.data.data
+      } else {
+        console.error('加载返工类别数据失败:', categoriesResponse.data.message)
+      }
+    }
+    
+    // 并行加载数据和选项
+    await Promise.all([
+      loadDataSilent(),
+      loadOptionsSilent()
+    ])
+    
+    ElMessage.success('数据刷新完成')
+  } catch (error) {
+    console.error('刷新数据失败:', error)
+    ElMessage.error('刷新数据失败')
+  }
 }
 
 const handleSizeChange = (size) => {
@@ -1193,24 +1546,136 @@ const handleSelectionChange = (selection) => {
   selectedRows.value = selection
 }
 
+// 批量操作方法
+const editSelectedRecord = () => {
+  if (selectedRows.value.length === 1) {
+    editRecord(selectedRows.value[0])
+  }
+}
+
+const deleteSelectedRecords = async () => {
+  if (selectedRows.value.length === 0) return
+  
+  const count = selectedRows.value.length
+  const message = count === 1 
+    ? `确定要删除选中的返工记录吗？` 
+    : `确定要删除选中的 ${count} 条返工记录吗？`
+  
+  try {
+    await ElMessageBox.confirm(message, '确认删除', {
+      type: 'warning',
+      confirmButtonText: '确定',
+      cancelButtonText: '取消'
+    })
+    
+    // 执行批量删除
+    const ids = selectedRows.value.map(row => row.ID)
+    const response = await axios.delete('/api/rework/batch', {
+      data: { ids }
+    })
+    
+    if (response.data.success) {
+      ElMessage.success(`成功删除 ${count} 条记录`)
+      selectedRows.value = []
+      loadData()
+    } else {
+      ElMessage.error(response.data.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量删除失败:', error)
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
 const showAddDialog = () => {
   isEdit.value = false
   resetForm()
+  cleanupResources() // 确保清理文件状态
   dialogVisible.value = true
+  forceDialogStyle()
 }
 
-const editRecord = (row) => {
-  isEdit.value = true
-  currentRecord.value = row
-  
-  // 填充表单数据
-  Object.keys(formData).forEach(key => {
-    if (row[key] !== undefined) {
-      formData[key] = row[key]
+const editRecord = async (row) => {
+  try {
+    isEdit.value = true
+    currentRecord.value = row
+    
+    // 清理之前的文件状态
+    cleanupResources()
+    
+    // 从后端获取完整的记录数据
+    const response = await axios.get(`/api/rework/${row.ID}`)
+    
+    if (response.data.success) {
+      const recordData = response.data.data
+      console.log('编辑对话框 - 从后端获取的记录数据:', recordData)
+      console.log('编辑对话框 - ReworkCategory字段值:', recordData.ReworkCategory)
+      
+      // 填充表单数据，使用数据库中的完整数据
+      Object.keys(formData).forEach(key => {
+        // 将数据库字段名映射到表单字段名
+        const dbFieldName = key.charAt(0).toUpperCase() + key.slice(1)
+        if (recordData[dbFieldName] !== undefined) {
+          formData[key] = recordData[dbFieldName]
+          console.log(`映射字段 ${key} <- ${dbFieldName}:`, recordData[dbFieldName])
+        } else if (recordData[key] !== undefined) {
+          formData[key] = recordData[key]
+          console.log(`直接映射字段 ${key}:`, recordData[key])
+        }
+      })
+      
+      console.log('编辑对话框 - 填充后的表单数据:', formData)
+      
+      // 特殊处理日期字段，使用formatDate函数避免时区偏移
+      if (recordData.ReworkDate) {
+        formData.reworkDate = formatDate(recordData.ReworkDate)
+      }
+      
+      // 特殊处理返工人员字段，将字符串转换为数组以支持多选
+      if (recordData.ReworkPersonnel) {
+        if (typeof recordData.ReworkPersonnel === 'string') {
+          // 如果是字符串，按分号或逗号分割为数组
+          formData.reworkPersonnel = recordData.ReworkPersonnel.split(/[;,]/).map(name => name.trim()).filter(name => name)
+        } else if (Array.isArray(recordData.ReworkPersonnel)) {
+          formData.reworkPersonnel = recordData.ReworkPersonnel
+        } else {
+          formData.reworkPersonnel = []
+        }
+      } else {
+        formData.reworkPersonnel = []
+      }
+      
+      // 如果有附件文件，显示文件信息（但不创建预览）
+      if (recordData.AttachmentFiles) {
+        // 处理多个文件，用分号分隔
+        const fileNames = recordData.AttachmentFiles.split(';').filter(name => name.trim())
+        if (fileNames.length > 0) {
+          // 目前只显示第一个文件，后续可扩展支持多文件
+          const fileName = fileNames[0]
+          selectedFileInfo.value = {
+            fileName: fileName,
+            generatedFileName: fileName,
+            previewUrl: null, // 编辑时不创建预览URL
+            relativePath: `uploads/${fileName}`,
+            file: null,
+            uploaded: true // 标记为已上传
+          }
+          // 将附件路径设置到formData中
+          formData.attachmentPath = recordData.AttachmentFiles
+        }
+      }
+      
+      dialogVisible.value = true
+      forceDialogStyle()
+    } else {
+      ElMessage.error(response.data.message || '获取记录详情失败')
     }
-  })
-  
-  dialogVisible.value = true
+  } catch (error) {
+    console.error('获取记录详情失败:', error)
+    ElMessage.error('获取记录详情失败')
+  }
 }
 
 const viewDetail = (row) => {
@@ -1252,14 +1717,35 @@ const submitForm = async () => {
     
     submitLoading.value = true
     
+    // 如果有文件需要上传且尚未上传
+    if (selectedFileInfo.value && !selectedFileInfo.value.uploaded) {
+      try {
+        fileUploading.value = true
+        await uploadFileToServer(selectedFileInfo.value.file, selectedFileInfo.value.generatedFileName)
+        ElMessage.success('文件上传成功')
+      } catch (error) {
+        ElMessage.error('文件上传失败：' + error.message)
+        return // 上传失败时阻止表单提交
+      } finally {
+        fileUploading.value = false
+      }
+    }
+    
     const url = isEdit.value ? `/api/rework/${currentRecord.value.ID}` : '/api/rework'
     const method = isEdit.value ? 'put' : 'post'
     
-    const response = await axios[method](url, {
+    // 准备提交数据，将返工人员数组转换为字符串
+    const submitData = {
       ...formData,
+      // 将返工人员数组转换为分号分隔的字符串
+      reworkPersonnel: Array.isArray(formData.reworkPersonnel) 
+        ? formData.reworkPersonnel.join(';') 
+        : formData.reworkPersonnel,
       createdBy: 'admin', // 实际应用中应该从用户信息获取
       updatedBy: 'admin'
-    })
+    }
+    
+    const response = await axios[method](url, submitData)
     
     if (response.data.success) {
       ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
@@ -1295,17 +1781,23 @@ const resetForm = () => {
     defectiveCategory: '',
     responsiblePerson: '',
     responsibleDept: '',
-    reworkPersonnel: '',
+    reworkCategory: '',
+    reworkPersonnel: [],
     reworkHours: null,
     reworkMethod: '',
     reworkStatus: '进行中',
     materialCost: null,
     laborCost: null,
     otherCost: null,
+    totalCost: null,
     qualityLevel: '',
     finalResult: '',
-    remarks: ''
+    remarks: '',
+    attachmentPath: ''
   })
+  
+  // 清空文件相关状态
+  cleanupResources()
   
   fileList.value = []
   currentRecord.value = null
@@ -1317,38 +1809,436 @@ const calculateDefectiveRate = () => {
   }
 }
 
+/**
+ * 计算人工成本
+ * 根据返工工时和工时单价自动计算人工成本
+ * 计算公式：人工成本 = 返工工时 × 工时单价
+ */
+const calculateLaborCost = () => {
+  const hours = formData.reworkHours
+  const rate = hourlyRate.value
+  
+  // 如果工时或单价为空，清空人工成本
+  if (!hours || !rate || hours <= 0 || rate <= 0) {
+    formData.laborCost = 0
+    calculateTotalCost()
+    return
+  }
+  
+  // 计算人工成本：工时 × 单价
+  const laborCost = Number(hours) * Number(rate)
+  formData.laborCost = Math.round(laborCost * 100) / 100 // 保留两位小数
+  
+  // 触发总成本计算
+  calculateTotalCost()
+}
+
+/**
+ * 计算总成本
+ * 根据材料成本、人工成本、其他成本自动计算总成本
+ * 计算公式：总成本 = 材料成本 + 人工成本 + 其他成本
+ */
 const calculateTotalCost = () => {
-  // 自动计算总成本在后端处理
+  const materialCost = Number(formData.materialCost) || 0
+  const laborCost = Number(formData.laborCost) || 0
+  const otherCost = Number(formData.otherCost) || 0
+  
+  // 计算总成本
+  const totalCost = materialCost + laborCost + otherCost
+  formData.totalCost = Math.round(totalCost * 100) / 100 // 保留两位小数
 }
 
 const exportData = async () => {
   try {
     exportLoading.value = true
-    // 导出功能实现
-    ElMessage.info('导出功能开发中')
+    
+    // 获取当前筛选条件下的所有数据
+    const params = {
+      ...searchForm,
+      exportAll: true // 标识导出所有数据
+    }
+    
+    if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+      params.startDate = searchForm.dateRange[0]
+      params.endDate = searchForm.dateRange[1]
+    }
+    
+    const response = await axios.get('/api/rework/export', { params })
+    
+    if (response.data.success) {
+      const data = response.data.data
+      
+      // 使用ExcelJS库支持样式
+      const ExcelJS = await import('exceljs')
+      const { saveAs } = await import('file-saver')
+      
+      // 准备导出数据
+      const exportData = data.map((item, index) => ({
+        '序号': index + 1,
+        'ID': item.ID,
+        '返工日期': formatDate(item.ReworkDate),
+        '客户编号': item.CustomerCode || '',
+        '工单号': item.OrderNo || '',
+        '产品名称': item.ProductName || '',
+        '产品规格': item.ProductSpec || '',
+        '车间': item.Workshop || '',
+        '总数量': item.TotalQty || 0,
+        '不良数': item.DefectiveQty || 0,
+        '合格数': item.GoodQty || 0,
+        '不良率(%)': item.DefectiveRate ? item.DefectiveRate.toFixed(2) : '0.00',
+        '不良原因': item.DefectiveReason || '',
+        '不良类别': item.DefectiveCategory || '',
+        '责任人': item.ResponsiblePerson || '',
+        '责任部门': item.ResponsibleDept || '',
+        '返工类别': item.ReworkCategory || '',
+        '返工人员': item.ReworkPersonnel || '',
+        '返工工时(h)': item.ReworkHours || 0,
+        '返工方法': item.ReworkMethod || '',
+        '返工状态': item.ReworkStatus || '',
+        '材料成本(¥)': item.MaterialCost ? item.MaterialCost.toFixed(2) : '0.00',
+        '人工成本(¥)': item.LaborCost ? item.LaborCost.toFixed(2) : '0.00',
+        '其他成本(¥)': item.OtherCost ? item.OtherCost.toFixed(2) : '0.00',
+        '总成本(¥)': item.TotalCost ? item.TotalCost.toFixed(2) : '0.00',
+        '质量等级': item.QualityLevel || '',
+        '最终结果': item.FinalResult || '',
+        '备注': item.Remarks || '',
+        '创建时间': formatDateTime(item.CreatedAt),
+        '更新时间': formatDateTime(item.UpdatedAt)
+      }))
+      
+      // 创建工作簿
+      const workbook = new ExcelJS.Workbook()
+      const worksheet = workbook.addWorksheet('返工记录')
+      
+      // 定义列
+      const columns = [
+        { header: '序号', key: 'index', width: 8 },
+        { header: 'ID', key: 'id', width: 10 },
+        { header: '返工日期', key: 'reworkDate', width: 15 },
+        { header: '客户编号', key: 'customerCode', width: 15 },
+        { header: '工单号', key: 'orderNo', width: 18 },
+        { header: '产品名称', key: 'productName', width: 30 },
+        { header: '产品规格', key: 'productSpec', width: 18 },
+        { header: '车间', key: 'workshop', width: 12 },
+        { header: '总数量', key: 'totalQty', width: 12 },
+        { header: '不良数', key: 'defectiveQty', width: 12 },
+        { header: '合格数', key: 'goodQty', width: 12 },
+        { header: '不良率(%)', key: 'defectiveRate', width: 15 },
+        { header: '不良原因', key: 'defectiveReason', width: 25 },
+        { header: '不良类别', key: 'defectiveCategory', width: 15 },
+        { header: '责任人', key: 'responsiblePerson', width: 12 },
+        { header: '责任部门', key: 'responsibleDept', width: 15 },
+        { header: '返工类别', key: 'reworkCategory', width: 15 },
+        { header: '返工人员', key: 'reworkPersonnel', width: 12 },
+        { header: '返工工时(h)', key: 'reworkHours', width: 15 },
+        { header: '返工方法', key: 'reworkMethod', width: 18 },
+        { header: '返工状态', key: 'reworkStatus', width: 12 },
+        { header: '材料成本(¥)', key: 'materialCost', width: 15 },
+        { header: '人工成本(¥)', key: 'laborCost', width: 15 },
+        { header: '其他成本(¥)', key: 'otherCost', width: 15 },
+        { header: '总成本(¥)', key: 'totalCost', width: 15 },
+        { header: '质量等级', key: 'qualityLevel', width: 12 },
+        { header: '最终结果', key: 'finalResult', width: 15 },
+        { header: '备注', key: 'remarks', width: 25 },
+        { header: '创建时间', key: 'createdAt', width: 20 },
+        { header: '更新时间', key: 'updatedAt', width: 20 }
+      ]
+      
+      worksheet.columns = columns
+      
+      // 设置表头样式
+       const headerRow = worksheet.getRow(1)
+       headerRow.height = 25
+       headerRow.eachCell((cell) => {
+         cell.font = {
+           name: 'Microsoft YaHei',
+           size: 10,
+           bold: true,
+           color: { argb: 'FFFFFFFF' }
+         }
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'FF2E5BBA' }
+        }
+        cell.alignment = {
+          horizontal: 'center',
+          vertical: 'middle',
+          wrapText: true
+        }
+        cell.border = {
+          top: { style: 'medium', color: { argb: 'FF1F4788' } },
+          left: { style: 'medium', color: { argb: 'FF1F4788' } },
+          bottom: { style: 'medium', color: { argb: 'FF1F4788' } },
+          right: { style: 'medium', color: { argb: 'FF1F4788' } }
+        }
+      })
+      
+      // 添加数据行
+      data.forEach((item, index) => {
+        const rowData = {
+          index: index + 1,
+          id: item.ID,
+          reworkDate: formatDate(item.ReworkDate),
+          customerCode: item.CustomerCode || '',
+          orderNo: item.OrderNo || '',
+          productName: item.ProductName || '',
+          productSpec: item.ProductSpec || '',
+          workshop: item.Workshop || '',
+          totalQty: item.TotalQty || 0,
+          defectiveQty: item.DefectiveQty || 0,
+          goodQty: item.GoodQty || 0,
+          defectiveRate: item.DefectiveRate ? item.DefectiveRate.toFixed(2) : '0.00',
+          defectiveReason: item.DefectiveReason || '',
+          defectiveCategory: item.DefectiveCategory || '',
+          responsiblePerson: item.ResponsiblePerson || '',
+          responsibleDept: item.ResponsibleDept || '',
+          reworkCategory: item.ReworkCategory || '',
+          reworkPersonnel: item.ReworkPersonnel || '',
+          reworkHours: item.ReworkHours || 0,
+          reworkMethod: item.ReworkMethod || '',
+          reworkStatus: item.ReworkStatus || '',
+          materialCost: item.MaterialCost ? item.MaterialCost.toFixed(2) : '0.00',
+          laborCost: item.LaborCost ? item.LaborCost.toFixed(2) : '0.00',
+          otherCost: item.OtherCost ? item.OtherCost.toFixed(2) : '0.00',
+          totalCost: item.TotalCost ? item.TotalCost.toFixed(2) : '0.00',
+          qualityLevel: item.QualityLevel || '',
+          finalResult: item.FinalResult || '',
+          remarks: item.Remarks || '',
+          createdAt: formatDateTime(item.CreatedAt),
+          updatedAt: formatDateTime(item.UpdatedAt)
+        }
+        
+        const row = worksheet.addRow(rowData)
+        row.height = 25
+        
+        // 设置数据行样式
+        row.eachCell((cell, colNumber) => {
+          const isEvenRow = (index + 2) % 2 === 0
+          
+          // 基础样式
+          cell.font = {
+            name: 'Microsoft YaHei',
+            size: 10
+          }
+          cell.alignment = {
+            horizontal: 'center',
+            vertical: 'middle',
+            wrapText: true
+          }
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+            left: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+            bottom: { style: 'thin', color: { argb: 'FFD0D0D0' } },
+            right: { style: 'thin', color: { argb: 'FFD0D0D0' } }
+          }
+          
+          // 交替行颜色
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: isEvenRow ? 'FFF8F9FA' : 'FFFFFFFF' }
+          }
+          
+          // 特殊列样式
+          // 不良率列 (第12列)
+          if (colNumber === 12) {
+            const rate = parseFloat(rowData.defectiveRate)
+            if (rate >= 5) {
+              cell.font.color = { argb: 'FFDC3545' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFFFF5F5' }
+            } else if (rate >= 2) {
+              cell.font.color = { argb: 'FFFD7E14' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFFFF8F0' }
+            } else {
+              cell.font.color = { argb: 'FF198754' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFF0F8F0' }
+            }
+          }
+          
+          // 成本列 (第22-25列)
+          if ([22, 23, 24, 25].includes(colNumber)) {
+            cell.alignment.horizontal = 'right'
+            cell.font.color = { argb: 'FF0D6EFD' }
+          }
+          
+          // 返工状态列 (第21列)
+          if (colNumber === 21) {
+            const status = rowData.reworkStatus
+            if (status === '已完成') {
+              cell.font.color = { argb: 'FF198754' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFD1E7DD' }
+            } else if (status === '进行中') {
+              cell.font.color = { argb: 'FF0DCAF0' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFCFF4FC' }
+            } else if (status === '暂停') {
+              cell.font.color = { argb: 'FFFFC107' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFFFF3CD' }
+            } else if (status === '取消') {
+              cell.font.color = { argb: 'FFDC3545' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFF8D7DA' }
+            }
+          }
+          
+          // 质量等级列 (第26列)
+          if (colNumber === 26) {
+            const level = rowData.qualityLevel
+            if (level === 'A') {
+              cell.font.color = { argb: 'FF198754' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFD1E7DD' }
+            } else if (level === 'B') {
+              cell.font.color = { argb: 'FFFFC107' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFFFF3CD' }
+            } else if (level === 'C') {
+              cell.font.color = { argb: 'FFDC3545' }
+              cell.font.bold = true
+              cell.fill.fgColor = { argb: 'FFF8D7DA' }
+            }
+          }
+          
+          // 日期列 (第3列、第29-30列)
+          if ([3, 29, 30].includes(colNumber)) {
+            cell.font.color = { argb: 'FF6C757D' }
+          }
+          
+          // 序号列 (第1列)
+          if (colNumber === 1) {
+            cell.font.bold = true
+            cell.font.color = { argb: 'FF495057' }
+            cell.fill.fgColor = { argb: 'FFE9ECEF' }
+          }
+        })
+      })
+      
+      // 生成文件名
+      const now = new Date()
+      const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '')
+      const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '')
+      const fileName = `返工记录导出_${dateStr}_${timeStr}.xlsx`
+      
+      // 导出文件
+      const buffer = await workbook.xlsx.writeBuffer()
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      saveAs(blob, fileName)
+      
+      ElMessage.success(`成功导出 ${data.length} 条记录`)
+    } else {
+      ElMessage.error(response.data.message || '导出失败')
+    }
   } catch (error) {
     console.error('导出失败:', error)
-    ElMessage.error('导出失败')
+    ElMessage.error('导出失败：' + (error.message || '未知错误'))
   } finally {
     exportLoading.value = false
   }
 }
 
 // 文件上传相关方法
+// 生成文件名
+const generateFileName = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  const hours = String(now.getHours()).padStart(2, '0')
+  const minutes = String(now.getMinutes()).padStart(2, '0')
+  const seconds = String(now.getSeconds()).padStart(2, '0')
+  const milliseconds = String(now.getMilliseconds()).padStart(3, '0')
+  
+  return `rework_${year}${month}${day}_${hours}${minutes}${seconds}_${milliseconds}`
+}
+
+// 生成相对路径
+const generateRelativePath = (generatedFileName, originalExtension) => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  
+  return `rework-images/${year}/${month}/${generatedFileName}${originalExtension}`
+}
+
+// 文件选择处理
+const handleFileChange = (file) => {
+  if (!file) return
+  
+  const originalExtension = '.' + file.name.split('.').pop().toLowerCase()
+  const generatedFileName = generateFileName()
+  const relativePath = generateRelativePath(generatedFileName, originalExtension)
+  
+  // 创建预览URL
+  const previewUrl = URL.createObjectURL(file.raw)
+  
+  selectedFileInfo.value = {
+    fileName: file.name,
+    generatedFileName: generatedFileName + originalExtension,
+    previewUrl: previewUrl,
+    relativePath: relativePath,
+    file: file.raw,
+    uploaded: false
+  }
+  
+  // 更新表单数据中的附件路径
+  formData.attachmentPath = relativePath
+  
+  return false // 阻止自动上传
+}
+
 const beforeUpload = (file) => {
   const isValidType = ['image/jpeg', 'image/png', 'application/pdf', 
-                      'application/msword', 'application/vnd.ms-excel'].includes(file.type)
+                      'application/msword', 'application/vnd.ms-excel',
+                      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'].includes(file.type)
   const isLt10M = file.size / 1024 / 1024 < 10
   
   if (!isValidType) {
-    ElMessage.error('只能上传jpg/png/pdf/doc/xls格式的文件')
+    ElMessage.error('只能上传jpg/png/pdf/doc/docx/xls/xlsx格式的文件')
     return false
   }
   if (!isLt10M) {
     ElMessage.error('文件大小不能超过10MB')
     return false
   }
-  return true
+  
+  return false // 阻止自动上传，但允许文件选择
+}
+
+// 上传文件到服务器
+const uploadFileToServer = async (file, generatedFileName) => {
+  const formData = new FormData()
+  formData.append('file', file, generatedFileName)
+  formData.append('customPath', 'rework-images')
+  
+  try {
+    const response = await axios.post(uploadUrl.value, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      onUploadProgress: (progressEvent) => {
+        uploadProgress.value = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+      }
+    })
+    
+    if (response.data.success) {
+      selectedFileInfo.value.uploaded = true
+      selectedFileInfo.value.relativePath = response.data.relativePath
+      formData.attachmentPath = response.data.relativePath
+      return response.data
+    } else {
+      throw new Error(response.data.message || '上传失败')
+    }
+  } catch (error) {
+    console.error('文件上传失败:', error)
+    throw error
+  }
 }
 
 const handleUploadSuccess = (response, file) => {
@@ -1356,13 +2246,108 @@ const handleUploadSuccess = (response, file) => {
 }
 
 const handleUploadRemove = (file) => {
-  // 处理文件移除
+  // 清理文件信息
+  if (selectedFileInfo.value) {
+    if (selectedFileInfo.value.previewUrl) {
+      URL.revokeObjectURL(selectedFileInfo.value.previewUrl)
+    }
+    selectedFileInfo.value = null
+  }
+  
+  // 清空表单中的附件路径
+  formData.attachmentPath = ''
+  
+  // 重置上传状态
+  fileUploading.value = false
+  uploadProgress.value = 0
+}
+
+// 清理资源
+const cleanupResources = () => {
+  if (selectedFileInfo.value && selectedFileInfo.value.previewUrl) {
+    URL.revokeObjectURL(selectedFileInfo.value.previewUrl)
+  }
+  selectedFileInfo.value = null
+  fileUploading.value = false
+  uploadProgress.value = 0
+}
+
+// 文件类型判断方法
+const isImageFile = (fileName) => {
+  return /\.(jpg|jpeg|png|gif|bmp|webp)$/i.test(fileName)
+}
+
+const isPdfFile = (fileName) => {
+  return /\.pdf$/i.test(fileName)
+}
+
+const isDocFile = (fileName) => {
+  return /\.(doc|docx)$/i.test(fileName)
+}
+
+const isExcelFile = (fileName) => {
+  return /\.(xls|xlsx)$/i.test(fileName)
+}
+
+// 获取文件图标类名
+const getFileIconClass = (fileName) => {
+  if (isDocFile(fileName)) return 'doc-icon'
+  if (isExcelFile(fileName)) return 'excel-icon'
+  if (isPdfFile(fileName)) return 'pdf-icon'
+  return 'default-icon'
+}
+
+// 获取文件类型标签
+const getFileTypeLabel = (fileName) => {
+  if (isDocFile(fileName)) return 'Word文档'
+  if (isExcelFile(fileName)) return 'Excel表格'
+  if (isPdfFile(fileName)) return 'PDF文档'
+  return '文档文件'
+}
+
+// 格式化文件大小
+const formatFileSize = (bytes) => {
+  if (!bytes) return ''
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(1024))
+  return Math.round(bytes / Math.pow(1024, i) * 100) / 100 + ' ' + sizes[i]
+}
+
+// 图片预览对话框
+const imagePreviewVisible = ref(false)
+const previewImageUrl = ref('')
+
+const openImagePreview = () => {
+  if (selectedFileInfo.value && selectedFileInfo.value.previewUrl) {
+    previewImageUrl.value = selectedFileInfo.value.previewUrl
+    imagePreviewVisible.value = true
+  }
+}
+
+// PDF预览
+const openPdfPreview = () => {
+  if (selectedFileInfo.value && selectedFileInfo.value.previewUrl) {
+    // 在新窗口中打开PDF
+    window.open(selectedFileInfo.value.previewUrl, '_blank')
+  }
 }
 
 // 工具方法
 const formatDate = (date) => {
   if (!date) return '-'
-  return new Date(date).toLocaleDateString('zh-CN')
+  
+  try {
+    const dateObj = new Date(date)
+    if (isNaN(dateObj.getTime())) return date
+    
+    // 使用本地时区的年月日，避免UTC转换，格式化为yyyy-mm-dd
+    const year = dateObj.getFullYear()
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const day = String(dateObj.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch (error) {
+    return date
+  }
 }
 
 const formatDateTime = (datetime) => {
@@ -1591,12 +2576,20 @@ const initQualityLevels = () => {
 
 <style scoped>
 .rework-management {
-  padding: 1.25rem;
+  padding: 0.5rem 1.25rem;
+  height: calc(100vh - 60px);
+  overflow: hidden;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
 @media (max-width: 48rem) {
   .rework-management {
     padding: 0.75rem;
+    height: calc(100vh - 60px);
+    overflow-y: auto;
+    box-sizing: border-box;
   }
   
   .page-description {
@@ -1613,10 +2606,10 @@ const initQualityLevels = () => {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 1.25rem;
+  margin-bottom: 1rem;
   flex-wrap: wrap;
   gap: 1rem;
-  padding: 1rem 0;
+  padding: 0.5rem 0;
 }
 
 .header-left h2 {
@@ -1679,7 +2672,7 @@ const initQualityLevels = () => {
 }
 
 .search-card {
-  margin-bottom: 20px;
+  margin-bottom: 1rem;
   border-radius: 0.5rem;
   box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08);
   border: 1px solid #e4e7ed;
@@ -1691,10 +2684,24 @@ const initQualityLevels = () => {
 
 .search-form {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
   gap: 1.2rem;
   align-items: end;
   padding: 0.5rem;
+}
+
+/* 日期范围控件特殊处理 */
+.search-form :deep(.el-form-item:first-child) {
+  grid-column: span 2;
+  min-width: 20rem;
+}
+
+/* 在较小屏幕上调整布局 */
+@media (max-width: 90rem) {
+  .search-form :deep(.el-form-item:first-child) {
+    grid-column: span 1;
+    min-width: 9rem;
+  }
 }
 
 /* 确保关键词和按钮在同一行 */
@@ -1767,20 +2774,26 @@ const initQualityLevels = () => {
 }
 
 .table-card {
-  min-height: 37.5rem;
-  overflow-x: auto;
+  overflow: hidden;
   border-radius: 0.5rem;
   box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08);
   border: 1px solid #e4e7ed;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
 }
 
 .table-card :deep(.el-card__body) {
   padding: 1.25rem;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 @media (max-width: 48rem) {
   .table-card {
-    min-height: 25rem;
   }
   
   :deep(.el-table) {
@@ -1789,6 +2802,21 @@ const initQualityLevels = () => {
   
   :deep(.el-table .el-table__cell) {
     padding: 0.375rem 0.25rem;
+  }
+  
+  /* 移动端产品名称列优化 */
+  .product-name-cell {
+    font-size: 0.75rem;
+    line-height: 1.4;
+    max-height: 3.5em;
+    -webkit-line-clamp: 2;
+  }
+  
+  /* 移动端操作按钮优化 */
+  :deep(.el-table .el-button--small) {
+    padding: 4px 8px;
+    font-size: 11px;
+    margin: 0 1px;
   }
 }
 
@@ -1849,28 +2877,146 @@ const initQualityLevels = () => {
   font-size: 12px;
 }
 
+/* 产品名称单元格样式 */
+.product-name-cell {
+  word-break: break-word;
+  line-height: 1.3;
+  max-height: 3.9em;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  white-space: normal;
+  padding: 2px 0;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace, 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+}
+
+/* 表格行高优化 */
+:deep(.el-table .el-table__row) {
+  height: auto;
+  min-height: 48px;
+}
+
+:deep(.el-table .el-table__cell) {
+  padding: 8px 6px;
+  vertical-align: middle;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace, 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.3;
+}
+
+/* 产品名称列特殊处理 */
+:deep(.el-table .el-table__cell:has(.product-name-cell)) {
+  vertical-align: middle;
+  line-height: 1.5;
+}
+
+/* 表格斑马纹优化 */
+:deep(.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell) {
+  background-color: #fafbfc;
+}
+
+/* 表格选中行样式 */
+:deep(.el-table__body tr.current-row > td.el-table__cell) {
+  background-color: #ecf5ff;
+}
+
+/* 表格内容对齐优化 */
+:deep(.el-table .el-table__cell .cell) {
+  padding: 0 8px;
+  word-break: break-word;
+}
+
+/* 数值列右对齐 */
+:deep(.el-table .el-table__cell[class*="is-right"]) {
+  text-align: right;
+}
+
+/* 状态标签样式优化 */
+:deep(.el-tag) {
+  border-radius: 12px;
+  font-size: 12px;
+  padding: 2px 8px;
+}
+
+/* 表格头部样式优化 */
+:deep(.el-table .el-table__header-wrapper .el-table__header .el-table__cell) {
+  background-color: #f8f9fa;
+  color: #606266;
+  font-weight: 600;
+  border-bottom: 2px solid #e4e7ed;
+  text-align: center;
+  font-size: 14px;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace, 'Microsoft YaHei', sans-serif;
+}
+
+/* 表格边框优化 */
+:deep(.el-table--border .el-table__cell) {
+  border-right: 1px solid #ebeef5;
+}
+
+:deep(.el-table--border .el-table__row:hover .el-table__cell) {
+  background-color: #f5f7fa;
+}
+
+/* 表格整体样式优化 */
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+  font-family: 'Consolas', 'Monaco', 'Courier New', monospace, 'Microsoft YaHei', sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  height: 100%;
+}
+
+/* 表格容器高度优化 */
+:deep(.el-table .el-table__body-wrapper) {
+  max-height: calc(100vh - 320px);
+  overflow-y: auto;
+}
+
+:deep(.el-table .el-table__body-wrapper) {
+  border-radius: 0 0 8px 8px;
+}
+
+/* 操作按钮样式优化 */
+:deep(.el-table .el-button--small) {
+  padding: 6px 6px;
+  font-size: 12px;
+  border-radius: 4px;
+  margin: 0 2px;
+}
+
 /* 表单卡片样式 */
 .form-container {
   max-height: 70vh;
   overflow-y: auto;
   padding-right: 0.5rem;
+  padding-bottom: 0;
+  margin-bottom: 0 !important;
 }
 
 .form-section {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   border-radius: 0.5rem;
   border: 1px solid #e4e7ed;
+}
+
+/* 最后一个表单卡片不要底部间距 */
+.form-section:last-child {
+  margin-bottom: 0;
 }
 
 .form-section :deep(.el-card__header) {
    background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
    border-bottom: 1px solid #e4e7ed;
    border-left: 4px solid #409eff;
-   padding: 1rem 1.25rem;
+   padding: 0.75rem 1rem;
  }
 
 .form-section :deep(.el-card__body) {
-  padding: 1.5rem 1.25rem;
+  padding: 1rem;
 }
 
 .section-header {
@@ -1911,7 +3057,7 @@ const initQualityLevels = () => {
 }
 
 .rework-dialog :deep(.el-dialog__body) {
-  padding: 1.5rem;
+  padding: 1.5rem 1.5rem 0 1.5rem;
   background: #fafafa;
 }
 
@@ -1923,26 +3069,27 @@ const initQualityLevels = () => {
 
 /* 强制设置对话框高度 - 修复定位和底部空白问题 */
 .rework-dialog::v-deep(.el-dialog) {
-  height: 90vh !important;
-  max-height: 90vh !important;
+  height: 80vh !important;
+  max-height: 80vh !important;
   display: flex !important;
   flex-direction: column !important;
-  margin: 5vh auto !important;
-  top: 0 !important;
+  margin: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
 }
 
 .rework-dialog::v-deep(.el-dialog__wrapper) {
   display: flex !important;
-  align-items: flex-start !important;
+  align-items: center !important;
   justify-content: center !important;
-  padding-top: 5vh !important;
+  padding: 0 !important;
 }
 
 .rework-dialog::v-deep(.el-dialog__body) {
   flex: 1 !important;
-  max-height: calc(90vh - 100px) !important;
+  max-height: calc(80vh - 100px) !important;
   overflow-y: auto !important;
-  padding: 1.5rem !important;
+  padding: 1rem 1rem 0 1rem !important;
   background: #fafafa !important;
   margin-bottom: 0 !important;
 }
@@ -1950,6 +3097,9 @@ const initQualityLevels = () => {
 .rework-dialog::v-deep(.el-dialog__footer) {
   flex-shrink: 0 !important;
   margin-top: auto !important;
+  padding: 0.125rem 1.5rem !important;
+  min-height: auto !important;
+  background: #fff !important;
 }
 
 /* 表单项样式增强 */
@@ -2037,6 +3187,147 @@ const initQualityLevels = () => {
    transform: translateY(-1px);
    box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
  }
+
+/* 文件上传样式 */
+.file-upload-container {
+  width: 100%;
+}
+
+.file-info-section {
+  margin-bottom: 1rem;
+}
+
+.upload-progress {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  border: 1px solid #e9ecef;
+}
+
+.progress-text {
+  margin: 0.5rem 0 0 0;
+  color: #666;
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.file-preview {
+  margin-top: 1rem;
+}
+
+.preview-container {
+  text-align: center;
+  padding: 1.5rem;
+  background: #f8f9fa;
+  border-radius: 0.5rem;
+  border: 1px solid #e9ecef;
+}
+
+/* 图片预览样式 */
+.image-preview-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.preview-image {
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 0.375rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.preview-image:hover {
+  transform: scale(1.05);
+}
+
+/* PDF和文档预览样式 */
+.pdf-preview-content,
+.document-preview-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+}
+
+.file-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  margin-bottom: 0.5rem;
+}
+
+.file-icon.pdf-icon {
+  background: #ff4757;
+  color: white;
+}
+
+.file-icon.doc-icon {
+  background: #2e86de;
+  color: white;
+}
+
+.file-icon.excel-icon {
+  background: #10ac84;
+  color: white;
+}
+
+.file-icon.default-icon {
+  background: #747d8c;
+  color: white;
+}
+
+.file-type-label {
+  font-size: 0.875rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.preview-filename {
+  margin: 0.5rem 0 0 0;
+  color: #333;
+  font-size: 0.875rem;
+  font-weight: 500;
+  word-break: break-all;
+}
+
+.file-size {
+  margin: 0.25rem 0 0 0;
+  color: #999;
+  font-size: 0.75rem;
+}
+
+/* 图片预览对话框样式 */
+.image-preview-dialog .el-dialog__body {
+  padding: 1rem;
+  text-align: center;
+}
+
+.image-preview-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 400px;
+}
+
+.preview-full-image {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
 
 /* 质量等级说明样式 */
 .quality-level-description {
@@ -2177,8 +3468,95 @@ const initQualityLevels = () => {
   margin: 0;
 }
 
+/* 批量操作按钮区域样式 */
+.table-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 0;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 1rem;
+}
+
+.actions-left {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.actions-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.selection-info {
+  color: #606266;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* 操作列图标按钮样式 */
+.action-btn {
+  margin-right: 0.125rem;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  transition: all 0.2s ease;
+  color: #606266;
+}
+
+.action-btn:hover {
+  background-color: #f5f7fa;
+  color: #409eff;
+}
+
+.action-btn.view-btn {
+  color: #409eff;
+}
+
+.action-btn.view-btn:hover {
+  background-color: rgba(64, 158, 255, 0.1);
+  color: #409eff;
+}
+
+.action-btn.edit-btn {
+  color: #e6a23c;
+}
+
+.action-btn.edit-btn:hover {
+  background-color: rgba(230, 162, 60, 0.1);
+  color: #e6a23c;
+}
+
+.action-btn.delete-btn {
+  color: #f56c6c;
+}
+
+.action-btn.delete-btn:hover {
+  background-color: rgba(245, 108, 108, 0.1);
+  color: #f56c6c;
+}
+
+.action-btn:last-child {
+  margin-right: 0;
+}
+
 /* 响应式设计 */
 @media (max-width: 48rem) {
+  .table-actions {
+    flex-direction: column;
+    gap: 0.75rem;
+    align-items: stretch;
+  }
+  
+  .actions-left {
+    justify-content: center;
+    flex-wrap: wrap;
+  }
+  
+  .actions-right {
+    justify-content: center;
+  }
   .form-container {
     max-height: 60vh;
     padding-right: 0;
@@ -2201,36 +3579,149 @@ const initQualityLevels = () => {
     font-size: 0.875rem;
   }
 }
+/* 强制样式优先级 */
+.el-dialog__wrapper .el-dialog.rework-dialog-global {
+  margin: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  max-height: 80vh !important;
+}
+
+.el-dialog__wrapper .el-dialog.rework-dialog-global .el-dialog__body {
+  flex: 1 !important;
+  max-height: calc(80vh - 100px) !important;
+  overflow-y: auto !important;
+  margin-bottom: 0 !important;
+  padding: 1rem !important;
+  background: #fafafa !important;
+}
+
+.el-dialog__wrapper .el-dialog.rework-dialog-global .el-dialog__footer {
+  flex-shrink: 0 !important;
+  margin-top: auto !important;
+  padding: 0.125rem 1.5rem !important;
+  min-height: auto !important;
+  background: #fff !important;
+  border-top: 1px solid #ebeef5 !important;
+}
+
+/* 覆盖Element Plus默认样式 */
+.el-overlay .el-dialog.rework-dialog-global .el-dialog__body {
+  max-height: calc(80vh - 100px) !important;
+  padding: 1rem !important;
+}
+
+.el-overlay .el-dialog.rework-dialog-global .el-dialog__footer {
+  padding: 0.125rem 1.5rem !important;
+}
+
+/* 强制对话框高度类 */
+.el-dialog.force-dialog-height {
+  height: 85vh !important;
+  max-height: 85vh !important;
+  margin-top: 5vh !important;
+  margin-bottom: 5vh !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.el-dialog.force-dialog-height .el-dialog__header {
+  flex-shrink: 0 !important;
+}
+
+.el-dialog.force-dialog-height .el-dialog__body {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 1rem 1rem 0 1rem !important;
+  margin: 0 !important;
+}
+
+.el-dialog.force-dialog-height .el-dialog__footer {
+  flex-shrink: 0 !important;
+  padding: 0.5rem 1.5rem !important;
+  margin: 0 !important;
+  background: #fff !important;
+  border-top: 1px solid #ebeef5 !important;
+}
+
+/* 附件显示样式 */
+.attachment-item {
+  margin-bottom: 0.5rem;
+}
+
+.attachment-item:last-child {
+  margin-bottom: 0;
+}
+
+.text-muted {
+  color: #909399;
+  font-style: italic;
+}
 </style>
 
 <!-- 全局样式作为备用方案 -->
 <style>
 /* 全局强制对话框高度样式 - 修复定位和底部空白 */
 .el-dialog.rework-dialog-global {
-  height: 90vh !important;
-  max-height: 90vh !important;
+  height: 80vh !important;
+  max-height: 80vh !important;
   display: flex !important;
   flex-direction: column !important;
-  margin: 5vh auto !important;
-  top: 0 !important;
+  margin: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
 }
 
 .rework-dialog-global .el-dialog__wrapper {
   display: flex !important;
-  align-items: flex-start !important;
+  align-items: center !important;
   justify-content: center !important;
-  padding-top: 5vh !important;
+  padding: 0 !important;
 }
 
 .el-dialog.rework-dialog-global .el-dialog__body {
   flex: 1 !important;
-  max-height: calc(90vh - 100px) !important;
+  max-height: calc(80vh - 100px) !important;
   overflow-y: auto !important;
   margin-bottom: 0 !important;
+  padding: 1rem 1rem 0 1rem !important;
 }
 
 .el-dialog.rework-dialog-global .el-dialog__footer {
   flex-shrink: 0 !important;
   margin-top: auto !important;
+  padding: 0.125rem 1.5rem !important;
+  min-height: auto !important;
+  background: #fff !important;
+}
+
+/* 全局强制对话框高度样式 */
+.el-dialog.force-dialog-height {
+  height: 80vh !important;
+  max-height: 80vh !important;
+  margin: auto !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.el-dialog.force-dialog-height .el-dialog__header {
+  flex-shrink: 0 !important;
+}
+
+.el-dialog.force-dialog-height .el-dialog__body {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  padding: 1rem 1rem 0 1rem !important;
+  margin: 0 !important;
+}
+
+.el-dialog.force-dialog-height .el-dialog__footer {
+  flex-shrink: 0 !important;
+  padding: 0.5rem 1.5rem !important;
+  margin: 0 !important;
+  background: #fff !important;
+  border-top: 1px solid #ebeef5 !important;
 }
 </style>

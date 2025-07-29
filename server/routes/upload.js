@@ -434,4 +434,111 @@ router.post('/complaint-attachment', customPathAttachmentUpload.single('file'), 
   }
 });
 
+// 返工记录附件上传
+router.post('/rework-attachment', customPathAttachmentUpload.single('file'), (req, res) => {
+  try {
+    console.log('=== 返工记录附件上传开始 ===');
+    console.log('req.body:', req.body);
+    console.log('req.file:', req.file);
+
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: '没有接收到文件'
+      });
+    }
+
+    const file = req.file;
+    const { customPath } = req.body;
+
+    console.log('接收到的自定义路径:', customPath);
+
+    // 如果提供了自定义路径，移动文件到指定位置
+    let finalPath = file.path;
+    let windowsPath = '';
+    let serverPath = '';
+
+    if (customPath) {
+      // 构建完整的目标路径
+      const targetDir = path.join(attachmentDir, customPath);
+      const targetPath = path.join(targetDir, file.filename);
+
+      console.log('目标目录:', targetDir);
+      console.log('目标路径:', targetPath);
+
+      // 确保目标目录存在
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+        console.log(`创建目录: ${targetDir}`);
+      }
+
+      // 移动文件
+      try {
+        fs.renameSync(file.path, targetPath);
+        finalPath = targetPath;
+        console.log(`文件移动成功: ${file.path} -> ${targetPath}`);
+      } catch (moveError) {
+        console.error('文件移动失败:', moveError);
+        // 如果移动失败，尝试复制然后删除原文件
+        try {
+          fs.copyFileSync(file.path, targetPath);
+          fs.unlinkSync(file.path);
+          finalPath = targetPath;
+          console.log(`文件复制成功: ${file.path} -> ${targetPath}`);
+        } catch (copyError) {
+          console.error('文件复制也失败:', copyError);
+          throw new Error('文件移动失败');
+        }
+      }
+
+      // 生成相对路径（用于数据库存储）
+      windowsPath = path.join('attachments', customPath, file.filename).replace(/\//g, '\\');
+      serverPath = finalPath;
+    } else {
+      // 没有自定义路径，使用默认路径
+      const relativePath = path.relative(path.join(__dirname, '../uploads'), finalPath);
+      windowsPath = relativePath.replace(/\//g, '\\');
+      serverPath = finalPath;
+    }
+
+    console.log('最终文件信息:', {
+      filename: file.filename,
+      originalName: file.originalname,
+      size: file.size,
+      relativePath: windowsPath,
+      serverPath: serverPath,
+      destination: file.destination,
+      customPath: customPath
+    });
+
+    res.json({
+      success: true,
+      message: '返工记录附件上传成功',
+      filename: file.filename,
+      originalName: file.originalname,
+      size: file.size,
+      relativePath: windowsPath,
+      serverPath: serverPath,
+      uploadTime: new Date()
+    });
+
+  } catch (error) {
+    console.error('返工记录附件上传失败:', error);
+
+    // 如果有临时文件，删除它
+    if (req.file && req.file.path) {
+      try {
+        fs.unlinkSync(req.file.path);
+      } catch (unlinkError) {
+        console.error('删除临时文件失败:', unlinkError);
+      }
+    }
+
+    res.status(500).json({
+      success: false,
+      message: error.message || '返工记录附件上传失败'
+    });
+  }
+});
+
 module.exports = router;

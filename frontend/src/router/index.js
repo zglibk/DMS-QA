@@ -20,7 +20,6 @@ import { createRouter, createWebHistory } from 'vue-router'
 // 导入主要页面组件（直接导入，首次加载）
 import Login from '../views/Login.vue'
 import Home from '../views/Home.vue'
-import ComplaintList from '../views/ComplaintList.vue'
 import DataVisualization from '../views/DataVisualization.vue'
 
 // 导入管理后台相关组件
@@ -43,11 +42,8 @@ const routes = [
   // 登录页面
   { path: '/login', component: Login },
 
-  // 首页 - 投诉记录管理
+  // 首页
   { path: '/', component: Home },
-
-  // 投诉相关页面
-  { path: '/complaint/list', component: ComplaintList },
 
   // 数据可视化页面
   { path: '/data-visualization', component: DataVisualization },
@@ -128,10 +124,17 @@ const routes = [
         meta: { requiresAuth: true }
       },
 
-      // 返工管理页面
+      // 返工管理页面（懒加载 + 需要认证）
       {
         path: 'rework-management',
         component: () => import('../views/admin/ReworkManagement.vue'),
+        meta: { requiresAuth: true }
+      },
+
+      // 人员管理页面（懒加载 + 需要认证）
+      {
+        path: 'person-management',
+        component: () => import('../views/admin/PersonManagement.vue'),
         meta: { requiresAuth: true }
       }
     ]

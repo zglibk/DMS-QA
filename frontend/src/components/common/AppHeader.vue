@@ -10,7 +10,6 @@
       <div class="nav-menu-wrap">
         <el-menu mode="horizontal" :default-active="activeMenu" @select="handleMenuSelect" class="nav-menu" :ellipsis="false">
           <el-menu-item index="home">首页</el-menu-item>
-          <el-menu-item index="complaint">投诉管理</el-menu-item>
           <el-menu-item index="stats">数据可视化</el-menu-item>
           <el-menu-item index="rework">返工分析</el-menu-item>
         </el-menu>
@@ -60,7 +59,6 @@ const { siteConfig } = useSiteConfig()
 const activeMenu = computed(() => {
   const path = route.path
   if (path === '/' || path === '/home') return 'home'
-  if (path === '/add' || path.includes('/complaint')) return 'complaint'
   if (path === '/data-visualization' || path.includes('/stats')) return 'stats'
   if (path === '/rework-analysis' || path.includes('/rework')) return 'rework'
   return 'home'
@@ -70,8 +68,6 @@ const activeMenu = computed(() => {
 const handleMenuSelect = (index) => {
   if (index === 'home') {
     router.push('/')
-  } else if (index === 'complaint') {
-    router.push('/add')
   } else if (index === 'stats') {
     router.push('/data-visualization')
   } else if (index === 'rework') {

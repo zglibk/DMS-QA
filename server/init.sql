@@ -285,7 +285,8 @@ CREATE TABLE [dbo].[Department] (
 CREATE TABLE [dbo].[Person] (
     [ID] INT IDENTITY(1,1) PRIMARY KEY,               -- 主键，自增ID
     [Name] NVARCHAR(50) NOT NULL UNIQUE,              -- 人员姓名，唯一
-    [DepartmentID] INT FOREIGN KEY REFERENCES Department(ID) -- 所属部门外键
+    [DepartmentID] INT FOREIGN KEY REFERENCES Department(ID), -- 所属部门外键
+    [IsActive] BIT DEFAULT 1                           -- 人员有效性标记（1=在职，0=离职）
 );
 
 -- =====================================================
@@ -460,7 +461,8 @@ INSERT INTO [dbo].[Workshop] (Name) VALUES (N'印刷车间'), (N'裁切车间'),
 -- 部门
 INSERT INTO [dbo].[Department] (Name) VALUES (N'生产部'), (N'质检部'), (N'销售部');
 -- 人员 (注意：这里的DepartmentID依赖于上面部门的插入顺序，1=生产部, 2=质检部)
-INSERT INTO [dbo].[Person] (Name, DepartmentID) VALUES (N'张三', 1), (N'李四', 1), (N'王五', 2);
+INSERT INTO [dbo].[Person] (Name, DepartmentID, IsActive) VALUES 
+(N'张三', 1, 1), (N'李四', 1, 1), (N'王五', 2, 1), (N'赵六', 1, 0);
 -- 投诉类别
 INSERT INTO [dbo].[ComplaintCategory] (Name) VALUES (N'客户投诉'), (N'内部质量问题');
 -- 客诉类型
@@ -628,6 +630,7 @@ CREATE TABLE [dbo].[ProductionReworkRegister] (
     [Workshop] NVARCHAR(50),                         -- 生产车间
     
     -- 返工信息
+    [ReworkCategory] NVARCHAR(50),                   -- 返工类别
     [ReworkPersonnel] NVARCHAR(200),                 -- 返工人员（可多人，逗号分隔）
     [ReworkHours] DECIMAL(8,2),                      -- 返工工时
     [ReworkMethod] NVARCHAR(500),                    -- 返工方法
@@ -748,10 +751,12 @@ GO
 
 -- 插入返工类别初始数据
 INSERT INTO [dbo].[ReworkCategory] ([Name], [Description]) VALUES 
+(N'客退返工', N'客户退货导致的返工处理'),
+(N'来料返工', N'原材料质量问题导致的返工'),
+(N'制程返工', N'生产制程中出现问题的返工'),
 (N'印刷返工', N'印刷过程中的质量问题返工'),
 (N'裁切返工', N'裁切工序的尺寸或质量问题返工'),
 (N'包装返工', N'包装工序的问题返工'),
-(N'材料返工', N'原材料问题导致的返工'),
 (N'设备返工', N'设备故障导致的返工'),
 (N'人为返工', N'操作失误导致的返工'),
 (N'其他返工', N'其他原因导致的返工');

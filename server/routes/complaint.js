@@ -1082,10 +1082,10 @@ router.get('/options', async (req, res) => {
       .query('SELECT Name FROM Department ORDER BY Name');
     console.log('部门选项结果:', departmentResult.recordset);
 
-    // 获取人员选项 - 从Person表获取
+    // 获取人员选项 - 从Person表获取（默认只查询在职员工）
     console.log('正在获取人员选项...');
     const personResult = await pool.request()
-      .query('SELECT Name FROM Person ORDER BY Name');
+      .query('SELECT Name FROM Person WHERE IsActive = 1 ORDER BY Name');
     console.log('人员选项结果:', personResult.recordset);
 
     const result = {

@@ -42,6 +42,7 @@ const uploadRouter = require('./routes/upload');              // 文件上传路
 const qualityMetricsRouter = require('./routes/quality-metrics'); // 质量指标路由
 const materialPriceRouter = require('./routes/material-price'); // 材料价格路由
 const reworkRouter = require('./routes/rework');              // 返工登记路由
+const personRouter = require('./routes/person');              // 人员管理路由
 
 /**
  * 创建Express应用实例
@@ -137,6 +138,7 @@ app.use('/api/upload', uploadRouter);
 app.use('/api/quality-metrics', qualityMetricsRouter);
 app.use('/api/admin/material-prices', materialPriceRouter);
 app.use('/api/rework', reworkRouter);
+app.use('/api/person', personRouter);
 
 /**
  * 静态文件服务配置

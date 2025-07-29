@@ -1,13 +1,14 @@
 <template>
-  <div class="rework-analysis">
-    <!-- 页面标题 -->
-    <div class="page-header">
-      <h1>
-        <el-icon><Tools /></el-icon>
-        生产不良返工分析
-      </h1>
-      <p class="page-subtitle">实时监控生产返工情况，分析不良原因，提升产品质量</p>
-    </div>
+  <AppLayout>
+    <div class="rework-analysis">
+      <!-- 页面标题 -->
+      <div class="page-header">
+        <h1>
+          <el-icon><Tools /></el-icon>
+          生产不良返工分析
+        </h1>
+        <p class="page-subtitle">实时监控生产返工情况，分析不良原因，提升产品质量</p>
+      </div>
 
     <!-- 统计卡片区域 -->
     <div class="stats-cards">
@@ -339,7 +340,8 @@
         </el-descriptions>
       </div>
     </el-dialog>
-  </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup name="ReworkAnalysis">
@@ -351,6 +353,7 @@ import {
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
+import AppLayout from '../components/common/AppLayout.vue'
 
 // 响应式数据
 const loading = ref(false)
@@ -758,7 +761,19 @@ const exportTableData = async () => {
 // 工具方法
 const formatDate = (date) => {
   if (!date) return '-'
-  return new Date(date).toLocaleDateString('zh-CN')
+  
+  try {
+    const dateObj = new Date(date)
+    if (isNaN(dateObj.getTime())) return date
+    
+    // 使用本地时区的年月日，避免UTC转换，格式化为yyyy-mm-dd
+    const year = dateObj.getFullYear()
+    const month = String(dateObj.getMonth() + 1).padStart(2, '0')
+    const day = String(dateObj.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  } catch (error) {
+    return date
+  }
 }
 
 const getStatusType = (status) => {

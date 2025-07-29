@@ -225,6 +225,7 @@ CREATE TABLE `Person` (
     `ID` INT AUTO_INCREMENT PRIMARY KEY,              -- 主键，自增ID
     `Name` VARCHAR(50) NOT NULL UNIQUE,               -- 人员姓名，唯一
     `DepartmentID` INT,
+    `IsActive` BOOLEAN DEFAULT TRUE,                   -- 人员有效性标记（TRUE=在职，FALSE=离职）
     FOREIGN KEY (`DepartmentID`) REFERENCES `Department`(`ID`)  -- 外键关联部门表
 );
 
@@ -383,7 +384,8 @@ INSERT INTO `Workshop` (`Name`) VALUES ('印刷车间'), ('裁切车间'), ('包
 INSERT INTO `Department` (`Name`) VALUES ('生产部'), ('质检部'), ('销售部');
 
 -- 人员（依赖部门表的ID：1=生产部, 2=质检部）
-INSERT INTO `Person` (`Name`, `DepartmentID`) VALUES ('张三', 1), ('李四', 1), ('王五', 2);
+INSERT INTO `Person` (`Name`, `DepartmentID`, `IsActive`) VALUES 
+('张三', 1, TRUE), ('李四', 1, TRUE), ('王五', 2, TRUE), ('赵六', 1, FALSE);
 
 -- 投诉类别
 INSERT INTO `ComplaintCategory` (`Name`) VALUES ('客户投诉'), ('内部质量问题');

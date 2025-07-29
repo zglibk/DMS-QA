@@ -43,6 +43,10 @@
             <el-icon><Grid /></el-icon>
             <span v-show="!collapsed">用户列表</span>
           </el-menu-item>
+          <el-menu-item index="/admin/person-management">
+            <el-icon><Avatar /></el-icon>
+            <span v-show="!collapsed">人员管理</span>
+          </el-menu-item>
         </el-sub-menu>
         <el-menu-item index="/admin/rework-management">
           <el-icon><Tools /></el-icon>
@@ -190,7 +194,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument, List, Money } from '@element-plus/icons-vue'
+import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument, List, Money, Avatar } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import Profile from '../Profile.vue'

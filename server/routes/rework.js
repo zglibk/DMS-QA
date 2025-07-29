@@ -59,6 +59,117 @@ const upload = multer({
 // =====================================================
 
 /**
+ * @route GET /api/rework/export
+ * @desc 导出返工记录数据
+ * @access Private
+ */
+router.get('/export', async (req, res) => {
+  try {
+    const pool = await getConnection();
+    
+    // 构建查询条件
+    let whereClause = 'WHERE 1=1';
+    const params = [];
+    
+    // 日期范围筛选
+    if (req.query.startDate && req.query.endDate) {
+      whereClause += ` AND ReworkDate >= @startDate AND ReworkDate <= @endDate`;
+      params.push({ name: 'startDate', type: sql.Date, value: req.query.startDate });
+      params.push({ name: 'endDate', type: sql.Date, value: req.query.endDate });
+    }
+    
+    // 客户编号筛选
+    if (req.query.customerCode) {
+      whereClause += ` AND CustomerCode LIKE @customerCode`;
+      params.push({ name: 'customerCode', type: sql.NVarChar, value: `%${req.query.customerCode}%` });
+    }
+    
+    // 工单号筛选
+    if (req.query.orderNo) {
+      whereClause += ` AND OrderNo LIKE @orderNo`;
+      params.push({ name: 'orderNo', type: sql.NVarChar, value: `%${req.query.orderNo}%` });
+    }
+    
+    // 责任人筛选
+    if (req.query.responsiblePerson) {
+      whereClause += ` AND ResponsiblePerson = @responsiblePerson`;
+      params.push({ name: 'responsiblePerson', type: sql.NVarChar, value: req.query.responsiblePerson });
+    }
+    
+    // 返工状态筛选
+    if (req.query.reworkStatus) {
+      whereClause += ` AND ReworkStatus = @reworkStatus`;
+      params.push({ name: 'reworkStatus', type: sql.NVarChar, value: req.query.reworkStatus });
+    }
+    
+    // 关键词搜索
+    if (req.query.keyword) {
+      whereClause += ` AND (ProductName LIKE @keyword OR DefectiveReason LIKE @keyword OR ReworkMethod LIKE @keyword)`;
+      params.push({ name: 'keyword', type: sql.NVarChar, value: `%${req.query.keyword}%` });
+    }
+    
+    const query = `
+      SELECT 
+        ID,
+        ReworkDate,
+        CustomerCode,
+        OrderNo,
+        ProductName,
+        ProductSpec,
+        Workshop,
+        TotalQty,
+        DefectiveQty,
+        GoodQty,
+        DefectiveRate,
+        DefectiveReason,
+        DefectiveCategory,
+        ResponsiblePerson,
+        ResponsibleDept,
+        ReworkCategory,
+        ReworkPersonnel,
+        ReworkHours,
+        ReworkMethod,
+        ReworkStatus,
+        MaterialCost,
+        LaborCost,
+        OtherCost,
+        TotalCost,
+        QualityLevel,
+        FinalResult,
+        Remarks,
+        CreatedAt,
+        UpdatedAt
+      FROM ProductionReworkRegister
+      ${whereClause}
+      ORDER BY ReworkDate DESC, ID DESC
+    `;
+    
+    const request = pool.request();
+    
+    // 添加参数
+    params.forEach(param => {
+      request.input(param.name, param.type, param.value);
+    });
+    
+    const result = await request.query(query);
+    
+    res.json({
+      success: true,
+      data: result.recordset,
+      message: '导出数据获取成功'
+    });
+    
+  } catch (error) {
+    console.error('导出数据失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '导出数据失败',
+      error: error.message
+    });
+  }
+});
+
+/**
  * @route GET /api/rework/list
  * @desc 获取返工记录列表（支持分页和筛选）
  * @access Private
@@ -150,7 +261,7 @@ router.get('/list', async (req, res) => {
           ROW_NUMBER() OVER (ORDER BY ReworkDate DESC, ID DESC) as RowNum,
           ID, ReworkDate, CustomerCode, OrderNo, ProductName, ProductSpec,
           TotalQty, DefectiveQty, GoodQty, DefectiveReason, DefectiveCategory,
-          ResponsiblePerson, ResponsibleDept, Workshop, ReworkPersonnel,
+          ResponsiblePerson, ResponsibleDept, Workshop, ReworkCategory, ReworkPersonnel,
           ReworkHours, ReworkMethod, ReworkResult, ReworkStatus,
           MaterialCost, LaborCost, OtherCost, TotalCost,
           QualityLevel, ReworkTimes, FinalResult,
@@ -165,6 +276,13 @@ router.get('/list', async (req, res) => {
     `;
     
     const dataResult = await request.query(dataQuery);
+    
+    // 调试日志：检查查询结果
+    console.log('列表API查询结果:', dataResult.recordset);
+    if (dataResult.recordset.length > 0) {
+      console.log('第一条记录的ReworkCategory:', dataResult.recordset[0].ReworkCategory);
+      console.log('第一条记录的所有字段:', Object.keys(dataResult.recordset[0]));
+    }
     
     res.json({
       success: true,
@@ -245,13 +363,13 @@ router.get('/options', async (req, res) => {
     }
     
     try {
-      // 尝试获取人员列表
+      // 尝试获取人员列表（包含所有人员，不限制IsActive状态）
       const personResult = await pool.request().query(`
-        SELECT p.Name, ISNULL(d.Name, '未分配') as Department 
+        SELECT p.Name, ISNULL(d.Name, '未分配') as Department, p.IsActive
         FROM Person p 
         LEFT JOIN Department d ON p.DepartmentID = d.ID 
         WHERE p.Name IS NOT NULL
-        ORDER BY p.Name
+        ORDER BY p.IsActive DESC, p.Name
       `);
       if (personResult.recordset.length > 0) {
         options.persons = personResult.recordset;
@@ -624,6 +742,38 @@ router.delete('/quality-levels/:id', async (req, res) => {
 });
 
 /**
+ * @route GET /api/rework/rework-categories
+ * @desc 获取返工类别列表
+ * @access Private
+ */
+router.get('/rework-categories', async (req, res) => {
+  try {
+    const pool = await getConnection();
+    const result = await pool.request().query(`
+      SELECT 
+        ID,
+        Name,
+        Description
+      FROM ReworkCategory
+      ORDER BY ID
+    `);
+    
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+    
+  } catch (error) {
+    console.error('获取返工类别列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取返工类别列表失败',
+      error: error.message
+    });
+  }
+});
+
+/**
  * @route GET /api/rework/:id
  * @desc 获取单个返工记录详情
  * @access Private
@@ -681,15 +831,16 @@ router.post('/', upload.array('attachments', 5), async (req, res) => {
       reworkDate, customerCode, orderNo, productName, productSpec,
       totalQty, defectiveQty, goodQty, defectiveReason, defectiveCategory,
       defectiveDescription, responsiblePerson, responsibleDept, workshop,
-      reworkPersonnel, reworkHours, reworkMethod, reworkResult, reworkStatus,
+      reworkCategory, reworkPersonnel, reworkHours, reworkMethod, reworkResult, reworkStatus,
       materialCost, laborCost, otherCost, qualityLevel, reworkTimes,
-      finalResult, remarks, processNotes, createdBy
+      finalResult, remarks, processNotes, createdBy, attachmentPath
     } = req.body;
     
-    // 处理上传的附件
-    let attachmentFiles = '';
+    // 处理附件路径 - 优先使用前端传来的attachmentPath
+    let attachmentFiles = attachmentPath || '';
     if (req.files && req.files.length > 0) {
-      attachmentFiles = req.files.map(file => file.filename).join(';');
+      const newFiles = req.files.map(file => file.filename).join(';');
+      attachmentFiles = attachmentFiles ? `${attachmentFiles};${newFiles}` : newFiles;
     }
     
     // 计算总成本
@@ -713,6 +864,7 @@ router.post('/', upload.array('attachments', 5), async (req, res) => {
     request.input('responsiblePerson', sql.NVarChar, responsiblePerson);
     request.input('responsibleDept', sql.NVarChar, responsibleDept);
     request.input('workshop', sql.NVarChar, workshop);
+    request.input('reworkCategory', sql.NVarChar, reworkCategory);
     request.input('reworkPersonnel', sql.NVarChar, reworkPersonnel);
     request.input('reworkHours', sql.Decimal(8,2), reworkHours);
     request.input('reworkMethod', sql.NVarChar, reworkMethod);
@@ -735,7 +887,7 @@ router.post('/', upload.array('attachments', 5), async (req, res) => {
         ReworkDate, CustomerCode, OrderNo, ProductName, ProductSpec,
         TotalQty, DefectiveQty, GoodQty, DefectiveReason, DefectiveCategory,
         DefectiveDescription, ResponsiblePerson, ResponsibleDept, Workshop,
-        ReworkPersonnel, ReworkHours, ReworkMethod, ReworkResult, ReworkStatus,
+        ReworkCategory, ReworkPersonnel, ReworkHours, ReworkMethod, ReworkResult, ReworkStatus,
         MaterialCost, LaborCost, OtherCost, TotalCost,
         QualityLevel, ReworkTimes, FinalResult,
         AttachmentFiles, Remarks, ProcessNotes, CreatedBy
@@ -743,7 +895,7 @@ router.post('/', upload.array('attachments', 5), async (req, res) => {
         @reworkDate, @customerCode, @orderNo, @productName, @productSpec,
         @totalQty, @defectiveQty, @goodQty, @defectiveReason, @defectiveCategory,
         @defectiveDescription, @responsiblePerson, @responsibleDept, @workshop,
-        @reworkPersonnel, @reworkHours, @reworkMethod, @reworkResult, @reworkStatus,
+        @reworkCategory, @reworkPersonnel, @reworkHours, @reworkMethod, @reworkResult, @reworkStatus,
         @materialCost, @laborCost, @otherCost, @totalCost,
         @qualityLevel, @reworkTimes, @finalResult,
         @attachmentFiles, @remarks, @processNotes, @createdBy
@@ -789,13 +941,13 @@ router.put('/:id', upload.array('attachments', 5), async (req, res) => {
       reworkDate, customerCode, orderNo, productName, productSpec,
       totalQty, defectiveQty, goodQty, defectiveReason, defectiveCategory,
       defectiveDescription, responsiblePerson, responsibleDept, workshop,
-      reworkPersonnel, reworkHours, reworkMethod, reworkResult, reworkStatus,
+      reworkCategory, reworkPersonnel, reworkHours, reworkMethod, reworkResult, reworkStatus,
       materialCost, laborCost, otherCost, qualityLevel, reworkTimes,
-      finalResult, remarks, processNotes, updatedBy
+      finalResult, remarks, processNotes, updatedBy, attachmentPath
     } = req.body;
     
-    // 处理上传的附件
-    let attachmentFiles = req.body.existingAttachments || '';
+    // 处理附件路径 - 优先使用前端传来的attachmentPath，兼容existingAttachments
+    let attachmentFiles = attachmentPath || req.body.existingAttachments || '';
     if (req.files && req.files.length > 0) {
       const newFiles = req.files.map(file => file.filename).join(';');
       attachmentFiles = attachmentFiles ? `${attachmentFiles};${newFiles}` : newFiles;
@@ -823,6 +975,7 @@ router.put('/:id', upload.array('attachments', 5), async (req, res) => {
     request.input('responsiblePerson', sql.NVarChar, responsiblePerson);
     request.input('responsibleDept', sql.NVarChar, responsibleDept);
     request.input('workshop', sql.NVarChar, workshop);
+    request.input('reworkCategory', sql.NVarChar, reworkCategory);
     request.input('reworkPersonnel', sql.NVarChar, reworkPersonnel);
     request.input('reworkHours', sql.Decimal(8,2), reworkHours);
     request.input('reworkMethod', sql.NVarChar, reworkMethod);
@@ -856,6 +1009,7 @@ router.put('/:id', upload.array('attachments', 5), async (req, res) => {
         ResponsiblePerson = @responsiblePerson,
         ResponsibleDept = @responsibleDept,
         Workshop = @workshop,
+        ReworkCategory = @reworkCategory,
         ReworkPersonnel = @reworkPersonnel,
         ReworkHours = @reworkHours,
         ReworkMethod = @reworkMethod,
@@ -1120,6 +1274,8 @@ router.get('/statistics/trend', async (req, res) => {
 // 返工类别和方法管理 API
 // =====================================================
 
+
+
 /**
  * @route GET /api/rework/categories
  * @desc 获取返工类别列表
@@ -1149,6 +1305,8 @@ router.get('/categories', async (req, res) => {
     });
   }
 });
+
+
 
 /**
  * @route GET /api/rework/methods
