@@ -325,7 +325,9 @@ const fetchMenus = async () => {
   try {
     loading.value = true
     const response = await axios.get('/api/menus')
-    menuList.value = response.data.data || []
+    // 修复：从分页数据结构中提取list数组
+    const data = response.data.data || {}
+    menuList.value = data.list || []
   } catch (error) {
     console.error('获取菜单列表失败:', error)
     ElMessage.error('获取菜单列表失败')

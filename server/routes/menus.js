@@ -6,20 +6,20 @@
 const express = require('express')
 const router = express.Router()
 const sql = require('mssql')
-const { poolPromise } = require('../config/database')
+const { getConnection } = require('../db')
 
 // 获取菜单树形列表
 router.get('/tree', async (req, res) => {
   try {
-    const pool = await poolPromise
+    const pool = await getConnection()
     const result = await pool.request()
       .query(`
-        SELECT 
+        SELECT
           ID,
-          Name,
-          Code,
+          MenuName as Name,
+          MenuCode as Code,
           ParentID,
-          Type,
+          MenuType as Type,
           Icon,
           Path,
           Component,
@@ -79,19 +79,19 @@ router.get('/', async (req, res) => {
     } = req.query
     
     const offset = (page - 1) * size
-    const pool = await poolPromise
+    const pool = await getConnection()
     
     // 构建查询条件
     let whereConditions = ['m.Status = 1']
     let queryParams = []
     
     if (keyword) {
-      whereConditions.push('(m.Name LIKE @keyword OR m.Code LIKE @keyword)')
+      whereConditions.push('(m.MenuName LIKE @keyword OR m.MenuCode LIKE @keyword)')
       queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
     }
-    
+
     if (type) {
-      whereConditions.push('m.Type = @type')
+      whereConditions.push('m.MenuType = @type')
       queryParams.push({ name: 'type', type: sql.NVarChar(20), value: type })
     }
     
@@ -132,27 +132,29 @@ router.get('/', async (req, res) => {
     dataRequest.input('size', sql.Int, parseInt(size))
     
     const dataResult = await dataRequest.query(`
-      SELECT 
-        m.ID,
-        m.Name,
-        m.Code,
-        m.ParentID,
-        p.Name as ParentName,
-        m.Type,
-        m.Icon,
-        m.Path,
-        m.Component,
-        m.Permission,
-        m.SortOrder,
-        m.Status,
-        m.CreatedAt,
-        m.UpdatedAt
-      FROM Menus m
-      LEFT JOIN Menus p ON m.ParentID = p.ID
-      WHERE ${whereClause}
-      ORDER BY m.SortOrder ASC, m.CreatedAt DESC
-      OFFSET @offset ROWS
-      FETCH NEXT @size ROWS ONLY
+      SELECT * FROM (
+        SELECT
+          ROW_NUMBER() OVER (ORDER BY m.SortOrder ASC, m.CreatedAt DESC) as RowNum,
+          m.ID,
+          m.MenuName as Name,
+          m.MenuCode as Code,
+          m.ParentID,
+          p.MenuName as ParentName,
+          m.MenuType as Type,
+          m.Icon,
+          m.Path,
+          m.Component,
+          m.Permission,
+          m.SortOrder,
+          m.Status,
+          m.CreatedAt,
+          m.UpdatedAt
+        FROM Menus m
+        LEFT JOIN Menus p ON m.ParentID = p.ID
+        WHERE ${whereClause}
+      ) AS T
+      WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
+      ORDER BY T.RowNum
     `)
     
     res.json({
@@ -178,17 +180,17 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const pool = await poolPromise
+    const pool = await getConnection()
     const result = await pool.request()
       .input('id', sql.Int, id)
       .query(`
-        SELECT 
+        SELECT
           m.ID,
-          m.Name,
-          m.Code,
+          m.MenuName as Name,
+          m.MenuCode as Code,
           m.ParentID,
-          p.Name as ParentName,
-          m.Type,
+          p.MenuName as ParentName,
+          m.MenuType as Type,
           m.Icon,
           m.Path,
           m.Component,
@@ -238,7 +240,7 @@ router.post('/', async (req, res) => {
       SortOrder = 0,
       Status = true
     } = req.body
-    
+
     // 验证必填字段
     if (!Name || !Code || !Type) {
       return res.status(400).json({
@@ -246,13 +248,13 @@ router.post('/', async (req, res) => {
         message: '菜单名称、菜单编码和菜单类型为必填项'
       })
     }
-    
-    const pool = await poolPromise
+
+    const pool = await getConnection()
     
     // 检查菜单编码是否已存在
     const checkResult = await pool.request()
       .input('code', sql.NVarChar(50), Code)
-      .query('SELECT COUNT(*) as count FROM Menus WHERE Code = @code')
+      .query('SELECT COUNT(*) as count FROM Menus WHERE MenuCode = @code')
     
     if (checkResult.recordset[0].count > 0) {
       return res.status(400).json({
@@ -280,7 +282,7 @@ router.post('/', async (req, res) => {
       .input('name', sql.NVarChar(50), Name)
       .input('code', sql.NVarChar(50), Code)
       .input('parentId', sql.Int, ParentID)
-      .input('type', sql.NVarChar(20), Type)
+      .input('type', sql.NVarChar(10), Type)
       .input('icon', sql.NVarChar(50), Icon)
       .input('path', sql.NVarChar(200), Path)
       .input('component', sql.NVarChar(200), Component)
@@ -289,9 +291,9 @@ router.post('/', async (req, res) => {
       .input('status', sql.Bit, Status)
       .query(`
         INSERT INTO Menus (
-          Name, Code, ParentID, Type, Icon, Path, Component, Permission,
+          MenuName, MenuCode, ParentID, MenuType, Icon, Path, Component, Permission,
           SortOrder, Status, CreatedAt, UpdatedAt
-        ) 
+        )
         OUTPUT INSERTED.ID
         VALUES (
           @name, @code, @parentId, @type, @icon, @path, @component, @permission,
@@ -338,8 +340,8 @@ router.put('/:id', async (req, res) => {
         message: '菜单名称、菜单编码和菜单类型为必填项'
       })
     }
-    
-    const pool = await poolPromise
+
+    const pool = await getConnection()
     
     // 检查菜单是否存在
     const existResult = await pool.request()
@@ -357,7 +359,7 @@ router.put('/:id', async (req, res) => {
     const checkResult = await pool.request()
       .input('code', sql.NVarChar(50), Code)
       .input('id', sql.Int, id)
-      .query('SELECT COUNT(*) as count FROM Menus WHERE Code = @code AND ID != @id')
+      .query('SELECT COUNT(*) as count FROM Menus WHERE MenuCode = @code AND ID != @id')
     
     if (checkResult.recordset[0].count > 0) {
       return res.status(400).json({
@@ -393,7 +395,7 @@ router.put('/:id', async (req, res) => {
       .input('name', sql.NVarChar(50), Name)
       .input('code', sql.NVarChar(50), Code)
       .input('parentId', sql.Int, ParentID)
-      .input('type', sql.NVarChar(20), Type)
+      .input('type', sql.NVarChar(10), Type)
       .input('icon', sql.NVarChar(50), Icon)
       .input('path', sql.NVarChar(200), Path)
       .input('component', sql.NVarChar(200), Component)
@@ -402,10 +404,10 @@ router.put('/:id', async (req, res) => {
       .input('status', sql.Bit, Status)
       .query(`
         UPDATE Menus SET
-          Name = @name,
-          Code = @code,
+          MenuName = @name,
+          MenuCode = @code,
           ParentID = @parentId,
-          Type = @type,
+          MenuType = @type,
           Icon = @icon,
           Path = @path,
           Component = @component,
@@ -434,7 +436,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const pool = await poolPromise
+    const pool = await getConnection()
     
     // 检查菜单是否存在
     const existResult = await pool.request()
@@ -494,14 +496,14 @@ router.delete('/:id', async (req, res) => {
 // 获取菜单选项（用于下拉选择）
 router.get('/options/list', async (req, res) => {
   try {
-    const pool = await poolPromise
+    const pool = await getConnection()
     const result = await pool.request()
       .query(`
-        SELECT 
+        SELECT
           ID as value,
-          Name as label,
+          MenuName as label,
           ParentID,
-          Type
+          MenuType as Type
         FROM Menus
         WHERE Status = 1
         ORDER BY SortOrder ASC, CreatedAt ASC
