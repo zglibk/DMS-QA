@@ -70,9 +70,72 @@ const routes = [
       { path: 'supplier/list', component: SupplierList },
       { path: 'supplier/material-price', component: MaterialPriceList },
 
-      // 用户管理
+      // 用户管理（旧路径，保持兼容性）
       { path: 'user', redirect: '/admin/user/list' }, // 重定向到用户列表
       { path: 'user/list', component: UserList },
+
+      // 质量管理模块
+      {
+        path: 'quality',
+        redirect: '/admin/quality/complaint'
+      },
+      {
+        path: 'quality/complaint',
+        component: () => import('../components/HomeContent.vue'), // 投诉管理页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'quality/rework',
+        component: () => import('../views/admin/ReworkManagement.vue'), // 返工管理页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'quality/person',
+        component: () => import('../views/admin/PersonManagement.vue'), // 人员管理页面
+        meta: { requiresAuth: true }
+      },
+
+      // 质量成本损失模块
+      {
+        path: 'copq',
+        redirect: '/admin/copq/material-price'
+      },
+      {
+        path: 'copq/material-price',
+        component: MaterialPriceList, // 物料单价页面
+        meta: { requiresAuth: true }
+      },
+
+      // 系统管理模块
+      {
+        path: 'system',
+        redirect: '/admin/system/user'
+      },
+      {
+        path: 'system/user',
+        component: UserList, // 用户管理页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'system/role',
+        component: () => import('../views/admin/RoleManagement.vue'), // 角色管理页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'system/menu',
+        component: () => import('../views/admin/MenuManagement.vue'), // 菜单管理页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'system/dept',
+        component: () => import('../views/admin/DepartmentManagement.vue'), // 部门管理页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'system/position',
+        component: () => import('../views/admin/PositionManagement.vue'), // 岗位管理页面
+        meta: { requiresAuth: true }
+      },
 
       // 个人资料（管理后台版本）
       { path: 'profile', component: () => import('../views/Profile.vue') },
@@ -186,26 +249,57 @@ const router = createRouter({
 /**
  * 全局前置路由守卫
  *
- * 功能：实现简单的登录验证
+ * 功能：实现登录验证和权限控制
  *
  * 工作流程：
  * 1. 检查目标路由是否为登录页
  * 2. 如果不是登录页，检查是否有token
- * 3. 无token时强制跳转到登录页
- * 4. 有token或访问登录页时正常放行
+ * 3. 对于admin路由，进行权限验证
+ * 4. 无token或权限不足时跳转到相应页面
  *
  * 参数说明：
  * - to: 即将进入的目标路由对象
  * - from: 当前导航正要离开的路由对象
  * - next: 控制导航的函数
  */
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   // 从本地存储获取JWT token
   const token = localStorage.getItem('token')
 
   // 如果访问的不是登录页且没有token，跳转到登录页
   if (to.path !== '/login' && !token) {
     next('/login')
+    return
+  }
+
+  // 如果访问admin路由，需要进行权限验证
+  if (to.path.startsWith('/admin') && token) {
+    try {
+      // 动态导入userStore以避免循环依赖
+      const { useUserStore } = await import('../store/user')
+      const userStore = useUserStore()
+      
+      // 确保获取最新的用户权限信息
+      await userStore.fetchProfile()
+      
+      // 检查用户是否有管理权限
+      const isAdminUser = userStore.isAdmin
+      const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+      const hasManagerRole = userStore.hasRole('manager') || userStore.hasRole('部门经理')
+      const isAdminUsername = userStore.user?.username === 'admin'
+      
+      // admin用户、具有admin角色或manager角色的用户可以访问后台
+      if (isAdminUsername || isAdminUser || hasAdminRole || hasManagerRole) {
+        next()
+      } else {
+        // 权限不足，跳转到首页
+        next('/')
+      }
+    } catch (error) {
+      console.error('权限验证失败:', error)
+      // 权限验证失败，跳转到登录页
+      next('/login')
+    }
   } else {
     // 正常放行
     next()

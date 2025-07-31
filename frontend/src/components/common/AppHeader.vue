@@ -8,7 +8,7 @@
     <!-- 中间菜单栏 -->
     <div class="header-center">
       <div class="nav-menu-wrap">
-        <el-menu mode="horizontal" :default-active="activeMenu" @select="handleMenuSelect" class="nav-menu" :ellipsis="false">
+        <el-menu mode="horizontal" @select="handleMenuSelect" class="nav-menu" :ellipsis="false">
           <el-menu-item index="home">首页</el-menu-item>
           <el-menu-item index="stats">数据可视化</el-menu-item>
           <el-menu-item index="rework">返工分析</el-menu-item>
@@ -18,12 +18,12 @@
     <!-- 右侧用户区 -->
     <div class="header-right">  
       <el-button type="primary" text class="admin-btn" @click="goAdmin">登录后台</el-button>
-      <el-avatar :size="32" :src="user.Avatar" class="avatar-icon" @click="goProfile">
-        <template v-if="!user.Avatar">
+      <el-avatar :size="32" :src="user.avatar" class="avatar-icon" @click="goProfile">
+        <template v-if="!user.avatar">
           <el-icon><User /></el-icon>
         </template>
       </el-avatar>
-      <span class="username" @click="goProfile">{{ user.Username }}</span>
+      <span class="username" @click="goProfile">{{ user?.username || '用户' }}</span>
       <el-dropdown>
         <span class="el-dropdown-link">
           <el-icon><ArrowDown /></el-icon>
@@ -55,14 +55,7 @@ const userStore = useUserStore()
 const { user } = storeToRefs(userStore)
 const { siteConfig } = useSiteConfig()
 
-// 根据当前路由计算活跃菜单
-const activeMenu = computed(() => {
-  const path = route.path
-  if (path === '/' || path === '/home') return 'home'
-  if (path === '/data-visualization' || path.includes('/stats')) return 'stats'
-  if (path === '/rework-analysis' || path.includes('/rework')) return 'rework'
-  return 'home'
-})
+// 移除了 activeMenu 计算属性以避免与 el-menu 的循环依赖
 
 // 导航相关方法
 const handleMenuSelect = (index) => {
@@ -80,15 +73,46 @@ const goProfile = () => {
 }
 
 const logout = () => {
-  localStorage.removeItem('token')
-  window.location.href = '/login'
+  userStore.clearUser()
+  router.push('/login')
 }
 
-const goAdmin = () => {
-  if (user.value.Role === 'admin') {
+/**
+ * 进入后台管理页面
+ * 检查用户登录状态和权限，避免不必要的API调用导致token失效
+ */
+const goAdmin = async () => {
+  // 检查用户是否已登录
+  if (!userStore.token) {
+    ElMessage.error('请先登录')
+    router.push('/login')
+    return
+  }
+
+  // 检查是否已有用户信息，如果没有则获取
+  if (!userStore.user || !userStore.user.id) {
+    try {
+      await userStore.fetchProfile()
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+      ElMessage.error('获取用户信息失败，请重新登录')
+      return
+    }
+  }
+
+  // 使用现有的用户信息进行权限检查，避免重复API调用
+  const currentUser = userStore.user
+  
+  // 检查用户是否为管理员或具有管理权限
+  const isAdminUser = currentUser?.username === 'admin'
+  const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+  const hasManagerRole = userStore.hasRole('manager') || userStore.hasRole('部门经理')
+  
+  // admin用户、具有admin角色或manager角色的用户可以进入后台
+  if (isAdminUser || hasAdminRole || hasManagerRole) {
     router.push('/admin/dashboard')
   } else {
-    ElMessage.error('无后台权限')
+    ElMessage.error('您没有后台管理权限，请联系管理员')
   }
 }
 

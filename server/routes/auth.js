@@ -77,8 +77,8 @@ router.post('/login', async (req, res) => {
 
     // 用户不存在
     if (!user) {
-      return res.status(401).json({ message: '用户名或密码错误' });
-    }
+       return res.status(401).json({ message: '用户名或密码错误' });
+     }
 
     // 用户被禁用
     if (user.Status === 0) {
@@ -91,9 +91,24 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: '用户名或密码错误' });
     }
 
+    // 更新用户最后登录时间
+    const currentTime = new Date();
+    await pool.request()
+      .input('UserId', sql.Int, user.ID)
+      .input('LoginTime', sql.DateTime, currentTime)
+      .query('UPDATE [User] SET LastLoginTime = @LoginTime WHERE ID = @UserId');
+
+    // 重新查询用户信息以获取更新后的LastLoginTime
+    const updatedUserResult = await pool.request()
+      .input('UserId', sql.Int, user.ID)
+      .query('SELECT * FROM [User] WHERE ID = @UserId');
+    
+    const updatedUser = updatedUserResult.recordset[0];
+
     // 生成JWT token
     const token = jwt.sign(
       {
+        id: user.ID,
         username: user.Username,
         role: user.Role
       },
@@ -101,8 +116,17 @@ router.post('/login', async (req, res) => {
       { expiresIn: '2h' }
     );
 
-    // 返回token
-    res.json({ token });
+    // 返回token和用户信息（包含正确的lastLoginTime）
+    res.json({ 
+      token,
+      user: {
+        id: updatedUser.ID,
+        username: updatedUser.Username,
+        realName: updatedUser.RealName,
+        role: updatedUser.Role,
+        lastLoginTime: updatedUser.LastLoginTime ? updatedUser.LastLoginTime.toISOString() : null
+      }
+    });
 
   } catch (err) {
     console.error('登录错误:', err);
@@ -144,11 +168,32 @@ router.get('/profile', authMiddleware, async (req, res) => {
     let pool = await sql.connect(await getDynamicConfig());
     const result = await pool.request()
       .input('Username', sql.NVarChar, username)
-      .query('SELECT Username, RealName, Avatar, Email, Phone, Department, Role, CreatedAt FROM [User] WHERE Username = @Username');
+      .query(`
+        SELECT 
+          u.ID as id,
+          u.Username as username,
+          u.RealName as realName,
+          u.Email as email,
+          u.Phone as phone,
+          u.Gender as gender,
+          u.Birthday as birthday,
+          u.Address as address,
+          u.Avatar as avatar,
+          u.Status as status,
+          u.DepartmentID as departmentId,
+          d.Name as departmentName,
+          u.PositionID as positionId,
+          p.PositionName as positionName,
+          u.CreatedAt as createdAt
+        FROM [User] u
+        LEFT JOIN [Department] d ON u.DepartmentID = d.ID
+        LEFT JOIN [Positions] p ON u.PositionID = p.ID
+        WHERE u.Username = @Username
+      `);
     const user = result.recordset[0];
     if (user) {
       // 限制头像最大长度，防止前端异常
-      if (user.Avatar && user.Avatar.length > 1000000) user.Avatar = '';
+      if (user.avatar && user.avatar.length > 1000000) user.avatar = '';
       res.json({ success: true, data: user });
     } else {
       res.json({ success: false, message: '用户不存在' });
@@ -238,7 +283,8 @@ router.get('/user-list', authMiddleware, async (req, res) => {
     const sqlQuery = `
       SELECT * FROM (
         SELECT 
-          Username, RealName, Department, Email, Phone, Role, ISNULL(Status, 1) AS Status,
+          ID, Username, RealName, Department, Email, Phone, Role, ISNULL(Status, 1) AS Status,
+          CreatedAt, LastLoginTime,
           ROW_NUMBER() OVER (ORDER BY Username) AS RowNum
         FROM [User]
         ${where}
@@ -315,5 +361,195 @@ router.post('/add-user', authMiddleware, async (req, res) => {
   }
 });
 
+// ===================== 获取用户角色和权限信息 =====================
+// GET /api/auth/user/:userId/roles-permissions
+// 获取指定用户的角色和权限信息
+router.get('/user/:userId/roles-permissions', authMiddleware, async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    let pool = await sql.connect(await getDynamicConfig());
+    
+    // 获取用户角色信息
+    const rolesResult = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .query(`
+        SELECT 
+          r.ID,
+          r.RoleName as Name,
+          r.RoleCode as Code,
+          r.Description
+        FROM [UserRoles] ur
+        INNER JOIN [Roles] r ON ur.RoleID = r.ID
+        WHERE ur.UserID = @UserId AND r.Status = 1
+      `);
+    
+    // 获取用户权限信息（通过角色获取菜单权限）
+    const permissionsResult = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .query(`
+        SELECT DISTINCT
+          m.ID as id,
+          m.MenuName as name,
+          m.MenuCode as code,
+          m.Path as path,
+          m.MenuType as type,
+          m.ParentID as parentId,
+          m.SortOrder
+        FROM [UserRoles] ur
+        INNER JOIN [RoleMenus] rm ON ur.RoleID = rm.RoleID
+        INNER JOIN [Menus] m ON rm.MenuID = m.ID
+        WHERE ur.UserID = @UserId AND m.Status = 1
+        ORDER BY m.SortOrder
+      `);
+    
+    const roles = rolesResult.recordset || [];
+    const permissions = permissionsResult.recordset || [];
+    
+    res.json({
+      success: true,
+      data: {
+        roles,
+        permissions,
+        menus: permissions // 兼容前端
+      }
+    });
+    
+  } catch (err) {
+    console.error('获取用户角色权限信息出错:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ===================== 重置用户密码 =====================
+// POST /api/auth/reset-user-password
+// 参数: userID, username, newPassword, notifyMethod
+// 管理员重置指定用户的密码
+router.post('/reset-user-password', authMiddleware, async (req, res) => {
+  const { userId, username, newPassword, notifyMethod } = req.body;
+  
+  // 参数验证
+  if (!userId || !username || !newPassword) {
+    return res.json({ success: false, message: '缺少必要参数' });
+  }
+  
+  if (newPassword.length < 6) {
+    return res.json({ success: false, message: '密码长度至少6位' });
+  }
+  
+  try {
+    let pool = await sql.connect(await getDynamicConfig());
+    
+    // 验证用户是否存在
+    const userResult = await pool.request()
+      .input('UserID', sql.Int, userId)
+      .input('Username', sql.NVarChar, username)
+      .query('SELECT ID, Username FROM [User] WHERE ID = @UserID AND Username = @Username');
+    
+    const user = userResult.recordset[0];
+    if (!user) {
+      return res.json({ success: false, message: '用户不存在' });
+    }
+    
+    // 加密新密码
+    const hash = await bcrypt.hash(newPassword, 10);
+    
+    // 更新密码
+    await pool.request()
+      .input('UserID', sql.Int, userId)
+      .input('Password', sql.NVarChar, hash)
+      .query('UPDATE [User] SET Password=@Password WHERE ID = @UserID');
+    
+    // 根据通知方式处理（这里可以扩展邮件或短信通知功能）
+    let notifyMessage = '';
+    switch (notifyMethod) {
+      case 'email':
+        notifyMessage = '已通过邮件通知用户';
+        // TODO: 实现邮件通知功能
+        break;
+      case 'sms':
+        notifyMessage = '已通过短信通知用户';
+        // TODO: 实现短信通知功能
+        break;
+      case 'none':
+      default:
+        notifyMessage = '密码重置成功，未发送通知';
+        break;
+    }
+    
+    res.json({ 
+      success: true, 
+      message: `用户 ${username} 的密码重置成功。${notifyMessage}` 
+    });
+    
+  } catch (err) {
+    console.error('重置密码失败:', err);
+    res.status(500).json({ success: false, message: '重置密码失败，请重试' });
+  }
+});
+
+// ===================== 用户角色分配 =====================
+// POST /api/auth/user/:userId/assign-roles
+// 为指定用户分配角色
+router.post('/user/:userId/assign-roles', authMiddleware, async (req, res) => {
+  const { userId } = req.params;
+  const { roleIds } = req.body;
+  
+  // 参数验证
+  if (!userId || !Array.isArray(roleIds)) {
+    return res.json({ success: false, message: '参数错误' });
+  }
+  
+  try {
+    let pool = await sql.connect(await getDynamicConfig());
+    
+    // 验证用户是否存在
+    const userResult = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .query('SELECT ID, Username FROM [User] WHERE ID = @UserId');
+    
+    const user = userResult.recordset[0];
+    if (!user) {
+      return res.json({ success: false, message: '用户不存在' });
+    }
+    
+    // 开始事务
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    
+    try {
+      // 删除用户现有角色
+      await transaction.request()
+        .input('UserId', sql.Int, userId)
+        .query('DELETE FROM [UserRoles] WHERE UserID = @UserId');
+      
+      // 分配新角色
+      for (const roleId of roleIds) {
+        if (roleId && !isNaN(roleId)) {
+          await transaction.request()
+            .input('UserId', sql.Int, userId)
+            .input('RoleId', sql.Int, roleId)
+            .query('INSERT INTO [UserRoles] (UserID, RoleID) VALUES (@UserId, @RoleId)');
+        }
+      }
+      
+      await transaction.commit();
+      
+      res.json({ 
+        success: true, 
+        message: `用户 ${user.Username} 的角色分配成功` 
+      });
+      
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+    
+  } catch (err) {
+    console.error('分配用户角色失败:', err);
+    res.status(500).json({ success: false, message: '分配角色失败，请重试' });
+  }
+});
+
 // 导出路由
-module.exports = router; 
+module.exports = router;

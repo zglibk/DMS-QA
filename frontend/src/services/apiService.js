@@ -143,9 +143,20 @@ class ApiService {
 
         // 处理认证错误
         if (error.response?.status === 401) {
-          console.log('🔐 认证失败，清除token')
+          console.log('🔐 认证失败，清除token并跳转到登录页')
           localStorage.removeItem('token')
-          // 可以在这里触发重新登录
+          
+          // 使用程序化导航跳转到登录页面，避免强制刷新
+          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
+            // 导入router实例并进行导航
+            import('../router/index.js').then(({ default: router }) => {
+              router.push('/login')
+            }).catch(err => {
+              console.error('导航到登录页失败:', err)
+              // 如果程序化导航失败，回退到强制跳转
+              window.location.href = '/login'
+            })
+          }
         }
 
         return Promise.reject(error)

@@ -369,7 +369,7 @@ BEGIN
     
     -- 生产管理子菜单
     INSERT INTO [dbo].[Menus] ([ParentID], [MenuCode], [MenuName], [MenuType], [Icon], [Path], [Component], [Permission], [SortOrder], [Visible], [Status]) VALUES
-    (@productionMenuId, 'material-price', N'物料单价', 'menu', 'Coin', '/production/material-price', 'production/material-price/index', 'production:material:view', 10, 1, 1);
+    (@productionMenuId, 'material-price', N'物料单价', 'menu', 'Coin', '/copq/material-price', 'copq/material-price/index', 'copq:material:view', 10, 1, 1);
 END
 
 -- 初始化角色数据

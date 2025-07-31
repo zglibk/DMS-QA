@@ -200,7 +200,12 @@ const login = async () => {
       }
       try {
         const res = await axios.post('/api/auth/login', form.value)
-        localStorage.setItem('token', res.data.token)
+        // 设置token到store和localStorage
+        userStore.setToken(res.data.token)
+        // 直接使用登录接口返回的用户信息，包括最后登录时间
+        if (res.data.user) {
+          userStore.setUser(res.data.user)
+        }
         await userStore.fetchProfile()
         ElMessage.success('登录成功')
         router.push('/')
@@ -1111,4 +1116,4 @@ const saveApiBase = () => {
   animation: float 4.2s ease-in-out infinite reverse;
   z-index: 1;
 }
-</style> 
+</style>

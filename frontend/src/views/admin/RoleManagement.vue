@@ -7,103 +7,113 @@
     </div>
 
     <!-- 搜索和操作工具栏 -->
-    <div class="toolbar">
-      <div class="search-section">
-        <el-input
-          v-model="searchForm.keyword"
-          placeholder="搜索角色名称或编码"
-          style="width: 300px; margin-right: 10px"
-          clearable
-          @keyup.enter="handleSearch"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
-        <el-select
-          v-model="searchForm.status"
-          placeholder="状态"
-          style="width: 120px; margin-right: 10px"
-          clearable
-        >
-          <el-option label="启用" :value="true" />
-          <el-option label="禁用" :value="false" />
-        </el-select>
-        <el-button type="primary" @click="handleSearch" :icon="Search">
-          搜索
-        </el-button>
-        <el-button @click="resetSearch" :icon="Refresh">
-          重置
-        </el-button>
+    <el-card class="toolbar-card" shadow="never">
+      <div class="toolbar">
+        <div class="search-section">
+          <el-input
+            v-model="searchForm.keyword"
+            placeholder="搜索角色名称或编码"
+            style="width: 300px; margin-right: 10px"
+            clearable
+            @keyup.enter="handleSearch"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-select
+            v-model="searchForm.status"
+            placeholder="状态"
+            style="width: 120px; margin-right: 10px"
+            clearable
+          >
+            <el-option label="启用" :value="true" />
+            <el-option label="禁用" :value="false" />
+          </el-select>
+          <el-button type="primary" @click="handleSearch" :icon="Search">
+            搜索
+          </el-button>
+          <el-button @click="resetSearch" :icon="Refresh">
+            重置
+          </el-button>
+        </div>
+        <div class="action-section">
+          <el-button type="primary" @click="showAddDialog" :icon="Plus">
+            新增角色
+          </el-button>
+          <el-button @click="refreshData" :icon="Refresh">
+            刷新
+          </el-button>
+        </div>
       </div>
-      <div class="action-section">
-        <el-button type="primary" @click="showAddDialog" :icon="Plus">
-          新增角色
-        </el-button>
-        <el-button @click="refreshData" :icon="Refresh">
-          刷新
-        </el-button>
-      </div>
-    </div>
+    </el-card>
 
     <!-- 角色列表表格 -->
-    <el-table
-      :data="roleList"
-      style="width: 100%"
-      v-loading="loading"
-      stripe
-    >
-      <el-table-column prop="Name" label="角色名称" min-width="150" />
-      <el-table-column prop="Code" label="角色编码" width="120" />
-      <el-table-column prop="Description" label="角色描述" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="Status" label="状态" width="80">
+    <el-card class="table-card" shadow="never">
+      <el-table
+        :data="roleList"
+        style="width: 100%"
+        v-loading="loading"
+        stripe
+        border
+        resizable
+        :header-cell-style="{ background: '#f8f9fa', color: '#606266' }"
+      >
+      <el-table-column label="#" type="index" width="60" fixed="left" />
+      <el-table-column prop="Name" label="角色名称" min-width="120" resizable show-overflow-tooltip />
+      <el-table-column prop="Code" label="角色编码" min-width="120" resizable show-overflow-tooltip />
+      <el-table-column prop="Description" label="角色描述" min-width="200" resizable show-overflow-tooltip />
+      <el-table-column prop="Status" label="状态" width="80" resizable>
         <template #default="{ row }">
           <el-tag :type="row.Status ? 'success' : 'danger'" size="small">
             {{ row.Status ? '启用' : '禁用' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="SortOrder" label="排序" width="80" />
-      <el-table-column prop="CreatedAt" label="创建时间" width="160">
+      <el-table-column prop="SortOrder" label="排序" width="80" resizable />
+      <el-table-column prop="CreatedAt" label="创建时间" min-width="160" resizable>
         <template #default="{ row }">
           {{ formatDate(row.CreatedAt) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="250" fixed="right">
+      <el-table-column label="操作" width="240" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
-            编辑
-          </el-button>
-          <el-button size="small" type="warning" @click="showPermissionDialog(row)" :icon="Key">
-            权限
-          </el-button>
-          <el-button size="small" type="info" @click="showDepartmentDialog(row)" :icon="OfficeBuilding">
-            部门
-          </el-button>
-          <el-button 
-            size="small" 
-            type="danger" 
-            @click="deleteRole(row)"
-            :icon="Delete"
-          >
-            删除
-          </el-button>
+          <div class="action-buttons">
+            <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
+              编辑
+            </el-button>
+            <el-button size="small" type="success" @click="showPermissionDialog(row)" :icon="Setting">
+              权限
+            </el-button>
+            <el-button size="small" type="warning" @click="showDepartmentDialog(row)" :icon="OfficeBuilding">
+              部门
+            </el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="deleteRole(row)"
+              :icon="Delete"
+            >
+              删除
+            </el-button>
+          </div>
         </template>
       </el-table-column>
-    </el-table>
-
-    <!-- 分页 -->
-    <div class="pagination-wrapper">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.size"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="pagination.total"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
+      </el-table>
+      
+      <!-- 分页 -->
+      <div class="pagination-wrapper">
+        <el-pagination
+          :current-page="pagination.page"
+          :page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </el-card>
 
     <!-- 新增/编辑角色对话框 -->
     <el-dialog
@@ -111,6 +121,8 @@
       v-model="dialogVisible"
       width="600px"
       :before-close="handleDialogClose"
+      :append-to-body="true"
+      :lock-scroll="false"
     >
       <el-form
         ref="formRef"
@@ -171,6 +183,8 @@
       v-model="permissionDialogVisible"
       width="800px"
       :before-close="handlePermissionDialogClose"
+      :append-to-body="true"
+      :lock-scroll="false"
     >
       <div class="permission-header">
         <h4>为角色 "{{ currentRole?.Name }}" 分配菜单权限</h4>
@@ -191,7 +205,7 @@
         :default-checked-keys="selectedMenuIds"
         class="menu-tree"
       >
-        <template #default="{ node, data }">
+        <template #default="{ data }">
           <div class="menu-node">
             <el-icon v-if="data.Icon" class="menu-icon">
               <component :is="data.Icon" />
@@ -219,6 +233,8 @@
       v-model="departmentDialogVisible"
       width="600px"
       :before-close="handleDepartmentDialogClose"
+      :append-to-body="true"
+      :lock-scroll="false"
     >
       <div class="department-header">
         <h4>为角色 "{{ currentRole?.Name }}" 分配部门权限</h4>
@@ -239,7 +255,7 @@
         :default-checked-keys="selectedDepartmentIds"
         class="department-tree"
       >
-        <template #default="{ node, data }">
+        <template #default="{ data }">
           <div class="department-node">
             <el-icon class="department-icon">
               <OfficeBuilding v-if="data.DeptType === 'company'" />
@@ -402,7 +418,9 @@ const fetchRoles = async () => {
 const fetchMenus = async () => {
   try {
     const response = await axios.get('/api/menus')
-    menuList.value = response.data.data || []
+    // 修复：从分页数据结构中提取list数组
+    const data = response.data.data || {}
+    menuList.value = data.list || []
   } catch (error) {
     console.error('获取菜单列表失败:', error)
   }
@@ -584,7 +602,9 @@ const deleteRole = async (role) => {
       {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        type: 'warning'
+        type: 'warning',
+        appendTo: 'body',
+        lockScroll: false
       }
     )
     
@@ -695,6 +715,8 @@ onMounted(async () => {
 <style scoped>
 .role-management {
   padding: 20px;
+  background: #f5f7fa;
+  height: auto;
 }
 
 .page-header {
@@ -704,6 +726,8 @@ onMounted(async () => {
 .page-header h2 {
   margin: 0 0 8px 0;
   color: #303133;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .page-header p {
@@ -712,13 +736,18 @@ onMounted(async () => {
   font-size: 14px;
 }
 
+.toolbar-card {
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 15px;
 }
 
 .search-section {
@@ -733,13 +762,25 @@ onMounted(async () => {
   gap: 10px;
 }
 
+.table-card {
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
 .pagination-wrapper {
   margin-top: 20px;
   text-align: right;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
 }
 
 .dialog-footer {
   text-align: right;
+}
+
+.dialog-footer .el-button {
+  margin-left: 10px;
 }
 
 .permission-header,
@@ -768,6 +809,7 @@ onMounted(async () => {
   border: 1px solid #dcdfe6;
   border-radius: 4px;
   padding: 10px;
+  background: #fafafa;
 }
 
 .menu-node,
@@ -775,30 +817,183 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 4px 0;
+  transition: all 0.3s ease;
+}
+
+.menu-node:hover,
+.department-node:hover {
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 4px;
+  padding: 4px 8px;
 }
 
 .menu-icon,
 .department-icon {
   color: #409EFF;
+  font-size: 16px;
 }
 
 .menu-type-tag {
   margin-left: auto;
 }
 
+/* Element Plus 组件样式覆盖 */
+:deep(.el-button) {
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-button:hover) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+:deep(.el-input) {
+  border-radius: 6px;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+:deep(.el-input__wrapper:hover) {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+:deep(.el-select) {
+  border-radius: 6px;
+}
+
+:deep(.el-dialog) {
+  border-radius: 12px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+:deep(.el-dialog__header) {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+:deep(.el-dialog__body) {
+  padding: 24px;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 16px 24px 24px;
+  border-top: 1px solid #f0f0f0;
+}
+
+:deep(.el-table) {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
 :deep(.el-table .el-table__cell) {
-  padding: 8px 0;
+  padding: 12px 0;
+  border-bottom: 1px solid #f5f7fa;
+}
+
+:deep(.el-table__header) {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+}
+
+:deep(.el-table__header th) {
+  background: transparent;
+  color: white;
+  font-weight: 600;
+}
+
+:deep(.el-table__row:hover) {
+  background: rgba(64, 158, 255, 0.05);
+}
+
+:deep(.el-card) {
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: none;
+}
+
+:deep(.el-card__body) {
+  padding: 24px;
 }
 
 :deep(.el-form-item) {
-  margin-bottom: 18px;
+  margin-bottom: 20px;
+}
+
+:deep(.el-form-item__label) {
+  font-weight: 500;
+  color: #303133;
 }
 
 :deep(.el-tree-node__content) {
-  height: 32px;
+  height: 36px;
+  border-radius: 4px;
+  margin: 2px 0;
+  transition: all 0.3s ease;
 }
 
+:deep(.el-tree-node__content:hover) {
+  background: rgba(64, 158, 255, 0.1);
+}
+
+:deep(.el-tag) {
+  border-radius: 12px;
+  font-weight: 500;
+}
+
+:deep(.el-pagination) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+}
+
+:deep(.el-pagination .btn-next),
+:deep(.el-pagination .btn-prev) {
+  border-radius: 6px;
+}
+
+:deep(.el-pager li) {
+  border-radius: 6px;
+  margin: 0 2px;
+}
+
+/* 动画效果 */
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  min-width: auto;
+  padding: 5px 8px;
+}
+
+/* 响应式布局 */
 @media (max-width: 768px) {
+  .role-management {
+    padding: 10px;
+  }
+  
   .toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -806,6 +1001,7 @@ onMounted(async () => {
   
   .search-section {
     justify-content: flex-start;
+    margin-bottom: 10px;
   }
   
   .action-section {
@@ -815,6 +1011,19 @@ onMounted(async () => {
   .permission-actions,
   .department-actions {
     flex-wrap: wrap;
+  }
+  
+  .pagination-wrapper {
+    text-align: center;
+  }
+  
+  :deep(.el-dialog) {
+    width: 95% !important;
+    margin: 5vh auto;
+  }
+  
+  :deep(.el-table__body-wrapper) {
+    overflow-x: auto;
   }
 }
 </style>

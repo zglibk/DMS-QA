@@ -7,119 +7,129 @@
     </div>
 
     <!-- 搜索和操作工具栏 -->
-    <div class="toolbar">
-      <div class="search-section">
-        <el-input
-          v-model="searchForm.keyword"
-          placeholder="搜索岗位名称或编码"
-          style="width: 300px; margin-right: 10px"
-          clearable
-          @keyup.enter="handleSearch"
-        >
-          <template #prefix>
-            <el-icon><Search /></el-icon>
-          </template>
-        </el-input>
-        <el-select
-          v-model="searchForm.departmentId"
-          placeholder="选择部门"
-          style="width: 200px; margin-right: 10px"
-          clearable
-        >
-          <el-option
-            v-for="dept in departmentOptions"
-            :key="dept.ID"
-            :label="dept.Name"
-            :value="dept.ID"
-          />
-        </el-select>
-        <el-select
-          v-model="searchForm.status"
-          placeholder="状态"
-          style="width: 120px; margin-right: 10px"
-          clearable
-        >
-          <el-option label="启用" :value="true" />
-          <el-option label="禁用" :value="false" />
-        </el-select>
-        <el-button type="primary" @click="handleSearch" :icon="Search">
-          搜索
-        </el-button>
-        <el-button @click="resetSearch" :icon="Refresh">
-          重置
-        </el-button>
+    <el-card class="toolbar-card" shadow="never">
+      <div class="toolbar">
+        <div class="search-section">
+          <el-input
+            v-model="searchForm.keyword"
+            placeholder="搜索岗位名称或编码"
+            style="width: 300px; margin-right: 10px"
+            clearable
+            @keyup.enter="handleSearch"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+          <el-select
+            v-model="searchForm.departmentId"
+            placeholder="选择部门"
+            style="width: 200px; margin-right: 10px"
+            clearable
+          >
+            <el-option
+              v-for="dept in departmentOptions"
+              :key="dept.ID"
+              :label="dept.Name"
+              :value="dept.ID"
+            />
+          </el-select>
+          <el-select
+            v-model="searchForm.status"
+            placeholder="状态"
+            style="width: 120px; margin-right: 10px"
+            clearable
+          >
+            <el-option label="启用" :value="true" />
+            <el-option label="禁用" :value="false" />
+          </el-select>
+          <el-button type="primary" @click="handleSearch" :icon="Search">
+            搜索
+          </el-button>
+          <el-button @click="resetSearch" :icon="Refresh">
+            重置
+          </el-button>
       </div>
-      <div class="action-section">
-        <el-button type="primary" @click="showAddDialog" :icon="Plus">
-          新增岗位
-        </el-button>
-        <el-button @click="refreshData" :icon="Refresh">
-          刷新
-        </el-button>
+        <div class="action-section">
+          <el-button type="primary" @click="showAddDialog" :icon="Plus">
+            新增岗位
+          </el-button>
+          <el-button @click="refreshData" :icon="Refresh">
+            刷新
+          </el-button>
+        </div>
       </div>
-    </div>
+    </el-card>
 
     <!-- 岗位列表表格 -->
-    <el-table
-      :data="positionList"
-      style="width: 100%"
-      v-loading="loading"
-      stripe
-    >
-      <el-table-column prop="Name" label="岗位名称" min-width="150" />
-      <el-table-column prop="Code" label="岗位编码" width="120" />
-      <el-table-column prop="DepartmentName" label="所属部门" width="150" />
-      <el-table-column prop="Level" label="岗位级别" width="100">
+    <el-card class="table-card" shadow="never">
+      <el-table
+        :data="positionList"
+        style="width: 100%"
+        v-loading="loading"
+        stripe
+        border
+        resizable
+        :header-cell-style="{ background: '#f8f9fa', color: '#606266' }"
+      >
+      <el-table-column label="#" type="index" width="60" fixed="left" />
+      <el-table-column prop="Name" label="岗位名称" min-width="150" resizable show-overflow-tooltip />
+      <el-table-column prop="Code" label="岗位编码" min-width="120" resizable show-overflow-tooltip />
+      <el-table-column prop="DepartmentName" label="所属部门" min-width="150" resizable show-overflow-tooltip />
+      <el-table-column prop="Level" label="岗位级别" width="100" resizable>
         <template #default="{ row }">
           <el-tag :type="getLevelTagType(row.Level)" size="small">
             {{ getLevelText(row.Level) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="Description" label="岗位描述" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="Requirements" label="任职要求" min-width="200" show-overflow-tooltip />
-      <el-table-column prop="Status" label="状态" width="80">
+      <el-table-column prop="Description" label="岗位描述" min-width="200" resizable show-overflow-tooltip />
+      <el-table-column prop="Requirements" label="任职要求" min-width="200" resizable show-overflow-tooltip />
+      <el-table-column prop="Status" label="状态" width="80" resizable>
         <template #default="{ row }">
           <el-tag :type="row.Status ? 'success' : 'danger'" size="small">
             {{ row.Status ? '启用' : '禁用' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="SortOrder" label="排序" width="80" />
-      <el-table-column prop="CreatedAt" label="创建时间" width="160">
+      <el-table-column prop="SortOrder" label="排序" width="80" resizable />
+      <el-table-column prop="CreatedAt" label="创建时间" min-width="160" resizable>
         <template #default="{ row }">
           {{ formatDate(row.CreatedAt) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="150" fixed="right">
+      <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
-            编辑
-          </el-button>
-          <el-button 
-            size="small" 
-            type="danger" 
-            @click="deletePosition(row)"
-            :icon="Delete"
-          >
-            删除
-          </el-button>
+          <div class="action-buttons">
+            <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
+              编辑
+            </el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="deletePosition(row)"
+              :icon="Delete"
+            >
+              删除
+            </el-button>
+          </div>
         </template>
       </el-table-column>
-    </el-table>
-
-    <!-- 分页 -->
-    <div class="pagination-wrapper">
-      <el-pagination
-        v-model:current-page="pagination.page"
-        v-model:page-size="pagination.size"
-        :page-sizes="[10, 20, 50, 100]"
-        :total="pagination.total"
-        layout="total, sizes, prev, pager, next, jumper"
-        @size-change="handleSizeChange"
-        @current-change="handleCurrentChange"
-      />
-    </div>
+      </el-table>
+      
+      <!-- 分页 -->
+      <div class="pagination-wrapper">
+        <el-pagination
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.size"
+          :page-sizes="[10, 20, 50, 100]"
+          :total="pagination.total"
+          layout="total, sizes, prev, pager, next, jumper"
+          @size-change="handleSizeChange"
+          @current-change="handleCurrentChange"
+        />
+      </div>
+    </el-card>
 
     <!-- 新增/编辑岗位对话框 -->
     <el-dialog
@@ -127,6 +137,8 @@
       v-model="dialogVisible"
       width="700px"
       :before-close="handleDialogClose"
+      :append-to-body="true"
+      :lock-scroll="false"
     >
       <el-form
         ref="formRef"
@@ -162,11 +174,11 @@
           <el-col :span="12">
             <el-form-item label="岗位级别" prop="Level">
               <el-select v-model="formData.Level" placeholder="请选择岗位级别">
-                <el-option label="初级" value="junior" />
-                <el-option label="中级" value="middle" />
-                <el-option label="高级" value="senior" />
-                <el-option label="专家" value="expert" />
-                <el-option label="管理" value="manager" />
+                <el-option label="初级" :value="1" />
+                <el-option label="中级" :value="2" />
+                <el-option label="高级" :value="3" />
+                <el-option label="专家" :value="4" />
+                <el-option label="管理" :value="5" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -257,7 +269,7 @@ const formData = reactive({
   Name: '',
   Code: '',
   DepartmentID: null,
-  Level: '',
+  Level: null,
   Description: '',
   Requirements: '',
   SortOrder: 0,
@@ -324,22 +336,22 @@ function buildTree(list, parentId = null) {
 
 function getLevelTagType(level) {
   const typeMap = {
-    junior: '',
-    middle: 'success',
-    senior: 'warning',
-    expert: 'danger',
-    manager: 'info'
+    1: '',
+    2: 'success',
+    3: 'warning',
+    4: 'danger',
+    5: 'info'
   }
   return typeMap[level] || ''
 }
 
 function getLevelText(level) {
   const textMap = {
-    junior: '初级',
-    middle: '中级',
-    senior: '高级',
-    expert: '专家',
-    manager: '管理'
+    1: '初级',
+    2: '中级',
+    3: '高级',
+    4: '专家',
+    5: '管理'
   }
   return textMap[level] || level
 }
@@ -424,7 +436,7 @@ const showEditDialog = (position) => {
     Name: position.Name,
     Code: position.Code,
     DepartmentID: position.DepartmentID,
-    Level: position.Level || '',
+    Level: position.Level || null,
     Description: position.Description || '',
     Requirements: position.Requirements || '',
     SortOrder: position.SortOrder || 0,
@@ -439,7 +451,7 @@ const resetForm = () => {
     Name: '',
     Code: '',
     DepartmentID: null,
-    Level: '',
+    Level: null,
     Description: '',
     Requirements: '',
     SortOrder: 0,
@@ -483,7 +495,9 @@ const deletePosition = async (position) => {
       {
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        type: 'warning'
+        type: 'warning',
+        appendTo: 'body',
+        lockScroll: false
       }
     )
     
@@ -519,6 +533,8 @@ onMounted(async () => {
 <style scoped>
 .position-management {
   padding: 20px;
+  background: #f5f7fa;
+  height: auto;
 }
 
 .page-header {
@@ -528,6 +544,8 @@ onMounted(async () => {
 .page-header h2 {
   margin: 0 0 8px 0;
   color: #303133;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .page-header p {
@@ -536,13 +554,18 @@ onMounted(async () => {
   font-size: 14px;
 }
 
+.toolbar-card {
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
 .toolbar {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  margin-bottom: 20px;
   flex-wrap: wrap;
-  gap: 10px;
+  gap: 15px;
 }
 
 .search-section {
@@ -557,9 +580,17 @@ onMounted(async () => {
   gap: 10px;
 }
 
+.table-card {
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
 .pagination-wrapper {
   margin-top: 20px;
   text-align: right;
+  padding-top: 20px;
+  border-top: 1px solid #ebeef5;
 }
 
 .dialog-footer {
@@ -567,14 +598,48 @@ onMounted(async () => {
 }
 
 :deep(.el-table .el-table__cell) {
-  padding: 8px 0;
+  padding: 12px 0;
 }
 
 :deep(.el-form-item) {
   margin-bottom: 18px;
 }
 
+:deep(.el-button) {
+  border-radius: 6px;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 6px;
+}
+
+:deep(.el-card__body) {
+  padding: 20px;
+}
+
+:deep(.el-dialog) {
+  border-radius: 8px;
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  min-width: auto;
+  padding: 5px 8px;
+}
+
 @media (max-width: 768px) {
+  .position-management {
+    padding: 10px;
+  }
+  
   .toolbar {
     flex-direction: column;
     align-items: stretch;
@@ -586,6 +651,10 @@ onMounted(async () => {
   
   .action-section {
     justify-content: flex-end;
+  }
+  
+  .page-header h2 {
+    font-size: 20px;
   }
 }
 </style>

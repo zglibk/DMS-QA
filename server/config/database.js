@@ -7,10 +7,14 @@
 
 const { getDynamicConfig, getConnection, executeQuery, sql, config } = require('../db');
 
+// 创建一个Promise，用于获取数据库连接池
+const poolPromise = getConnection();
+
 module.exports = {
   getDynamicConfig,
   getConnection,
   executeQuery,
   sql,
-  config
+  config,
+  poolPromise
 };

@@ -2577,7 +2577,7 @@ const initQualityLevels = () => {
 <style scoped>
 .rework-management {
   padding: 0.5rem 1.25rem;
-  height: calc(100vh - 60px);
+  height: auto;
   overflow: hidden;
   box-sizing: border-box;
   display: flex;
@@ -2587,7 +2587,7 @@ const initQualityLevels = () => {
 @media (max-width: 48rem) {
   .rework-management {
     padding: 0.75rem;
-    height: calc(100vh - 60px);
+    height: auto;
     overflow-y: auto;
     box-sizing: border-box;
   }

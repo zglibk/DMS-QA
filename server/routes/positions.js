@@ -6,7 +6,7 @@
 const express = require('express')
 const router = express.Router()
 const sql = require('mssql')
-const { poolPromise } = require('../config/database')
+const { getConnection } = require('../db')
 
 // 获取岗位列表（支持分页和搜索）
 router.get('/', async (req, res) => {
@@ -20,14 +20,14 @@ router.get('/', async (req, res) => {
     } = req.query
     
     const offset = (page - 1) * size
-    const pool = await poolPromise
+    const pool = await getConnection()
     
     // 构建查询条件
     let whereConditions = ['p.Status = 1']
     let queryParams = []
     
     if (keyword) {
-      whereConditions.push('(p.Name LIKE @keyword OR p.Code LIKE @keyword)')
+      whereConditions.push('(p.PositionName LIKE @keyword OR p.PositionCode LIKE @keyword)')
       queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
     }
     
@@ -65,25 +65,27 @@ router.get('/', async (req, res) => {
     dataRequest.input('size', sql.Int, parseInt(size))
     
     const dataResult = await dataRequest.query(`
-      SELECT 
-        p.ID,
-        p.Name,
-        p.Code,
-        p.DepartmentID,
-        d.Name as DepartmentName,
-        p.Level,
-        p.Description,
-        p.Requirements,
-        p.SortOrder,
-        p.Status,
-        p.CreatedAt,
-        p.UpdatedAt
-      FROM Positions p
-      LEFT JOIN Department d ON p.DepartmentID = d.ID
-      WHERE ${whereClause}
-      ORDER BY p.SortOrder ASC, p.CreatedAt DESC
-      OFFSET @offset ROWS
-      FETCH NEXT @size ROWS ONLY
+      SELECT * FROM (
+        SELECT 
+          ROW_NUMBER() OVER (ORDER BY p.SortOrder ASC, p.CreatedAt DESC) as RowNum,
+          p.ID,
+          p.PositionName as Name,
+          p.PositionCode as Code,
+          p.DepartmentID,
+          d.Name as DepartmentName,
+          p.Level,
+          p.Description,
+          p.Requirements,
+          p.SortOrder,
+          p.Status,
+          p.CreatedAt,
+          p.UpdatedAt
+        FROM Positions p
+        LEFT JOIN Department d ON p.DepartmentID = d.ID
+        WHERE ${whereClause}
+      ) AS T
+      WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
+      ORDER BY T.RowNum
     `)
     
     res.json({
@@ -109,14 +111,14 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const pool = await poolPromise
+    const pool = await getConnection()
     const result = await pool.request()
       .input('id', sql.Int, id)
       .query(`
         SELECT 
           p.ID,
-          p.Name,
-          p.Code,
+          p.PositionName as Name,
+          p.PositionCode as Code,
           p.DepartmentID,
           d.Name as DepartmentName,
           p.Level,
@@ -173,13 +175,13 @@ router.post('/', async (req, res) => {
         message: '岗位名称、岗位编码和所属部门为必填项'
       })
     }
-    
-    const pool = await poolPromise
+
+    const pool = await getConnection()
     
     // 检查岗位编码是否已存在
     const checkResult = await pool.request()
       .input('code', sql.NVarChar(20), Code)
-      .query('SELECT COUNT(*) as count FROM Positions WHERE Code = @code')
+      .query('SELECT COUNT(*) as count FROM Positions WHERE PositionCode = @code')
     
     if (checkResult.recordset[0].count > 0) {
       return res.status(400).json({
@@ -205,14 +207,14 @@ router.post('/', async (req, res) => {
       .input('name', sql.NVarChar(50), Name)
       .input('code', sql.NVarChar(20), Code)
       .input('departmentId', sql.Int, DepartmentID)
-      .input('level', sql.NVarChar(20), Level)
+      .input('level', sql.Int, Level)
       .input('description', sql.NVarChar(500), Description)
       .input('requirements', sql.NVarChar(1000), Requirements)
       .input('sortOrder', sql.Int, SortOrder)
       .input('status', sql.Bit, Status)
       .query(`
         INSERT INTO Positions (
-          Name, Code, DepartmentID, Level, Description, Requirements,
+          PositionName, PositionCode, DepartmentID, Level, Description, Requirements,
           SortOrder, Status, CreatedAt, UpdatedAt
         ) 
         OUTPUT INSERTED.ID
@@ -259,8 +261,8 @@ router.put('/:id', async (req, res) => {
         message: '岗位名称、岗位编码和所属部门为必填项'
       })
     }
-    
-    const pool = await poolPromise
+
+    const pool = await getConnection()
     
     // 检查岗位是否存在
     const existResult = await pool.request()
@@ -278,7 +280,7 @@ router.put('/:id', async (req, res) => {
     const checkResult = await pool.request()
       .input('code', sql.NVarChar(20), Code)
       .input('id', sql.Int, id)
-      .query('SELECT COUNT(*) as count FROM Positions WHERE Code = @code AND ID != @id')
+      .query('SELECT COUNT(*) as count FROM Positions WHERE PositionCode = @code AND ID != @id')
     
     if (checkResult.recordset[0].count > 0) {
       return res.status(400).json({
@@ -305,15 +307,15 @@ router.put('/:id', async (req, res) => {
       .input('name', sql.NVarChar(50), Name)
       .input('code', sql.NVarChar(20), Code)
       .input('departmentId', sql.Int, DepartmentID)
-      .input('level', sql.NVarChar(20), Level)
+      .input('level', sql.Int, Level)
       .input('description', sql.NVarChar(500), Description)
       .input('requirements', sql.NVarChar(1000), Requirements)
       .input('sortOrder', sql.Int, SortOrder)
       .input('status', sql.Bit, Status)
       .query(`
         UPDATE Positions SET
-          Name = @name,
-          Code = @code,
+          PositionName = @name,
+          PositionCode = @code,
           DepartmentID = @departmentId,
           Level = @level,
           Description = @description,
@@ -342,7 +344,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const pool = await poolPromise
+    const pool = await getConnection()
     
     // 检查岗位是否存在
     const existResult = await pool.request()

@@ -6,7 +6,7 @@
 const express = require('express')
 const router = express.Router()
 const sql = require('mssql')
-const { poolPromise } = require('../config/database')
+const { getConnection } = require('../db')
 
 // 获取角色列表（支持分页和搜索）
 router.get('/', async (req, res) => {
@@ -19,14 +19,14 @@ router.get('/', async (req, res) => {
     } = req.query
     
     const offset = (page - 1) * size
-    const pool = await poolPromise
+    const pool = await getConnection()
     
     // 构建查询条件
-    let whereConditions = ['r.Status = 1']
+    let whereConditions = ['1=1']  // 移除硬编码的状态过滤
     let queryParams = []
     
     if (keyword) {
-      whereConditions.push('(r.Name LIKE @keyword OR r.Code LIKE @keyword)')
+      whereConditions.push('(r.RoleName LIKE @keyword OR r.RoleCode LIKE @keyword)')
       queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
     }
     
@@ -58,23 +58,25 @@ router.get('/', async (req, res) => {
     dataRequest.input('size', sql.Int, parseInt(size))
     
     const dataResult = await dataRequest.query(`
-      SELECT 
-        r.ID,
-        r.Name,
-        r.Code,
-        r.Description,
-        r.SortOrder,
-        r.Status,
-        r.CreatedAt,
-        r.UpdatedAt,
-        COUNT(ur.UserID) as UserCount
-      FROM Roles r
-      LEFT JOIN UserRoles ur ON r.ID = ur.RoleID
-      WHERE ${whereClause}
-      GROUP BY r.ID, r.Name, r.Code, r.Description, r.SortOrder, r.Status, r.CreatedAt, r.UpdatedAt
-      ORDER BY r.SortOrder ASC, r.CreatedAt DESC
-      OFFSET @offset ROWS
-      FETCH NEXT @size ROWS ONLY
+      SELECT * FROM (
+        SELECT 
+          ROW_NUMBER() OVER (ORDER BY r.SortOrder ASC, r.CreatedAt DESC) as RowNum,
+          r.ID,
+          r.RoleName as Name,
+          r.RoleCode as Code,
+          r.Description,
+          r.SortOrder,
+          r.Status,
+          r.CreatedAt,
+          r.UpdatedAt,
+          COUNT(ur.UserID) as UserCount
+        FROM Roles r
+        LEFT JOIN UserRoles ur ON r.ID = ur.RoleID
+        WHERE ${whereClause}
+        GROUP BY r.ID, r.RoleName, r.RoleCode, r.Description, r.SortOrder, r.Status, r.CreatedAt, r.UpdatedAt
+      ) AS T
+      WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
+      ORDER BY T.RowNum
     `)
     
     res.json({
@@ -100,7 +102,7 @@ router.get('/', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const pool = await poolPromise
+    const pool = await getConnection()
     
     // 获取角色基本信息
     const roleResult = await pool.request()
@@ -108,8 +110,8 @@ router.get('/:id', async (req, res) => {
       .query(`
         SELECT 
           ID,
-          Name,
-          Code,
+          RoleName as Name,
+          RoleCode as Code,
           Description,
           SortOrder,
           Status,
@@ -182,8 +184,8 @@ router.post('/', async (req, res) => {
         message: '角色名称和角色编码为必填项'
       })
     }
-    
-    const pool = await poolPromise
+
+    const pool = await getConnection()
     const transaction = new sql.Transaction(pool)
     
     try {
@@ -192,7 +194,7 @@ router.post('/', async (req, res) => {
       // 检查角色编码是否已存在
       const checkResult = await transaction.request()
         .input('code', sql.NVarChar(20), Code)
-        .query('SELECT COUNT(*) as count FROM Roles WHERE Code = @code')
+        .query('SELECT COUNT(*) as count FROM Roles WHERE RoleCode = @code')
       
       if (checkResult.recordset[0].count > 0) {
         await transaction.rollback()
@@ -211,7 +213,7 @@ router.post('/', async (req, res) => {
         .input('status', sql.Bit, Status)
         .query(`
           INSERT INTO Roles (
-            Name, Code, Description, SortOrder, Status, CreatedAt, UpdatedAt
+            RoleName, RoleCode, Description, SortOrder, Status, CreatedAt, UpdatedAt
           ) 
           OUTPUT INSERTED.ID
           VALUES (
@@ -289,8 +291,8 @@ router.put('/:id', async (req, res) => {
         message: '角色名称和角色编码为必填项'
       })
     }
-    
-    const pool = await poolPromise
+
+    const pool = await getConnection()
     const transaction = new sql.Transaction(pool)
     
     try {
@@ -313,7 +315,7 @@ router.put('/:id', async (req, res) => {
       const checkResult = await transaction.request()
         .input('code', sql.NVarChar(20), Code)
         .input('id', sql.Int, id)
-        .query('SELECT COUNT(*) as count FROM Roles WHERE Code = @code AND ID != @id')
+        .query('SELECT COUNT(*) as count FROM Roles WHERE RoleCode = @code AND ID != @id')
       
       if (checkResult.recordset[0].count > 0) {
         await transaction.rollback()
@@ -333,8 +335,8 @@ router.put('/:id', async (req, res) => {
         .input('status', sql.Bit, Status)
         .query(`
           UPDATE Roles SET
-            Name = @name,
-            Code = @code,
+            RoleName = @name,
+            RoleCode = @code,
             Description = @description,
             SortOrder = @sortOrder,
             Status = @status,
@@ -402,7 +404,7 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const pool = await poolPromise
+    const pool = await getConnection()
     const transaction = new sql.Transaction(pool)
     
     try {
@@ -464,6 +466,216 @@ router.delete('/:id', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '删除角色失败',
+      error: error.message
+    })
+  }
+})
+
+// 获取角色权限（菜单）
+router.get('/:id/menus', async (req, res) => {
+  try {
+    const { id } = req.params
+    const pool = await getConnection()
+    
+    // 检查角色是否存在
+    const roleResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT COUNT(*) as count FROM Roles WHERE ID = @id')
+    
+    if (roleResult.recordset[0].count === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '角色不存在'
+      })
+    }
+    
+    // 获取角色关联的菜单ID列表
+    const menuResult = await pool.request()
+      .input('roleId', sql.Int, id)
+      .query(`
+        SELECT MenuID
+        FROM RoleMenus
+        WHERE RoleID = @roleId
+      `)
+    
+    const menuIds = menuResult.recordset.map(row => row.MenuID)
+    
+    res.json({
+      success: true,
+      data: menuIds
+    })
+  } catch (error) {
+    console.error('获取角色权限失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取角色权限失败',
+      error: error.message
+    })
+  }
+})
+
+// 保存角色权限（菜单）
+router.post('/:id/menus', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { menuIds = [] } = req.body
+    const pool = await getConnection()
+    const transaction = new sql.Transaction(pool)
+    
+    try {
+      await transaction.begin()
+      
+      // 检查角色是否存在
+      const roleResult = await transaction.request()
+        .input('id', sql.Int, id)
+        .query('SELECT COUNT(*) as count FROM Roles WHERE ID = @id')
+      
+      if (roleResult.recordset[0].count === 0) {
+        await transaction.rollback()
+        return res.status(404).json({
+          success: false,
+          message: '角色不存在'
+        })
+      }
+      
+      // 删除现有的角色菜单关联
+      await transaction.request()
+        .input('roleId', sql.Int, id)
+        .query('DELETE FROM RoleMenus WHERE RoleID = @roleId')
+      
+      // 插入新的角色菜单关联
+      if (menuIds && menuIds.length > 0) {
+        for (const menuId of menuIds) {
+          await transaction.request()
+            .input('roleId', sql.Int, id)
+            .input('menuId', sql.Int, menuId)
+            .query(`
+              INSERT INTO RoleMenus (RoleID, MenuID, CreatedAt)
+              VALUES (@roleId, @menuId, GETDATE())
+            `)
+        }
+      }
+      
+      await transaction.commit()
+      
+      res.json({
+        success: true,
+        message: '权限保存成功'
+      })
+    } catch (error) {
+      await transaction.rollback()
+      throw error
+    }
+  } catch (error) {
+    console.error('保存角色权限失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '保存角色权限失败',
+      error: error.message
+    })
+  }
+})
+
+// 获取角色部门
+router.get('/:id/departments', async (req, res) => {
+  try {
+    const { id } = req.params
+    const pool = await getConnection()
+    
+    // 检查角色是否存在
+    const roleResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query('SELECT COUNT(*) as count FROM Roles WHERE ID = @id')
+    
+    if (roleResult.recordset[0].count === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '角色不存在'
+      })
+    }
+    
+    // 获取角色关联的部门ID列表
+    const deptResult = await pool.request()
+      .input('roleId', sql.Int, id)
+      .query(`
+        SELECT DepartmentID
+        FROM RoleDepartments
+        WHERE RoleID = @roleId
+      `)
+    
+    const departmentIds = deptResult.recordset.map(row => row.DepartmentID)
+    
+    res.json({
+      success: true,
+      data: departmentIds
+    })
+  } catch (error) {
+    console.error('获取角色部门失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取角色部门失败',
+      error: error.message
+    })
+  }
+})
+
+// 保存角色部门
+router.post('/:id/departments', async (req, res) => {
+  try {
+    const { id } = req.params
+    const { departmentIds = [] } = req.body
+    const pool = await getConnection()
+    const transaction = new sql.Transaction(pool)
+    
+    try {
+      await transaction.begin()
+      
+      // 检查角色是否存在
+      const roleResult = await transaction.request()
+        .input('id', sql.Int, id)
+        .query('SELECT COUNT(*) as count FROM Roles WHERE ID = @id')
+      
+      if (roleResult.recordset[0].count === 0) {
+        await transaction.rollback()
+        return res.status(404).json({
+          success: false,
+          message: '角色不存在'
+        })
+      }
+      
+      // 删除现有的角色部门关联
+      await transaction.request()
+        .input('roleId', sql.Int, id)
+        .query('DELETE FROM RoleDepartments WHERE RoleID = @roleId')
+      
+      // 插入新的角色部门关联
+      if (departmentIds && departmentIds.length > 0) {
+        for (const deptId of departmentIds) {
+          await transaction.request()
+            .input('roleId', sql.Int, id)
+            .input('deptId', sql.Int, deptId)
+            .query(`
+              INSERT INTO RoleDepartments (RoleID, DepartmentID, CreatedAt)
+              VALUES (@roleId, @deptId, GETDATE())
+            `)
+        }
+      }
+      
+      await transaction.commit()
+      
+      res.json({
+        success: true,
+        message: '部门保存成功'
+      })
+    } catch (error) {
+      await transaction.rollback()
+      throw error
+    }
+  } catch (error) {
+    console.error('保存角色部门失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '保存角色部门失败',
       error: error.message
     })
   }

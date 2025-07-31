@@ -90,18 +90,21 @@
       </div>
       
       <!-- 图表和数据表格并排显示 -->
-      <div class="chart-and-table-container">
+      <el-row :gutter="20">
         <!-- 左侧图表容器 -->
-        <div class="chart-container">
-          <h4 class="section-title">
-            <el-icon><DataAnalysis /></el-icon>
-            质量指标趋势分析
-          </h4>
-          <div ref="chartRef" class="chart" style="height: 450px;"></div>
-        </div>
+        <el-col :span="12">
+          <div class="chart-container">
+            <h4 class="section-title">
+              <el-icon><DataAnalysis /></el-icon>
+              质量指标趋势分析
+            </h4>
+            <div ref="chartRef" class="chart" style="height: 450px;"></div>
+          </div>
+        </el-col>
 
         <!-- 右侧数据表格 -->
-        <div class="data-table" v-if="showTable">
+        <el-col :span="12" v-if="showTable">
+          <div class="data-table">
           <h4 class="section-title">
             <el-icon><Grid /></el-icon>
             数据清单
@@ -133,8 +136,9 @@
               </template>
             </el-table-column>
           </el-table>
-        </div>
-      </div>
+          </div>
+        </el-col>
+      </el-row>
       
       <!-- 底部控制 -->
       <div class="chart-footer">
@@ -873,19 +877,8 @@ onMounted(async () => {
 .inspection-batch-value { color: #E6A23C; }
 .delivery-batch-value { color: #909399; }
 
-/* 图表和表格并排布局 */
-.chart-and-table-container {
-  display: flex;
-  gap: 20px;
-  margin: 20px 0;
-  width: 100%;
-  box-sizing: border-box;
-}
-
+/* 图表和表格样式 */
 .chart-container {
-  flex: 0 0 50%; /* 固定占50%宽度 */
-  width: 50%;
-  min-width: 0; /* 防止内容溢出 */
   padding: 20px;
   background: linear-gradient(135deg, #f8f9fa 0%, #ffffff 100%);
   border-radius: 8px;
@@ -894,9 +887,6 @@ onMounted(async () => {
 }
 
 .data-table {
-  flex: 0 0 50%; /* 固定占50%宽度 */
-  width: 50%;
-  min-width: 0; /* 防止内容溢出 */
   padding: 20px;
   background: white;
   border-radius: 8px;
@@ -922,88 +912,16 @@ onMounted(async () => {
   color: #409EFF;
 }
 
-/* 响应式设计 - 动态布局 */
-/* 超小屏幕 - 强制垂直布局 */
+/* 响应式设计 */
 @media (max-width: 768px) {
-  .chart-and-table-container {
-    flex-direction: column;
-    gap: 12px;
-  }
-
-  .chart-container,
-  .data-table {
-    flex: none;
-    width: 100%;
-    max-width: 100%;
-    padding: 12px;
-  }
-
   .chart {
     height: 300px !important;
   }
 }
 
-/* 小屏幕 - 根据内容动态决定布局 */
 @media (min-width: 769px) and (max-width: 1024px) {
-  .chart-and-table-container {
-    flex-wrap: wrap;
-    gap: 16px;
-  }
-
-  .chart-container,
-  .data-table {
-    flex: 1 1 calc(50% - 8px);
-    min-width: 400px; /* 最小宽度，如果不够则换行 */
-    padding: 16px;
-  }
-
   .chart {
     height: 350px !important;
-  }
-}
-
-/* 中等屏幕 - 优先保持一排，空间不足时换行 */
-@media (min-width: 1025px) and (max-width: 1200px) {
-  .chart-and-table-container {
-    flex-wrap: wrap;
-    gap: 18px;
-  }
-
-  .chart-container,
-  .data-table {
-    flex: 1 1 calc(50% - 9px);
-    min-width: 450px; /* 最小宽度，如果不够则换行 */
-    padding: 18px;
-  }
-}
-
-/* 大屏幕 - 固定50%布局 */
-@media (min-width: 1201px) and (max-width: 1600px) {
-  .chart-and-table-container {
-    gap: 20px;
-    flex-wrap: nowrap; /* 强制一排显示 */
-  }
-
-  .chart-container,
-  .data-table {
-    flex: 0 0 calc(50% - 10px);
-    width: calc(50% - 10px);
-    padding: 20px;
-  }
-}
-
-/* 超大屏幕 - 固定50%布局，增加间距 */
-@media (min-width: 1601px) {
-  .chart-and-table-container {
-    gap: 24px;
-    flex-wrap: nowrap; /* 强制一排显示 */
-  }
-
-  .chart-container,
-  .data-table {
-    flex: 0 0 calc(50% - 12px);
-    width: calc(50% - 12px);
-    padding: 24px;
   }
 }
 

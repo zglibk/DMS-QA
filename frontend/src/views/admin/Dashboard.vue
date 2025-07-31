@@ -1107,7 +1107,7 @@ onBeforeUnmount(() => {
   /* background: url('@/assets/images/bg.jpg') no-repeat center center fixed; */
   /* background-size: cover; */
   background: #f5f7fa;
-  min-height: calc(100vh - 60px);
+  height: auto;
   position: relative;
 }
 

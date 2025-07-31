@@ -7,75 +7,87 @@
     </div>
 
     <!-- 操作工具栏 -->
-    <div class="toolbar">
-      <el-button type="primary" @click="showAddDialog" :icon="Plus">
-        新增部门
-      </el-button>
-      <el-button @click="expandAll" :icon="Expand">
-        展开全部
-      </el-button>
-      <el-button @click="collapseAll" :icon="Fold">
-        收起全部
-      </el-button>
-      <el-button @click="refreshData" :icon="Refresh">
-        刷新
-      </el-button>
-    </div>
+    <el-card class="toolbar-card" shadow="never">
+      <div class="toolbar">
+        <div class="action-section">
+          <el-button type="primary" @click="showAddDialog" :icon="Plus">
+            新增部门
+          </el-button>
+          <el-button @click="expandAll" :icon="Expand">
+            展开全部
+          </el-button>
+          <el-button @click="collapseAll" :icon="Fold">
+            收起全部
+          </el-button>
+          <el-button @click="refreshData" :icon="Refresh">
+            刷新
+          </el-button>
+        </div>
+      </div>
+    </el-card>
 
     <!-- 部门树表格 -->
-    <el-table
-      ref="tableRef"
-      :data="departmentTree"
-      style="width: 100%"
-      row-key="ID"
-      :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
-      v-loading="loading"
-    >
-      <el-table-column prop="Name" label="部门名称" min-width="200">
+    <el-card class="table-card" shadow="never">
+      <el-table
+        ref="tableRef"
+        :data="departmentTree"
+        style="width: 100%"
+        row-key="ID"
+        :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
+        v-loading="loading"
+        stripe
+        border
+        resizable
+        :header-cell-style="{ background: '#f8f9fa', color: '#606266' }"
+      >
+      <el-table-column prop="Name" label="部门名称" min-width="200" resizable show-overflow-tooltip>
         <template #default="{ row }">
           <el-icon v-if="row.DeptType === 'company'" class="dept-icon"><OfficeBuilding /></el-icon>
           <el-icon v-else class="dept-icon"><Grid /></el-icon>
           {{ row.Name }}
         </template>
       </el-table-column>
-      <el-table-column prop="DeptCode" label="部门编码" width="120" />
-      <el-table-column prop="DeptType" label="部门类型" width="100">
+      <el-table-column prop="DeptCode" label="部门编码" min-width="120" resizable show-overflow-tooltip />
+      <el-table-column prop="DeptType" label="部门类型" width="100" resizable>
         <template #default="{ row }">
           <el-tag :type="row.DeptType === 'company' ? 'danger' : 'primary'" size="small">
             {{ row.DeptType === 'company' ? '公司' : '部门' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="Leader" label="负责人" width="120" />
-      <el-table-column prop="Phone" label="联系电话" width="130" />
-      <el-table-column prop="Status" label="状态" width="80">
+      <el-table-column prop="Leader" label="负责人" min-width="120" resizable show-overflow-tooltip />
+      <el-table-column prop="Phone" label="联系电话" min-width="130" resizable show-overflow-tooltip />
+      <el-table-column prop="Status" label="状态" width="80" resizable>
         <template #default="{ row }">
           <el-tag :type="row.Status ? 'success' : 'danger'" size="small">
             {{ row.Status ? '启用' : '禁用' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="SortOrder" label="排序" width="80" />
-      <el-table-column label="操作" width="200" fixed="right">
+      <el-table-column prop="SortOrder" label="排序" width="80" resizable />
+      <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
-          <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
-            编辑
-          </el-button>
-          <el-button size="small" type="success" @click="showAddDialog(row)" :icon="Plus">
-            新增子部门
-          </el-button>
-          <el-button 
-            size="small" 
-            type="danger" 
-            @click="deleteDepartment(row)"
-            :icon="Delete"
-            :disabled="row.children && row.children.length > 0"
-          >
-            删除
-          </el-button>
+          <div class="action-buttons">
+            <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
+              编辑
+            </el-button>
+            <el-button size="small" type="success" @click="showAddDialog(row)" :icon="Plus">
+              新增子部门
+            </el-button>
+            <el-button 
+              size="small" 
+              type="danger" 
+              @click="deleteDepartment(row)"
+              :icon="Delete"
+              :disabled="row.children && row.children.length > 0"
+            >
+              删除
+            </el-button>
+          </div>
         </template>
       </el-table-column>
-    </el-table>
+      </el-table>
+    </el-card>
 
     <!-- 新增/编辑部门对话框 -->
     <el-dialog
@@ -83,6 +95,8 @@
       v-model="dialogVisible"
       width="600px"
       :before-close="handleDialogClose"
+      :append-to-body="true"
+      :lock-scroll="false"
     >
       <el-form
         ref="formRef"
@@ -356,18 +370,52 @@ const submitForm = async () => {
 // 删除部门
 const deleteDepartment = async (dept) => {
   try {
-    await ElMessageBox.confirm(
-      `确定要删除部门 "${dept.Name}" 吗？`,
-      '确认删除',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
+    // 首先检查是否有子部门
+    const hasChildren = departmentList.value.some(d => d.ParentID === dept.ID)
     
-    await axios.delete(`/api/departments/${dept.ID}`)
-    ElMessage.success('删除成功')
+    let confirmMessage = `确定要删除部门 "${dept.Name}" 吗？`
+    let cascadeDelete = false
+    
+    if (hasChildren) {
+      // 如果有子部门，询问是否级联删除
+      const result = await ElMessageBox.confirm(
+        `部门 "${dept.Name}" 下还有子部门。\n\n请选择删除方式：`,
+        '确认删除',
+        {
+          confirmButtonText: '级联删除（删除该部门及所有子部门）',
+          cancelButtonText: '取消',
+          distinguishCancelAndClose: true,
+          type: 'warning',
+          showClose: false,
+          appendTo: 'body',
+          lockScroll: false
+        }
+      )
+      cascadeDelete = true
+    } else {
+      // 如果没有子部门，正常删除确认
+      await ElMessageBox.confirm(
+        confirmMessage,
+        '确认删除',
+        {
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+          type: 'warning',
+          appendTo: 'body',
+          lockScroll: false
+        }
+      )
+    }
+    
+    // 构建删除请求URL
+    const deleteUrl = cascadeDelete 
+      ? `/api/departments/${dept.ID}?cascade=true`
+      : `/api/departments/${dept.ID}`
+    
+    const response = await axios.delete(deleteUrl)
+    
+    // 显示成功消息
+    ElMessage.success(response.data.message || '删除成功')
     await fetchDepartments()
   } catch (error) {
     if (error !== 'cancel') {
@@ -415,6 +463,8 @@ onMounted(() => {
 <style scoped>
 .department-management {
   padding: 20px;
+  background: #f5f7fa;
+  height: auto;
 }
 
 .page-header {
@@ -424,6 +474,8 @@ onMounted(() => {
 .page-header h2 {
   margin: 0 0 8px 0;
   color: #303133;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 .page-header p {
@@ -432,8 +484,28 @@ onMounted(() => {
   font-size: 14px;
 }
 
-.toolbar {
+.toolbar-card {
   margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
+.toolbar {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+
+.action-section {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.table-card {
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
 .dept-icon {
@@ -446,10 +518,54 @@ onMounted(() => {
 }
 
 :deep(.el-table .el-table__cell) {
-  padding: 8px 0;
+  padding: 12px 0;
 }
 
 :deep(.el-form-item) {
   margin-bottom: 18px;
+}
+
+:deep(.el-button) {
+  border-radius: 6px;
+}
+
+:deep(.el-input__wrapper) {
+  border-radius: 6px;
+}
+
+:deep(.el-card__body) {
+  padding: 20px;
+}
+
+:deep(.el-dialog) {
+  border-radius: 8px;
+}
+
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  min-width: auto;
+  padding: 5px 8px;
+}
+
+@media (max-width: 768px) {
+  .department-management {
+    padding: 10px;
+  }
+  
+  .action-section {
+    justify-content: flex-start;
+  }
+  
+  .page-header h2 {
+    font-size: 20px;
+  }
 }
 </style>

@@ -6,109 +6,8 @@
         <img :src="siteConfig.logoBase64Img" class="logo-img" />
         <span class="logo-text" v-show="!collapsed">{{ siteConfig.headerTitle }}</span>
       </div>
-      <el-menu
-        :default-active="activeMenu"
-        class="el-menu-vertical-demo"
-        router
-        background-color="#001529"
-        text-color="#fff"
-        active-text-color="#409EFF"
-        :collapse="collapsed"
-        unique-opened
-      >
-        <el-menu-item index="/admin/dashboard">
-          <el-icon><HomeFilled /></el-icon>
-          <span v-show="!collapsed">仪表盘</span>
-        </el-menu-item>
-        <el-sub-menu index="/admin/supplier">
-          <template #title>
-            <el-icon><OfficeBuilding /></el-icon>
-            <span v-show="!collapsed">供应商管理</span>
-          </template>
-          <el-menu-item index="/admin/supplier/list">
-            <el-icon><List /></el-icon>
-            <span v-show="!collapsed">供应商列表</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/supplier/material-price">
-            <el-icon><Money /></el-icon>
-            <span v-show="!collapsed">材料价格</span>
-          </el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu index="/admin/user">
-          <template #title>
-            <el-icon><User /></el-icon>
-            <span v-show="!collapsed">用户管理</span>
-          </template>
-          <el-menu-item index="/admin/user/list">
-            <el-icon><Grid /></el-icon>
-            <span v-show="!collapsed">用户列表</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/person-management">
-            <el-icon><Avatar /></el-icon>
-            <span v-show="!collapsed">人员管理</span>
-          </el-menu-item>
-        </el-sub-menu>
-        <el-menu-item index="/admin/rework-management">
-          <el-icon><Tools /></el-icon>
-          <span v-show="!collapsed">返工管理</span>
-        </el-menu-item>
-        <el-sub-menu index="/admin/permission">
-          <template #title>
-            <el-icon><Setting /></el-icon>
-            <span v-show="!collapsed">权限管理</span>
-          </template>
-          <el-menu-item index="/admin/department-management">
-            <el-icon><OfficeBuilding /></el-icon>
-            <span v-show="!collapsed">部门管理</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/position-management">
-            <el-icon><Briefcase /></el-icon>
-            <span v-show="!collapsed">岗位管理</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/role-management">
-            <el-icon><UserFilled /></el-icon>
-            <span v-show="!collapsed">角色管理</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/menu-management">
-            <el-icon><Menu /></el-icon>
-            <span v-show="!collapsed">菜单管理</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/role-list">
-            <el-icon><User /></el-icon>
-            <span v-show="!collapsed">角色列表</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/permission-list">
-            <el-icon><Grid /></el-icon>
-            <span v-show="!collapsed">权限列表</span>
-          </el-menu-item>
-        </el-sub-menu>
-        <el-sub-menu index="/admin/settings">
-          <template #title>
-            <el-icon><Tools /></el-icon>
-            <span v-show="!collapsed">设置</span>
-          </template>
-          <el-menu-item index="/admin/data-management">
-            <el-icon><Upload /></el-icon>
-            <span v-show="!collapsed">数据管理</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/path-analysis">
-            <el-icon><FolderOpened /></el-icon>
-            <span v-show="!collapsed">路径格式分析</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/file-copy-test">
-            <el-icon><CopyDocument /></el-icon>
-            <span v-show="!collapsed">文件拷贝测试</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/system-config">
-            <el-icon><Setting /></el-icon>
-            <span v-show="!collapsed">系统配置</span>
-          </el-menu-item>
-          <el-menu-item index="/admin/home-card-config">
-            <el-icon><Grid /></el-icon>
-            <span v-show="!collapsed">主页卡片配置</span>
-          </el-menu-item>
-        </el-sub-menu>
-      </el-menu>
+      <!-- 动态菜单组件 -->
+      <DynamicMenu :collapsed="collapsed" ref="dynamicMenuRef" />
     </el-aside>
     <!-- 主内容区 -->
     <el-container>
@@ -118,22 +17,7 @@
           <el-icon class="collapse-icon" @click="collapsed = !collapsed">
             <component :is="collapsed ? Expand : Fold" />
           </el-icon>
-          <el-breadcrumb separator="/">
-            <el-breadcrumb-item>后台管理</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path.startsWith('/admin/user')">用户管理</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path === '/admin/user/list'">用户列表</el-breadcrumb-item>
-            <el-breadcrumb-item v-else-if="route.path === '/admin/dashboard'">仪表盘</el-breadcrumb-item>
-            <el-breadcrumb-item v-else-if="route.path.startsWith('/admin/supplier')">供应商管理</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path === '/admin/supplier/list'">供应商列表</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path === '/admin/supplier/material-price'">材料价格</el-breadcrumb-item>
-            <el-breadcrumb-item v-else-if="route.path.startsWith('/admin/data-management') || route.path.startsWith('/admin/path-analysis') || route.path.startsWith('/admin/file-copy-test') || route.path.startsWith('/admin/system-config')">设置</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path === '/admin/data-management'">数据管理</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path === '/admin/path-analysis'">路径格式分析</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path === '/admin/file-copy-test'">文件拷贝测试</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path === '/admin/system-config'">系统配置</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path === '/admin/rework-management'">返工管理</el-breadcrumb-item>
-            <el-breadcrumb-item v-if="route.path === '/admin/profile'">用户中心</el-breadcrumb-item>
-          </el-breadcrumb>
+          <DynamicBreadcrumb />
         </div>
         <div class="header-right">
           <span class="fullscreen-icon-wrap" @click="toggleFullscreen">
@@ -164,8 +48,8 @@
           </el-dropdown>
           <el-dropdown trigger="click" placement="bottom-end">
             <span class="user-dropdown-trigger">
-              <el-avatar :size="36" :src="user.Avatar" style="background:#eee;">
-                <template v-if="!user.Avatar">
+              <el-avatar :size="36" :src="user.avatar" style="background:#eee;">
+                <template v-if="!user.avatar">
                   <el-icon><User /></el-icon>
                 </template>
               </el-avatar>
@@ -173,14 +57,15 @@
             <template #dropdown>
               <el-card class="user-dropdown-card">
                 <div class="user-info">
-                  <el-avatar :size="48" :src="user.Avatar" style="background:#eee;">
-                    <template v-if="!user.Avatar">
+                  <el-avatar :size="48" :src="user.avatar" style="background:#eee;">
+                    <template v-if="!user.avatar">
                       <el-icon><User /></el-icon>
                     </template>
                   </el-avatar>
                   <div class="user-meta">
-                    <div class="user-name">{{ user.Username || 'Super' }}</div>
-                    <div class="user-role">{{ user.Role === 'admin' ? '管理员' : user.Role === 'user' ? '普通用户' : '-' }}</div>
+                    <div class="user-name">{{ user.realName || user.username || 'Super' }}</div>
+                    <div class="user-role">{{ userStore.userRoleNames.join(', ') || '普通用户' }}</div>
+                    <div class="user-dept" v-if="user.departmentName">{{ user.departmentName }}</div>
                   </div>
                 </div>
                 <el-divider style="margin: 8px 0;" />
@@ -215,6 +100,9 @@ import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import Profile from '../Profile.vue'
 import { useSiteConfig } from '../../composables/useSiteConfig'
+import DynamicBreadcrumb from '../../components/common/DynamicBreadcrumb.vue'
+import DynamicMenu from '../../components/common/DynamicMenu.vue'
+import { ElMessage } from 'element-plus'
 
 const route = useRoute()
 const router = useRouter()
@@ -225,11 +113,13 @@ const { user } = storeToRefs(userStore)
 const { siteConfig } = useSiteConfig()
 
 const collapsed = ref(false)
-const activeMenu = computed(() => {
-  if (route.path.startsWith('/admin/user')) return '/admin/user/list'
-  if (route.path.startsWith('/admin/supplier')) return route.path
-  return route.path
-})
+const dynamicMenuRef = ref(null)
+// 移除activeMenu计算属性以避免与路由变化的循环依赖
+// const activeMenu = computed(() => {
+//   if (route.path.startsWith('/admin/user')) return '/admin/user/list'
+//   if (route.path.startsWith('/admin/supplier')) return route.path
+//   return route.path
+// })
 const pageTitle = computed(() => {
   switch (route.path) {
     case '/admin/dashboard': return '仪表盘'
@@ -250,7 +140,7 @@ const notifyList = ref([
 ])
 
 const logout = () => {
-  localStorage.removeItem('token')
+  userStore.clearUser()
   router.replace('/login')
 }
 
@@ -288,8 +178,16 @@ const handleLogoError = (event) => {
   event.target.src = '/logo.png'
 }
 
-onMounted(() => {
-  userStore.fetchProfile()
+onMounted(async () => {
+  try {
+    // 初始化用户信息和基础数据
+    await userStore.fetchProfile()
+    await userStore.initializeBaseData()
+  } catch (error) {
+    console.error('初始化失败:', error)
+    ElMessage.error('初始化失败，请重新登录')
+    logout()
+  }
 })
 </script>
 
