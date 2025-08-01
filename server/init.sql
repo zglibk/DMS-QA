@@ -247,14 +247,21 @@ CREATE TABLE [dbo].[User] (
     [ID] INT IDENTITY(1,1) PRIMARY KEY,               -- 主键，自增ID
     [Username] NVARCHAR(50) NOT NULL UNIQUE,          -- 用户名，唯一标识
     [Password] NVARCHAR(100) NOT NULL,                -- 密码（bcrypt哈希）
+    [Department] NVARCHAR(32),                        -- 所属部门名称
     [RealName] NVARCHAR(32),                          -- 真实姓名
     [Avatar] NVARCHAR(MAX),                           -- 头像（Base64或URL）
     [Email] NVARCHAR(64),                             -- 邮箱地址
     [Phone] NVARCHAR(20),                             -- 手机号码
-    [Department] NVARCHAR(32),                        -- 所属部门
-    [Role] NVARCHAR(32),                              -- 用户角色（admin/user等）
+    [CreatedAt] DATETIME DEFAULT CURRENT_TIMESTAMP,   -- 创建时间
     [Status] INT DEFAULT 1,                           -- 状态（1=启用，0=禁用）
-    [CreatedAt] DATETIME DEFAULT CURRENT_TIMESTAMP    -- 创建时间
+    [PositionID] INT,                                  -- 职位ID
+    [DepartmentID] INT,                               -- 部门ID
+    [Gender] NVARCHAR(10),                            -- 性别
+    [Birthday] DATE,                                  -- 生日
+    [Address] NVARCHAR(200),                          -- 地址
+    [Remark] NVARCHAR(500),                           -- 备注
+    [LastLoginTime] DATETIME,                         -- 最后登录时间
+    [UpdatedAt] DATETIME                              -- 更新时间
 );
 
 -- =====================================================

@@ -18,12 +18,12 @@
     <!-- 右侧用户区 -->
     <div class="header-right">  
       <el-button type="primary" text class="admin-btn" @click="goAdmin">登录后台</el-button>
-      <el-avatar :size="32" :src="user.avatar" class="avatar-icon" @click="goProfile">
-        <template v-if="!user.avatar">
+      <el-avatar :size="32" :src="user.Avatar" class="avatar-icon" @click="goProfile">
+        <template v-if="!user.Avatar">
           <el-icon><User /></el-icon>
         </template>
       </el-avatar>
-      <span class="username" @click="goProfile">{{ user?.username || '用户' }}</span>
+      <span class="username" @click="goProfile">{{ user?.Username || '用户' }}</span>
       <el-dropdown>
         <span class="el-dropdown-link">
           <el-icon><ArrowDown /></el-icon>
@@ -68,8 +68,22 @@ const handleMenuSelect = (index) => {
   }
 }
 
+/**
+ * 跳转到个人中心页面
+ * 在后台管理页面中正常跳转，在其他页面中新标签页打开
+ */
 const goProfile = () => {
-  router.push('/profile')
+  // 检查当前是否在后台管理页面
+  const isInAdminPage = route.path.startsWith('/admin')
+  
+  if (isInAdminPage) {
+    // 在后台管理页面中，正常跳转
+    router.push('/admin/profile')
+  } else {
+    // 在其他页面中，新标签页打开
+    const profileUrl = router.resolve('/profile').href
+    window.open(profileUrl, '_blank')
+  }
 }
 
 const logout = () => {
@@ -104,9 +118,18 @@ const goAdmin = async () => {
   const currentUser = userStore.user
   
   // 检查用户是否为管理员或具有管理权限
-  const isAdminUser = currentUser?.username === 'admin'
+  // 注意：后端返回的用户名字段是Username（大写U），不是username（小写u）
+  const isAdminUser = currentUser?.Username === 'admin'
   const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
   const hasManagerRole = userStore.hasRole('manager') || userStore.hasRole('部门经理')
+  
+  console.log('权限检查调试信息:', {
+    currentUser: currentUser,
+    isAdminUser: isAdminUser,
+    hasAdminRole: hasAdminRole,
+    hasManagerRole: hasManagerRole,
+    userRoles: userStore.user?.roles
+  })
   
   // admin用户、具有admin角色或manager角色的用户可以进入后台
   if (isAdminUser || hasAdminRole || hasManagerRole) {
@@ -127,7 +150,7 @@ const handleLogoError = (event) => {
   box-shadow: 0 0.125rem 0.5rem 0 rgba(0,0,0,0.04);
   display: flex;
   align-items: center;
-  height: 4rem;
+  height: 5rem;
   padding: 0 2.5rem;
   justify-content: space-between;
   position: fixed;

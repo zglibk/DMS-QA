@@ -109,8 +109,7 @@ router.post('/login', async (req, res) => {
     const token = jwt.sign(
       {
         id: user.ID,
-        username: user.Username,
-        role: user.Role
+        username: user.Username
       },
       SECRET,
       { expiresIn: '2h' }
@@ -123,7 +122,6 @@ router.post('/login', async (req, res) => {
         id: updatedUser.ID,
         username: updatedUser.Username,
         realName: updatedUser.RealName,
-        role: updatedUser.Role,
         lastLoginTime: updatedUser.LastLoginTime ? updatedUser.LastLoginTime.toISOString() : null
       }
     });
@@ -143,16 +141,62 @@ router.get('/init-admin', async (req, res) => {
     const result = await pool.request()
       .input('Username', sql.NVarChar, 'admin')
       .query('SELECT * FROM [User] WHERE Username = @Username');
+    
+    const hash = await bcrypt.hash('Password112233', 10);
+    
     if (result.recordset.length === 0) {
-      const hash = await bcrypt.hash('123456', 10);
+      // 开始事务
+      const transaction = new sql.Transaction(pool);
+      await transaction.begin();
+      
+      try {
+        // 插入admin用户（不再使用Role字段）
+        const userResult = await transaction.request()
+          .input('Username', sql.NVarChar, 'admin')
+          .input('Password', sql.NVarChar, hash)
+          .input('RealName', sql.NVarChar, '系统管理员')
+          .input('Status', sql.Int, 1)
+          .query('INSERT INTO [User] (Username, Password, RealName, Status) OUTPUT INSERTED.ID VALUES (@Username, @Password, @RealName, @Status)');
+        
+        const adminUserId = userResult.recordset[0].ID;
+        
+        // 查找或创建系统管理员角色
+        let adminRoleResult = await transaction.request()
+          .query("SELECT ID FROM [Roles] WHERE RoleName = '系统管理员' OR Code = 'admin'");
+        
+        let adminRoleId;
+        if (adminRoleResult.recordset.length === 0) {
+          // 创建系统管理员角色
+          const newRoleResult = await transaction.request()
+            .input('RoleName', sql.NVarChar, '系统管理员')
+            .input('Code', sql.NVarChar, 'admin')
+            .input('Description', sql.NVarChar, '系统管理员角色，拥有所有权限')
+            .input('Status', sql.Bit, 1)
+            .query('INSERT INTO [Roles] (RoleName, Code, Description, Status) OUTPUT INSERTED.ID VALUES (@RoleName, @Code, @Description, @Status)');
+          adminRoleId = newRoleResult.recordset[0].ID;
+        } else {
+          adminRoleId = adminRoleResult.recordset[0].ID;
+        }
+        
+        // 为admin用户分配系统管理员角色
+        await transaction.request()
+          .input('UserID', sql.Int, adminUserId)
+          .input('RoleID', sql.Int, adminRoleId)
+          .query('INSERT INTO [UserRoles] (UserID, RoleID) VALUES (@UserID, @RoleID)');
+        
+        await transaction.commit();
+        res.send('初始化admin用户成功');
+      } catch (error) {
+        await transaction.rollback();
+        throw error;
+      }
+    } else {
+      // 更新现有admin用户的密码
       await pool.request()
         .input('Username', sql.NVarChar, 'admin')
         .input('Password', sql.NVarChar, hash)
-        .input('Role', sql.NVarChar, 'admin')
-        .query('INSERT INTO [User] (Username, Password, Role) VALUES (@Username, @Password, @Role)');
-      res.send('初始化admin用户成功');
-    } else {
-      res.send('admin用户已存在');
+        .query('UPDATE [User] SET Password = @Password WHERE Username = @Username');
+      res.send('admin用户密码已更新');
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -170,30 +214,44 @@ router.get('/profile', authMiddleware, async (req, res) => {
       .input('Username', sql.NVarChar, username)
       .query(`
         SELECT 
-          u.ID as id,
-          u.Username as username,
-          u.RealName as realName,
-          u.Email as email,
-          u.Phone as phone,
-          u.Gender as gender,
-          u.Birthday as birthday,
-          u.Address as address,
-          u.Avatar as avatar,
-          u.Status as status,
-          u.DepartmentID as departmentId,
-          d.Name as departmentName,
-          u.PositionID as positionId,
-          p.PositionName as positionName,
-          u.CreatedAt as createdAt
+          u.ID,
+          u.Username,
+          u.RealName,
+          u.Email,
+          u.Phone,
+          u.Gender,
+          u.Birthday,
+          u.Address,
+          u.Remark,
+          u.Avatar,
+          u.Status,
+          u.DepartmentID,
+          d.Name as DepartmentName,
+          u.PositionID,
+          p.PositionName,
+          u.CreatedAt
         FROM [User] u
         LEFT JOIN [Department] d ON u.DepartmentID = d.ID
         LEFT JOIN [Positions] p ON u.PositionID = p.ID
         WHERE u.Username = @Username
       `);
+    
+    // 获取用户角色信息
+    const rolesResult = await pool.request()
+      .input('UserID', sql.Int, result.recordset[0]?.ID)
+      .query(`
+        SELECT r.ID, r.RoleName as name
+        FROM [UserRoles] ur
+        JOIN [Roles] r ON ur.RoleID = r.ID
+        WHERE ur.UserID = @UserID
+      `);
+    
     const user = result.recordset[0];
     if (user) {
-      // 限制头像最大长度，防止前端异常
-      if (user.avatar && user.avatar.length > 1000000) user.avatar = '';
+      // 添加角色信息
+      user.roles = rolesResult.recordset;
+      // 限制头像最大长度，防止前端异常（调整为2MB以容纳现有头像数据）
+      if (user.Avatar && user.Avatar.length > 2000000) user.Avatar = '';
       res.json({ success: true, data: user });
     } else {
       res.json({ success: false, message: '用户不存在' });
@@ -210,7 +268,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
 // 只允许用户修改自己的部分信息
 router.post('/profile', authMiddleware, async (req, res) => {
   const username = req.user.username;
-  let { RealName, Email, Phone, Department, Avatar } = req.body;
+  let { RealName, Email, Phone, DepartmentID, Avatar, Gender, Birthday, Address, Remark } = req.body;
   try {
     // 校验头像类型和长度
     if (Avatar && typeof Avatar === 'string' && Avatar.length > 2000000) {
@@ -222,13 +280,39 @@ router.post('/profile', authMiddleware, async (req, res) => {
       .input('RealName', sql.NVarChar, RealName)
       .input('Email', sql.NVarChar, Email)
       .input('Phone', sql.NVarChar, Phone)
-      .input('Department', sql.NVarChar, Department)
+      .input('DepartmentID', sql.Int, DepartmentID)
       .input('Avatar', sql.NVarChar, Avatar)
-      .query('UPDATE [User] SET RealName=@RealName, Email=@Email, Phone=@Phone, Department=@Department, Avatar=@Avatar WHERE Username=@Username');
-    // 保存后立即查询最新用户数据返回
+      .input('Gender', sql.NVarChar, Gender)
+      .input('Birthday', sql.Date, Birthday)
+      .input('Address', sql.NVarChar, Address)
+      .input('Remark', sql.NVarChar, Remark)
+      .query('UPDATE [User] SET RealName=@RealName, Email=@Email, Phone=@Phone, DepartmentID=@DepartmentID, Avatar=@Avatar, Gender=@Gender, Birthday=@Birthday, Address=@Address, Remark=@Remark WHERE Username=@Username');
+    // 保存后立即查询最新用户数据返回，字段名与GET /profile保持一致
     const result = await pool.request()
       .input('Username', sql.NVarChar, username)
-      .query('SELECT Username, RealName, Avatar, Email, Phone, Department, Role, CreatedAt FROM [User] WHERE Username = @Username');
+      .query(`
+        SELECT 
+          u.ID,
+          u.Username,
+          u.RealName,
+          u.Email,
+          u.Phone,
+          u.Gender,
+          u.Birthday,
+          u.Address,
+          u.Remark,
+          u.Avatar,
+          u.Status,
+          u.DepartmentID,
+          d.Name as DepartmentName,
+          u.PositionID,
+          p.PositionName,
+          u.CreatedAt
+        FROM [User] u
+        LEFT JOIN [Department] d ON u.DepartmentID = d.ID
+        LEFT JOIN [Positions] p ON u.PositionID = p.ID
+        WHERE u.Username = @Username
+      `);
     const user = result.recordset[0];
     res.json({ success: true, message: '信息已更新', data: user });
   } catch (err) {
@@ -275,18 +359,30 @@ router.get('/user-list', authMiddleware, async (req, res) => {
     let pool = await sql.connect(await getDynamicConfig())
     let where = ''
     if (search) {
-      where = `WHERE Username LIKE N'%${search}%' OR Email LIKE N'%${search}%' OR Phone LIKE N'%${search}%'`
+      where = `WHERE u.Username LIKE N'%${search}%' OR u.Email LIKE N'%${search}%' OR u.Phone LIKE N'%${search}%'`
     }
-    const countResult = await pool.request().query(`SELECT COUNT(*) AS total FROM [User] ${where}`)
+    const countResult = await pool.request().query(`SELECT COUNT(*) AS total FROM [User] u ${where}`)
     const total = countResult.recordset[0].total
     const offset = (page - 1) * pageSize
     const sqlQuery = `
       SELECT * FROM (
         SELECT 
-          ID, Username, RealName, Department, Email, Phone, Role, ISNULL(Status, 1) AS Status,
-          CreatedAt, LastLoginTime,
-          ROW_NUMBER() OVER (ORDER BY Username) AS RowNum
-        FROM [User]
+          u.ID, u.Username, u.RealName, u.Department, u.Email, u.Phone, 
+          ISNULL(u.Status, 1) AS Status, u.CreatedAt, u.LastLoginTime,
+          STUFF((
+            SELECT ', ' + r.RoleName 
+            FROM [UserRoles] ur 
+            INNER JOIN [Roles] r ON ur.RoleID = r.ID 
+            WHERE ur.UserID = u.ID 
+            FOR XML PATH('')
+          ), 1, 2, '') AS RoleNames,
+          CASE WHEN EXISTS(
+            SELECT 1 FROM [UserRoles] ur 
+            INNER JOIN [Roles] r ON ur.RoleID = r.ID 
+            WHERE ur.UserID = u.ID AND r.RoleCode = 'admin'
+          ) THEN 'admin' ELSE 'user' END AS Role,
+          ROW_NUMBER() OVER (ORDER BY u.Username) AS RowNum
+        FROM [User] u
         ${where}
       ) AS T
       WHERE T.RowNum BETWEEN ${offset + 1} AND ${offset + pageSize}
@@ -307,13 +403,21 @@ router.post('/user-status', authMiddleware, async (req, res) => {
   const { username, status } = req.body;
   try {
     let pool = await sql.connect(await getDynamicConfig());
-    // 查询用户角色
+    // 查询用户是否存在及是否为管理员
     const result = await pool.request()
       .input('Username', sql.NVarChar, username)
-      .query('SELECT Role FROM [User] WHERE Username = @Username');
+      .query(`
+        SELECT u.ID, u.Username,
+        CASE WHEN EXISTS(
+          SELECT 1 FROM [UserRoles] ur 
+          INNER JOIN [Roles] r ON ur.RoleID = r.ID 
+          WHERE ur.UserID = u.ID AND r.RoleCode = 'admin'
+        ) THEN 1 ELSE 0 END AS IsAdmin
+        FROM [User] u WHERE u.Username = @Username
+      `);
     const user = result.recordset[0];
     if (!user) return res.json({ success: false, message: '用户不存在' });
-    if (user.Role === 'admin') {
+    if (user.IsAdmin === 1) {
       return res.json({ success: false, message: '超级管理员状态不可修改' });
     }
     await pool.request()
@@ -330,8 +434,8 @@ router.post('/user-status', authMiddleware, async (req, res) => {
 // POST /api/auth/add-user
 // 参数: Username, Password, Role, Department, RealName, Avatar, Email, Phone
 router.post('/add-user', authMiddleware, async (req, res) => {
-  const { Username, Password, Role, Department, RealName, Avatar, Email, Phone } = req.body;
-  if (!Username || !Password || !Role || !Department || !RealName || !Phone) {
+  const { Username, Password, Department, RealName, Avatar, Email, Phone } = req.body;
+  if (!Username || !Password || !Department || !RealName || !Phone) {
     return res.json({ success: false, message: '请填写所有必填项' });
   }
   try {
@@ -345,18 +449,70 @@ router.post('/add-user', authMiddleware, async (req, res) => {
     }
     // 密码加密
     const hash = await bcrypt.hash(Password, 10);
-    await pool.request()
+    const result = await pool.request()
       .input('Username', sql.NVarChar, Username)
       .input('Password', sql.NVarChar, hash)
-      .input('Role', sql.NVarChar, Role)
       .input('Department', sql.NVarChar, Department)
       .input('RealName', sql.NVarChar, RealName)
       .input('Avatar', sql.NVarChar, Avatar)
       .input('Email', sql.NVarChar, Email)
       .input('Phone', sql.NVarChar, Phone)
-      .query('INSERT INTO [User] (Username, Password, Role, Department, RealName, Avatar, Email, Phone) VALUES (@Username, @Password, @Role, @Department, @RealName, @Avatar, @Email, @Phone)');
+      .query('INSERT INTO [User] (Username, Password, Department, RealName, Avatar, Email, Phone) OUTPUT INSERTED.ID VALUES (@Username, @Password, @Department, @RealName, @Avatar, @Email, @Phone)');
+    
+    // 新用户默认分配普通用户角色
+    const newUserId = result.recordset[0].ID;
+    const defaultRoleResult = await pool.request()
+      .query("SELECT ID FROM [Roles] WHERE RoleCode = 'user' OR RoleName = '普通用户'");
+    
+    if (defaultRoleResult.recordset.length > 0) {
+      const defaultRoleId = defaultRoleResult.recordset[0].ID;
+      await pool.request()
+        .input('UserId', sql.Int, newUserId)
+        .input('RoleId', sql.Int, defaultRoleId)
+        .query('INSERT INTO [UserRoles] (UserID, RoleID) VALUES (@UserId, @RoleId)');
+    }
+    
     res.json({ success: true, message: '添加成功' });
   } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
+  }
+});
+
+// ===================== 更新用户信息 =====================
+// PUT /api/auth/update-user
+// 更新用户信息（管理员功能）
+router.put('/update-user', authMiddleware, async (req, res) => {
+  console.log('收到更新用户请求:', req.body);
+  const { Username, Department, RealName, Avatar, Email, Phone } = req.body;
+  if (!Username || !Department || !RealName || !Phone) {
+    console.log('缺少必填项:', { Username, Department, RealName, Phone });
+    return res.json({ success: false, message: '请填写所有必填项' });
+  }
+  try {
+    // 校验头像类型和长度
+    if (Avatar && typeof Avatar === 'string' && Avatar.length > 2000000) {
+      return res.status(400).json({ success: false, message: '头像图片过大' });
+    }
+    let pool = await sql.connect(await getDynamicConfig());
+    // 检查用户是否存在
+    const exist = await pool.request()
+      .input('Username', sql.NVarChar, Username)
+      .query('SELECT ID FROM [User] WHERE Username=@Username');
+    if (exist.recordset.length === 0) {
+      return res.json({ success: false, message: '用户不存在' });
+    }
+    // 更新用户信息（不包括角色，角色通过专门的角色分配接口管理）
+    await pool.request()
+      .input('Username', sql.NVarChar, Username)
+      .input('Department', sql.NVarChar, Department)
+      .input('RealName', sql.NVarChar, RealName)
+      .input('Avatar', sql.NVarChar, Avatar)
+      .input('Email', sql.NVarChar, Email)
+      .input('Phone', sql.NVarChar, Phone)
+      .query('UPDATE [User] SET Department=@Department, RealName=@RealName, Avatar=@Avatar, Email=@Email, Phone=@Phone WHERE Username=@Username');
+    res.json({ success: true, message: '更新成功' });
+  } catch (err) {
+    console.error('更新用户信息出错:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 });

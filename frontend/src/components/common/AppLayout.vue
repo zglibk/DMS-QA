@@ -29,9 +29,9 @@ import AppFooter from './AppFooter.vue'
 }
 
 .scrollable-content {
-  margin-top: 4rem; /* 为固定头部留出空间 */
+  margin-top: 5rem; /* 为固定头部留出空间 */
   margin-bottom: 3rem; /* 为固定底部留出空间 */
-  min-height: calc(100vh - 7rem); /* 确保内容区域至少占满剩余空间 */
+  min-height: calc(100vh - 8rem); /* 确保内容区域至少占满剩余空间 */
   overflow-y: auto;
 }
 

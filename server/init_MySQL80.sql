@@ -192,14 +192,21 @@ CREATE TABLE `User` (
     `ID` INT AUTO_INCREMENT PRIMARY KEY,              -- 主键，自增ID
     `Username` VARCHAR(50) NOT NULL UNIQUE,           -- 用户名，唯一
     `Password` VARCHAR(100) NOT NULL,                 -- 密码（bcrypt哈希）
+    `Department` VARCHAR(32),                          -- 所属部门名称
     `RealName` VARCHAR(32),                           -- 真实姓名
     `Avatar` TEXT,                                     -- 头像（MySQL用TEXT替代NVARCHAR(MAX)）
     `Email` VARCHAR(64),                               -- 邮箱地址
     `Phone` VARCHAR(20),                               -- 手机号码
-    `Department` VARCHAR(32),                          -- 所属部门
-    `Role` VARCHAR(32),                                -- 用户角色（admin/user等）
+    `CreatedAt` DATETIME DEFAULT CURRENT_TIMESTAMP,   -- 创建时间
     `Status` INT DEFAULT 1,                            -- 状态（1=启用，0=禁用）
-    `CreatedAt` DATETIME DEFAULT CURRENT_TIMESTAMP    -- 创建时间
+    `PositionID` INT,                                  -- 职位ID
+    `DepartmentID` INT,                               -- 部门ID
+    `Gender` VARCHAR(10),                              -- 性别
+    `Birthday` DATE,                                  -- 生日
+    `Address` VARCHAR(200),                           -- 地址
+    `Remark` VARCHAR(500),                            -- 备注
+    `LastLoginTime` DATETIME,                         -- 最后登录时间
+    `UpdatedAt` DATETIME                              -- 更新时间
 );
 
 -- =====================================================

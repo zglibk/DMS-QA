@@ -37,6 +37,8 @@
     "sortablejs": "^1.15.6",
     "vue": "^3.0.0",
     "vue-advanced-cropper": "^2.8.9",
+    "vue-avatar-upload": "^1.2.1",
+    "vue-cropperjs": "^5.0.0",
     "vue-router": "^4.0.0",
     "vuedraggable": "^4.1.0",
     "xlsx": "^0.18.5",
@@ -46,6 +48,7 @@
   "devDependencies": {
     "@types/file-saver": "^2.0.7",
     "@vitejs/plugin-vue": "^4.5.2",
+    "sass": "^1.89.2",
     "vite": "^4.5.1"
   },
   "_dependency_descriptions": {

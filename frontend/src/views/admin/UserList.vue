@@ -185,7 +185,7 @@
                 <Star v-if="scope.row.Role === 'admin'" />
                 <User v-else />
               </el-icon>
-              {{ scope.row.Role === 'admin' ? '管理员' : '普通用户' }}
+              {{ scope.row.RoleNames || '普通用户' }}
             </el-tag>
           </template>
         </el-table-column>
@@ -237,7 +237,7 @@
             <div class="status-control">
               <el-switch
                 v-model="scope.row.Status"
-                :disabled="scope.row.Role === 'admin'"
+                :disabled="scope.row.Role === 'admin' || (scope.row.RoleNames && scope.row.RoleNames.includes('admin'))"
                 :active-value="1"
                 :inactive-value="0"
                 active-color="#67c23a"
@@ -310,7 +310,7 @@
                   size="small" 
                   circle 
                   @click="deleteUser(scope.row)"
-                  :disabled="scope.row.Role === 'admin'"
+                  :disabled="scope.row.Role === 'admin' || (scope.row.RoleNames && scope.row.RoleNames.includes('admin'))"
                 />
               </el-tooltip>
             </div>
@@ -372,20 +372,29 @@
           <el-icon class="dialog-icon" style="font-size: 24px;"><UserFilled /></el-icon>
           <span class="dialog-title">{{ isEdit ? '编辑用户信息' : '新增用户' }}</span>
           <div v-if="isEdit" class="header-actions">
-            <el-button type="warning" size="small" @click="showResetPassword = true">
+            <el-button type="warning" @click="openResetPasswordDialog">
               <el-icon><Key /></el-icon>
               重置密码
             </el-button>
           </div>
         </div>
       </template>
+      <el-divider />
       <el-form :model="addUserForm" :rules="addUserRules" ref="addUserRef" label-width="120px" class="user-form">
         <!-- 基本信息区域 -->
         <div class="form-section">
-          <div class="section-title">
-            <el-icon><User /></el-icon>
-            <span>基本信息</span>
+          <!-- 头像显示区域 -->
+          <div class="avatar-preview-section">
+            <el-form-item :label="isEdit ? '当前头像' : '用户头像'">
+              <UploadImg 
+                shape="round" 
+                :currentAvatar="addUserForm.Avatar || ''"
+                :uploadUrl="'/api/users/update-avatar'" 
+                @upload-success="handleAvatarUploadSuccess"
+              />
+            </el-form-item>
           </div>
+
           <el-row :gutter="24">
             <el-col :span="12">
               <el-form-item label="用户名" prop="Username">
@@ -443,10 +452,7 @@
 
         <!-- 角色权限区域 -->
         <div class="form-section">
-          <div class="section-title">
-            <el-icon><Setting /></el-icon>
-            <span>角色权限</span>
-          </div>
+
           <el-row :gutter="24">
             <el-col :span="12">
               <el-form-item label="用户角色" prop="Role">
@@ -493,10 +499,7 @@
 
         <!-- 联系信息区域 -->
         <div class="form-section">
-          <div class="section-title">
-            <el-icon><Message /></el-icon>
-            <span>联系信息</span>
-          </div>
+
           <el-row :gutter="24">
             <el-col :span="12">
               <el-form-item label="联系电话" prop="Phone">
@@ -521,29 +524,7 @@
           </el-row>
         </div>
         
-        <!-- 头像上传区域 -->
-        <div class="form-section">
-          <div class="section-title">
-            <el-icon><Picture /></el-icon>
-            <span>头像设置</span>
-          </div>
-          <el-form-item label="用户头像">
-            <div class="avatar-upload">
-              <div class="avatar-uploader" @click="triggerFileInput">
-                <el-avatar v-if="addUserForm.Avatar" :src="addUserForm.Avatar" :size="100" />
-                <el-empty v-else description="点击上传头像" :image-size="60">
-                  <template #image>
-                    <el-icon :size="40" style="color: #c0c4cc;"><Picture /></el-icon>
-                  </template>
-                </el-empty>
-              </div>
-              <input ref="fileInput" type="file" accept="image/*" style="display:none" @change="openCropper" />
-              <div class="avatar-tips">
-                <p>支持 JPG、PNG 格式，文件大小不超过 2MB</p>
-              </div>
-            </div>
-          </el-form-item>
-        </div>
+
       </el-form>
       
       <template #footer>
@@ -584,7 +565,7 @@
           <el-descriptions-item label="用户ID">{{ currentUser.ID || 'N/A' }}</el-descriptions-item>
           <el-descriptions-item label="用户角色">
             <el-tag :type="currentUser.Role === 'admin' ? 'danger' : 'primary'">
-              {{ currentUser.Role === 'admin' ? '管理员' : '普通用户' }}
+              {{ currentUser.RoleNames || '普通用户' }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="所属部门">{{ currentUser.Department }}</el-descriptions-item>
@@ -689,15 +670,15 @@
     </el-dialog>
 
     <!-- 头像裁切对话框 -->
-    <el-dialog v-model="cropperVisible" title="裁剪头像" width="420px" :append-to-body="true">
-      <div style="height:320px;width:100%;overflow:auto;">
+    <el-dialog v-model="cropperVisible" title="裁剪头像" width="700px" :append-to-body="true">
+      <div style="height:520px;width:100%;overflow:auto;">
         <Cropper
           ref="cropper"
           :src="cropperImg"
           :stencil-props="{ aspectRatio: 1 }"
           :autoZoom="true"
           :resizeImage="true"
-          style="height:300px;width:100%;background:#222;"
+          style="height:490px;width:100%;background:#222;"
         />
       </div>
       <template #footer>
@@ -709,7 +690,7 @@
     </el-dialog>
 
     <!-- 密码重置对话框 -->
-    <el-dialog v-model="showResetPassword" title="重置密码" width="500px" :append-to-body="true" :lock-scroll="false">
+    <el-dialog v-model="showResetPassword" title="重置密码" width="500px" :append-to-body="true" :lock-scroll="false" @close="closeResetPasswordDialog">
       <template #header>
         <div class="dialog-header">
           <el-icon class="dialog-icon" style="font-size: 24px;"><Key /></el-icon>
@@ -756,7 +737,7 @@
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="showResetPassword = false">取消</el-button>
+          <el-button @click="closeResetPasswordDialog">取消</el-button>
           <el-button type="primary" @click="doResetPassword">确认重置</el-button>
         </span>
       </template>
@@ -885,11 +866,19 @@ import axios from 'axios'
 import { 
   Edit, Delete, Setting, Search, Plus, Refresh, User, UserFilled, 
   Star, Phone, Message, OfficeBuilding, Grid, View, Lock, Unlock,
-  Select, Download, Close, Check, Key, CaretTop, CaretBottom, Clock, Calendar, Picture
+  Select, Download, Close, Check, Key, CaretTop, CaretBottom, Clock, Calendar
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Cropper } from 'vue-advanced-cropper'
 import 'vue-advanced-cropper/dist/style.css'
+import UploadImg from './UploadImg.vue'
+
+import { useUserStore } from '../../store/user'
+import { storeToRefs } from 'pinia'
+
+// 用户store
+const userStore = useUserStore()
+const { user: currentLoginUser } = storeToRefs(userStore)
 
 // 基础数据
 const search = ref('')
@@ -935,6 +924,11 @@ const cropperVisible = ref(false)
 const cropperImg = ref('')
 const cropper = ref(null)
 const fileInput = ref(null)
+// 头像base64临时存储
+const avatarBase64 = ref('')
+const avatarPreviewUrl = ref('')
+// 原始用户数据，用于比较头像是否有变化
+const originalUserData = ref(null)
 
 // 密码重置相关
 const showResetPassword = ref(false)
@@ -962,7 +956,6 @@ const activeUsers = computed(() => {
   return users.value.filter(user => user.Status === 1).length
 })
 
-
 // 表单验证规则
 const addUserRules = {
   Username: [
@@ -970,17 +963,52 @@ const addUserRules = {
     { min: 3, max: 20, message: '用户名长度在 3 到 20 个字符', trigger: 'blur' }
   ],
   Password: [
-    { required: true, message: '请输入密码', trigger: 'blur' },
-    { min: 6, max: 20, message: '密码长度在 6 到 20 个字符', trigger: 'blur' }
-  ],
-  ConfirmPassword: [
-    { required: true, message: '请确认密码', trigger: 'blur' },
     { 
       validator: (rule, value, callback) => {
-        if (value !== addUserForm.value.Password) {
-          callback(new Error('两次输入密码不一致'))
+        // 编辑模式下密码不是必填的
+        if (isEdit.value) {
+          if (value && value.length < 6) {
+            callback(new Error('密码长度至少6个字符'))
+          } else if (value && value.length > 20) {
+            callback(new Error('密码长度不能超过20个字符'))
+          } else {
+            callback()
+          }
         } else {
-          callback()
+          // 新增模式下密码是必填的
+          if (!value) {
+            callback(new Error('请输入密码'))
+          } else if (value.length < 6 || value.length > 20) {
+            callback(new Error('密码长度在 6 到 20 个字符'))
+          } else {
+            callback()
+          }
+        }
+      },
+      trigger: 'blur'
+    }
+  ],
+  ConfirmPassword: [
+    { 
+      validator: (rule, value, callback) => {
+        // 编辑模式下确认密码不是必填的
+        if (isEdit.value) {
+          if (addUserForm.value.Password && !value) {
+            callback(new Error('请确认密码'))
+          } else if (value !== addUserForm.value.Password) {
+            callback(new Error('两次输入密码不一致'))
+          } else {
+            callback()
+          }
+        } else {
+          // 新增模式下确认密码是必填的
+          if (!value) {
+            callback(new Error('请确认密码'))
+          } else if (value !== addUserForm.value.Password) {
+            callback(new Error('两次输入密码不一致'))
+          } else {
+            callback()
+          }
         }
       }, 
       trigger: 'blur' 
@@ -1001,6 +1029,9 @@ const addUserRules = {
 const addUserRef = ref()
 
 // 重置表单
+/**
+ * 重置表单数据和头像相关变量
+ */
 const resetAddUser = () => {
   addUserForm.value = { 
     Username: '', 
@@ -1013,8 +1044,19 @@ const resetAddUser = () => {
     Email: '', 
     Phone: '' 
   }
+  
+  // 清空头像相关临时变量
+  avatarBase64.value = ''
+  avatarPreviewUrl.value = ''
+  cropperImg.value = ''
+  
   isEdit.value = false
   addUserRef.value?.resetFields()
+  
+  // 清空文件输入框
+  if (fileInput.value) {
+    fileInput.value.value = ''
+  }
 }
 
 // 重置筛选条件
@@ -1037,7 +1079,12 @@ const refreshData = async () => {
     ElMessage.error('刷新数据失败')
   }
 }
-// 提交用户表单
+
+
+/**
+ * 提交用户表单
+ * 直接将头像base64数据保存到数据库中
+ */
 const submitAddUser = () => {
   addUserRef.value.validate(async valid => {
     if (!valid) return
@@ -1054,12 +1101,52 @@ const submitAddUser = () => {
         delete formData.ConfirmPassword
       }
       
+      // 头像数据处理：优先使用表单中的Avatar数据（与个人中心逻辑一致）
+      // 如果有新上传的头像数据，使用新数据；否则保持原有数据
+      if (avatarBase64.value) {
+        // 有新裁剪的头像数据
+        formData.Avatar = avatarBase64.value
+        console.log('保存新裁剪的头像base64数据到数据库')
+      } else if (addUserForm.value.Avatar) {
+        // 保持表单中现有的头像数据
+        formData.Avatar = addUserForm.value.Avatar
+        console.log('保持现有头像数据')
+      } else {
+        // 没有头像数据
+        formData.Avatar = ''
+        console.log('清空头像数据')
+      }
+      
       const res = await axios[method](url, formData, {
         headers: { Authorization: `Bearer ${token}` }
       })
       
       if (res.data && res.data.success) {
-        ElMessage.success(isEdit.value ? '修改成功' : '添加成功')
+        // 根据是否有头像更新显示不同的成功消息
+        let successMessage = isEdit.value ? '修改成功' : '添加成功'
+        if (formData.Avatar && formData.Avatar !== (isEdit.value ? originalUserData.value?.Avatar : '')) {
+          successMessage += '，头像已更新'
+        }
+        ElMessage.success(successMessage)
+        
+        // 如果编辑的是当前登录用户，重新从后端获取用户数据
+         if (isEdit.value && res.data.data && currentLoginUser.value && 
+             (res.data.data.Username === currentLoginUser.value.username || 
+              res.data.data.ID === currentLoginUser.value.id)) {           
+           // 重新从后端获取完整的用户信息
+           await userStore.fetchProfile(true) // 强制刷新
+           
+           // 使用nextTick确保DOM更新
+           await nextTick()
+           
+           // 同时更新编辑表单中的头像显示
+           if (userStore.user.Avatar) {
+             addUserForm.value.Avatar = userStore.user.Avatar
+           }
+           
+           console.log('用户store数据重新获取完成，头像应该已更新')
+         }
+        
         showAddUser.value = false
         fetchUsers()
         resetAddUser()
@@ -1138,7 +1225,7 @@ const handleCurrentChange = (p) => {
 
 // 表格行样式
 const getRowClassName = ({ row, rowIndex }) => {
-  if (row.Role === 'admin') return 'admin-row'
+  if (row.Role === 'admin' || (row.RoleNames && row.RoleNames.includes('admin'))) return 'admin-row'
   if (row.Status === 0) return 'disabled-row'
   return ''
 }
@@ -1177,15 +1264,38 @@ onMounted(() => {
 })
 
 // 用户操作方法
+/**
+ * 编辑用户
+ * @param {Object} row - 用户数据
+ */
 const editUser = (row) => {
   isEdit.value = true
   addUserForm.value = { ...row, Password: '', ConfirmPassword: '' }
   currentUser.value = row  // 设置当前操作用户，用于重置密码功能
+  
+  // 保存原始用户数据，用于比较头像是否有变化
+  originalUserData.value = { ...row }
+  
+  // 清空头像相关临时变量，但保留原有头像数据用于显示
+  avatarBase64.value = ''
+  avatarPreviewUrl.value = ''
+  cropperImg.value = ''
+  
+  // 如果编辑的是当前登录用户，优先使用store中的头像数据
+  if (currentLoginUser.value && 
+      (row.Username === currentLoginUser.value.username || row.ID === currentLoginUser.value.id)) {
+    // 当前登录用户，优先使用store中的头像数据
+    addUserForm.value.Avatar = currentLoginUser.value.Avatar || row.Avatar || ''
+  } else {
+    // 其他用户，使用数据库中的头像数据
+    addUserForm.value.Avatar = row.Avatar || ''
+  }
+  
   showAddUser.value = true
 }
 
 const deleteUser = async (row) => {
-  if (row.Role === 'admin') {
+  if (row.Role === 'admin' || (row.RoleNames && row.RoleNames.includes('admin'))) {
     ElMessage.warning('不能删除管理员账户')
     return
   }
@@ -1346,7 +1456,7 @@ const exportUsers = async () => {
         '序号': index + 1,
         '用户名': user.Username,
         '真实姓名': user.RealName,
-        '角色': user.Role === 'admin' ? '管理员' : '普通用户',
+        '角色': user.RoleNames || '普通用户',
         '部门': user.Department || '未分配',
         '邮箱': user.Email || '',
         '联系电话': user.Phone || '',
@@ -1534,7 +1644,7 @@ const exportUsersAsCSV = async () => {
         '序号': index + 1,
         '用户名': user.Username,
         '真实姓名': user.RealName,
-        '角色': user.Role === 'admin' ? '管理员' : '普通用户',
+        '角色': user.RoleNames || '普通用户',
         '部门': user.Department || '未分配',
         '邮箱': user.Email || '',
         '联系电话': user.Phone || '',
@@ -1580,14 +1690,66 @@ const triggerFileInput = () => {
   fileInput.value && fileInput.value.click()
 }
 
-const openCropper = (e) => {
+/**
+ * 图片压缩函数（与个人中心保持一致）
+ * @param {File} file - 要压缩的图片文件
+ * @returns {Promise<string>} 压缩后的base64数据
+ */
+const compressImage = (file) => {
+  return new Promise((resolve, reject) => {
+    const canvas = document.createElement('canvas')
+    const ctx = canvas.getContext('2d')
+    const img = new Image()
+    
+    img.onload = () => {
+      // 设置最大尺寸
+      const maxDimension = 800
+      let { width, height } = img
+      
+      // 计算新尺寸
+      if (width > height) {
+        if (width > maxDimension) {
+          height = (height * maxDimension) / width
+          width = maxDimension
+        }
+      } else {
+        if (height > maxDimension) {
+          width = (width * maxDimension) / height
+          height = maxDimension
+        }
+      }
+      
+      canvas.width = width
+      canvas.height = height
+      
+      // 绘制压缩后的图片
+      ctx.drawImage(img, 0, 0, width, height)
+      
+      // 转换为base64，如果还是太大则降低质量
+      let compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8)
+      
+      // 如果压缩后仍然太大，继续降低质量
+      let quality = 0.8
+      while (compressedDataUrl.length > 2000000 && quality > 0.1) {
+        quality -= 0.1
+        compressedDataUrl = canvas.toDataURL('image/jpeg', quality)
+      }
+      
+      resolve(compressedDataUrl)
+    }
+    
+    img.onerror = reject
+    img.src = URL.createObjectURL(file)
+  })
+}
+
+const openCropper = async (e) => {
   const file = e.target.files[0]
   if (!file) return
   
   // 检查文件类型
-  const isJPG = file.type === 'image/jpeg' || file.type === 'image/png'
-  if (!isJPG) {
-    ElMessage.error('头像只能是 JPG/PNG 格式!')
+  if (!file.type.startsWith('image/')) {
+    ElMessage.error('请选择图片文件')
     return
   }
   
@@ -1598,14 +1760,53 @@ const openCropper = (e) => {
     return
   }
   
-  const reader = new FileReader()
-  reader.onload = ev => {
-    cropperImg.value = ev.target.result
-    cropperVisible.value = true
+  try {
+    let avatarData
+    
+    // 如果文件大小超过2MB，进行压缩
+    if (file.size > 2 * 1024 * 1024) {
+      ElMessage.info('图片较大，正在自动压缩...')
+      avatarData = await compressImage(file)
+      ElMessage.success('图片压缩完成')
+    } else {
+      // 文件大小合适，直接读取
+      avatarData = await new Promise((resolve, reject) => {
+        const reader = new FileReader()
+        reader.onload = ev => resolve(ev.target.result)
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
+    }
+    
+    // 直接保存到表单中，与个人中心逻辑一致
+    addUserForm.value.Avatar = avatarData
+    avatarBase64.value = avatarData
+    avatarPreviewUrl.value = avatarData
+    
+    ElMessage.success('头像已更新，请点击保存按钮保存更改')
+    
+    // 清空文件输入框
+    if (fileInput.value) {
+      fileInput.value.value = ''
+    }
+  } catch (error) {
+    console.error('头像处理失败:', error)
+    ElMessage.error('头像处理失败，请重试')
+    
+    // 如果直接上传失败，回退到裁剪模式
+    const reader = new FileReader()
+    reader.onload = ev => {
+      cropperImg.value = ev.target.result
+      cropperVisible.value = true
+    }
+    reader.readAsDataURL(file)
   }
-  reader.readAsDataURL(file)
 }
 
+/**
+ * 裁剪头像并转换为base64格式
+ * 将裁剪后的图片保存到临时变量，等待表单提交时一起保存
+ */
 const doCrop = async () => {
   // 获取裁剪后的canvas
   const result = cropper.value.getResult()
@@ -1631,45 +1832,42 @@ const doCrop = async () => {
     return
   }
   
-  // 上传到后台
-  try {
-    const token = localStorage.getItem('token')
-    const formData = new FormData()
-    
-    // 将base64转换为blob
-    const byteCharacters = atob(base64.split(',')[1])
-    const byteNumbers = new Array(byteCharacters.length)
-    for (let i = 0; i < byteCharacters.length; i++) {
-      byteNumbers[i] = byteCharacters.charCodeAt(i)
-    }
-    const byteArray = new Uint8Array(byteNumbers)
-    const blob = new Blob([byteArray], { type: 'image/jpeg' })
-    
-    formData.append('avatar', blob, 'avatar.jpg')
-    
-    const res = await axios.post('/api/upload/avatar', formData, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'multipart/form-data'
-      }
-    })
-    
-    if (res.data && res.data.success) {
-      addUserForm.value.Avatar = res.data.data.url
-      ElMessage.success('头像上传成功')
-    } else {
-      ElMessage.error(res.data.message || '头像上传失败')
-    }
-  } catch (error) {
-    console.error('头像上传失败:', error)
-    ElMessage.error('头像上传失败，请重试')
-  }
+  // 保存base64到临时变量
+  avatarBase64.value = base64
+  avatarPreviewUrl.value = base64
+  
+  // 更新表单中的头像显示
+  addUserForm.value.Avatar = base64
+  
+  ElMessage.success('头像裁剪完成，将在提交表单时保存')
   
   cropperVisible.value = false
   // 清空文件输入框
   if (fileInput.value) {
     fileInput.value.value = ''
   }
+}
+
+// 打开重置密码对话框
+const openResetPasswordDialog = () => {
+  // 重置表单数据
+  resetPasswordForm.value = {
+    newPassword: '',
+    confirmPassword: '',
+    notifyMethod: 'none'
+  }
+  showResetPassword.value = true
+}
+
+// 关闭重置密码对话框
+const closeResetPasswordDialog = () => {
+  // 重置表单数据
+  resetPasswordForm.value = {
+    newPassword: '',
+    confirmPassword: '',
+    notifyMethod: 'none'
+  }
+  showResetPassword.value = false
 }
 
 // 密码重置方法
@@ -1709,13 +1907,7 @@ const doResetPassword = async () => {
     
     if (res.data && res.data.success) {
       ElMessage.success('密码重置成功')
-      showResetPassword.value = false
-      // 重置表单
-      resetPasswordForm.value = {
-        newPassword: '',
-        confirmPassword: '',
-        notifyMethod: 'none'
-      }
+      closeResetPasswordDialog()
     } else {
       ElMessage.error(res.data.message || '密码重置失败')
     }
@@ -1725,7 +1917,7 @@ const doResetPassword = async () => {
   }
 }
 const changeStatus = async (row, val) => {
-  if (row.Role === 'admin') {
+  if (row.Role === 'admin' || (row.RoleNames && row.RoleNames.includes('admin'))) {
     row.Status = 1;
     ElMessage.warning('超级管理员状态不可修改！')
     return;
@@ -1804,7 +1996,7 @@ const batchDisable = async () => {
   }
   
   // 检查是否包含管理员
-  const hasAdmin = selectedUsers.value.some(user => user.Role === 'admin')
+  const hasAdmin = selectedUsers.value.some(user => user.Role === 'admin' || (user.RoleNames && user.RoleNames.includes('admin')))
   if (hasAdmin) {
     ElMessage.warning('不能禁用管理员账户')
     return
@@ -1855,7 +2047,7 @@ const batchDelete = async () => {
   }
   
   // 检查是否包含管理员
-  const hasAdmin = selectedUsers.value.some(user => user.Role === 'admin')
+  const hasAdmin = selectedUsers.value.some(user => user.Role === 'admin' || (user.RoleNames && user.RoleNames.includes('admin')))
   if (hasAdmin) {
     ElMessage.warning('不能删除管理员账户')
     return
@@ -1996,6 +2188,26 @@ const isColumnVisible = (columnKey) => {
 }
 
 /**
+ * 处理头像上传成功
+ */
+/**
+ * 处理头像上传成功事件
+ * @param {string} avatarData - base64格式的头像数据
+ */
+const handleAvatarUploadSuccess = (avatarData) => {
+  // 更新当前编辑用户的头像数据
+  if (addUserForm.value) {
+    addUserForm.value.Avatar = avatarData
+  }
+  
+  // 更新头像预览
+  avatarPreviewUrl.value = avatarData
+  avatarBase64.value = avatarData
+  
+  console.log('头像已更新到表单数据')
+}
+
+/**
  * 格式化日期时间
  */
 const formatDateTime = (dateTime) => {
@@ -2014,7 +2226,6 @@ const formatDateTime = (dateTime) => {
     
     return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
   } catch (error) {
-    console.error('日期格式化错误:', error)
     return '-'
   }
 }
@@ -2047,6 +2258,8 @@ const getUserIdTagStyle = (userId) => {
     border: `1px solid ${colors.color}20`
   }
 }
+
+
 </script>
 
 <style scoped>
@@ -2540,9 +2753,33 @@ const getUserIdTagStyle = (userId) => {
 
 /* 表单样式 */
 .user-form {
-  background: white;
-  border-radius: 8px;
-  padding: 24px;
+  background: transparent;
+  padding: 0;
+}
+
+/* 表单分区样式 - 简洁版 */
+.form-section {
+  margin-bottom: 24px;
+}
+
+.form-section:last-child {
+  margin-bottom: 0;
+}
+
+/* 分区标题样式 - 简洁版 */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: #409eff;
+}
+
+.section-title .el-icon {
+  font-size: 16px;
+  color: #409eff;
 }
 
 .role-option,
@@ -2552,44 +2789,9 @@ const getUserIdTagStyle = (userId) => {
   gap: 8px;
 }
 
-.avatar-upload {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 12px;
-}
-
-.avatar-uploader {
-  border: 2px dashed #d9d9d9;
-  border-radius: 6px;
-  cursor: pointer;
-  position: relative;
-  overflow: hidden;
-  transition: all 0.3s ease;
-  width: 100px;
-  height: 100px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.avatar-uploader:hover {
-  border-color: #409eff;
-  background: rgba(64, 158, 255, 0.05);
-  transform: scale(1.05);
-}
 
 
 
-.avatar-tips {
-  text-align: center;
-}
-
-.avatar-tips p {
-  font-size: 12px;
-  color: #909399;
-  margin: 0;
-}
 
 /* 用户详情样式 */
 .user-detail {
@@ -2696,22 +2898,39 @@ const getUserIdTagStyle = (userId) => {
   overflow: hidden;
 }
 
-:deep(.el-dialog__header) {
-  background: #409eff;
+/* 新增用户对话框样式优化 */
+.user-dialog :deep(.el-dialog) {
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.user-dialog :deep(.el-dialog__header) {
+  background: linear-gradient(135deg, #409eff 0%, #667eea 100%);
   color: white;
-  padding: 20px 24px;
+  padding: 24px 32px;
   border-bottom: none;
 }
 
-:deep(.el-dialog__body) {
-  padding: 32px;
-  background: #fafbfc;
+.user-dialog :deep(.el-dialog__title) {
+  font-size: 18px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-:deep(.el-dialog__footer) {
-  padding: 24px 32px;
+.user-dialog :deep(.el-dialog__body) {
+  padding: 0.9375rem;
   background: white;
-  border-top: 1px solid #f0f0f0;
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.user-dialog :deep(.el-dialog__footer) {
+  padding: 20px 32px;
+  background: white;
+  border-top: 1px solid #e4e7ed;
 }
 
 :deep(.el-table) {
@@ -2832,13 +3051,54 @@ const getUserIdTagStyle = (userId) => {
   padding: 24px;
 }
 
-:deep(.el-form-item) {
-  margin-bottom: 20px;
+.user-form :deep(.el-form-item) {
+  margin-bottom: 24px;
 }
 
-:deep(.el-form-item__label) {
-  font-weight: 500;
+.user-form :deep(.el-form-item__label) {
+  font-weight: 600;
   color: #303133;
+  font-size: 14px;
+  line-height: 1.5;
+  text-align: right;
+  vertical-align: middle;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  height: 40px;
+}
+
+.user-form :deep(.el-input__wrapper) {
+  border-radius: 8px;
+  transition: all 0.3s ease;
+  min-height: 40px;
+}
+
+.user-form :deep(.el-input__wrapper:hover) {
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.user-form :deep(.el-select .el-input__wrapper) {
+  border-radius: 8px;
+  min-height: 40px;
+}
+
+.user-form :deep(.el-input) {
+  height: 40px;
+}
+
+.user-form :deep(.el-select) {
+  height: 40px;
+}
+
+.user-form :deep(.el-row) {
+  margin-bottom: 8px;
+}
+
+/* 对话框分割线样式 */
+.user-dialog :deep(.el-divider) {
+  margin: 0;
+  border-color: #e4e7ed;
 }
 
 :deep(.el-tag) {
@@ -2954,6 +3214,8 @@ const getUserIdTagStyle = (userId) => {
 .fade-leave-to {
   opacity: 0;
 }
+
+
 
 /* 操作按钮样式 */
 .action-buttons {
@@ -3245,10 +3507,7 @@ const getUserIdTagStyle = (userId) => {
     padding: 16px;
   }
   
-  .avatar-uploader {
-    width: 100px;
-    height: 100px;
-  }
+
   
   .avatar {
     width: 100px;
@@ -3523,27 +3782,77 @@ const getUserIdTagStyle = (userId) => {
   .role-table-container :deep(.el-table) {
     font-size: 14px;
   }
-  
-  .role-name-text {
-    font-size: 15px;
-  }
-  
-  .role-code {
-    font-size: 12px;
-  }
-  
-  .section-desc {
-    font-size: 14px;
-    padding: 10px 12px;
-    margin-bottom: 16px;
-  }
-  
-  .dialog-footer .el-button {
-    width: 120px !important;
-    height: 36px !important;
-    font-size: 14px !important;
-  }
 }
 
+/* 头像预览样式 */
+.avatar-preview-section {
+  margin-bottom: 20px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.avatar-preview-container {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.avatar-preview {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid #e4e7ed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f5f7fa;
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  font-size: 12px;
+}
+
+.avatar-placeholder .el-icon {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.avatar-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.role-name-text {
+  font-size: 15px;
+}
+
+.role-code {
+  font-size: 12px;
+}
+
+.section-desc {
+  font-size: 14px;
+  padding: 10px 12px;
+  margin-bottom: 16px;
+}
+
+.dialog-footer .el-button {
+  width: 120px !important;
+  height: 36px !important;
+  font-size: 14px !important;
+}
 
 </style>

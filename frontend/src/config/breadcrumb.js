@@ -260,7 +260,17 @@ export function getBreadcrumbConfig(path) {
   })
 
   // 如果是根路径，直接返回
-  if (path === '/admin' || path === '/admin/dashboard') {
+  if (path === '/admin') {
+    breadcrumbs.push({
+      title: '系统首页',
+      path: '/admin',
+      icon: 'HomeFilled',
+      clickable: false
+    })
+    return breadcrumbs
+  }
+  
+  if (path === '/admin/dashboard') {
     breadcrumbs.push({
       title: '仪表盘',
       path: '/admin/dashboard',

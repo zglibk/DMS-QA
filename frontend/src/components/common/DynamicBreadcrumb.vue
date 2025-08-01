@@ -3,12 +3,23 @@
     <el-breadcrumb-item 
       v-for="(item, index) in breadcrumbs" 
       :key="index"
-      :to="item.clickable ? item.path : undefined"
     >
-      <el-icon v-if="item.icon" class="breadcrumb-icon">
-        <component :is="item.icon" />
-      </el-icon>
-      <span>{{ item.title }}</span>
+      <span 
+        v-if="item.clickable" 
+        @click="handleBreadcrumbClick(item.path)"
+        class="breadcrumb-link"
+      >
+        <el-icon v-if="item.icon" class="breadcrumb-icon">
+          <component :is="item.icon" />
+        </el-icon>
+        {{ item.title }}
+      </span>
+      <span v-else class="breadcrumb-text">
+        <el-icon v-if="item.icon" class="breadcrumb-icon">
+          <component :is="item.icon" />
+        </el-icon>
+        {{ item.title }}
+      </span>
     </el-breadcrumb-item>
   </el-breadcrumb>
 </template>
@@ -25,12 +36,13 @@
  */
 
 import { computed } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { getBreadcrumbConfig } from '@/config/breadcrumb'
 
 // 获取当前路由信息
 const route = useRoute()
+const router = useRouter()
 // 获取用户store
 const userStore = useUserStore()
 
@@ -39,6 +51,13 @@ const breadcrumbs = computed(() => {
   const currentPath = route.path
   return getBreadcrumbConfig(currentPath)
 })
+
+// 处理面包屑点击跳转
+const handleBreadcrumbClick = (path) => {
+  if (path && path !== route.path) {
+    router.push(path)
+  }
+}
 
 
 
@@ -92,5 +111,27 @@ const breadcrumbs = computed(() => {
 
 :deep(.el-breadcrumb__item:last-child .el-breadcrumb__inner:hover) {
   color: #303133;
+}
+
+/* 面包屑链接样式 */
+.breadcrumb-link {
+  display: inline-flex;
+  align-items: center;
+  color: #409EFF;
+  cursor: pointer;
+  transition: color 0.3s;
+  text-decoration: none;
+}
+
+.breadcrumb-link:hover {
+  color: #66b1ff;
+  text-decoration: underline;
+}
+
+/* 面包屑文本样式 */
+.breadcrumb-text {
+  display: inline-flex;
+  align-items: center;
+  color: #606266;
 }
 </style>

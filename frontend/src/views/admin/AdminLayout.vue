@@ -48,8 +48,8 @@
           </el-dropdown>
           <el-dropdown trigger="click" placement="bottom-end">
             <span class="user-dropdown-trigger">
-              <el-avatar :size="36" :src="user.avatar" style="background:#eee;">
-                <template v-if="!user.avatar">
+              <el-avatar :size="36" :src="user.Avatar" style="background:#eee;">
+                <template v-if="!user.Avatar">
                   <el-icon><User /></el-icon>
                 </template>
               </el-avatar>
@@ -57,8 +57,8 @@
             <template #dropdown>
               <el-card class="user-dropdown-card">
                 <div class="user-info">
-                  <el-avatar :size="48" :src="user.avatar" style="background:#eee;">
-                    <template v-if="!user.avatar">
+                  <el-avatar :size="48" :src="user.Avatar" style="background:#eee;">
+                    <template v-if="!user.Avatar">
                       <el-icon><User /></el-icon>
                     </template>
                   </el-avatar>
@@ -237,7 +237,7 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 3.75rem;
+  height: 5rem;
   box-shadow: 0 0.125rem 0.5rem #f0f1f2;
   padding: 0 1.5rem;
   position: sticky;

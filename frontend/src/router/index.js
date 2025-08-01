@@ -63,6 +63,9 @@ const routes = [
     path: '/admin',
     component: AdminLayout, // 管理后台布局组件
     children: [
+      // 默认欢迎页面
+      { path: '', component: () => import('../views/admin/Welcome.vue') },
+      
       // 仪表板
       { path: 'dashboard', component: Dashboard },
 

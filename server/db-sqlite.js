@@ -35,16 +35,29 @@ async function initDatabase() {
           ID INTEGER PRIMARY KEY AUTOINCREMENT,
           Username TEXT UNIQUE NOT NULL,
           Password TEXT NOT NULL,
-          Role TEXT DEFAULT 'user',
-          CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP
+          Department TEXT,
+          RealName TEXT,
+          Avatar TEXT,
+          Email TEXT,
+          Phone TEXT,
+          CreatedAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+          Status INTEGER DEFAULT 1,
+          PositionID INTEGER,
+          DepartmentID INTEGER,
+          Gender TEXT,
+          Birthday DATE,
+          Address TEXT,
+          Remark TEXT,
+          LastLoginTime DATETIME,
+          UpdatedAt DATETIME
         )
       `);
 
       // 插入默认管理员用户 (密码: admin123)
       const hashedPassword = '$2a$10$92IXUNpkjO0rOQ5byMi.Ye4oKoEa3Ro9llC/.og/at2.uheWG/igi'; // bcrypt hash for 'admin123'
       db.run(`
-        INSERT OR IGNORE INTO Users (Username, Password, Role) 
-        VALUES ('admin', ?, 'admin')
+        INSERT OR IGNORE INTO Users (Username, Password) 
+        VALUES ('admin', ?)
       `, [hashedPassword]);
 
       // 创建站点配置表

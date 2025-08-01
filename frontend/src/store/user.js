@@ -29,7 +29,7 @@ export const useUserStore = defineStore('user', {
       gender: '',
       birthday: null,
       address: '',
-      avatar: '',
+      Avatar: '',
       status: 1,
       lastLoginTime: null, // 最后登录时间
       // 部门信息
@@ -94,6 +94,8 @@ export const useUserStore = defineStore('user', {
      */
     async fetchProfile(forceRefresh = false) {
       try {
+        console.log('fetchProfile调用，forceRefresh:', forceRefresh)
+        
         // 如果用户信息已存在且不强制刷新，则跳过基本信息获取
         if (!forceRefresh && this.user && this.user.id && this.user.username) {
           console.log('用户基本信息已存在，跳过重复获取')
@@ -104,31 +106,52 @@ export const useUserStore = defineStore('user', {
           return { success: true, data: this.user }
         }
 
+        console.log('开始从后端获取用户资料...')
         const response = await apiService.get('/api/auth/profile')
         if (response.data.success) {
           const userData = response.data.data
+          console.log('从后端获取到的用户数据:', userData)
+          console.log('更新前store中的头像:', this.user?.Avatar)
           
-          // 设置基本用户信息
-          this.user = {
+          // 设置基本用户信息 - 使用setUser方法确保响应式更新
+          const newUserData = {
             ...this.user,
-            id: userData.id,
-            username: userData.username,
-            realName: userData.realName,
-            email: userData.email,
-            phone: userData.phone,
-            gender: userData.gender,
-            birthday: userData.birthday,
-            address: userData.address,
-            avatar: userData.avatar,
-            status: userData.status,
-            departmentId: userData.departmentId,
-            departmentName: userData.departmentName,
-            positionId: userData.positionId,
-            positionName: userData.positionName
+            id: userData.ID,
+            username: userData.Username, // 将后端的Username映射到前端的username
+            Username: userData.Username, // 保留原字段以兼容现有代码
+            realName: userData.RealName,
+            RealName: userData.RealName, // 保留原字段以兼容现有代码
+            email: userData.Email,
+            Email: userData.Email, // 保留原字段以兼容现有代码
+            phone: userData.Phone,
+            Phone: userData.Phone, // 保留原字段以兼容现有代码
+            gender: userData.Gender,
+            Gender: userData.Gender, // 保留原字段以兼容现有代码
+            birthday: userData.Birthday,
+            Birthday: userData.Birthday, // 保留原字段以兼容现有代码
+            address: userData.Address,
+            Address: userData.Address, // 保留原字段以兼容现有代码
+            Avatar: userData.Avatar,
+            status: userData.Status,
+            Status: userData.Status, // 保留原字段以兼容现有代码
+            departmentId: userData.DepartmentID,
+            DepartmentID: userData.DepartmentID, // 保留原字段以兼容现有代码
+            departmentName: userData.DepartmentName,
+            DepartmentName: userData.DepartmentName, // 保留原字段以兼容现有代码
+            positionId: userData.PositionID,
+            PositionID: userData.PositionID, // 保留原字段以兼容现有代码
+            positionName: userData.PositionName,
+            PositionName: userData.PositionName, // 保留原字段以兼容现有代码
+            CreatedAt: userData.CreatedAt
           }
           
+          // 使用setUser方法确保响应式更新
+          this.setUser(newUserData)
+          
+          console.log('用户数据更新完成，新的头像:', this.user.Avatar)
+          
           // 获取用户角色和权限信息
-          await this.fetchUserRolesAndPermissions(userData.id)
+          await this.fetchUserRolesAndPermissions(userData.ID)
         }
         return response.data
       } catch (error) {
@@ -264,6 +287,7 @@ export const useUserStore = defineStore('user', {
 
     // 手动设置用户信息
     setUser(userData) {
+      // 完全替换user对象以确保响应式更新
       this.user = { ...this.user, ...userData }
     },
 
