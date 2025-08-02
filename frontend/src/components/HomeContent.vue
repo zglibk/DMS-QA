@@ -177,7 +177,7 @@
                       </div>
                     </div>
                     <div class="card-right">
-                      <div class="card-title">今日投诉</div>
+                      <div class="card-title today-title">今日投诉</div>
                       <div class="card-value today-value">{{ todayCount }}</div>
                       <div class="card-subtitle">内诉: {{ todayInnerCount || 0 }} | 客诉: {{ todayOuterCount || 0 }}</div>
                     </div>
@@ -191,7 +191,7 @@
                       </div>
                     </div>
                     <div class="card-right">
-                      <div class="card-title">{{ selectedMonthText }}总投诉</div>
+                      <div class="card-title total-title">{{ selectedMonthText }}总投诉</div>
                       <div class="card-value total-value">{{ monthCount }}</div>
                       <div class="card-subtitle">内诉: {{ monthInnerCount || 0 }} | 客诉: {{ monthOuterCount || 0 }}</div>
                     </div>
@@ -205,7 +205,7 @@
                       </div>
                     </div>
                     <div class="card-right">
-                      <div class="card-title">一次交检合格率</div>
+                      <div class="card-title rate-title">一次交检合格率</div>
                       <div class="card-value rate-value">{{ qualityStats.passRate }}%</div>
                       <div class="card-subtitle">交检: {{ qualityStats.totalInspections }} | 不合格: {{ qualityStats.failedInspections }}</div>
                     </div>
@@ -219,7 +219,7 @@
                       </div>
                     </div>
                     <div class="card-right">
-                      <div class="card-title">客诉率</div>
+                      <div class="card-title customer-rate-title">客诉率</div>
                       <div class="card-value customer-rate-value">{{ qualityStats.complaintRate }}%</div>
                       <div class="card-subtitle">交付: {{ qualityStats.totalDeliveries }} | 客诉: {{ qualityStats.complaintBatches }}</div>
                     </div>
@@ -240,7 +240,7 @@
                       </div>
                     </div>
                     <div class="card-right">
-                      <div class="card-title">
+                      <div class="card-title" :class="card.data.type === 'workshop' ? 'inner-title' : 'outer-title'">
                         {{ card.data.unit }}
                         <el-tag
                           :type="card.data.type === 'workshop' ? 'primary' : 'success'"
@@ -4805,8 +4805,16 @@ body::-webkit-scrollbar-thumb:hover {
   align-items: center;
 }
 
+/* 不同卡片的标题颜色 */
+.carousel-page .today-title { color: #409EFF; }
+.carousel-page .total-title { color: #409EFF; }
+.carousel-page .inner-title { color: #E6A23C; }
+.carousel-page .outer-title { color: #F56C6C; }
+.carousel-page .rate-title { color: #67C23A; }
+.carousel-page .customer-rate-title { color: #909399; }
+
 .carousel-page .card-value {
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 700;
   margin-bottom: 2px;
   transition: all 0.3s ease;

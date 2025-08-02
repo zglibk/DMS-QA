@@ -47,6 +47,7 @@ const departmentRouter = require('./routes/departments');      // 部门管理�
 const positionRouter = require('./routes/positions');         // 岗位管理路由
 const roleRouter = require('./routes/roles');                 // 角色管理路由
 const menuRouter = require('./routes/menus');                 // 菜单管理路由
+const sampleRouter = require('./routes/sample');              // 样品管理路由
 
 /**
  * 创建Express应用实例
@@ -147,6 +148,7 @@ app.use('/api/departments', departmentRouter);
 app.use('/api/positions', positionRouter);
 app.use('/api/roles', roleRouter);
 app.use('/api/menus', menuRouter);
+app.use('/api/sample', sampleRouter);
 
 /**
  * 静态文件服务配置

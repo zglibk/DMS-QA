@@ -368,7 +368,9 @@ router.get('/user-list', authMiddleware, async (req, res) => {
       SELECT * FROM (
         SELECT 
           u.ID, u.Username, u.RealName, u.Department, u.Email, u.Phone, 
-          ISNULL(u.Status, 1) AS Status, u.CreatedAt, u.LastLoginTime,
+          u.Avatar, ISNULL(u.Status, 1) AS Status, u.CreatedAt, u.LastLoginTime,
+          u.Gender, u.Birthday, u.Address, u.Remark, u.UpdatedAt,
+          p.PositionName AS Position,
           STUFF((
             SELECT ', ' + r.RoleName 
             FROM [UserRoles] ur 
@@ -383,6 +385,7 @@ router.get('/user-list', authMiddleware, async (req, res) => {
           ) THEN 'admin' ELSE 'user' END AS Role,
           ROW_NUMBER() OVER (ORDER BY u.Username) AS RowNum
         FROM [User] u
+        LEFT JOIN [Positions] p ON u.PositionID = p.ID
         ${where}
       ) AS T
       WHERE T.RowNum BETWEEN ${offset + 1} AND ${offset + pageSize}
@@ -394,6 +397,68 @@ router.get('/user-list', authMiddleware, async (req, res) => {
     res.status(500).json({ success: false, message: err.message })
   }
 })
+
+// ===================== 获取单个用户详细信息 =====================
+// GET /api/auth/user/:userId
+/**
+ * 获取指定用户的详细信息
+ * @param {number} userId - 用户ID
+ * @returns {Object} 用户详细信息
+ */
+router.get('/user/:userId', authMiddleware, async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    let pool = await sql.connect(await getDynamicConfig());
+    
+    // 获取用户基本信息
+    const userResult = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .query(`
+        SELECT 
+          u.ID, u.Username, u.RealName, u.Department, u.Email, u.Phone, 
+          u.Avatar, u.PositionID, u.DepartmentID, u.Gender, u.Birthday, u.Address,
+          ISNULL(u.Status, 1) AS Status, u.CreatedAt, u.LastLoginTime
+        FROM [User] u
+        WHERE u.ID = @UserId
+      `);
+    
+    if (userResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '用户不存在' });
+    }
+    
+    const user = userResult.recordset[0];
+    
+    // 获取用户角色信息
+    const rolesResult = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .query(`
+        SELECT r.ID, r.RoleName, r.RoleCode
+        FROM [UserRoles] ur
+        INNER JOIN [Roles] r ON ur.RoleID = r.ID
+        WHERE ur.UserID = @UserId
+      `);
+    
+    // 组装角色信息
+    const roles = rolesResult.recordset;
+    const roleNames = roles.map(r => r.RoleName).join(', ');
+    const isAdmin = roles.some(r => r.RoleCode === 'admin');
+    
+    // 返回完整的用户信息
+    const userInfo = {
+      ...user,
+      RoleNames: roleNames,
+      Role: isAdmin ? 'admin' : 'user',
+      Roles: roles
+    };
+    
+    res.json({ success: true, data: userInfo });
+    
+  } catch (err) {
+    console.error('获取用户详细信息失败:', err);
+    res.status(500).json({ success: false, message: '获取用户信息失败，请重试' });
+  }
+});
 
 // ===================== 用户状态变更接口 =====================
 // POST /api/auth/user-status
@@ -432,9 +497,9 @@ router.post('/user-status', authMiddleware, async (req, res) => {
 
 // ===================== 添加用户接口 =====================
 // POST /api/auth/add-user
-// 参数: Username, Password, Role, Department, RealName, Avatar, Email, Phone
+// 参数: Username, Password, Role, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark
 router.post('/add-user', authMiddleware, async (req, res) => {
-  const { Username, Password, Department, RealName, Avatar, Email, Phone } = req.body;
+  const { Username, Password, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
   if (!Username || !Password || !Department || !RealName || !Phone) {
     return res.json({ success: false, message: '请填写所有必填项' });
   }
@@ -457,7 +522,13 @@ router.post('/add-user', authMiddleware, async (req, res) => {
       .input('Avatar', sql.NVarChar, Avatar)
       .input('Email', sql.NVarChar, Email)
       .input('Phone', sql.NVarChar, Phone)
-      .query('INSERT INTO [User] (Username, Password, Department, RealName, Avatar, Email, Phone) OUTPUT INSERTED.ID VALUES (@Username, @Password, @Department, @RealName, @Avatar, @Email, @Phone)');
+      .input('PositionID', sql.Int, PositionID || null)
+      .input('DepartmentID', sql.Int, DepartmentID || null)
+      .input('Gender', sql.NVarChar, Gender || null)
+      .input('Birthday', sql.Date, Birthday || null)
+      .input('Address', sql.NVarChar, Address || null)
+      .input('Remark', sql.NVarChar, Remark || null)
+      .query('INSERT INTO [User] (Username, Password, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark) OUTPUT INSERTED.ID VALUES (@Username, @Password, @Department, @RealName, @Avatar, @Email, @Phone, @PositionID, @DepartmentID, @Gender, @Birthday, @Address, @Remark)');
     
     // 新用户默认分配普通用户角色
     const newUserId = result.recordset[0].ID;
@@ -483,7 +554,7 @@ router.post('/add-user', authMiddleware, async (req, res) => {
 // 更新用户信息（管理员功能）
 router.put('/update-user', authMiddleware, async (req, res) => {
   console.log('收到更新用户请求:', req.body);
-  const { Username, Department, RealName, Avatar, Email, Phone } = req.body;
+  const { Username, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
   if (!Username || !Department || !RealName || !Phone) {
     console.log('缺少必填项:', { Username, Department, RealName, Phone });
     return res.json({ success: false, message: '请填写所有必填项' });
@@ -509,7 +580,13 @@ router.put('/update-user', authMiddleware, async (req, res) => {
       .input('Avatar', sql.NVarChar, Avatar)
       .input('Email', sql.NVarChar, Email)
       .input('Phone', sql.NVarChar, Phone)
-      .query('UPDATE [User] SET Department=@Department, RealName=@RealName, Avatar=@Avatar, Email=@Email, Phone=@Phone WHERE Username=@Username');
+      .input('PositionID', sql.Int, PositionID || null)
+      .input('DepartmentID', sql.Int, DepartmentID || null)
+      .input('Gender', sql.NVarChar, Gender || null)
+      .input('Birthday', sql.Date, Birthday || null)
+      .input('Address', sql.NVarChar, Address || null)
+      .input('Remark', sql.NVarChar, Remark || null)
+      .query('UPDATE [User] SET Department=@Department, RealName=@RealName, Avatar=@Avatar, Email=@Email, Phone=@Phone, PositionID=@PositionID, DepartmentID=@DepartmentID, Gender=@Gender, Birthday=@Birthday, Address=@Address, Remark=@Remark WHERE Username=@Username');
     res.json({ success: true, message: '更新成功' });
   } catch (err) {
     console.error('更新用户信息出错:', err);

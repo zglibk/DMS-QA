@@ -50,6 +50,17 @@
 
     <!-- 角色列表表格 -->
     <el-card class="table-card" shadow="never">
+      <template #header>
+        <div class="table-header">
+          <div class="table-title">
+            <el-icon class="title-icon"><UserFilled /></el-icon>
+            <span>角色列表</span>
+          </div>
+          <div class="table-info">
+            <span class="total-count">共 {{ total }} 条记录</span>
+          </div>
+        </div>
+      </template>
       <el-table
         :data="roleList"
         style="width: 100%"
@@ -201,8 +212,8 @@
         :props="{ children: 'children', label: 'Name' }"
         node-key="ID"
         show-checkbox
-        check-strictly
         :default-checked-keys="selectedMenuIds"
+        @check="handleMenuCheck"
         class="menu-tree"
       >
         <template #default="{ data }">
@@ -291,7 +302,8 @@ import {
   Search,
   Key,
   OfficeBuilding,
-  Grid
+  Grid,
+  UserFilled
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 
@@ -327,6 +339,9 @@ const pagination = reactive({
   size: 20,
   total: 0
 })
+
+// 计算属性
+const total = computed(() => pagination.total)
 
 // 表单数据
 const formData = reactive({
@@ -550,15 +565,26 @@ const submitForm = async () => {
 }
 
 // 保存权限
+// 处理菜单选择事件
+const handleMenuCheck = (data, checked) => {
+  // 移除check-strictly后，Element Plus会自动处理父子节点关联
+  // 这里可以添加额外的业务逻辑，比如记录操作日志等
+}
+
 const savePermissions = async () => {
   if (!currentRole.value || !menuTreeRef.value) return
   
   try {
     permissionSubmitting.value = true
+    // 获取完全选中的节点和半选中的节点
     const checkedKeys = menuTreeRef.value.getCheckedKeys()
+    const halfCheckedKeys = menuTreeRef.value.getHalfCheckedKeys()
+    
+    // 合并完全选中和半选中的节点ID
+    const allSelectedKeys = [...checkedKeys, ...halfCheckedKeys]
     
     await axios.post(`/api/roles/${currentRole.value.ID}/menus`, {
-      menuIds: checkedKeys
+      menuIds: allSelectedKeys
     })
     
     ElMessage.success('权限保存成功')
@@ -836,6 +862,41 @@ onMounted(async () => {
 
 .menu-type-tag {
   margin-left: auto;
+}
+
+/* 表格标题样式 */
+.table-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0;
+}
+
+.table-title {
+  display: flex;
+  align-items: center;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.title-icon {
+  margin-right: 8px;
+  color: #409eff;
+  font-size: 18px;
+}
+
+.table-info {
+  display: flex;
+  align-items: center;
+}
+
+.total-count {
+  font-size: 14px;
+  color: #909399;
+  background: #f5f7fa;
+  padding: 4px 12px;
+  border-radius: 12px;
 }
 
 /* Element Plus 组件样式覆盖 */

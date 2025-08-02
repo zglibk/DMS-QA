@@ -1,7 +1,7 @@
 <template>
   <el-container class="admin-layout">
     <!-- 侧边栏 -->
-    <el-aside :width="collapsed ? '64px' : '220px'" class="admin-aside">
+    <el-aside :width="collapsed ? '64px' : '260px'" class="admin-aside">
       <div class="logo-wrap">
         <img :src="siteConfig.logoBase64Img" class="logo-img" />
         <span class="logo-text" v-show="!collapsed">{{ siteConfig.headerTitle }}</span>

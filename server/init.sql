@@ -1058,4 +1058,148 @@ CREATE NONCLUSTERED INDEX [IX_User_DepartmentID] ON [dbo].[User] ([DepartmentID]
 CREATE NONCLUSTERED INDEX [IX_User_PositionID] ON [dbo].[User] ([PositionID]);
 
 PRINT '权限管理系统索引创建完成。';
+
+-- =====================================================
+-- 样品承认书管理表 (SampleApproval)
+-- 功能：管理样品承认书的制作、签收、分发等全流程
+-- 用途：样品管理、质量控制、流程跟踪
+-- =====================================================
+
+-- 如果表已存在则删除
+IF OBJECT_ID('[dbo].[SampleApproval]', 'U') IS NOT NULL
+    DROP TABLE [dbo].[SampleApproval];
+GO
+
+CREATE TABLE [dbo].[SampleApproval] (
+    -- 基础信息字段
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+    [CertificateNo] NVARCHAR(50) NOT NULL UNIQUE,    -- 承认书编号，唯一
+    [CustomerNo] NVARCHAR(50) NOT NULL,              -- 客户编号，必填
+    [WorkOrderNo] NVARCHAR(50) NOT NULL,             -- 工单号，必填
+    [ProductNo] NVARCHAR(50) NOT NULL,               -- 产品编号，必填
+    [ProductName] NVARCHAR(100) NOT NULL,            -- 品名，必填
+    [ProductSpec] NVARCHAR(200) NOT NULL,            -- 产品规格，必填
+    
+    -- 图片文件字段
+    [ProductDrawing] NVARCHAR(500),                  -- 产品图纸文件路径
+    [ColorCardImage] NVARCHAR(500),                  -- 色卡图像文件路径
+    [ColorCardQuantity] INT NOT NULL DEFAULT 1,      -- 色卡数量，默认1
+    
+    -- 制作信息
+    [CreateDate] DATE NOT NULL,                      -- 制作日期，必填
+    [Creator] NVARCHAR(50) NOT NULL,                 -- 制作人，必填
+    [Follower] NVARCHAR(50) NOT NULL,                -- 跟单员，必填
+    
+    -- 签收信息
+    [Receiver] NVARCHAR(50),                         -- 签收人
+    [ReceiveDate] DATE,                              -- 签收日期
+    [ReturnQuantity] INT DEFAULT 0,                  -- 退回数量
+    [Signer] NVARCHAR(50),                           -- 签字人
+    [SignDate] DATE,                                 -- 签字日期
+    [Judgment] NVARCHAR(200),                        -- 判定结果
+    
+    -- 分发信息
+    [DistributionDepartment] NVARCHAR(500),          -- 分发部门（JSON格式存储多个部门）
+    [DistributionQuantity] INT DEFAULT 0,            -- 分发数量
+    
+    -- 状态和备注
+    [SampleStatus] NVARCHAR(20) DEFAULT N'正常使用', -- 样板状态：正常使用、待更新、待作废、已作废
+    [ExpiryDate] DATE,                               -- 到期日期
+    [Remark] NVARCHAR(1000),                         -- 备注信息
+    
+    -- 系统字段
+    [CreatedAt] DATETIME DEFAULT GETDATE(),          -- 记录创建时间
+    [UpdatedAt] DATETIME DEFAULT GETDATE(),          -- 记录更新时间
+    [CreatedBy] NVARCHAR(50),                        -- 创建人
+    [UpdatedBy] NVARCHAR(50),                        -- 更新人
+    [IsDeleted] BIT DEFAULT 0                        -- 软删除标记
+);
+
+-- 创建索引优化查询性能
+CREATE NONCLUSTERED INDEX [IX_SampleApproval_CertificateNo] ON [dbo].[SampleApproval] ([CertificateNo]);
+CREATE NONCLUSTERED INDEX [IX_SampleApproval_CustomerNo] ON [dbo].[SampleApproval] ([CustomerNo]);
+CREATE NONCLUSTERED INDEX [IX_SampleApproval_WorkOrderNo] ON [dbo].[SampleApproval] ([WorkOrderNo]);
+CREATE NONCLUSTERED INDEX [IX_SampleApproval_ProductNo] ON [dbo].[SampleApproval] ([ProductNo]);
+CREATE NONCLUSTERED INDEX [IX_SampleApproval_CreateDate] ON [dbo].[SampleApproval] ([CreateDate] DESC);
+CREATE NONCLUSTERED INDEX [IX_SampleApproval_SampleStatus] ON [dbo].[SampleApproval] ([SampleStatus]);
+CREATE NONCLUSTERED INDEX [IX_SampleApproval_ExpiryDate] ON [dbo].[SampleApproval] ([ExpiryDate] DESC);
+CREATE NONCLUSTERED INDEX [IX_SampleApproval_Creator] ON [dbo].[SampleApproval] ([Creator]);
+CREATE NONCLUSTERED INDEX [IX_SampleApproval_Follower] ON [dbo].[SampleApproval] ([Follower]);
+
+GO
+
+-- =====================================================
+-- 样品承认书统计视图 (SampleApprovalStatistics)
+-- 功能：提供样品承认书数据的统计分析
+-- 用途：报表生成、趋势分析、KPI统计
+-- =====================================================
+
+-- 如果视图已存在则删除
+IF OBJECT_ID('[dbo].[SampleApprovalStatistics]', 'V') IS NOT NULL
+    DROP VIEW [dbo].[SampleApprovalStatistics];
+GO
+
+CREATE VIEW [dbo].[SampleApprovalStatistics] AS
+SELECT 
+    YEAR(CreateDate) as StatYear,
+    MONTH(CreateDate) as StatMonth,
+    COUNT(*) as TotalSampleCount,
+    SUM(ColorCardQuantity) as TotalColorCardQty,
+    SUM(DistributionQuantity) as TotalDistributionQty,
+    AVG(DATEDIFF(DAY, CreateDate, ReceiveDate)) as AvgReceiveDays,
+    COUNT(DISTINCT CustomerNo) as UniqueCustomerCount,
+    COUNT(DISTINCT Creator) as UniqueCreatorCount,
+    COUNT(DISTINCT Follower) as UniqueFollowerCount
+FROM SampleApproval
+WHERE IsDeleted = 0
+GROUP BY YEAR(CreateDate), MONTH(CreateDate);
+
+GO
+
+-- =====================================================
+-- 年度样品承认书汇总视图 (YearlySampleApprovalSummary)
+-- 功能：提供年度样品承认书数据汇总
+-- 用途：年度报告、绩效评估
+-- =====================================================
+
+-- 如果视图已存在则删除
+IF OBJECT_ID('[dbo].[YearlySampleApprovalSummary]', 'V') IS NOT NULL
+    DROP VIEW [dbo].[YearlySampleApprovalSummary];
+GO
+
+CREATE VIEW [dbo].[YearlySampleApprovalSummary] AS
+SELECT 
+    YEAR(CreateDate) as StatYear,
+    COUNT(*) as YearlySampleCount,
+    SUM(ColorCardQuantity) as YearlyColorCardQty,
+    SUM(DistributionQuantity) as YearlyDistributionQty,
+    AVG(DATEDIFF(DAY, CreateDate, ReceiveDate)) as YearlyAvgReceiveDays,
+    COUNT(DISTINCT CustomerNo) as YearlyUniqueCustomerCount
+FROM SampleApproval
+WHERE IsDeleted = 0
+GROUP BY YEAR(CreateDate);
+
+GO
+
+-- 插入样品承认书测试数据
+INSERT INTO [dbo].[SampleApproval] (
+    [CertificateNo], [CustomerNo], [WorkOrderNo], [ProductNo], [ProductName], [ProductSpec],
+    [ProductDrawing], [ColorCardImage], [ColorCardQuantity], [CreateDate], [Creator], [Follower],
+    [Remark], [CreatedBy]
+) VALUES 
+(N'SA2025001', N'C001', N'WO2025001', N'P001', N'产品A', N'规格A', 
+ N'/files/site-images/产品图纸/drawing1-1735891200000-123456789.jpg', 
+ N'/files/site-images/样板图像/colorcard1-1735891200000-987654321.jpg', 
+ 2, '2025-01-01', N'张三', N'李四', N'测试数据1', N'admin'),
+(N'SA2025002', N'C002', N'WO2025002', N'P002', N'产品B', N'规格B', 
+ N'/files/site-images/产品图纸/drawing2-1735891200000-123456790.jpg', 
+ N'/files/site-images/样板图像/colorcard2-1735891200000-987654322.jpg', 
+ 1, '2025-01-02', N'王五', N'赵六', N'测试数据2', N'admin'),
+(N'SA2025003', N'C003', N'WO2025003', N'P003', N'产品C', N'规格C', 
+ N'/files/site-images/产品图纸/drawing3-1735891200000-123456791.jpg', 
+ N'/files/site-images/样板图像/colorcard3-1735891200000-987654323.jpg', 
+ 3, '2025-01-03', N'孙七', N'周八', N'测试数据3', N'admin');
+
+PRINT '样品承认书管理表及相关视图已创建完成。';
 PRINT '用户权限管理系统数据库表结构已完整集成到init.sql中！';
+PRINT '样品管理模块数据库表结构创建完成！';

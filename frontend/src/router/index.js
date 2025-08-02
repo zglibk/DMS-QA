@@ -70,8 +70,27 @@ const routes = [
       { path: 'dashboard', component: Dashboard },
 
       // 供应商管理
+      { path: 'supplier', redirect: '/admin/supplier/list' }, // 重定向到供应商列表
       { path: 'supplier/list', component: SupplierList },
       { path: 'supplier/material-price', component: MaterialPriceList },
+      
+      // 供应商管理子菜单
+      { path: 'supplier/basic-info', component: () => import('../views/admin/supplier/BasicInfo.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/materials', component: () => import('../views/admin/supplier/MaterialSuppliers.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/equipment', component: () => import('../views/admin/supplier/EquipmentSuppliers.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/quality', component: () => import('../views/admin/supplier/QualityAssessment.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/performance', component: () => import('../views/admin/supplier/Performance.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/contracts', component: () => import('../views/admin/supplier/Contracts.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/qualified', component: () => import('../views/admin/supplier/QualifiedSuppliers.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/audit', component: () => import('../views/admin/supplier/SupplierAudit.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/inspection', component: () => import('../views/admin/supplier/InspectionReports.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/annual-audit-plan', component: () => import('../views/admin/supplier/AnnualAuditPlan.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/audit-reports', component: () => import('../views/admin/supplier/AuditReports.vue'), meta: { requiresAuth: true } },
+
+      // 样版管理
+      { path: 'sample', redirect: '/admin/sample/approval' }, // 重定向到样品承认书
+      { path: 'sample/approval', component: () => import('../views/admin/sample/SampleApproval.vue'), meta: { requiresAuth: true } },
+      { path: 'sample/color-card', component: () => import('../views/admin/sample/InternalColorCard.vue'), meta: { requiresAuth: true } },
 
       // 用户管理（旧路径，保持兼容性）
       { path: 'user', redirect: '/admin/user/list' }, // 重定向到用户列表
@@ -95,6 +114,11 @@ const routes = [
       {
         path: 'quality/person',
         component: () => import('../views/admin/PersonManagement.vue'), // 人员管理页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'quality/data-management',
+        component: () => import('../views/admin/DataManagement.vue'), // 质量异常数据导入页面
         meta: { requiresAuth: true }
       },
 
@@ -139,6 +163,16 @@ const routes = [
         component: () => import('../views/admin/PositionManagement.vue'), // 岗位管理页面
         meta: { requiresAuth: true }
       },
+      {
+        path: 'system/config',
+        component: () => import('../views/admin/SystemConfig.vue'), // 系统配置页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'supplier/list',
+        component: () => import('../views/admin/SupplierList.vue'), // 供应商管理页面
+        meta: { requiresAuth: true }
+      },
 
       // 个人资料（管理后台版本）
       { path: 'profile', component: () => import('../views/Profile.vue') },
@@ -155,12 +189,7 @@ const routes = [
         meta: { requiresAuth: true }
       },
 
-      // 数据管理页面
-      {
-        path: 'data-management',
-        component: () => import('../views/admin/DataManagement.vue'),
-        meta: { requiresAuth: true }
-      },
+
 
       // 路径分析页面
       {

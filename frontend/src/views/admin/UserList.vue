@@ -11,13 +11,24 @@
           <p class="page-description">统一管理系统用户信息、角色权限及状态控制</p>
         </div>
         <div class="header-stats">
-          <div class="stat-item">
-            <div class="stat-value">{{ total }}</div>
-            <div class="stat-label">总用户数</div>
+          <div class="stat-item total-users">
+            <div class="stat-icon">
+              <el-icon><UserFilled /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ total }}</div>
+              <div class="stat-label">总用户数</div>
+            </div>
           </div>
-          <div class="stat-item">
-            <div class="stat-value">{{ activeUsers }}</div>
-            <div class="stat-label">活跃用户</div>
+          <div class="stat-item active-users">
+            <div class="stat-icon">
+              <el-icon><CircleCheckFilled /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ activeUsers }}</div>
+              <div class="stat-label">活跃用户</div>
+              <div class="stat-desc">近一周内登录</div>
+            </div>
           </div>
         </div>
       </div>
@@ -171,22 +182,33 @@
           v-if="isColumnVisible('role')"
           prop="Role" 
           label="用户角色" 
-          width="120" 
+          min-width="150" 
           align="center" 
           header-align="center"
         >
           <template #default="scope">
-            <el-tag 
-              :type="scope.row.Role === 'admin' ? 'danger' : 'primary'"
-              size="small"
-              class="role-tag"
-            >
-              <el-icon>
-                <Star v-if="scope.row.Role === 'admin'" />
-                <User v-else />
-              </el-icon>
-              {{ scope.row.RoleNames || '普通用户' }}
-            </el-tag>
+            <div class="role-tags-container">
+              <template v-if="scope.row.RoleNames">
+                <el-tag 
+                  v-for="(roleName, index) in getRoleList(scope.row.RoleNames)"
+                  :key="index"
+                  :type="getRoleTagType(roleName)"
+                  size="small"
+                  class="role-tag"
+                  effect="plain"
+                >
+                  <el-icon>
+                    <Star v-if="roleName === 'admin' || roleName === '管理员'" />
+                    <User v-else />
+                  </el-icon>
+                  {{ roleName }}
+                </el-tag>
+              </template>
+              <el-tag v-else type="info" size="small" class="role-tag" effect="plain">
+                <el-icon><User /></el-icon>
+                普通用户
+              </el-tag>
+            </div>
           </template>
         </el-table-column>
         
@@ -523,6 +545,101 @@
             </el-col>
           </el-row>
         </div>
+
+        <!-- 职位信息区域 -->
+        <div class="form-section">
+          <el-row :gutter="24">
+            <el-col :span="12">
+              <el-form-item label="职位" prop="PositionID">
+                <el-select 
+                  v-model="addUserForm.PositionID" 
+                  placeholder="请选择职位" 
+                  style="width: 100%"
+                  size="large"
+                  clearable
+                >
+                  <el-option 
+                    v-for="position in positions" 
+                    :key="position.ID" 
+                    :label="position.Name" 
+                    :value="position.ID"
+                  >
+                    <div class="position-option">
+                      <el-icon><Briefcase /></el-icon>
+                      <span>{{ position.Name }}</span>
+                    </div>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="性别" prop="Gender">
+                <el-select 
+                  v-model="addUserForm.Gender" 
+                  placeholder="请选择性别" 
+                  style="width: 100%"
+                  size="large"
+                  clearable
+                >
+                  <el-option label="男" value="男">
+                    <div class="gender-option">
+                      <el-icon><Male /></el-icon>
+                      <span>男</span>
+                    </div>
+                  </el-option>
+                  <el-option label="女" value="女">
+                    <div class="gender-option">
+                      <el-icon><Female /></el-icon>
+                      <span>女</span>
+                    </div>
+                  </el-option>
+                </el-select>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+
+        <!-- 个人信息区域 -->
+        <div class="form-section">
+          <el-row :gutter="24">
+            <el-col :span="12">
+              <el-form-item label="生日" prop="Birthday">
+                <el-date-picker
+                  v-model="addUserForm.Birthday"
+                  type="date"
+                  placeholder="请选择生日"
+                  style="width: 100%"
+                  size="large"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="地址" prop="Address">
+                <el-input 
+                  v-model="addUserForm.Address" 
+                  placeholder="请输入地址"
+                  :prefix-icon="Location"
+                  size="large"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          <el-row :gutter="24">
+            <el-col :span="24">
+              <el-form-item label="备注" prop="Remark">
+                <el-input 
+                  v-model="addUserForm.Remark" 
+                  type="textarea"
+                  placeholder="请输入备注信息"
+                  :rows="3"
+                  size="large"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
         
 
       </el-form>
@@ -547,11 +664,12 @@
     <el-dialog 
       v-model="showUserDetail" 
       title="用户详情" 
-      width="500px"
+      width="700px"
       :append-to-body="true"
       :lock-scroll="false"
     >
       <div class="user-detail" v-if="currentUser">
+        <!-- 用户头像和基本信息 -->
         <div class="detail-header">
           <el-avatar :src="currentUser.Avatar" :size="80">
             <el-icon><User /></el-icon>
@@ -561,22 +679,149 @@
             <p>@{{ currentUser.Username }}</p>
           </div>
         </div>
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="用户ID">{{ currentUser.ID || 'N/A' }}</el-descriptions-item>
-          <el-descriptions-item label="用户角色">
-            <el-tag :type="currentUser.Role === 'admin' ? 'danger' : 'primary'">
-              {{ currentUser.RoleNames || '普通用户' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="所属部门">{{ currentUser.Department }}</el-descriptions-item>
-          <el-descriptions-item label="账户状态">
-            <el-tag :type="currentUser.Status === 1 ? 'success' : 'danger'">
-              {{ currentUser.Status === 1 ? '启用' : '禁用' }}
-            </el-tag>
-          </el-descriptions-item>
-          <el-descriptions-item label="联系电话">{{ currentUser.Phone || '未设置' }}</el-descriptions-item>
-          <el-descriptions-item label="邮箱地址">{{ currentUser.Email || '未设置' }}</el-descriptions-item>
-        </el-descriptions>
+        
+        <!-- 用户详细信息表单 -->
+        <el-form 
+          :model="currentUser" 
+          label-width="120px" 
+          class="user-detail-form"
+          label-position="left"
+        >
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="用户ID">
+                <el-input v-model="currentUser.ID" readonly />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="用户名">
+                <el-input v-model="currentUser.Username" readonly />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="真实姓名">
+                <el-input v-model="currentUser.RealName" readonly />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="性别">
+                <el-input :value="currentUser.Gender || '未设置'" readonly />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="生日">
+                <el-input :value="currentUser.Birthday || '未设置'" readonly />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="联系电话">
+                <el-input :value="currentUser.Phone || '未设置'" readonly />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="邮箱地址">
+                <el-input :value="currentUser.Email || '未设置'" readonly />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="所属部门">
+                <el-input :value="currentUser.Department || '未设置'" readonly />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="岗位职务">
+                <el-input :value="currentUser.Position || '未设置'" readonly />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="用户角色">
+                <div class="role-tags-container">
+                  <template v-if="currentUser.RoleNames">
+                    <el-tag 
+                      v-for="(roleName, index) in getRoleList(currentUser.RoleNames)"
+                      :key="index"
+                      :type="getRoleTagType(roleName)"
+                      class="role-tag-detail"
+                      effect="plain"
+                    >
+                      <el-icon>
+                        <Star v-if="roleName === 'admin' || roleName === '管理员'" />
+                        <User v-else />
+                      </el-icon>
+                      {{ roleName }}
+                    </el-tag>
+                  </template>
+                  <el-tag v-else type="info" class="role-tag-detail" effect="plain">
+                    <el-icon><User /></el-icon>
+                    普通用户
+                  </el-tag>
+                </div>
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="账户状态">
+                <el-tag :type="currentUser.Status === 1 ? 'success' : 'danger'">
+                  {{ currentUser.Status === 1 ? '启用' : '禁用' }}
+                </el-tag>
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <!-- 预留空间，保持布局平衡 -->
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="地址">
+                <el-input :value="currentUser.Address || '未设置'" readonly />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="创建时间">
+                <el-input :value="formatDateTime(currentUser.CreatedAt) || '未知'" readonly />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="最后登录">
+                <el-input :value="formatDateTime(currentUser.LastLoginTime) || '从未登录'" readonly />
+              </el-form-item>
+            </el-col>
+          </el-row>
+          
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item label="备注">
+                <el-input 
+                  type="textarea" 
+                  :value="currentUser.Remark || '无备注'" 
+                  readonly 
+                  :rows="3"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </el-form>
       </div>
     </el-dialog>
 
@@ -863,10 +1108,12 @@
 <script setup>
 import { ref, onMounted, watch, computed, nextTick } from 'vue'
 import axios from 'axios'
+import apiService from '@/services/apiService.js'
 import { 
   Edit, Delete, Setting, Search, Plus, Refresh, User, UserFilled, 
   Star, Phone, Message, OfficeBuilding, Grid, View, Lock, Unlock,
-  Select, Download, Close, Check, Key, CaretTop, CaretBottom, Clock, Calendar
+  Select, Download, Close, Check, Key, CaretTop, CaretBottom, Clock, Calendar,
+  Briefcase, Male, Female, Location, CircleCheckFilled
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Cropper } from 'vue-advanced-cropper'
@@ -948,12 +1195,41 @@ const addUserForm = ref({
   RealName: '',
   Avatar: '',
   Email: '',
-  Phone: ''
+  Phone: '',
+  PositionID: '',
+  DepartmentID: '',
+  Gender: '',
+  Birthday: '',
+  Address: '',
+  Remark: ''
 })
 
-// 计算属性
+// 计算属性 - 优化活跃用户判断逻辑
 const activeUsers = computed(() => {
-  return users.value.filter(user => user.Status === 1).length
+  const oneWeekAgo = new Date()
+  oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
+  
+  return users.value.filter(user => {
+    // 用户必须是启用状态
+    if (user.Status !== 1) return false
+    
+    // 如果有最后登录时间，检查是否在一周内
+    if (user.LastLoginTime) {
+      const lastLoginDate = new Date(user.LastLoginTime)
+      return lastLoginDate >= oneWeekAgo
+    }
+    
+    // 如果没有登录记录但是最近创建的用户（3天内），也算活跃
+    if (user.CreatedAt) {
+      const threeDaysAgo = new Date()
+      threeDaysAgo.setDate(threeDaysAgo.getDate() - 3)
+      const createdDate = new Date(user.CreatedAt)
+      return createdDate >= threeDaysAgo
+    }
+    
+    // 其他情况不算活跃用户
+    return false
+  }).length
 })
 
 // 表单验证规则
@@ -1023,6 +1299,14 @@ const addUserRules = {
   Email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
   Phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+  ],
+  Gender: [{ required: false, message: '请选择性别', trigger: 'change' }],
+  Birthday: [{ required: false, message: '请选择生日', trigger: 'change' }],
+  Address: [
+    { max: 200, message: '地址长度不能超过200个字符', trigger: 'blur' }
+  ],
+  Remark: [
+    { max: 500, message: '备注长度不能超过500个字符', trigger: 'blur' }
   ]
 }
 
@@ -1042,7 +1326,13 @@ const resetAddUser = () => {
     RealName: '', 
     Avatar: '', 
     Email: '', 
-    Phone: '' 
+    Phone: '',
+    PositionID: '',
+    DepartmentID: '',
+    Gender: '',
+    Birthday: '',
+    Address: '',
+    Remark: ''
   }
   
   // 清空头像相关临时变量
@@ -1163,6 +1453,11 @@ const submitAddUser = () => {
 }
 
 const departments = ref([])
+const positions = ref([])
+
+/**
+ * 获取部门列表
+ */
 const fetchDepartments = async () => {
   const token = localStorage.getItem('token')
   const res = await axios.get('/api/complaint/options', {
@@ -1172,9 +1467,27 @@ const fetchDepartments = async () => {
     departments.value = res.data.departments
   }
 }
+
+/**
+ * 获取职位列表
+ */
+const fetchPositions = async () => {
+  try {
+    const token = localStorage.getItem('token')
+    const res = await axios.get('/api/positions', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    if (res.data && res.data.success) {
+      positions.value = res.data.data.list || []
+    }
+  } catch (error) {
+    console.error('获取职位列表失败:', error)
+  }
+}
 watch(showAddUser, v => { 
   if (v) {
     fetchDepartments()
+    fetchPositions()
     fetchAllRoles()
   }
 })
@@ -1258,9 +1571,135 @@ const getDepartmentTagType = (department) => {
   return colors[Math.abs(hash) % colors.length]
 }
 
+/**
+ * 将角色名称字符串拆分为角色数组
+ * @param {string} roleNames - 逗号分隔的角色名称字符串
+ * @returns {Array} 角色名称数组
+ */
+const getRoleList = (roleNames) => {
+  if (!roleNames) return []
+  return roleNames.split(',').map(role => role.trim()).filter(role => role)
+}
+
+/**
+ * 根据角色名称获取标签类型（颜色）
+ * @param {string} roleName - 角色名称
+ * @returns {string} Element Plus 标签类型
+ */
+const getRoleTagType = (roleName) => {
+  // 从动态获取的角色列表中查找对应角色
+  const role = availableRoles.value.find(r => r.Name === roleName || r.Code === roleName)
+  
+  // 创建一个全局的角色颜色映射缓存
+  if (!window.roleColorCache) {
+    window.roleColorCache = new Map()
+  }
+  
+  // 如果已经为这个角色分配过颜色，直接返回
+  if (window.roleColorCache.has(roleName)) {
+    return window.roleColorCache.get(roleName)
+  }
+  
+  // 扩展的颜色选项，确保有足够的颜色区分不同角色
+  const allColors = [
+    'primary',   // 蓝色
+    'success',   // 绿色
+    'warning',   // 橙色
+    'danger',    // 红色
+    'info',      // 灰色
+    '',          // 默认色
+  ]
+  
+  let assignedColor = 'primary' // 默认颜色
+  
+  if (role && role.ID) {
+    // 获取已使用的颜色
+    const usedColors = Array.from(window.roleColorCache.values())
+    
+    // 根据角色类型确定优先颜色组
+    const roleCode = role.Code?.toLowerCase() || ''
+    const roleNameLower = role.Name?.toLowerCase() || ''
+    
+    let preferredColors = []
+    
+    // 管理员类角色优先使用红色系
+    if (roleCode.includes('admin') || roleNameLower.includes('管理员') || roleNameLower.includes('超级') || roleNameLower.includes('系统')) {
+      preferredColors = ['danger', 'warning']
+    }
+    // 审核类角色优先使用绿色系
+    else if (roleNameLower.includes('审核') || roleNameLower.includes('审批') || roleCode.includes('audit') || roleCode.includes('review')) {
+      preferredColors = ['success', 'primary']
+    }
+    // 部门管理类角色优先使用橙色系
+    else if (roleNameLower.includes('部门') || roleNameLower.includes('质量') || roleCode.includes('manager')) {
+      preferredColors = ['warning', 'info']
+    }
+    // 其他角色使用所有颜色
+    else {
+      preferredColors = allColors
+    }
+    
+    // 从优先颜色组中找到第一个未使用的颜色
+    for (const color of preferredColors) {
+      if (!usedColors.includes(color)) {
+        assignedColor = color
+        break
+      }
+    }
+    
+    // 如果优先颜色都被使用了，从所有颜色中找未使用的
+    if (usedColors.includes(assignedColor)) {
+      for (const color of allColors) {
+        if (!usedColors.includes(color)) {
+          assignedColor = color
+          break
+        }
+      }
+    }
+    
+    // 如果所有颜色都被使用了，使用角色ID进行循环分配
+    if (usedColors.includes(assignedColor)) {
+      const colorIndex = role.ID % allColors.length
+      assignedColor = allColors[colorIndex]
+    }
+  }
+  else {
+    // 硬编码的备用映射（兼容性保证）
+    const fallbackColors = {
+      'admin': 'danger',
+      '管理员': 'danger',
+      '超级管理员': 'warning',
+      '系统管理员': 'danger',
+      '部门管理员': 'warning',
+      '质量管理员': 'info',
+      '审核员': 'success',
+      '操作员': 'primary',
+      '普通用户': 'info',
+      '用户': ''
+    }
+    
+    if (fallbackColors[roleName]) {
+      assignedColor = fallbackColors[roleName]
+    } else {
+      // 根据角色名称的哈希值分配颜色
+      let hash = 0
+      for (let i = 0; i < roleName.length; i++) {
+        hash = roleName.charCodeAt(i) + ((hash << 5) - hash)
+      }
+      assignedColor = allColors[Math.abs(hash) % allColors.length] || 'primary'
+    }
+  }
+  
+  // 缓存颜色分配结果
+  window.roleColorCache.set(roleName, assignedColor)
+  
+  return assignedColor
+}
+
 onMounted(() => {
   loadColumnSettings()
   fetchUsers()
+  fetchAllRoles() // 获取角色数据用于动态颜色分配
 })
 
 // 用户操作方法
@@ -1268,30 +1707,75 @@ onMounted(() => {
  * 编辑用户
  * @param {Object} row - 用户数据
  */
-const editUser = (row) => {
-  isEdit.value = true
-  addUserForm.value = { ...row, Password: '', ConfirmPassword: '' }
-  currentUser.value = row  // 设置当前操作用户，用于重置密码功能
-  
-  // 保存原始用户数据，用于比较头像是否有变化
-  originalUserData.value = { ...row }
-  
-  // 清空头像相关临时变量，但保留原有头像数据用于显示
-  avatarBase64.value = ''
-  avatarPreviewUrl.value = ''
-  cropperImg.value = ''
-  
-  // 如果编辑的是当前登录用户，优先使用store中的头像数据
-  if (currentLoginUser.value && 
-      (row.Username === currentLoginUser.value.username || row.ID === currentLoginUser.value.id)) {
-    // 当前登录用户，优先使用store中的头像数据
-    addUserForm.value.Avatar = currentLoginUser.value.Avatar || row.Avatar || ''
-  } else {
-    // 其他用户，使用数据库中的头像数据
-    addUserForm.value.Avatar = row.Avatar || ''
+/**
+ * 编辑用户信息
+ * 通过API获取最新的用户数据并填充到编辑表单中
+ * @param {Object} row - 表格行数据（包含用户ID）
+ */
+const editUser = async (row) => {
+  try {
+    // 显示加载状态
+    loading.value = true
+    
+    console.log('🔍 开始编辑用户:', row)
+    
+    // 使用apiService调用API获取最新的用户详细信息
+    const apiInstance = await apiService.getInstance()
+    const res = await apiInstance.get(`/api/auth/user/${row.ID}`)
+    
+    console.log('📡 API响应:', res.data)
+    
+    if (res.data && res.data.success) {
+      const latestUserData = res.data.data
+      
+      console.log('✅ 获取用户数据成功:', latestUserData)
+      
+      // 设置编辑模式
+      isEdit.value = true
+      
+      // 使用最新的用户数据填充表单，清空密码字段
+      addUserForm.value = { 
+        ...latestUserData, 
+        Password: '', 
+        ConfirmPassword: '' 
+      }
+      
+      // 设置当前操作用户，用于重置密码功能
+      currentUser.value = latestUserData
+      
+      // 保存原始用户数据，用于比较头像是否有变化
+      originalUserData.value = { ...latestUserData }
+      
+      // 清空头像相关临时变量，但保留原有头像数据用于显示
+      avatarBase64.value = ''
+      avatarPreviewUrl.value = ''
+      cropperImg.value = ''
+      
+      // 如果编辑的是当前登录用户，优先使用store中的头像数据
+      if (currentLoginUser.value && 
+          (latestUserData.Username === currentLoginUser.value.username || 
+           latestUserData.ID === currentLoginUser.value.id)) {
+        // 当前登录用户，优先使用store中的头像数据
+        addUserForm.value.Avatar = currentLoginUser.value.Avatar || latestUserData.Avatar || ''
+      } else {
+        // 其他用户，使用数据库中的最新头像数据
+        addUserForm.value.Avatar = latestUserData.Avatar || ''
+      }
+      
+      // 显示编辑对话框
+      showAddUser.value = true
+      
+    } else {
+      console.error('❌ API返回错误:', res.data)
+      ElMessage.error(res.data.message || '获取用户信息失败')
+    }
+    
+  } catch (error) {
+    console.error('💥 获取用户详细信息失败:', error)
+    ElMessage.error('获取用户信息失败，请重试')
+  } finally {
+    loading.value = false
   }
-  
-  showAddUser.value = true
 }
 
 const deleteUser = async (row) => {
@@ -2318,35 +2802,101 @@ const getUserIdTagStyle = (userId) => {
 
 .header-stats {
   display: flex;
-  gap: 16px;
+  gap: 20px;
 }
 
 .stat-item {
-  text-align: center;
+  display: flex;
+  align-items: center;
   background: white;
-  padding: 16px 20px;
-  border-radius: 8px;
+  padding: 20px 24px;
+  border-radius: 12px;
   border: 1px solid #e4e7ed;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.3s ease;
+  min-width: 180px;
+  position: relative;
+  overflow: hidden;
+}
+
+.stat-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #409eff, #67c23a);
   transition: all 0.3s ease;
 }
 
+.stat-item.total-users::before {
+  background: linear-gradient(90deg, #409eff, #79bbff);
+}
+
+.stat-item.active-users::before {
+  background: linear-gradient(90deg, #67c23a, #95d475);
+}
+
 .stat-item:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  transform: translateY(-3px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
+}
+
+.stat-item:hover::before {
+  height: 6px;
+}
+
+.stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  margin-right: 16px;
+  font-size: 24px;
+  transition: all 0.3s ease;
+}
+
+.total-users .stat-icon {
+  background: linear-gradient(135deg, #409eff, #79bbff);
+  color: white;
+}
+
+.active-users .stat-icon {
+  background: linear-gradient(135deg, #67c23a, #95d475);
+  color: white;
+}
+
+.stat-item:hover .stat-icon {
+  transform: scale(1.1);
+}
+
+.stat-content {
+  flex: 1;
+  text-align: left;
 }
 
 .stat-value {
-  font-size: 24px;
+  font-size: 28px;
   font-weight: 700;
-  margin-bottom: 6px;
-  color: #409eff;
+  margin-bottom: 4px;
+  color: #303133;
+  line-height: 1;
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 14px;
   color: #606266;
-  font-weight: 500;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.stat-desc {
+  font-size: 12px;
+  color: #909399;
+  font-weight: 400;
 }
 
 /* 工具栏样式 */
@@ -2565,6 +3115,16 @@ const getUserIdTagStyle = (userId) => {
   gap: 6px;
   font-weight: 600;
   padding: 6px 12px;
+  margin: 2px;
+}
+
+.role-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
 }
 
 .contact-info {
@@ -2759,7 +3319,7 @@ const getUserIdTagStyle = (userId) => {
 
 /* 表单分区样式 - 简洁版 */
 .form-section {
-  margin-bottom: 24px;
+  margin-bottom: 10px;
 }
 
 .form-section:last-child {
@@ -2790,36 +3350,92 @@ const getUserIdTagStyle = (userId) => {
 }
 
 
-
-
-
 /* 用户详情样式 */
 .user-detail {
-  padding: 16px;
+  padding: 0;
 }
 
-.detail-header {
+.user-detail .detail-header {
   display: flex;
   align-items: center;
   gap: 16px;
-  margin-bottom: 24px;
   padding: 20px;
-  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  background: #67C23A;
   border-radius: 12px;
+  margin-bottom: 24px;
+  color: white;
 }
 
-.user-basic h3 {
-  margin: 0 0 8px 0;
+.user-detail .user-basic h3 {
+  margin: 0 0 4px 0;
   font-size: 20px;
   font-weight: 600;
-  color: #303133;
 }
 
-.user-basic p {
+.user-detail .user-basic p {
   margin: 0;
-  color: #909399;
+  opacity: 0.9;
   font-size: 14px;
 }
+
+.user-detail-form {
+  background: #fafafa;
+  padding: 24px;
+  border-radius: 12px;
+  border: 1px solid #e4e7ed;
+}
+
+.user-detail-form .el-form-item {
+  margin-bottom: 12px;
+}
+
+.user-detail-form .el-form-item__label {
+  font-weight: 600;
+  color: #606266;
+}
+
+.user-detail-form .el-input__wrapper {
+  background-color: #ffffff;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+}
+
+.user-detail-form .el-input.is-disabled .el-input__wrapper {
+  background-color: #f5f7fa;
+  border-color: #e4e7ed;
+  color: #606266;
+}
+
+.user-detail-form .el-textarea.is-disabled .el-textarea__inner {
+  background-color: #f5f7fa;
+  border-color: #e4e7ed;
+  color: #606266;
+}
+
+.user-detail-form .el-tag {
+  font-weight: 500;
+  border-radius: 6px;
+  padding: 4px 12px;
+}
+
+.user-detail-form .role-tag-detail {
+  max-width: 100%;
+  word-break: break-all;
+  white-space: normal;
+  line-height: 1.4;
+  padding: 6px 12px;
+  display: inline-block;
+  margin-right: 8px;
+  margin-bottom: 4px;
+}
+
+.role-tags-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+/* 移除重复的样式定义，使用上面更好的样式 */
 
 :deep(.el-table) {
   border-radius: 8px;
@@ -2855,10 +3471,8 @@ const getUserIdTagStyle = (userId) => {
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
 }
 
-
-
 :deep(.el-input) {
-  border-radius: 8px;
+  border-radius: 5px;
 }
 
 :deep(.el-input__wrapper) {
@@ -2908,7 +3522,7 @@ const getUserIdTagStyle = (userId) => {
 .user-dialog :deep(.el-dialog__header) {
   background: linear-gradient(135deg, #409eff 0%, #667eea 100%);
   color: white;
-  padding: 24px 32px;
+  padding: 20px 32px;
   border-bottom: none;
 }
 
@@ -3052,7 +3666,7 @@ const getUserIdTagStyle = (userId) => {
 }
 
 .user-form :deep(.el-form-item) {
-  margin-bottom: 24px;
+  margin-bottom: 8px;
 }
 
 .user-form :deep(.el-form-item__label) {
@@ -3065,34 +3679,42 @@ const getUserIdTagStyle = (userId) => {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  height: 40px;
+  height: 28px;
 }
 
 .user-form :deep(.el-input__wrapper) {
-  border-radius: 8px;
+  border-radius: 5px;
   transition: all 0.3s ease;
-  min-height: 40px;
+  min-height: 28px;
 }
 
 .user-form :deep(.el-input__wrapper:hover) {
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+  box-shadow: 0 2px 5px rgba(64, 158, 255, 0.1);
 }
 
 .user-form :deep(.el-select .el-input__wrapper) {
-  border-radius: 8px;
-  min-height: 40px;
+  border-radius: 5px;
+  min-height: 28px;
 }
 
 .user-form :deep(.el-input) {
-  height: 40px;
+  height: 28px;
 }
 
 .user-form :deep(.el-select) {
-  height: 40px;
+  height: 28px;
 }
 
 .user-form :deep(.el-row) {
-  margin-bottom: 8px;
+  margin-bottom: 4px;
+}
+
+.user-form :deep(.el-date-editor) {
+  height: 28px;
+}
+
+.user-form :deep(.el-date-editor .el-input__wrapper) {
+  min-height: 28px;
 }
 
 /* 对话框分割线样式 */
@@ -3328,8 +3950,7 @@ const getUserIdTagStyle = (userId) => {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
-  }
-  
+  } 
 }
 
 /* 列设置对话框样式 */
@@ -3478,7 +4099,7 @@ const getUserIdTagStyle = (userId) => {
   .modern-dialog {
     width: 95%;
     margin: 0 auto;
-    border-radius: 16px;
+    border-radius: 10px;
   }
   
   .dialog-header {
@@ -3490,7 +4111,7 @@ const getUserIdTagStyle = (userId) => {
   }
   
   .dialog-body {
-    padding: 20px;
+    padding: 30px;
   }
   
   .dialog-footer {
@@ -3506,8 +4127,6 @@ const getUserIdTagStyle = (userId) => {
   .user-form {
     padding: 16px;
   }
-  
-
   
   .avatar {
     width: 100px;
@@ -3786,9 +4405,15 @@ const getUserIdTagStyle = (userId) => {
 
 /* 头像预览样式 */
 .avatar-preview-section {
-  margin-bottom: 20px;
-  padding-bottom: 20px;
+  margin-bottom: 8px;
+  padding-bottom: 8px;
   border-bottom: 1px solid #ebeef5;
+}
+
+/* 减小头像上传区域尺寸 */
+.avatar-preview-section :deep(.upload) {
+  width: 100px !important;
+  height: 100px !important;
 }
 
 .avatar-preview-container {

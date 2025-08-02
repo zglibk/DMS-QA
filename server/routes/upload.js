@@ -24,7 +24,24 @@ if (!fs.existsSync(attachmentDir)) {
 // 配置multer存储 - 网站图片
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, siteImagesDir);
+    // 根据文件类型确定存储目录
+    const fileType = req.body.fileType || req.body.type || 'image';
+    let targetDir = siteImagesDir;
+    
+    if (fileType === 'productDrawing' || fileType === 'drawing') {
+      // 产品图纸存储到产品图纸目录
+      targetDir = path.join(siteImagesDir, '产品图纸');
+    } else if (fileType === 'colorCard' || fileType === 'sample') {
+      // 样板图像存储到样板图像目录
+      targetDir = path.join(siteImagesDir, '样板图像');
+    }
+    
+    // 确保目标目录存在
+    if (!fs.existsSync(targetDir)) {
+      fs.mkdirSync(targetDir, { recursive: true });
+    }
+    
+    cb(null, targetDir);
   },
   filename: function (req, file, cb) {
     // 生成唯一文件名
@@ -191,6 +208,59 @@ const customPathAttachmentUpload = multer({
 });
 
 // 网站图片上传接口 - 转换为BASE64存储
+// 样品图片上传接口
+router.post('/', upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: '没有上传文件'
+      });
+    }
+
+    // 根据文件类型构建访问URL
+    const fileType = req.body.fileType || req.body.type || 'image';
+    let subDir = '';
+    
+    if (fileType === 'productDrawing' || fileType === 'drawing') {
+      subDir = '/产品图纸';
+    } else if (fileType === 'colorCard' || fileType === 'sample') {
+      subDir = '/样板图像';
+    }
+    
+    const fileUrl = `/files/site-images${subDir}/${req.file.filename}`;
+
+    console.log('样品图片上传成功:', {
+      originalName: req.file.originalname,
+      filename: req.file.filename,
+      size: req.file.size,
+      path: req.file.path,
+      url: fileUrl,
+      fileType: fileType
+    });
+
+    res.json({
+      success: true,
+      message: '图片上传成功',
+      url: fileUrl,
+      data: {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        path: req.file.path,
+        fileType: fileType
+      }
+    });
+
+  } catch (error) {
+    console.error('样品图片上传失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '图片上传失败: ' + error.message
+    });
+  }
+});
+
 router.post('/site-image', upload.single('file'), (req, res) => {
   try {
     if (!req.file) {

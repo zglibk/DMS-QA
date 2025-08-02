@@ -95,9 +95,13 @@ class SmartApiDetector {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), timeout);
 
+      console.log(`🔍 测试API连接: ${url}`);
       this.notifier.debug(`测试API连接: ${url}`);
 
-      const response = await fetch(`${url}/api/test-connection`, {
+      const testUrl = `${url}/api/test-connection`;
+      console.log(`📡 完整请求URL: ${testUrl}`);
+
+      const response = await fetch(testUrl, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -110,8 +114,11 @@ class SmartApiDetector {
       clearTimeout(timeoutId);
       const responseTime = Date.now() - startTime;
 
+      console.log(`📊 响应状态: ${response.status}, 响应时间: ${responseTime}ms`);
+
       if (response.ok) {
         const data = await response.json();
+        console.log(`✅ API连接成功: ${url} (${responseTime}ms)`, data);
         this.notifier.debug(`API连接成功: ${url} (${responseTime}ms)`);
 
         return {
@@ -122,6 +129,7 @@ class SmartApiDetector {
           timestamp: Date.now()
         };
       } else {
+        console.error(`❌ API连接失败: ${url} - HTTP ${response.status}`);
         this.notifier.debug(`API连接失败: ${url} - HTTP ${response.status}`);
         return {
           success: false,
@@ -133,6 +141,7 @@ class SmartApiDetector {
     } catch (error) {
       const responseTime = Date.now() - startTime;
       const errorMsg = error.name === 'AbortError' ? 'Timeout' : error.message;
+      console.error(`💥 API连接异常: ${url} - ${errorMsg} (${responseTime}ms)`, error);
       this.notifier.debug(`API连接异常: ${url} - ${errorMsg} (${responseTime}ms)`);
 
       return {

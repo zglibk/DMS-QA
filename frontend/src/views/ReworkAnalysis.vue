@@ -884,7 +884,7 @@ const getTrendIcon = (trend) => {
 }
 
 .card-value {
-  font-size: 24px;
+  font-size: 36px;
   font-weight: bold;
   color: #303133;
   margin-bottom: 5px;

@@ -32,6 +32,82 @@ export const breadcrumbConfig = {
     icon: 'Money'
   },
 
+  // 供应商基础信息
+  '/admin/supplier/basic-info': {
+    title: '供应商基础信息',
+    icon: 'Document'
+  },
+
+  // 原材料供应商
+  '/admin/supplier/materials': {
+    title: '原材料供应商',
+    icon: 'Box'
+  },
+
+  // 仪器供应商
+  '/admin/supplier/equipment': {
+    title: '仪器供应商',
+    icon: 'Tools'
+  },
+
+  // 供应商质量评估
+  '/admin/supplier/quality': {
+    title: '供应商质量评估',
+    icon: 'Medal'
+  },
+
+  // 供应商绩效管理
+  '/admin/supplier/performance': {
+    title: '供应商绩效管理',
+    icon: 'TrendCharts'
+  },
+
+  // 供应商合同管理
+  '/admin/supplier/contracts': {
+    title: '供应商合同管理',
+    icon: 'Files'
+  },
+
+  // 合格供应商清单
+  '/admin/supplier/qualified': {
+    title: '合格供应商清单',
+    icon: 'CircleCheck'
+  },
+
+  // 供应商审核
+  '/admin/supplier/audit': {
+    title: '供应商审核',
+    icon: 'View'
+  },
+
+  // 出厂检验报告
+  '/admin/supplier/inspection-reports': {
+    title: '出厂检验报告',
+    icon: 'Document'
+  },
+  '/admin/supplier/annual-audit-plan': {
+    title: '年度审核计划',
+    icon: 'Calendar'
+  },
+  '/admin/supplier/audit-reports': {
+    title: '审核报告管理',
+    icon: 'Files'
+  },
+
+  // 样版管理
+  '/admin/sample': {
+    title: '样版管理',
+    icon: 'Document'
+  },
+  '/admin/sample/approval': {
+    title: '样品承认书',
+    icon: 'Document'
+  },
+  '/admin/sample/color-card': {
+    title: '内部色卡',
+    icon: 'Picture'
+  },
+
   // 用户管理
   '/admin/user': {
     title: '用户管理',
@@ -152,6 +228,12 @@ export const breadcrumbConfig = {
     icon: 'DataAnalysis'
   },
 
+  // 质量异常数据导入
+  '/admin/quality/data-management': {
+    title: '质量异常数据导入',
+    icon: 'Upload'
+  },
+
   // 质量报告
   '/admin/quality/reports': {
     title: '质量报告',
@@ -200,7 +282,13 @@ export const breadcrumbConfig = {
     icon: 'Tools'
   },
 
-  // 生产管理 - 物料单价
+  // 质量成本损失
+  '/admin/copq': {
+    title: '质量成本损失',
+    icon: 'Money'
+  },
+
+  // 质量成本损失 - 物料单价
   '/admin/copq/material-price': {
     title: '物料单价',
     icon: 'Money'
@@ -239,6 +327,18 @@ export const breadcrumbConfig = {
   // 系统管理 - 岗位管理
   '/admin/system/position': {
     title: '岗位管理',
+    icon: 'Briefcase'
+  },
+
+  // 系统配置
+  '/admin/system/config': {
+    title: '系统配置',
+    icon: 'Setting'
+  },
+
+  // 供应商管理
+  '/admin/supplier/list': {
+    title: '供应商管理',
     icon: 'Briefcase'
   }
 }
@@ -328,6 +428,7 @@ function generateDefaultTitle(segment) {
   const titleMap = {
     'dashboard': '仪表盘',
     'supplier': '供应商管理',
+    'sample': '样板管理',
     'user': '用户管理',
     'person': '人员管理',
     'permission': '权限管理',

@@ -1,94 +1,131 @@
-# DMS-QA Multi-Repository Push Script (PowerShell)
-# Push to both Gitee and GitHub repositories
+# DMS-QA Auto Push Script
+# Function: Automatically add, commit and push code to all remote repositories
+# Author: DMS-QA Team
+# Date: 2025-01-15
 
-param(
-    [string]$Branch = "master",
-    [switch]$Force = $false
-)
+# Set error handling
+$ErrorActionPreference = "Stop"
 
-Write-Host "========================================" -ForegroundColor Green
-Write-Host "DMS-QA Multi-Repository Push Script" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Green
-
-Write-Host "`nCurrent branch: $Branch" -ForegroundColor Cyan
-
-# Check repository status
-Write-Host "`nChecking repository status..." -ForegroundColor Yellow
-$status = git status --porcelain
-if ($status) {
-    Write-Host "Uncommitted changes detected:" -ForegroundColor Yellow
-    git status
-    Write-Host ""
+# Color output function
+function Write-ColorOutput {
+    param(
+        [string]$Message,
+        [string]$Color = "White"
+    )
+    Write-Host $Message -ForegroundColor $Color
 }
 
-# Check current branch
-$currentBranch = git branch --show-current
-if ($currentBranch -ne $Branch) {
-    Write-Host "Warning: Current branch ($currentBranch) differs from target branch ($Branch)" -ForegroundColor Yellow
-}
-
-# Confirmation
-if (-not $Force) {
-    $confirm = Read-Host "Push branch '$Branch' to both Gitee and GitHub? (y/N)"
-    if ($confirm -ne "y" -and $confirm -ne "Y") {
-        Write-Host "Operation cancelled." -ForegroundColor Yellow
-        exit 0
-    }
-}
-
-Write-Host "`n========================================" -ForegroundColor Green
-Write-Host "Pushing to all remote repositories..." -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Green
-
-try {
-    # Check remote configuration
-    Write-Host "Checking remote configuration..." -ForegroundColor Yellow
-    $remotes = git remote -v
-    Write-Host $remotes -ForegroundColor Gray
-    
-    # Push to origin (should push to both repositories if configured correctly)
-    Write-Host "`nPushing to origin (both Gitee and GitHub)..." -ForegroundColor Yellow
-    git push origin $Branch
-    
-    if ($LASTEXITCODE -eq 0) {
-        Write-Host "[SUCCESS] Push completed successfully!" -ForegroundColor Green
+# Check Git status function
+function Check-GitStatus {
+    Write-ColorOutput "Checking Git status..." "Yellow"
+    $status = git status --porcelain
+    if ($status) {
+        Write-ColorOutput "Found uncommitted changes:" "Cyan"
+        git status --short
+        return $true
     } else {
-        throw "Git push failed with exit code $LASTEXITCODE"
+        Write-ColorOutput "Working directory clean, no uncommitted changes." "Green"
+        return $false
     }
+}
+
+# Add all changes function
+function Add-AllChanges {
+    Write-ColorOutput "Adding all changes to staging area..." "Yellow"
+    git add .
+    if ($LASTEXITCODE -eq 0) {
+        Write-ColorOutput "All changes added to staging area" "Green"
+    } else {
+        Write-ColorOutput "Failed to add changes" "Red"
+        exit 1
+    }
+}
+
+# Commit changes function
+function Commit-Changes {
+    param([string]$CommitMessage)
     
-    # Optional: Push tags
-    $pushTags = Read-Host "`nPush tags as well? (y/N)"
-    if ($pushTags -eq "y" -or $pushTags -eq "Y") {
-        Write-Host "Pushing tags..." -ForegroundColor Yellow
-        git push origin --tags
+    Write-ColorOutput "Committing changes..." "Yellow"
+    git commit -m $CommitMessage
+    if ($LASTEXITCODE -eq 0) {
+        Write-ColorOutput "Changes committed successfully" "Green"
+    } else {
+        Write-ColorOutput "Commit failed" "Red"
+        exit 1
+    }
+}
+
+# Push to remote repositories function
+function Push-ToRemotes {
+    Write-ColorOutput "Getting remote repository configuration..." "Yellow"
+    $remotes = git remote -v
+    Write-ColorOutput "Current remote repository configuration:" "Cyan"
+    $remotes
+    
+    Write-ColorOutput "`nStarting push to all remote repositories..." "Yellow"
+    
+    # Push to all remote repositories
+    $remoteNames = git remote
+    foreach ($remote in $remoteNames) {
+        Write-ColorOutput "Pushing to $remote..." "Yellow"
+        git push $remote master
         if ($LASTEXITCODE -eq 0) {
-            Write-Host "[SUCCESS] Tags pushed successfully!" -ForegroundColor Green
+            Write-ColorOutput "Successfully pushed to $remote" "Green"
         } else {
-            Write-Host "[WARNING] Failed to push tags" -ForegroundColor Yellow
+            Write-ColorOutput "Failed to push to $remote" "Red"
         }
     }
-    
-} catch {
-    Write-Host "[ERROR] Push failed: $($_.Exception.Message)" -ForegroundColor Red
-    Write-Host "`nTroubleshooting tips:" -ForegroundColor Yellow
-    Write-Host "1. Check your internet connection" -ForegroundColor White
-    Write-Host "2. Verify GitHub repository exists and is accessible" -ForegroundColor White
-    Write-Host "3. Check authentication credentials (GitHub token/SSH key)" -ForegroundColor White
-    Write-Host "4. Ensure branch exists on remote repositories" -ForegroundColor White
-    Write-Host "5. Verify remote URLs are configured correctly:" -ForegroundColor White
-    Write-Host "   git remote -v" -ForegroundColor Gray
-    exit 1
 }
 
-Write-Host "`n========================================" -ForegroundColor Green
-Write-Host "Push Summary" -ForegroundColor Green
-Write-Host "========================================" -ForegroundColor Green
-Write-Host "Branch: $Branch" -ForegroundColor Cyan
-Write-Host "Status: SUCCESS" -ForegroundColor Green
-Write-Host "Repositories updated:" -ForegroundColor Cyan
-Write-Host "  - Gitee: https://gitee.com/lbk168/dms-qa" -ForegroundColor White
-Write-Host "  - GitHub: https://github.com/YOUR_USERNAME/dms-qa" -ForegroundColor White
-Write-Host "========================================" -ForegroundColor Green
+# Main function
+function Main {
+    Write-ColorOutput "========================================" "Magenta"
+    Write-ColorOutput "    DMS-QA Auto Push Script v2.0" "Magenta"
+    Write-ColorOutput "========================================" "Magenta"
+    
+    try {
+        # Check if in Git repository
+        if (!(Test-Path ".git")) {
+            Write-ColorOutput "Current directory is not a Git repository" "Red"
+            exit 1
+        }
+        
+        # Check Git status
+        $hasChanges = Check-GitStatus
+        
+        if ($hasChanges) {
+            # Get commit message
+            $defaultMessage = "Update project files - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
+            Write-ColorOutput "`nPlease enter commit message (press Enter for default):" "Yellow"
+            Write-ColorOutput "Default message: $defaultMessage" "Gray"
+            $commitMessage = Read-Host "Commit message"
+            
+            if ([string]::IsNullOrWhiteSpace($commitMessage)) {
+                $commitMessage = $defaultMessage
+            }
+            
+            # Add all changes
+            Add-AllChanges
+            
+            # Commit changes
+            Commit-Changes $commitMessage
+        }
+        
+        # Push to remote repositories
+        Push-ToRemotes
+        
+        Write-ColorOutput "`n========================================" "Magenta"
+        Write-ColorOutput "Push operation completed!" "Green"
+        Write-ColorOutput "========================================" "Magenta"
+        
+    } catch {
+        Write-ColorOutput "Script execution error: $($_.Exception.Message)" "Red"
+        exit 1
+    }
+    
+    Write-ColorOutput "`nPress any key to exit..." "Gray"
+    $null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
+}
 
-Write-Host "`nPress any key to continue..." -ForegroundColor Gray
-Read-Host
+# Execute main function
+Main

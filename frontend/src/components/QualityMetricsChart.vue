@@ -859,7 +859,7 @@ onMounted(async () => {
 }
 
 .card-value {
-  font-size: 28px;
+  font-size: 36px;
   font-weight: 700;
   margin-bottom: 2px;
   transition: all 0.3s ease;

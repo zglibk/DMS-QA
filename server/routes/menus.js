@@ -686,6 +686,52 @@ function getDefaultMenus() {
     },
     {
       ID: 5,
+      Name: '质量管理',
+      Code: 'quality',
+      Path: '/admin/quality',
+      Icon: 'DocumentChecked',
+      Type: 'menu',
+      children: [
+        {
+          ID: 51,
+          Name: '投诉管理',
+          Code: 'complaint-management',
+          Path: '/admin/quality/complaint',
+          Icon: 'Warning',
+          Type: 'menu',
+          children: []
+        },
+        {
+          ID: 52,
+          Name: '返工管理',
+          Code: 'quality-rework-management',
+          Path: '/admin/quality/rework',
+          Icon: 'Refresh',
+          Type: 'menu',
+          children: []
+        },
+        {
+          ID: 53,
+          Name: '人员管理',
+          Code: 'quality-person-management',
+          Path: '/admin/quality/person',
+          Icon: 'Avatar',
+          Type: 'menu',
+          children: []
+        },
+        {
+          ID: 54,
+          Name: '质量异常数据导入',
+          Code: 'data-management',
+          Path: '/admin/quality/data-management',
+          Icon: 'Upload',
+          Type: 'menu',
+          children: []
+        }
+      ]
+    },
+    {
+      ID: 6,
       Name: '权限管理',
       Code: 'permission',
       Path: '/admin/permission',
@@ -693,7 +739,7 @@ function getDefaultMenus() {
       Type: 'menu',
       children: [
         {
-          ID: 51,
+          ID: 61,
           Name: '部门管理',
           Code: 'department-management',
           Path: '/admin/department-management',
@@ -702,7 +748,7 @@ function getDefaultMenus() {
           children: []
         },
         {
-          ID: 52,
+          ID: 62,
           Name: '岗位管理',
           Code: 'position-management',
           Path: '/admin/position-management',
@@ -711,7 +757,7 @@ function getDefaultMenus() {
           children: []
         },
         {
-          ID: 53,
+          ID: 63,
           Name: '角色管理',
           Code: 'role-management',
           Path: '/admin/role-management',
@@ -720,7 +766,7 @@ function getDefaultMenus() {
           children: []
         },
         {
-          ID: 54,
+          ID: 64,
           Name: '菜单管理',
           Code: 'menu-management',
           Path: '/admin/menu-management',
@@ -731,7 +777,7 @@ function getDefaultMenus() {
       ]
     },
     {
-      ID: 6,
+      ID: 7,
       Name: '设置',
       Code: 'settings',
       Path: '/admin/settings',
@@ -739,16 +785,7 @@ function getDefaultMenus() {
       Type: 'menu',
       children: [
         {
-          ID: 61,
-          Name: '数据管理',
-          Code: 'data-management',
-          Path: '/admin/data-management',
-          Icon: 'Upload',
-          Type: 'menu',
-          children: []
-        },
-        {
-          ID: 62,
+          ID: 71,
           Name: '系统配置',
           Code: 'system-config',
           Path: '/admin/system-config',
@@ -757,7 +794,7 @@ function getDefaultMenus() {
           children: []
         },
         {
-          ID: 63,
+          ID: 72,
           Name: '主页卡片配置',
           Code: 'home-card-config',
           Path: '/admin/home-card-config',

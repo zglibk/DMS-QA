@@ -1164,7 +1164,7 @@ onBeforeUnmount(() => {
 }
 
 .stat-card-value {
-  font-size: 32px;
+  font-size: 36px;
   font-weight: bold;
   color: #303133;
   margin-bottom: 8px;
@@ -1274,7 +1274,7 @@ onBeforeUnmount(() => {
 }
 
 .quality-card-value {
-  font-size: 28px;
+  font-size: 36px;
   font-weight: bold;
   color: #303133;
   margin-bottom: 8px;
