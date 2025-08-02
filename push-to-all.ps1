@@ -55,6 +55,76 @@ function Commit-Changes {
     }
 }
 
+# Generate intelligent commit message function
+function Generate-CommitMessage {
+    Write-ColorOutput "Analyzing changes to generate commit message..." "Yellow"
+    
+    # Get git status information
+    $statusOutput = git status --porcelain
+    $modifiedFiles = @()
+    $addedFiles = @()
+    $deletedFiles = @()
+    $renamedFiles = @()
+    
+    foreach ($line in $statusOutput) {
+        $status = $line.Substring(0, 2)
+        $file = $line.Substring(3)
+        
+        switch ($status.Trim()) {
+            "M" { $modifiedFiles += $file }
+            "A" { $addedFiles += $file }
+            "D" { $deletedFiles += $file }
+            "R" { $renamedFiles += $file }
+            "??" { $addedFiles += $file }
+        }
+    }
+    
+    # Generate commit message based on changes
+    $commitParts = @()
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    
+    if ($addedFiles.Count -gt 0) {
+        $commitParts += "Add $($addedFiles.Count) new file$(if($addedFiles.Count -gt 1){'s'})"
+    }
+    
+    if ($modifiedFiles.Count -gt 0) {
+        $commitParts += "Update $($modifiedFiles.Count) file$(if($modifiedFiles.Count -gt 1){'s'})"
+    }
+    
+    if ($deletedFiles.Count -gt 0) {
+        $commitParts += "Delete $($deletedFiles.Count) file$(if($deletedFiles.Count -gt 1){'s'})"
+    }
+    
+    if ($renamedFiles.Count -gt 0) {
+        $commitParts += "Rename $($renamedFiles.Count) file$(if($renamedFiles.Count -gt 1){'s'})"
+    }
+    
+    # Check for specific file types and generate more specific messages
+    $hasReadme = $statusOutput | Where-Object { $_ -match "README" }
+    $hasConfig = $statusOutput | Where-Object { $_ -match "config|\.env|\.json" }
+    $hasFrontend = $statusOutput | Where-Object { $_ -match "frontend/|src/|\.vue|\.js|\.css" }
+    $hasBackend = $statusOutput | Where-Object { $_ -match "server/|routes/|\.sql" }
+    $hasScript = $statusOutput | Where-Object { $_ -match "\.ps1|\.bat|\.sh|scripts/" }
+    
+    if ($hasReadme) {
+        return "docs: Update project documentation - $timestamp"
+    } elseif ($hasScript) {
+        return "scripts: Update automation scripts - $timestamp"
+    } elseif ($hasFrontend -and $hasBackend) {
+        return "feat: Update both frontend and backend components - $timestamp"
+    } elseif ($hasFrontend) {
+        return "feat: Update frontend components - $timestamp"
+    } elseif ($hasBackend) {
+        return "feat: Update backend components - $timestamp"
+    } elseif ($hasConfig) {
+        return "config: Update configuration files - $timestamp"
+    } elseif ($commitParts.Count -gt 0) {
+        return "chore: $($commitParts -join ', ') - $timestamp"
+    } else {
+        return "chore: Update project files - $timestamp"
+    }
+}
+
 # Push to remote repositories function
 function Push-ToRemotes {
     Write-ColorOutput "Getting remote repository configuration..." "Yellow"
@@ -94,15 +164,9 @@ function Main {
         $hasChanges = Check-GitStatus
         
         if ($hasChanges) {
-            # Get commit message
-            $defaultMessage = "Update project files - $(Get-Date -Format 'yyyy-MM-dd HH:mm:ss')"
-            Write-ColorOutput "`nPlease enter commit message (press Enter for default):" "Yellow"
-            Write-ColorOutput "Default message: $defaultMessage" "Gray"
-            $commitMessage = Read-Host "Commit message"
-            
-            if ([string]::IsNullOrWhiteSpace($commitMessage)) {
-                $commitMessage = $defaultMessage
-            }
+            # Generate intelligent commit message
+            $commitMessage = Generate-CommitMessage
+            Write-ColorOutput "Auto-generated commit message: $commitMessage" "Cyan"
             
             # Add all changes
             Add-AllChanges
