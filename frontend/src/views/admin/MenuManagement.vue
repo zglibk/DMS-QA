@@ -6,6 +6,57 @@
       <p>管理系统中的菜单信息，支持树形结构</p>
     </div>
 
+    <!-- 搜索和筛选栏 -->
+    <el-card class="search-card" shadow="never">
+      <el-row :gutter="20">
+        <el-col :span="6">
+          <el-input
+            v-model="searchForm.keyword"
+            placeholder="搜索菜单名称或编码"
+            clearable
+            @clear="handleSearch"
+            @keyup.enter="handleSearch"
+          >
+            <template #prefix>
+              <el-icon><Search /></el-icon>
+            </template>
+          </el-input>
+        </el-col>
+        <el-col :span="4">
+          <el-select
+            v-model="searchForm.type"
+            placeholder="菜单类型"
+            clearable
+            @change="handleSearch"
+          >
+            <el-option label="目录" value="catalog" />
+            <el-option label="菜单" value="menu" />
+            <el-option label="按钮" value="button" />
+            <el-option label="接口" value="api" />
+          </el-select>
+        </el-col>
+        <el-col :span="4">
+          <el-select
+            v-model="searchForm.status"
+            placeholder="状态"
+            clearable
+            @change="handleSearch"
+          >
+            <el-option label="启用" :value="true" />
+            <el-option label="禁用" :value="false" />
+          </el-select>
+        </el-col>
+        <el-col :span="6">
+          <el-button type="primary" @click="handleSearch" :icon="Search">
+            搜索
+          </el-button>
+          <el-button @click="handleReset" :icon="Refresh">
+            重置
+          </el-button>
+        </el-col>
+      </el-row>
+    </el-card>
+
     <!-- 操作工具栏 -->
     <el-card class="toolbar-card" shadow="never">
       <div class="toolbar">
@@ -96,6 +147,19 @@
         </template>
       </el-table-column>
       </el-table>
+      
+      <!-- 分页组件 -->
+      <div class="pagination-wrapper">
+        <el-pagination
+           v-model:current-page="pagination.page"
+           v-model:page-size="pagination.size"
+           :page-sizes="[5, 10, 20, 50]"
+           :total="pagination.total"
+           layout="total, sizes, prev, pager, next, jumper"
+           @size-change="handleSizeChange"
+           @current-change="handleCurrentChange"
+         />
+      </div>
     </el-card>
 
     <!-- 新增/编辑菜单对话框 -->
@@ -227,7 +291,8 @@ import {
   Refresh,
   Expand,
   Fold,
-  Menu
+  Menu,
+  Search
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 
@@ -238,8 +303,23 @@ const dialogVisible = ref(false)
 const tableRef = ref()
 const formRef = ref()
 const menuList = ref([])
+const filteredMenuList = ref([])
 const isEdit = ref(false)
 const currentEditId = ref(null)
+
+// 搜索表单
+const searchForm = reactive({
+  keyword: '',
+  type: '',
+  status: ''
+})
+
+// 分页数据
+const pagination = reactive({
+  page: 1,
+  size: 5,
+  total: 0
+})
 
 // 表单数据
 const formData = reactive({
@@ -303,7 +383,7 @@ const dialogTitle = computed(() => {
 
 // 构建树形结构
 const menuTree = computed(() => {
-  return buildTree(menuList.value)
+  return buildTree(filteredMenuList.value)
 })
 
 // 菜单选项（用于上级菜单选择）
@@ -311,7 +391,10 @@ const menuOptions = computed(() => {
   return buildTree(menuList.value.filter(menu => menu.ID !== currentEditId.value))
 })
 
-// 构建树形结构的函数
+/**
+ * 构建树形结构的函数
+ * 在当前页数据范围内构建树形结构
+ */
 function buildTree(list, parentId = null) {
   const tree = []
   for (const item of list) {
@@ -347,20 +430,155 @@ function getTypeText(type) {
   return textMap[type] || type
 }
 
-// 获取菜单列表
+/**
+ * 获取菜单列表数据
+ * 支持分页、搜索和筛选
+ */
 const fetchMenus = async () => {
+  loading.value = true
   try {
-    loading.value = true
-    const response = await axios.get('/api/menus')
-    // 修复：从分页数据结构中提取list数组
-    const data = response.data.data || {}
-    menuList.value = data.list || []
+    // 获取完整的树形数据用于显示
+    const treeResponse = await axios.get('/api/menus/tree')
+    const allMenus = treeResponse.data.data || []
+    
+    // 将树形数据扁平化为列表（用于完整数据操作）
+    const flattenMenus = (menus) => {
+      const result = []
+      const traverse = (items) => {
+        items.forEach(item => {
+          result.push(item)
+          if (item.children && item.children.length > 0) {
+            traverse(item.children)
+          }
+        })
+      }
+      traverse(menus)
+      return result
+    }
+    
+    const flatMenus = flattenMenus(allMenus)
+    
+    // 获取顶级菜单（用于分页计算）
+    const getTopLevelMenus = (menus) => {
+      return menus.filter(menu => !menu.ParentID)
+    }
+    
+    let topLevelMenus = getTopLevelMenus(allMenus)
+    
+    // 应用搜索和筛选到顶级菜单
+    if (searchForm.keyword) {
+      const keyword = searchForm.keyword.toLowerCase()
+      // 如果搜索关键词匹配子菜单，也要包含其父菜单
+      const matchingMenus = flatMenus.filter(menu => 
+        (menu.Name && menu.Name.toLowerCase().includes(keyword)) ||
+        (menu.Code && menu.Code.toLowerCase().includes(keyword))
+      )
+      
+      const topLevelIds = new Set()
+      matchingMenus.forEach(menu => {
+        // 找到顶级父菜单
+        let current = menu
+        while (current.ParentID) {
+          current = flatMenus.find(m => m.ID === current.ParentID) || { ParentID: null }
+        }
+        if (current.ID) {
+          topLevelIds.add(current.ID)
+        }
+      })
+      
+      topLevelMenus = topLevelMenus.filter(menu => topLevelIds.has(menu.ID))
+    }
+    
+    if (searchForm.type) {
+      // 如果筛选类型，检查顶级菜单或其子菜单是否匹配
+      topLevelMenus = topLevelMenus.filter(topMenu => {
+        const hasMatchingChild = (menu) => {
+          if (menu.Type === searchForm.type) return true
+          if (menu.children) {
+            return menu.children.some(child => hasMatchingChild(child))
+          }
+          return false
+        }
+        return hasMatchingChild(topMenu)
+      })
+    }
+    
+    if (searchForm.status !== '') {
+      const status = searchForm.status === '1'
+      // 如果筛选状态，检查顶级菜单或其子菜单是否匹配
+      topLevelMenus = topLevelMenus.filter(topMenu => {
+        const hasMatchingChild = (menu) => {
+          if (menu.Status === status) return true
+          if (menu.children) {
+            return menu.children.some(child => hasMatchingChild(child))
+          }
+          return false
+        }
+        return hasMatchingChild(topMenu)
+      })
+    }
+    
+    // 计算分页（只对顶级菜单分页）
+    const total = topLevelMenus.length
+    const startIndex = (pagination.page - 1) * pagination.size
+    const endIndex = startIndex + pagination.size
+    const pageTopMenus = topLevelMenus.slice(startIndex, endIndex)
+    
+    // 构建当前页面的完整菜单树（包含选中顶级菜单的所有子菜单）
+    const currentPageMenus = []
+    pageTopMenus.forEach(topMenu => {
+      // 递归添加顶级菜单及其所有子菜单
+      const addMenuWithChildren = (menu) => {
+        currentPageMenus.push(menu)
+        if (menu.children) {
+          menu.children.forEach(child => addMenuWithChildren(child))
+        }
+      }
+      addMenuWithChildren(topMenu)
+    })
+    
+    menuList.value = flatMenus // 保存完整列表用于其他操作
+    filteredMenuList.value = currentPageMenus // 用于树形显示的数据
+    pagination.total = total // 只计算顶级菜单数量
+    
   } catch (error) {
     console.error('获取菜单列表失败:', error)
     ElMessage.error('获取菜单列表失败')
   } finally {
     loading.value = false
   }
+}
+
+
+
+// 搜索处理
+const handleSearch = () => {
+  pagination.page = 1
+  fetchMenus()
+}
+
+// 重置搜索
+const handleReset = () => {
+  Object.assign(searchForm, {
+    keyword: '',
+    type: '',
+    status: ''
+  })
+  pagination.page = 1
+  fetchMenus()
+}
+
+// 分页大小变化
+const handleSizeChange = (size) => {
+  pagination.size = size
+  pagination.page = 1
+  fetchMenus()
+}
+
+// 当前页变化
+const handleCurrentChange = (page) => {
+  pagination.page = page
+  fetchMenus()
 }
 
 // 显示新增对话框
@@ -542,10 +760,22 @@ onMounted(() => {
   font-size: 14px;
 }
 
+.search-card {
+  margin-bottom: 20px;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+}
+
 .toolbar-card {
   margin-bottom: 20px;
   border-radius: 8px;
   border: 1px solid #e4e7ed;
+}
+
+.pagination-wrapper {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
 }
 
 .toolbar {

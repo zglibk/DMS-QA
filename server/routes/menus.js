@@ -83,7 +83,7 @@ router.get('/', async (req, res) => {
     const pool = await getConnection()
     
     // 构建查询条件
-    let whereConditions = ['m.Status = 1']
+    let whereConditions = ['1=1'] // 移除Status=1的硬编码限制，允许显示所有状态的菜单
     let queryParams = []
     
     if (keyword) {

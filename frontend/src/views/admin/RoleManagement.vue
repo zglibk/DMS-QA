@@ -432,7 +432,8 @@ const fetchRoles = async () => {
 // 获取菜单列表
 const fetchMenus = async () => {
   try {
-    const response = await axios.get('/api/menus')
+    // 获取所有菜单数据，设置足够大的分页参数
+    const response = await axios.get('/api/menus?size=1000')
     // 修复：从分页数据结构中提取list数组
     const data = response.data.data || {}
     menuList.value = data.list || []
@@ -504,6 +505,10 @@ const showEditDialog = (role) => {
 const showPermissionDialog = async (role) => {
   currentRole.value = role
   try {
+    // 先获取最新的菜单数据，确保包含新增的菜单
+    await fetchMenus()
+    
+    // 然后获取角色的权限数据
     const response = await axios.get(`/api/roles/${role.ID}/menus`)
     selectedMenuIds.value = response.data.data || []
   } catch (error) {
