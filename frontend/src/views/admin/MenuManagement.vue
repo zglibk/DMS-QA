@@ -6,75 +6,89 @@
       <p>管理系统中的菜单信息，支持树形结构</p>
     </div>
 
-    <!-- 搜索和筛选栏 -->
-    <el-card class="search-card" shadow="never">
-      <el-row :gutter="20">
-        <el-col :span="6">
-          <el-input
-            v-model="searchForm.keyword"
-            placeholder="搜索菜单名称或编码"
-            clearable
-            @clear="handleSearch"
-            @keyup.enter="handleSearch"
-          >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
+    <!-- 操作工具栏和搜索筛选栏 -->
+    <el-card class="toolbar-search-card" shadow="never">
+      <el-row :gutter="20" class="toolbar-search-row">
+        <!-- 左侧：操作按钮 -->
+        <el-col :xs="24" :sm="24" :md="12" :lg="12" :xl="12" class="action-section">
+          <div class="action-buttons">
+            <el-button type="primary" @click="showAddDialog" :icon="Plus">
+              新增菜单
+            </el-button>
+            <el-button @click="expandAll" :icon="Expand">
+              展开全部
+            </el-button>
+            <el-button @click="collapseAll" :icon="Fold">
+              收起全部
+            </el-button>
+            <el-button @click="refreshData" :icon="Refresh">
+              刷新
+            </el-button>
+          </div>
         </el-col>
-        <el-col :span="4">
-          <el-select
-            v-model="searchForm.type"
-            placeholder="菜单类型"
-            clearable
-            @change="handleSearch"
-          >
-            <el-option label="目录" value="catalog" />
-            <el-option label="菜单" value="menu" />
-            <el-option label="按钮" value="button" />
-            <el-option label="接口" value="api" />
-          </el-select>
-        </el-col>
-        <el-col :span="4">
-          <el-select
-            v-model="searchForm.status"
-            placeholder="状态"
-            clearable
-            @change="handleSearch"
-          >
-            <el-option label="启用" :value="true" />
-            <el-option label="禁用" :value="false" />
-          </el-select>
-        </el-col>
-        <el-col :span="6">
-          <el-button type="primary" @click="handleSearch" :icon="Search">
-            搜索
-          </el-button>
-          <el-button @click="handleReset" :icon="Refresh">
-            重置
-          </el-button>
-        </el-col>
+        
+        <!-- 右侧：搜索和筛选 -->
+         <el-col :xs="24" :sm="24" :md="12" :lg="12" :xl="12" class="search-section">
+           <div class="search-filters">
+             <el-row :gutter="10" class="search-row">
+               <el-col :xs="24" :sm="8" :md="8" :lg="8" :xl="8">
+                 <el-input
+                   v-model="searchForm.keyword"
+                   placeholder="搜索菜单名称或编码"
+                   clearable
+                   @clear="handleSearch"
+                   @keyup.enter="handleSearch"
+                   size="default"
+                   class="search-input"
+                 >
+                   <template #prefix>
+                     <el-icon><Search /></el-icon>
+                   </template>
+                 </el-input>
+               </el-col>
+               <el-col :xs="12" :sm="4" :md="4" :lg="4" :xl="4">
+                 <el-select
+                   v-model="searchForm.type"
+                   placeholder="类型"
+                   clearable
+                   @change="handleSearch"
+                   size="default"
+                   style="width: 100%"
+                 >
+                   <el-option label="目录" value="catalog" />
+                   <el-option label="菜单" value="menu" />
+                   <el-option label="按钮" value="button" />
+                   <el-option label="接口" value="api" />
+                 </el-select>
+               </el-col>
+               <el-col :xs="12" :sm="4" :md="4" :lg="4" :xl="4">
+                 <el-select
+                   v-model="searchForm.status"
+                   placeholder="状态"
+                   clearable
+                   @change="handleSearch"
+                   @clear="handleSearch"
+                   size="default"
+                   style="width: 100%"
+                 >
+                   <el-option label="启用" :value="true" />
+                   <el-option label="禁用" :value="false" />
+                 </el-select>
+               </el-col>
+               <el-col :xs="12" :sm="4" :md="4" :lg="4" :xl="4">
+                 <el-button type="primary" @click="handleSearch" :icon="Search" size="default" style="width: 100%">
+                   搜索
+                 </el-button>
+               </el-col>
+               <el-col :xs="12" :sm="4" :md="4" :lg="4" :xl="4">
+                 <el-button @click="handleReset" :icon="Refresh" size="default" style="width: 100%">
+                   重置
+                 </el-button>
+               </el-col>
+             </el-row>
+           </div>
+         </el-col>
       </el-row>
-    </el-card>
-
-    <!-- 操作工具栏 -->
-    <el-card class="toolbar-card" shadow="never">
-      <div class="toolbar">
-        <div class="action-section">
-          <el-button type="primary" @click="showAddDialog" :icon="Plus">
-            新增菜单
-          </el-button>
-          <el-button @click="expandAll" :icon="Expand">
-            展开全部
-          </el-button>
-          <el-button @click="collapseAll" :icon="Fold">
-            收起全部
-          </el-button>
-          <el-button @click="refreshData" :icon="Refresh">
-            刷新
-          </el-button>
-        </div>
-      </div>
     </el-card>
 
     <!-- 菜单树表格 -->
@@ -437,109 +451,61 @@ function getTypeText(type) {
 const fetchMenus = async () => {
   loading.value = true
   try {
-    // 获取完整的树形数据用于显示
-    const treeResponse = await axios.get('/api/menus/tree')
-    const allMenus = treeResponse.data.data || []
+    // 构建查询参数
+    const params = {
+      page: pagination.page,
+      size: pagination.size,
+      keyword: searchForm.keyword,
+      type: searchForm.type,
+      status: searchForm.status
+    }
     
-    // 将树形数据扁平化为列表（用于完整数据操作）
-    const flattenMenus = (menus) => {
-      const result = []
-      const traverse = (items) => {
-        items.forEach(item => {
-          result.push(item)
-          if (item.children && item.children.length > 0) {
-            traverse(item.children)
-          }
-        })
+    // 移除空值参数
+    Object.keys(params).forEach(key => {
+      if (params[key] === '' || params[key] === null || params[key] === undefined) {
+        delete params[key]
       }
-      traverse(menus)
-      return result
-    }
-    
-    const flatMenus = flattenMenus(allMenus)
-    
-    // 获取顶级菜单（用于分页计算）
-    const getTopLevelMenus = (menus) => {
-      return menus.filter(menu => !menu.ParentID)
-    }
-    
-    let topLevelMenus = getTopLevelMenus(allMenus)
-    
-    // 应用搜索和筛选到顶级菜单
-    if (searchForm.keyword) {
-      const keyword = searchForm.keyword.toLowerCase()
-      // 如果搜索关键词匹配子菜单，也要包含其父菜单
-      const matchingMenus = flatMenus.filter(menu => 
-        (menu.Name && menu.Name.toLowerCase().includes(keyword)) ||
-        (menu.Code && menu.Code.toLowerCase().includes(keyword))
-      )
-      
-      const topLevelIds = new Set()
-      matchingMenus.forEach(menu => {
-        // 找到顶级父菜单
-        let current = menu
-        while (current.ParentID) {
-          current = flatMenus.find(m => m.ID === current.ParentID) || { ParentID: null }
-        }
-        if (current.ID) {
-          topLevelIds.add(current.ID)
-        }
-      })
-      
-      topLevelMenus = topLevelMenus.filter(menu => topLevelIds.has(menu.ID))
-    }
-    
-    if (searchForm.type) {
-      // 如果筛选类型，检查顶级菜单或其子菜单是否匹配
-      topLevelMenus = topLevelMenus.filter(topMenu => {
-        const hasMatchingChild = (menu) => {
-          if (menu.Type === searchForm.type) return true
-          if (menu.children) {
-            return menu.children.some(child => hasMatchingChild(child))
-          }
-          return false
-        }
-        return hasMatchingChild(topMenu)
-      })
-    }
-    
-    if (searchForm.status !== '') {
-      const status = searchForm.status === '1'
-      // 如果筛选状态，检查顶级菜单或其子菜单是否匹配
-      topLevelMenus = topLevelMenus.filter(topMenu => {
-        const hasMatchingChild = (menu) => {
-          if (menu.Status === status) return true
-          if (menu.children) {
-            return menu.children.some(child => hasMatchingChild(child))
-          }
-          return false
-        }
-        return hasMatchingChild(topMenu)
-      })
-    }
-    
-    // 计算分页（只对顶级菜单分页）
-    const total = topLevelMenus.length
-    const startIndex = (pagination.page - 1) * pagination.size
-    const endIndex = startIndex + pagination.size
-    const pageTopMenus = topLevelMenus.slice(startIndex, endIndex)
-    
-    // 构建当前页面的完整菜单树（包含选中顶级菜单的所有子菜单）
-    const currentPageMenus = []
-    pageTopMenus.forEach(topMenu => {
-      // 递归添加顶级菜单及其所有子菜单
-      const addMenuWithChildren = (menu) => {
-        currentPageMenus.push(menu)
-        if (menu.children) {
-          menu.children.forEach(child => addMenuWithChildren(child))
-        }
-      }
-      addMenuWithChildren(topMenu)
     })
     
+    // 获取菜单列表数据
+    const response = await axios.get('/api/menus', { params })
+    const allMenus = response.data.data.list || []
+    
+    // 构建树形结构
+    const buildMenuTree = (menuList) => {
+      const menuMap = new Map()
+      const rootMenus = []
+      
+      // 先创建所有菜单的映射
+      menuList.forEach(menu => {
+        menu.children = []
+        menuMap.set(menu.ID, menu)
+      })
+      
+      // 构建父子关系
+      menuList.forEach(menu => {
+        if (menu.ParentID && menuMap.has(menu.ParentID)) {
+          menuMap.get(menu.ParentID).children.push(menu)
+        } else {
+          rootMenus.push(menu)
+        }
+      })
+      
+      return rootMenus
+    }
+    
+    const flatMenus = allMenus
+    const menuTreeData = buildMenuTree([...allMenus])
+    
+    // 获取顶级菜单（用于分页计算）
+    let topLevelMenus = menuTreeData
+    
+    // 后端已经处理了搜索和筛选，前端直接使用返回的数据
+    
+    // 设置数据（后端已处理分页）
     menuList.value = flatMenus // 保存完整列表用于其他操作
-    filteredMenuList.value = currentPageMenus // 用于树形显示的数据
-    pagination.total = total // 只计算顶级菜单数量
+    filteredMenuList.value = topLevelMenus // 用于树形显示的数据
+    pagination.total = response.data.data.total || topLevelMenus.length
     
   } catch (error) {
     console.error('获取菜单列表失败:', error)
@@ -784,10 +750,54 @@ onMounted(() => {
   align-items: center;
 }
 
+/* 工具栏和搜索卡片样式 */
+.toolbar-search-card {
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  margin-bottom: 20px;
+}
+
+.toolbar-search-row {
+  align-items: flex-start;
+}
+
+/* 操作按钮区域 */
 .action-section {
   display: flex;
-  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 8px;
   flex-wrap: wrap;
+}
+
+/* 搜索区域 */
+.search-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.search-filters {
+  width: 100%;
+}
+
+.search-row {
+  align-items: center;
+}
+
+.search-input {
+  max-width: 420px;
+}
+
+/* 在小屏幕下搜索输入框占满宽度 */
+@media (max-width: 576px) {
+  .search-input {
+    max-width: 100%;
+  }
 }
 
 .table-card {
@@ -807,6 +817,26 @@ onMounted(() => {
 
 :deep(.el-table .el-table__cell) {
   padding: 12px 0;
+}
+
+/* 表格标题行文字居中 */
+:deep(.el-table .el-table__header-wrapper .el-table__header .el-table__cell) {
+  text-align: center;
+}
+
+/* 操作列按钮不换行 */
+.action-buttons {
+  display: flex;
+  gap: 4px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  min-width: auto;
+  padding: 5px 8px;
+  font-size: 12px;
 }
 
 :deep(.el-form-item) {
@@ -829,31 +859,56 @@ onMounted(() => {
   border-radius: 8px;
 }
 
-/* 操作按钮样式 */
-.action-buttons {
-  display: flex;
-  gap: 4px;
-  flex-wrap: nowrap;
-  white-space: nowrap;
-}
-
-.action-buttons .el-button {
-  margin: 0;
-  min-width: auto;
-  padding: 5px 8px;
-}
-
+/* 响应式布局 */
 @media (max-width: 768px) {
   .menu-management {
     padding: 10px;
   }
   
-  .action-section {
-    justify-content: flex-start;
-  }
-  
   .page-header h2 {
     font-size: 20px;
+  }
+  
+  /* 小屏幕下操作按钮区域 */
+  .action-section {
+    margin-bottom: 20px;
+  }
+  
+  .action-buttons {
+    gap: 6px;
+  }
+  
+  .action-buttons .el-button {
+    font-size: 12px;
+    padding: 6px 10px;
+  }
+  
+  /* 小屏幕下搜索区域 */
+   .search-section {
+     margin-top: 15px;
+   }
+   
+   .search-row .el-col {
+     margin-bottom: 8px;
+   }
+}
+
+@media (max-width: 576px) {
+  /* 超小屏幕优化 */
+  .action-buttons {
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+  }
+  
+  .action-buttons .el-button {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .filter-row .el-col {
+    span: 24;
+    margin-bottom: 10px;
   }
 }
 </style>

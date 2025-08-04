@@ -26,7 +26,7 @@ router.get('/tree', async (req, res) => {
           Component,
           Permission,
           SortOrder,
-          Status,
+          CAST(Status as BIT) as Status,
           CreatedAt,
           UpdatedAt
         FROM Menus
@@ -34,18 +34,24 @@ router.get('/tree', async (req, res) => {
         ORDER BY SortOrder ASC, CreatedAt ASC
       `)
     
+    // 将bit类型的Status字段转换为布尔值
+    const processedMenus = result.recordset.map(menu => ({
+      ...menu,
+      Status: Boolean(menu.Status)
+    }))
+    
     // 构建树形结构
     const menuMap = new Map()
     const rootMenus = []
     
     // 先创建所有菜单的映射
-    result.recordset.forEach(menu => {
+    processedMenus.forEach(menu => {
       menu.children = []
       menuMap.set(menu.ID, menu)
     })
     
     // 构建父子关系
-    result.recordset.forEach(menu => {
+    processedMenus.forEach(menu => {
       if (menu.ParentID && menuMap.has(menu.ParentID)) {
         menuMap.get(menu.ParentID).children.push(menu)
       } else {
@@ -112,7 +118,7 @@ router.get('/', async (req, res) => {
     
     const whereClause = whereConditions.join(' AND ')
     
-    // 获取总数
+    // 获取总数（只计算顶级菜单数量，用于分页）
     let countRequest = pool.request()
     queryParams.forEach(param => {
       countRequest.input(param.name, param.type, param.value)
@@ -121,7 +127,7 @@ router.get('/', async (req, res) => {
     const countResult = await countRequest.query(`
       SELECT COUNT(*) as total
       FROM Menus m
-      WHERE ${whereClause}
+      WHERE ${whereClause} AND (m.ParentID IS NULL OR m.ParentID = 0)
     `)
     
     // 获取分页数据
@@ -132,36 +138,96 @@ router.get('/', async (req, res) => {
     dataRequest.input('offset', sql.Int, offset)
     dataRequest.input('size', sql.Int, parseInt(size))
     
-    const dataResult = await dataRequest.query(`
+    // 先获取分页的顶级菜单ID
+    const topMenuResult = await dataRequest.query(`
       SELECT * FROM (
         SELECT
           ROW_NUMBER() OVER (ORDER BY m.SortOrder ASC, m.CreatedAt DESC) as RowNum,
+          m.ID
+        FROM Menus m
+        WHERE ${whereClause} AND (m.ParentID IS NULL OR m.ParentID = 0)
+      ) AS T
+      WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
+      ORDER BY T.RowNum
+    `)
+    
+    const topMenuIds = topMenuResult.recordset.map(item => item.ID)
+    
+    // 如果没有顶级菜单，返回空结果
+    if (topMenuIds.length === 0) {
+      return res.json({
+        success: true,
+        data: {
+          list: [],
+          total: countResult.recordset[0].total,
+          page: parseInt(page),
+          size: parseInt(size)
+        }
+      })
+    }
+    
+    // 获取这些顶级菜单及其所有子菜单
+    const allMenusRequest = pool.request()
+    queryParams.forEach(param => {
+      allMenusRequest.input(param.name, param.type, param.value)
+    })
+    
+    const dataResult = await allMenusRequest.query(`
+      WITH MenuHierarchy AS (
+        -- 获取分页的顶级菜单
+        SELECT
           m.ID,
           m.MenuName as Name,
           m.MenuCode as Code,
           m.ParentID,
-          p.MenuName as ParentName,
           m.MenuType as Type,
           m.Icon,
           m.Path,
           m.Component,
           m.Permission,
           m.SortOrder,
-          m.Status,
+          CAST(m.Status as BIT) as Status,
           m.CreatedAt,
-          m.UpdatedAt
+          m.UpdatedAt,
+          0 as Level
         FROM Menus m
-        LEFT JOIN Menus p ON m.ParentID = p.ID
-        WHERE ${whereClause}
-      ) AS T
-      WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
-      ORDER BY T.RowNum
+        WHERE m.ID IN (${topMenuIds.join(',')}) AND ${whereClause}
+        
+        UNION ALL
+        
+        -- 递归获取所有子菜单（不应用筛选条件，只获取子菜单）
+        SELECT
+          m.ID,
+          m.MenuName as Name,
+          m.MenuCode as Code,
+          m.ParentID,
+          m.MenuType as Type,
+          m.Icon,
+          m.Path,
+          m.Component,
+          m.Permission,
+          m.SortOrder,
+          CAST(m.Status as BIT) as Status,
+          m.CreatedAt,
+          m.UpdatedAt,
+          mh.Level + 1
+        FROM Menus m
+        INNER JOIN MenuHierarchy mh ON m.ParentID = mh.ID
+      )
+      SELECT * FROM MenuHierarchy
+      ORDER BY Level ASC, SortOrder ASC, CreatedAt DESC
     `)
+    
+    // 将bit类型的Status字段转换为布尔值
+    const processedData = dataResult.recordset.map(item => ({
+      ...item,
+      Status: Boolean(item.Status)
+    }))
     
     res.json({
       success: true,
       data: {
-        list: dataResult.recordset,
+        list: processedData,
         total: countResult.recordset[0].total,
         page: parseInt(page),
         size: parseInt(size)
