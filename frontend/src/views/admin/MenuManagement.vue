@@ -104,6 +104,7 @@
         border
         resizable
         :header-cell-style="{ background: '#f8f9fa', color: '#606266' }"
+        @expand-change="handleExpandChange"
       >
       <el-table-column prop="Name" label="菜单名称" min-width="200" resizable show-overflow-tooltip>
         <template #default="{ row }">
@@ -296,7 +297,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus,
@@ -507,6 +508,11 @@ const fetchMenus = async () => {
     filteredMenuList.value = topLevelMenus // 用于树形显示的数据
     pagination.total = response.data.data.total || topLevelMenus.length
     
+    // 数据加载完成后，设置默认展开状态
+    nextTick(() => {
+      setDefaultExpansion()
+    })
+    
   } catch (error) {
     console.error('获取菜单列表失败:', error)
     ElMessage.error('获取菜单列表失败')
@@ -667,7 +673,80 @@ const deleteMenu = async (menu) => {
   }
 }
 
-// 展开全部
+/**
+ * 处理表格展开变化事件
+ * 实现手风琴效果：展开一个节点时自动折叠其他同级节点
+ * @param {Object} row - 当前操作的行数据
+ * @param {Boolean} expanded - 是否展开状态
+ */
+const handleExpandChange = (row, expanded) => {
+  // 如果当前行被展开
+  if (expanded) {
+    // 找到同级的其他节点并折叠它们
+    const siblings = getSiblings(row)
+    siblings.forEach(sibling => {
+      if (sibling.ID !== row.ID) {
+        tableRef.value.toggleRowExpansion(sibling, false)
+      }
+    })
+  }
+}
+
+/**
+ * 获取同级节点
+ */
+const getSiblings = (row) => {
+  // 如果是顶级菜单，返回所有顶级菜单
+  if (!row.ParentID) {
+    return menuTree.value
+  }
+  
+  // 如果是子菜单，找到父菜单的所有子菜单
+  const parent = findMenuById(row.ParentID)
+  return parent ? parent.children || [] : []
+}
+
+/**
+ * 根据ID查找菜单项
+ */
+const findMenuById = (id) => {
+  const findInList = (list) => {
+    for (const item of list) {
+      if (item.ID === id) {
+        return item
+      }
+      if (item.children) {
+        const found = findInList(item.children)
+        if (found) return found
+      }
+    }
+    return null
+  }
+  return findInList(menuTree.value)
+}
+
+/**
+ * 设置默认展开状态
+ * 只展开第一个顶级菜单
+ */
+const setDefaultExpansion = () => {
+  if (tableRef.value && menuTree.value.length > 0) {
+    // 先折叠所有菜单
+    menuList.value.forEach(menu => {
+      tableRef.value.toggleRowExpansion(menu, false)
+    })
+    
+    // 只展开第一个顶级菜单
+    const firstTopMenu = menuTree.value[0]
+    if (firstTopMenu) {
+      tableRef.value.toggleRowExpansion(firstTopMenu, true)
+    }
+  }
+}
+
+/**
+ * 展开全部菜单
+ */
 const expandAll = () => {
   if (tableRef.value) {
     menuList.value.forEach(menu => {
@@ -676,12 +755,21 @@ const expandAll = () => {
   }
 }
 
-// 收起全部
+/**
+ * 收起全部菜单并重置为默认状态
+ * 折叠全部后只展开第一个顶级菜单
+ */
 const collapseAll = () => {
   if (tableRef.value) {
+    // 先折叠所有菜单
     menuList.value.forEach(menu => {
       tableRef.value.toggleRowExpansion(menu, false)
     })
+    
+    // 延迟一下再设置默认展开，确保折叠操作完成
+    setTimeout(() => {
+      setDefaultExpansion()
+    }, 100)
   }
 }
 
