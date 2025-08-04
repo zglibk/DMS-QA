@@ -246,6 +246,24 @@ export const breadcrumbConfig = {
     icon: 'Warning'
   },
 
+  // 质量管理 - 投诉管理
+  '/admin/quality/complaint': {
+    title: '投诉管理',
+    icon: 'Warning'
+  },
+
+  // 内部投诉
+  '/admin/quality/complaint/internal': {
+    title: '内部投诉',
+    icon: 'User'
+  },
+
+  // 客户投诉
+  '/admin/quality/complaint/customer': {
+    title: '客户投诉',
+    icon: 'Phone'
+  },
+
   // 投诉列表
   '/admin/complaint/list': {
     title: '投诉列表',
@@ -340,6 +358,18 @@ export const breadcrumbConfig = {
   '/admin/supplier/list': {
     title: '供应商管理',
     icon: 'Briefcase'
+  },
+
+  // 二次开发
+  '/admin/development': {
+    title: '二次开发',
+    icon: 'Tools'
+  },
+
+  // 结构组件
+  '/admin/development/structure-components': {
+    title: '结构组件',
+    icon: 'Grid'
   }
 }
 

@@ -1203,3 +1203,68 @@ INSERT INTO [dbo].[SampleApproval] (
 PRINT '样品承认书管理表及相关视图已创建完成。';
 PRINT '用户权限管理系统数据库表结构已完整集成到init.sql中！';
 PRINT '样品管理模块数据库表结构创建完成！';
+
+-- =====================================================
+-- 客户投诉记录表 (CustomerComplaints)
+-- 功能：记录客户投诉的详细信息和处理过程
+-- 用途：投诉管理、质量跟踪、责任追溯
+-- 兼容：SQL Server 2008R2 及以上版本
+-- =====================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[CustomerComplaints]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[CustomerComplaints] (
+        -- 基础信息字段
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,                    -- 主键，自增ID
+        [Date] DATE NOT NULL,                                  -- 投诉日期，必填
+        [CustomerCode] NVARCHAR(50) NOT NULL,                  -- 客户编号，必填
+        [WorkOrderNo] NVARCHAR(50) NOT NULL,                   -- 工单号，必填
+        [ProductName] NVARCHAR(200) NOT NULL,                  -- 品名，必填
+        [Specification] NVARCHAR(200) NULL,                    -- 规格，可空
+        [OrderQuantity] INT NULL,                              -- 订单数量，可空
+        [ProblemDescription] NVARCHAR(2000) NOT NULL,          -- 问题描述，必填
+        [ProblemImages] NVARCHAR(MAX) NULL,                    -- 问题图片（JSON格式），可空
+        [DefectQuantity] INT NULL,                             -- 不良数量，可空
+        [DefectRate] DECIMAL(5,2) NULL,                       -- 不良率，可空
+        [ComplaintMethod] NVARCHAR(20) NOT NULL,               -- 投诉方式，必填
+        
+        -- 处理信息字段
+        [ProcessingDeadline] DATE NULL,                        -- 处理时限，可空
+        [RequireReport] BIT NULL,                              -- 是否需要报告，可空
+        [CauseAnalysis] NVARCHAR(2000) NULL,                  -- 原因分析，可空
+        [CorrectiveActions] NVARCHAR(2000) NULL,              -- 纠正措施，可空
+        [DisposalMeasures] NVARCHAR(2000) NULL,               -- 处置措施，可空
+        [ResponsibleDepartment] NVARCHAR(50) NULL,            -- 责任部门，可空
+        [ResponsiblePerson] NVARCHAR(50) NULL,                -- 责任人，可空
+        [ReplyDate] DATE NULL,                                 -- 回复日期，可空
+        [ReportAttachments] NVARCHAR(MAX) NULL,               -- 报告附件（JSON格式），可空
+        [FeedbackPerson] NVARCHAR(50) NULL,                   -- 反馈人，可空
+        [FeedbackDate] DATE NULL,                             -- 反馈日期，可空
+        [Processor] NVARCHAR(50) NULL,                        -- 处理人，可空
+        [ImprovementVerification] NVARCHAR(2000) NULL,        -- 改善验证，可空
+        [VerificationDate] DATE NULL,                         -- 验证日期，可空
+        [Status] NVARCHAR(20) NULL DEFAULT 'pending',         -- 处理状态，默认pending
+        
+        -- 系统字段
+        [CreatedBy] NVARCHAR(50) NULL,                        -- 创建人
+        [CreatedAt] DATETIME NULL DEFAULT GETDATE(),          -- 创建时间
+        [UpdatedBy] NVARCHAR(50) NULL,                        -- 更新人
+        [UpdatedAt] DATETIME NULL DEFAULT GETDATE()           -- 更新时间
+    );
+    
+    -- 创建索引以优化查询性能
+    CREATE INDEX [IX_CustomerComplaints_Date] ON [dbo].[CustomerComplaints] ([Date]);
+    CREATE INDEX [IX_CustomerComplaints_CustomerCode] ON [dbo].[CustomerComplaints] ([CustomerCode]);
+    CREATE INDEX [IX_CustomerComplaints_WorkOrderNo] ON [dbo].[CustomerComplaints] ([WorkOrderNo]);
+    CREATE INDEX [IX_CustomerComplaints_Status] ON [dbo].[CustomerComplaints] ([Status]);
+    CREATE INDEX [IX_CustomerComplaints_ResponsibleDepartment] ON [dbo].[CustomerComplaints] ([ResponsibleDepartment]);
+    CREATE INDEX [IX_CustomerComplaints_ResponsiblePerson] ON [dbo].[CustomerComplaints] ([ResponsiblePerson]);
+    
+    PRINT 'CustomerComplaints 表创建成功。';
+END
+ELSE
+BEGIN
+    PRINT 'CustomerComplaints 表已存在，跳过创建。';
+END
+
+PRINT '客户投诉记录表结构创建完成！';
+PRINT 'DMS-QA 数据库初始化脚本执行完成！';

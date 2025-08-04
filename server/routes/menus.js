@@ -765,7 +765,26 @@ function getDefaultMenus() {
           Path: '/admin/quality/complaint',
           Icon: 'Warning',
           Type: 'menu',
-          children: []
+          children: [
+            {
+              ID: 511,
+              Name: '内部投诉',
+              Code: 'internal-complaint',
+              Path: '/admin/quality/complaint/internal',
+              Icon: 'User',
+              Type: 'menu',
+              children: []
+            },
+            {
+              ID: 512,
+              Name: '客户投诉',
+              Code: 'customer-complaint',
+              Path: '/admin/quality/complaint/customer',
+              Icon: 'Phone',
+              Type: 'menu',
+              children: []
+            }
+          ]
         },
         {
           ID: 52,

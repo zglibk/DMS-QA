@@ -103,9 +103,20 @@ const routes = [
       },
       {
         path: 'quality/complaint',
-        component: () => import('../components/HomeContent.vue'), // 投诉管理页面
-        meta: { requiresAuth: true }
+        redirect: '/admin/quality/complaint/customer'
       },
+      {
+          path: 'quality/complaint/internal',
+          name: 'InternalComplaint',
+          component: () => import('../components/HomeContent.vue'), // 内部投诉页面
+          meta: { title: '内部投诉', requiresAuth: true }
+        },
+        {
+          path: 'quality/complaint/customer',
+          name: 'CustomerComplaint',
+          component: () => import('../views/quality/complaint/CustomerComplaint.vue'), // 客户投诉页面
+          meta: { title: '客户投诉', requiresAuth: true }
+        },
       {
         path: 'quality/rework',
         component: () => import('../views/admin/ReworkManagement.vue'), // 返工管理页面
@@ -166,6 +177,22 @@ const routes = [
       {
         path: 'system/config',
         component: () => import('../views/admin/SystemConfig.vue'), // 系统配置页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'system/accordion-table-example',
+        component: () => import('../examples/AccordionTableExample.vue'), // AccordionTable组件示例页面
+        meta: { requiresAuth: true }
+      },
+
+      // 二次开发模块
+      {
+        path: 'development',
+        redirect: '/admin/development/structure-components'
+      },
+      {
+        path: 'development/structure-components',
+        component: () => import('../views/development/StructureComponents.vue'), // 结构组件页面
         meta: { requiresAuth: true }
       },
       {

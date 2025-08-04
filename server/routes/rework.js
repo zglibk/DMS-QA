@@ -1351,6 +1351,88 @@ router.get('/methods', async (req, res) => {
   }
 });
 
+/**
+ * 批量删除返工记录
+ * DELETE /api/rework/batch
+ */
+// 批量删除接口（DELETE方法）
+router.delete('/batch', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供要删除的ID列表'
+      });
+    }
+
+    const pool = await getConnection();
+    const request = pool.request();
+
+    // 构建删除查询
+    const placeholders = ids.map((_, index) => `@id${index}`).join(',');
+    const query = `DELETE FROM ProductionReworkRegister WHERE ID IN (${placeholders})`;
+    
+    // 绑定参数
+    ids.forEach((id, index) => {
+      request.input(`id${index}`, sql.Int, parseInt(id));
+    });
+    
+    await request.query(query);
+
+    res.json({
+      success: true,
+      message: '批量删除成功'
+    });
+  } catch (error) {
+    console.error('批量删除返工记录失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '批量删除返工记录失败',
+      error: error.message
+    });
+  }
+});
+
+// 批量删除接口（POST方法）- 与客户投诉页面保持一致
+router.post('/batch-delete', async (req, res) => {
+  try {
+    const { ids } = req.body;
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供要删除的ID列表'
+      });
+    }
+
+    const pool = await getConnection();
+    const request = pool.request();
+
+    // 构建删除查询
+    const placeholders = ids.map((_, index) => `@id${index}`).join(',');
+    const query = `DELETE FROM ProductionReworkRegister WHERE ID IN (${placeholders})`;
+    
+    // 绑定参数
+    ids.forEach((id, index) => {
+      request.input(`id${index}`, sql.Int, parseInt(id));
+    });
+    
+    const result = await request.query(query);
+
+    res.json({
+      success: true,
+      message: `成功删除 ${ids.length} 条返工记录`
+    });
+  } catch (error) {
+    console.error('批量删除返工记录失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '批量删除返工记录失败',
+      error: error.message
+    });
+  }
+});
+
 // =====================================================
 // 质量等级管理 API
 // =====================================================

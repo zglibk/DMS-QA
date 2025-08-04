@@ -35,6 +35,8 @@ const path = require('path');
 
 // 导入各个功能模块的路由
 const complaintRouter = require('./routes/complaint');        // 投诉管理路由
+const customerComplaintsRouter = require('./routes/customerComplaints'); // 客户投诉记录路由
+const customerComplaintsBatchRouter = require('./routes/customerComplaintsBatch'); // 客户投诉记录批量删除路由
 const authRouter = require('./routes/auth');                  // 认证授权路由
 const configRouter = require('./routes/config');              // 配置管理路由
 const importRouter = require('./routes/import');              // 数据导入路由
@@ -136,6 +138,8 @@ app.get('/api/test-connection', (req, res) => {
  * - /api/rework: 生产不良返工登记管理（增删改查、统计分析）
  */
 app.use('/api/complaint', complaintRouter);
+app.use('/api/customer-complaints', customerComplaintsRouter);
+app.use('/api/customer-complaints-batch', customerComplaintsBatchRouter);
 app.use('/api/auth', authRouter);
 app.use('/api/config', configRouter);
 app.use('/api/import', importRouter);
@@ -167,6 +171,7 @@ app.use('/api/sample', sampleRouter);
 app.use('/files/attachments', express.static(path.join(__dirname, 'uploads/attachments')));
 app.use('/files/site-images', express.static(path.join(__dirname, 'uploads/site-images')));
 app.use('/files/rework-attachments', express.static(path.join(__dirname, 'uploads/rework-attachments')));
+app.use('/uploads/complaints', express.static(path.join(__dirname, 'uploads/complaints')));
 
 // 添加共享文件访问路由
 app.use('/shared-files', require('./routes/shared-files'));

@@ -1160,6 +1160,7 @@ import {
   ZoomIn
 } from '@element-plus/icons-vue'
 import axios from 'axios'
+import apiService from '@/services/apiService'
 
 // 响应式数据
 const loading = ref(false)
@@ -1553,38 +1554,44 @@ const editSelectedRecord = () => {
   }
 }
 
+/**
+ * 批量删除返工记录
+ */
 const deleteSelectedRecords = async () => {
-  if (selectedRows.value.length === 0) return
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请选择要删除的记录')
+    return
+  }
   
   const count = selectedRows.value.length
   const message = count === 1 
-    ? `确定要删除选中的返工记录吗？` 
-    : `确定要删除选中的 ${count} 条返工记录吗？`
+    ? `确定要删除选中的返工记录吗？此操作不可恢复。` 
+    : `确定要删除选中的 ${count} 条返工记录吗？此操作不可恢复。`
   
   try {
-    await ElMessageBox.confirm(message, '确认删除', {
+    await ElMessageBox.confirm(message, '批量删除确认', {
       type: 'warning',
-      confirmButtonText: '确定',
+      confirmButtonText: '确定删除',
       cancelButtonText: '取消'
     })
     
     // 执行批量删除
     const ids = selectedRows.value.map(row => row.ID)
-    const response = await axios.delete('/api/rework/batch', {
-      data: { ids }
+    const response = await apiService.post('/api/rework/batch-delete', {
+      ids: ids
     })
     
     if (response.data.success) {
-      ElMessage.success(`成功删除 ${count} 条记录`)
+      ElMessage.success(response.data.message || `成功删除 ${count} 条记录`)
       selectedRows.value = []
-      loadData()
+      await loadData()
     } else {
-      ElMessage.error(response.data.message || '删除失败')
+      ElMessage.error(response.data.message || '批量删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
       console.error('批量删除失败:', error)
-      ElMessage.error('删除失败')
+      ElMessage.error('批量删除失败，请重试')
     }
   }
 }

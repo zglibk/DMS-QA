@@ -227,14 +227,14 @@ const buildMenuTree = (menus) => {
   
   // 创建菜单映射
   menus.forEach(menu => {
-    menuMap.set(menu.id, { ...menu, children: [] })
+    menuMap.set(menu.ID, { ...menu, children: [] })
   })
   
   // 构建树形结构
   menus.forEach(menu => {
-    const menuItem = menuMap.get(menu.id)
-    if (menu.parentId && menuMap.has(menu.parentId)) {
-      menuMap.get(menu.parentId).children.push(menuItem)
+    const menuItem = menuMap.get(menu.ID)
+    if (menu.ParentID && menuMap.has(menu.ParentID)) {
+      menuMap.get(menu.ParentID).children.push(menuItem)
     } else {
       rootMenus.push(menuItem)
     }
