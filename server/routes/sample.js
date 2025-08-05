@@ -11,7 +11,7 @@
 const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
-const { poolPromise, executeQuery } = require('../config/database');
+const { executeQuery } = require('../db');
 const auth = require('../middleware/auth');
 
 /**
@@ -24,9 +24,6 @@ async function generateCertificateNo() {
     const year = now.getFullYear();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
     
-    const pool = await poolPromise;
-    const request = pool.request();
-    
     // 查询当前年月的记录数
     const query = `
       SELECT COUNT(*) as count 
@@ -35,10 +32,16 @@ async function generateCertificateNo() {
       AND MONTH(CreateDate) = @month
     `;
     
-    request.input('year', sql.Int, year);
-    request.input('month', sql.Int, parseInt(month));
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      request.input('year', sql.Int, year);
+      request.input('month', sql.Int, parseInt(month));
+      return await request.query(query);
+    });
+    if (!result || !result.recordset || result.recordset.length === 0) {
+      throw new Error('无法获取样版编号计数');
+    }
     
-    const result = await request.query(query);
     const count = result.recordset[0].count;
     
     // 生成流水号：下一个序号
@@ -91,7 +94,6 @@ router.get('/list', auth, async (req, res) => {
       createDateEnd 
     } = req.query;
 
-    const pool = await poolPromise;
     let whereConditions = [];
     let parameters = {};
 
@@ -122,11 +124,19 @@ router.get('/list', auth, async (req, res) => {
     
     // 查询总数
     const countQuery = `SELECT COUNT(*) as total FROM SampleApproval ${whereClause}`;
-    let countRequest = pool.request();
-    Object.keys(parameters).forEach(key => {
-      countRequest.input(key, parameters[key]);
+    const countResult = await executeQuery(async (pool) => {
+      const request = pool.request();
+      Object.keys(parameters).forEach(key => {
+        request.input(key, sql.NVarChar, parameters[key]);
+      });
+      return await request.query(countQuery);
     });
-    const countResult = await countRequest.query(countQuery);
+    if (!countResult || !countResult.recordset || countResult.recordset.length === 0) {
+      return res.status(500).json({
+        code: 500,
+        message: '获取样板承认书总数失败'
+      });
+    }
     const total = countResult.recordset[0].total;
 
     // 查询数据 - 使用ROW_NUMBER()方式兼容SQL Server 2008 R2
@@ -146,14 +156,21 @@ router.get('/list', auth, async (req, res) => {
       ORDER BY CreateDate DESC
     `;
     
-    let dataRequest = pool.request();
-    Object.keys(parameters).forEach(key => {
-      dataRequest.input(key, parameters[key]);
+    const dataResult = await executeQuery(async (pool) => {
+      const request = pool.request();
+      Object.keys(parameters).forEach(key => {
+        request.input(key, sql.NVarChar, parameters[key]);
+      });
+      request.input('offset', sql.Int, offset);
+      request.input('pageSize', sql.Int, parseInt(pageSize));
+      return await request.query(dataQuery);
     });
-    dataRequest.input('offset', offset);
-    dataRequest.input('pageSize', parseInt(pageSize));
-    
-    const dataResult = await dataRequest.query(dataQuery);
+    if (!dataResult) {
+      return res.status(500).json({
+        code: 500,
+        message: '获取样板承认书列表失败'
+      });
+    }
 
     // 日期格式转换函数：将ISO日期转换为yyyy-MM-dd格式并处理时区偏移
     const formatDate = (date) => {
@@ -246,9 +263,6 @@ router.post('/create', auth, async (req, res) => {
     // 自动生成样版编号
     const certificateNo = await generateCertificateNo();
 
-    const pool = await poolPromise;
-    const request = pool.request();
-
     const query = `
       INSERT INTO SampleApproval (
         CertificateNo, CustomerNo, WorkOrderNo, ProductNo, ProductName, ProductSpec,
@@ -263,31 +277,39 @@ router.post('/create', auth, async (req, res) => {
       )
     `;
 
-    request.input('certificateNo', sql.NVarChar, certificateNo);
-    request.input('customerNo', sql.NVarChar, customerNo);
-    request.input('workOrderNo', sql.NVarChar, workOrderNo);
-    request.input('productNo', sql.NVarChar, productNo);
-    request.input('productName', sql.NVarChar, productName);
-    request.input('productSpec', sql.NVarChar, productSpec);
-    request.input('productDrawing', sql.NVarChar, productDrawing);
-    request.input('colorCardImage', sql.NVarChar, colorCardImage);
-    request.input('colorCardQuantity', sql.Int, colorCardQuantity);
-    request.input('createDate', sql.Date, createDate);
-    request.input('creator', sql.NVarChar, creator);
-    request.input('follower', sql.NVarChar, follower);
-    request.input('receiver', sql.NVarChar, receiver);
-    request.input('returnQuantity', sql.Int, returnQuantity);
-    request.input('signer', sql.NVarChar, signer);
-    request.input('signDate', sql.Date, signDate);
-    request.input('receiveDate', sql.Date, receiveDate);
-    request.input('judgment', sql.NVarChar, judgment);
-    request.input('distributionDepartment', sql.NVarChar, JSON.stringify(distributionDepartment));
-    request.input('distributionQuantity', sql.Int, distributionQuantity);
-    request.input('sampleStatus', sql.NVarChar, sampleStatus);
-    request.input('expiryDate', sql.Date, expiryDate);
-    request.input('remark', sql.NVarChar, remark);
-
-    await request.query(query);
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      request.input('certificateNo', sql.NVarChar, certificateNo);
+      request.input('customerNo', sql.NVarChar, customerNo);
+      request.input('workOrderNo', sql.NVarChar, workOrderNo);
+      request.input('productNo', sql.NVarChar, productNo);
+      request.input('productName', sql.NVarChar, productName);
+      request.input('productSpec', sql.NVarChar, productSpec);
+      request.input('productDrawing', sql.NVarChar, productDrawing);
+      request.input('colorCardImage', sql.NVarChar, colorCardImage);
+      request.input('colorCardQuantity', sql.Int, colorCardQuantity);
+      request.input('createDate', sql.Date, createDate);
+      request.input('creator', sql.NVarChar, creator);
+      request.input('follower', sql.NVarChar, follower);
+      request.input('receiver', sql.NVarChar, receiver);
+      request.input('returnQuantity', sql.Int, returnQuantity);
+      request.input('signer', sql.NVarChar, signer);
+      request.input('signDate', sql.Date, signDate);
+      request.input('receiveDate', sql.Date, receiveDate);
+      request.input('judgment', sql.NVarChar, judgment);
+      request.input('distributionDepartment', sql.NVarChar, JSON.stringify(distributionDepartment));
+      request.input('distributionQuantity', sql.Int, distributionQuantity);
+      request.input('sampleStatus', sql.NVarChar, sampleStatus);
+      request.input('expiryDate', sql.Date, expiryDate);
+      request.input('remark', sql.NVarChar, remark);
+      return await request.query(query);
+    });
+    if (!result) {
+      return res.status(500).json({
+        code: 500,
+        message: '创建样板承认书失败'
+      });
+    }
 
     res.json({
       code: 200,
@@ -336,9 +358,6 @@ router.put('/update/:id', auth, async (req, res) => {
       remark
     } = req.body;
 
-    const pool = await poolPromise;
-    const request = pool.request();
-
     const query = `
       UPDATE SampleApproval SET
         CertificateNo = @certificateNo,
@@ -367,32 +386,40 @@ router.put('/update/:id', auth, async (req, res) => {
       WHERE ID = @id
     `;
 
-    request.input('id', sql.Int, id);
-    request.input('certificateNo', sql.NVarChar, certificateNo);
-    request.input('customerNo', sql.NVarChar, customerNo);
-    request.input('workOrderNo', sql.NVarChar, workOrderNo);
-    request.input('productNo', sql.NVarChar, productNo);
-    request.input('productName', sql.NVarChar, productName);
-    request.input('productSpec', sql.NVarChar, productSpec);
-    request.input('productDrawing', sql.NVarChar, productDrawing);
-    request.input('colorCardImage', sql.NVarChar, colorCardImage);
-    request.input('colorCardQuantity', sql.Int, colorCardQuantity);
-    request.input('createDate', sql.Date, createDate);
-    request.input('creator', sql.NVarChar, creator);
-    request.input('follower', sql.NVarChar, follower);
-    request.input('receiver', sql.NVarChar, receiver);
-    request.input('returnQuantity', sql.Int, returnQuantity);
-    request.input('signer', sql.NVarChar, signer);
-    request.input('signDate', sql.Date, signDate);
-    request.input('receiveDate', sql.Date, receiveDate);
-    request.input('judgment', sql.NVarChar, judgment);
-    request.input('distributionDepartment', sql.NVarChar, JSON.stringify(distributionDepartment));
-    request.input('distributionQuantity', sql.Int, distributionQuantity);
-    request.input('sampleStatus', sql.NVarChar, sampleStatus);
-    request.input('expiryDate', sql.Date, expiryDate);
-    request.input('remark', sql.NVarChar, remark);
-
-    await request.query(query);
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      request.input('id', sql.Int, id);
+      request.input('certificateNo', sql.NVarChar, certificateNo);
+      request.input('customerNo', sql.NVarChar, customerNo);
+      request.input('workOrderNo', sql.NVarChar, workOrderNo);
+      request.input('productNo', sql.NVarChar, productNo);
+      request.input('productName', sql.NVarChar, productName);
+      request.input('productSpec', sql.NVarChar, productSpec);
+      request.input('productDrawing', sql.NVarChar, productDrawing);
+      request.input('colorCardImage', sql.NVarChar, colorCardImage);
+      request.input('colorCardQuantity', sql.Int, colorCardQuantity);
+      request.input('createDate', sql.Date, createDate);
+      request.input('creator', sql.NVarChar, creator);
+      request.input('follower', sql.NVarChar, follower);
+      request.input('receiver', sql.NVarChar, receiver);
+      request.input('returnQuantity', sql.Int, returnQuantity);
+      request.input('signer', sql.NVarChar, signer);
+      request.input('signDate', sql.Date, signDate);
+      request.input('receiveDate', sql.Date, receiveDate);
+      request.input('judgment', sql.NVarChar, judgment);
+      request.input('distributionDepartment', sql.NVarChar, JSON.stringify(distributionDepartment));
+      request.input('distributionQuantity', sql.Int, distributionQuantity);
+      request.input('sampleStatus', sql.NVarChar, sampleStatus);
+      request.input('expiryDate', sql.Date, expiryDate);
+      request.input('remark', sql.NVarChar, remark);
+      return await request.query(query);
+    });
+    if (!result) {
+      return res.status(500).json({
+        code: 500,
+        message: '更新样板承认书失败'
+      });
+    }
 
     res.json({
       code: 200,
@@ -415,13 +442,20 @@ router.put('/update/:id', auth, async (req, res) => {
 router.delete('/delete/:id', auth, async (req, res) => {
   try {
     const { id } = req.params;
-    const pool = await poolPromise;
-    const request = pool.request();
 
     const query = 'DELETE FROM SampleApproval WHERE ID = @id';
-    request.input('id', sql.Int, id);
     
-    await request.query(query);
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      request.input('id', sql.Int, id);
+      return await request.query(query);
+    });
+    if (!result) {
+      return res.status(500).json({
+        code: 500,
+        message: '删除样板承认书失败'
+      });
+    }
 
     res.json({
       code: 200,
@@ -451,17 +485,22 @@ router.delete('/batch-delete', auth, async (req, res) => {
       });
     }
 
-    const pool = await poolPromise;
-    const request = pool.request();
-
     const placeholders = ids.map((_, index) => `@id${index}`).join(',');
     const query = `DELETE FROM SampleApproval WHERE ID IN (${placeholders})`;
     
-    ids.forEach((id, index) => {
-      request.input(`id${index}`, sql.Int, id);
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      ids.forEach((id, index) => {
+        request.input(`id${index}`, sql.Int, id);
+      });
+      return await request.query(query);
     });
-    
-    await request.query(query);
+    if (!result) {
+      return res.status(500).json({
+        code: 500,
+        message: '批量删除样板承认书失败'
+      });
+    }
 
     res.json({
       code: 200,
@@ -483,11 +522,11 @@ router.delete('/batch-delete', auth, async (req, res) => {
  */
 router.get('/statistics', auth, async (req, res) => {
   try {
-    const pool = await poolPromise;
-    
     // 获取总数统计
     const totalQuery = 'SELECT COUNT(*) as total FROM SampleApproval';
-    const totalResult = await pool.request().query(totalQuery);
+    const totalResult = await executeQuery(async (pool) => {
+      return await pool.request().query(totalQuery);
+    });
     
     // 获取已回签数量：ReceiveDate字段存在有效日期即视为已回签
     const signedQuery = `
@@ -495,7 +534,9 @@ router.get('/statistics', auth, async (req, res) => {
       FROM SampleApproval 
       WHERE ReceiveDate IS NOT NULL
     `;
-    const signedResult = await pool.request().query(signedQuery);
+    const signedResult = await executeQuery(async (pool) => {
+      return await pool.request().query(signedQuery);
+    });
     
     // 获取未回签数量：ReceiveDate字段为空且SampleStatus不为"已作废"
     const unsignedQuery = `
@@ -504,7 +545,9 @@ router.get('/statistics', auth, async (req, res) => {
       WHERE ReceiveDate IS NULL 
         AND (SampleStatus != '已作废' OR SampleStatus IS NULL)
     `;
-    const unsignedResult = await pool.request().query(unsignedQuery);
+    const unsignedResult = await executeQuery(async (pool) => {
+      return await pool.request().query(unsignedQuery);
+    });
     
     // 获取已作废数量：SampleStatus字段值为"已作废"
     const cancelledQuery = `
@@ -512,7 +555,9 @@ router.get('/statistics', auth, async (req, res) => {
       FROM SampleApproval 
       WHERE SampleStatus = '已作废'
     `;
-    const cancelledResult = await pool.request().query(cancelledQuery);
+    const cancelledResult = await executeQuery(async (pool) => {
+      return await pool.request().query(cancelledQuery);
+    });
     
     // 获取即将到期的样板数量（30天内）
     const expiringQuery = `
@@ -523,7 +568,17 @@ router.get('/statistics', auth, async (req, res) => {
         AND ExpiryDate >= GETDATE()
         AND SampleStatus != '已作废'
     `;
-    const expiringResult = await pool.request().query(expiringQuery);
+    const expiringResult = await executeQuery(async (pool) => {
+      return await pool.request().query(expiringQuery);
+    });
+
+    // 检查所有查询结果
+    if (!totalResult || !signedResult || !unsignedResult || !cancelledResult || !expiringResult) {
+      return res.status(500).json({
+        code: 500,
+        message: '获取样板统计数据失败'
+      });
+    }
 
     res.json({
       code: 200,

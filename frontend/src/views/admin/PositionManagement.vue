@@ -336,13 +336,13 @@ function buildTree(list, parentId = null) {
 
 function getLevelTagType(level) {
   const typeMap = {
-    1: '',
+    1: 'primary',
     2: 'success',
     3: 'warning',
     4: 'danger',
     5: 'info'
   }
-  return typeMap[level] || ''
+  return typeMap[level] || 'primary'
 }
 
 function getLevelText(level) {
@@ -364,7 +364,7 @@ function formatDate(dateString) {
 // 获取部门列表
 const fetchDepartments = async () => {
   try {
-    const response = await axios.get('/api/departments')
+    const response = await axios.get('/departments')
     departmentList.value = response.data.data || []
   } catch (error) {
     console.error('获取部门列表失败:', error)
@@ -380,7 +380,7 @@ const fetchPositions = async () => {
       size: pagination.size,
       ...searchForm
     }
-    const response = await axios.get('/api/positions', { params })
+    const response = await axios.get('/positions', { params })
     const data = response.data.data || {}
     positionList.value = data.list || []
     pagination.total = data.total || 0
@@ -470,7 +470,7 @@ const submitForm = async () => {
     await formRef.value.validate()
     submitting.value = true
     
-    const url = isEdit.value ? `/api/positions/${currentEditId.value}` : '/api/positions'
+    const url = isEdit.value ? `/positions/${currentEditId.value}` : '/positions'
     const method = isEdit.value ? 'put' : 'post'
     
     await axios[method](url, formData)
@@ -501,7 +501,7 @@ const deletePosition = async (position) => {
       }
     )
     
-    await axios.delete(`/api/positions/${position.ID}`)
+    await axios.delete(`/positions/${position.ID}`)
     ElMessage.success('删除成功')
     await fetchPositions()
   } catch (error) {

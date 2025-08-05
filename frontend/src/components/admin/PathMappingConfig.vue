@@ -261,13 +261,10 @@ const checkUserPermission = async (showMessage = false) => {
   }
 
   const userInfo = userStore.user
-  console.log('用户信息:', userInfo)
 
   // 检查用户名是否为admin（忽略大小写）
   // 检查Username字段（注意大小写）
   isAdmin.value = userInfo.Username && userInfo.Username.toLowerCase() === 'admin'
-
-  console.log('是否为管理员:', isAdmin.value)
 
   if (!isAdmin.value && showMessage) {
     ElMessage.warning('只有管理员用户才能进行此操作')
@@ -402,7 +399,7 @@ const testConversion = async () => {
 
   isTesting.value = true
   try {
-    const response = await axios.post('/api/import/test-path-conversion', {
+    const response = await axios.post('/import/test-path-conversion', {
       path: testPath.value,
       mappings: pathMappings.value,
       config: conversionConfig
@@ -427,7 +424,7 @@ const testConversion = async () => {
 const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
-    const response = await axios.get('/api/import/path-mapping-config')
+    const response = await axios.get('/import/path-mapping-config')
     if (response.data.success) {
       const config = response.data.data
       if (config.pathMappings) {
@@ -484,7 +481,7 @@ const saveConfig = async () => {
 
   isSubmitting.value = true
   try {
-    const response = await axios.put('/api/import/path-mapping-config', {
+    const response = await axios.put('/import/path-mapping-config', {
       pathMappings: pathMappings.value.map(mapping => ({
         id: mapping.id,
         name: mapping.name,

@@ -11,7 +11,7 @@ let autoBackupConfig = null;
 
 // =============================================
 // 自动备份调度器辅助函数
-// =============================================
+// ============================================
 
 // 启动自动备份调度器
 const startAutoBackupScheduler = async (config) => {
@@ -992,7 +992,9 @@ router.post('/init-site-config', async (req, res) => {
     const sqlScript = fs.readFileSync(path.join(__dirname, '../create_siteconfig_table.sql'), 'utf8');
 
     // 执行SQL脚本
-    await executeQuery(sqlScript);
+    await executeQuery(async (pool) => {
+      return await pool.request().query(sqlScript);
+    });
 
     res.json({
       success: true,
@@ -1077,8 +1079,6 @@ router.get('/site-config', async (req, res) => {
 router.put('/site-config', async (req, res) => {
   try {
     const { siteName, companyName, logoBase64Img, faviconBase64Img, headerTitle, loginTitle, footerCopyright } = req.body;
-
-    console.log('网站配置保存请求:', { siteName, companyName, logoBase64Img, faviconBase64Img, headerTitle, loginTitle, footerCopyright });
 
     try {
       // 配置项映射
@@ -1328,15 +1328,30 @@ router.get('/table-list', async (req, res) => {
               WHEN t.TABLE_NAME = 'PathMappingConfig' THEN '路径映射配置表'
               WHEN t.TABLE_NAME = 'HomeCardConfig' THEN '主页卡片配置表'
               WHEN t.TABLE_NAME = 'SiteConfig' THEN '网站配置表'
+              WHEN t.TABLE_NAME = 'BackupRecord' THEN '备份记录表'
+              WHEN t.TABLE_NAME = 'ConversionConfig' THEN '转换配置表'
+              WHEN t.TABLE_NAME = 'CustomerComplaints' THEN '客户投诉表'
+              WHEN t.TABLE_NAME = 'Menus' THEN '菜单表'
+              WHEN t.TABLE_NAME = 'MonthlyBatchStats' THEN '月度批次统计表'
+              WHEN t.TABLE_NAME = 'Positions' THEN '职位表'
+              WHEN t.TABLE_NAME = 'ProductionReworkRegister' THEN '生产返工登记表'
+              WHEN t.TABLE_NAME = 'QualityLevelSettings' THEN '质量等级设置表'
+              WHEN t.TABLE_NAME = 'ReworkCategory' THEN '返工类别表'
+              WHEN t.TABLE_NAME = 'ReworkMethod' THEN '返工方法表'
+              WHEN t.TABLE_NAME = 'RoleDepartments' THEN '角色部门关联表'
+              WHEN t.TABLE_NAME = 'RoleMenus' THEN '角色菜单关联表'
+              WHEN t.TABLE_NAME = 'Roles' THEN '角色表'
+              WHEN t.TABLE_NAME = 'SampleApproval' THEN '样品承认书表'
+              WHEN t.TABLE_NAME = 'UserRoles' THEN '用户角色关联表'
               ELSE t.TABLE_NAME
             END as displayName,
             CASE
-              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig') THEN 'system'
-              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice') THEN 'basic'
+              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig', 'BackupRecord', 'ConversionConfig', 'Menus', 'Roles', 'RoleDepartments', 'RoleMenus', 'UserRoles', 'UserTokens') THEN 'system'
+              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice', 'Positions', 'QualityLevelSettings', 'ReworkCategory', 'ReworkMethod') THEN 'basic'
               ELSE 'business'
             END as tableType,
             CASE
-              WHEN t.TABLE_NAME IN ('ComplaintRegister', 'MaterialPrice', 'User', 'Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'UserTokens', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig') THEN 1
+              WHEN t.TABLE_NAME IN ('ComplaintRegister', 'MaterialPrice', 'User', 'Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'UserTokens', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig', 'BackupRecord', 'ConversionConfig', 'CustomerComplaints', 'Menus', 'MonthlyBatchStats', 'Positions', 'ProductionReworkRegister', 'QualityLevelSettings', 'ReworkCategory', 'ReworkMethod', 'RoleDepartments', 'RoleMenus', 'Roles', 'SampleApproval', 'UserRoles') THEN 1
               ELSE 0
             END as hasIdentity
           FROM INFORMATION_SCHEMA.TABLES t
@@ -1345,8 +1360,8 @@ router.get('/table-list', async (req, res) => {
             AND t.TABLE_NAME NOT LIKE 'sys%'
           ORDER BY
             CASE
-              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig') THEN 'system'
-              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice') THEN 'basic'
+              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig', 'BackupRecord', 'ConversionConfig', 'Menus', 'Roles', 'RoleDepartments', 'RoleMenus', 'UserRoles', 'UserTokens') THEN 'system'
+              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice', 'Positions', 'QualityLevelSettings', 'ReworkCategory', 'ReworkMethod') THEN 'basic'
               ELSE 'business'
             END,
             t.TABLE_NAME
@@ -1376,7 +1391,11 @@ router.get('/table-stats/:tableName', async (req, res) => {
       'ComplaintRegister', 'MaterialPrice', 'User', 'Workshop', 'Department',
       'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory',
       'DefectiveItem', 'UserTokens', 'DbConfig', 'PathMappingConfig',
-      'HomeCardConfig', 'SiteConfig'
+      'HomeCardConfig', 'SiteConfig', 'BackupRecord', 'ConversionConfig',
+      'CustomerComplaints', 'Menus', 'MonthlyBatchStats', 'Positions',
+      'ProductionReworkRegister', 'QualityLevelSettings', 'ReworkCategory',
+      'ReworkMethod', 'RoleDepartments', 'RoleMenus', 'Roles', 'SampleApproval',
+      'UserRoles'
     ];
 
     if (!validTables.includes(tableName)) {

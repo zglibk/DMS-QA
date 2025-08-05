@@ -356,7 +356,7 @@ const fetchOptions = async () => {
   try {
     const token = localStorage.getItem('token')
 
-    const response = await axios.get('/api/complaint/options', {
+    const response = await axios.get('/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -404,7 +404,7 @@ const fetchData = async () => {
     }
 
     const token = localStorage.getItem('token')
-    const response = await axios.get('/api/complaint/list', {
+    const response = await axios.get('/complaint/list', {
       params,
       headers: { Authorization: `Bearer ${token}` }
     })

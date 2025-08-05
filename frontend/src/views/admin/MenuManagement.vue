@@ -469,7 +469,7 @@ const fetchMenus = async () => {
     })
     
     // 获取菜单列表数据
-    const response = await axios.get('/api/menus', { params })
+    const response = await axios.get('/menus', { params })
     const allMenus = response.data.data.list || []
     
     // 构建树形结构
@@ -631,7 +631,7 @@ const submitForm = async () => {
     await formRef.value.validate()
     submitting.value = true
     
-    const url = isEdit.value ? `/api/menus/${currentEditId.value}` : '/api/menus'
+    const url = isEdit.value ? `/menus/${currentEditId.value}` : '/menus'
     const method = isEdit.value ? 'put' : 'post'
     
     await axios[method](url, formData)
@@ -662,7 +662,7 @@ const deleteMenu = async (menu) => {
       }
     )
     
-    await axios.delete(`/api/menus/${menu.ID}`)
+    await axios.delete(`/menus/${menu.ID}`)
     ElMessage.success('删除成功')
     await fetchMenus()
   } catch (error) {

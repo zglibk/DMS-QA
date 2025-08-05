@@ -1110,7 +1110,7 @@ const loadData = async () => {
     }
     delete params.defectRateRange
     
-    const response = await apiService.get('/api/customer-complaints', { params })
+    const response = await apiService.get('/customer-complaints', { params })
     if (response.data.success) {
       // 将后端返回的PascalCase字段转换为前端使用的camelCase字段
       const convertedData = (response.data.data || []).map(item => ({
@@ -1243,7 +1243,7 @@ const handleDelete = async (row) => {
       type: 'warning'
     })
     
-    const response = await apiService.delete(`/api/customer-complaints/${row.id}`)
+    const response = await apiService.delete(`/customer-complaints/${row.id}`)
     if (response.data.success) {
       ElMessage.success('删除成功')
       loadData()
@@ -1281,9 +1281,9 @@ const handleSubmit = async () => {
     
     let response
     if (isEdit.value) {
-      response = await apiService.put(`/api/customer-complaints/${formData.id}`, submitData)
+      response = await apiService.put(`/customer-complaints/${formData.id}`, submitData)
     } else {
-      response = await apiService.post('/api/customer-complaints', submitData)
+      response = await apiService.post('/customer-complaints', submitData)
     }
     
     if (response.data.success) {
@@ -1493,7 +1493,7 @@ const handleBatchDelete = async () => {
 
     const ids = selectedRows.value.map(row => row.id)
     
-    const response = await apiService.post('/api/customer-complaints-batch/delete', {
+    const response = await apiService.post('/customer-complaints-batch/delete', {
       ids: ids
     })
 

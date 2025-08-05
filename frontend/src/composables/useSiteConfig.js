@@ -65,7 +65,7 @@ const loadSiteConfig = async () => {
   isLoading.value = true
   try {
     // 请求网站配置API
-    const response = await axios.get('/api/config/site-config')
+    const response = await axios.get('/config/site-config')
 
     if (response.data.success) {
       // 合并新配置到全局状态

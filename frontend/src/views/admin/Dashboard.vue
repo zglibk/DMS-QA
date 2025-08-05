@@ -346,19 +346,19 @@ async function fetchDashboardData() {
 
     // 并行获取当前月份和上月数据，以及批次统计数据
     const [currentRes, lastMonthRes, currentBatchRes, lastBatchRes] = await Promise.all([
-      axios.get('/api/complaint/month-stats', {
+      axios.get('/complaint/month-stats', {
         headers: { Authorization: `Bearer ${token}` },
         params: { month: selectedMonth.value }
       }),
-      axios.get('/api/complaint/month-stats', {
+      axios.get('/complaint/month-stats', {
         headers: { Authorization: `Bearer ${token}` },
         params: { month: getLastMonth(selectedMonth.value) }
       }),
-      axios.get('/api/quality-metrics/month-batch-stats', {
+      axios.get('/quality-metrics/month-batch-stats', {
         headers: { Authorization: `Bearer ${token}` },
         params: { month: selectedMonth.value }
       }),
-      axios.get('/api/quality-metrics/month-batch-stats', {
+      axios.get('/quality-metrics/month-batch-stats', {
         headers: { Authorization: `Bearer ${token}` },
         params: { month: getLastMonth(selectedMonth.value) }
       })
@@ -421,7 +421,7 @@ async function fetchQualityStats(token) {
     // 并行获取数据
     const [innerComplaintRes, outerComplaintRes, batchStatsRes] = await Promise.all([
       // 获取内诉数量（不合格数）
-      axios.get('/api/complaint/list', {
+      axios.get('/complaint/list', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           page: 1,
@@ -432,7 +432,7 @@ async function fetchQualityStats(token) {
         }
       }),
       // 获取客诉批次数量
-      axios.get('/api/complaint/list', {
+      axios.get('/complaint/list', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           page: 1,
@@ -443,7 +443,7 @@ async function fetchQualityStats(token) {
         }
       }),
       // 获取月度批次统计数据
-      axios.get('/api/quality-metrics/month-batch-stats', {
+      axios.get('/quality-metrics/month-batch-stats', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           month: selectedMonth.value
@@ -498,7 +498,7 @@ async function fetchLastQualityStats(token) {
     // 并行获取上月数据
     const [innerComplaintRes, outerComplaintRes, batchStatsRes] = await Promise.all([
       // 获取上月内诉数量
-      axios.get('/api/complaint/list', {
+      axios.get('/complaint/list', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           page: 1,
@@ -509,7 +509,7 @@ async function fetchLastQualityStats(token) {
         }
       }),
       // 获取上月客诉数量
-      axios.get('/api/complaint/list', {
+      axios.get('/complaint/list', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           page: 1,
@@ -520,7 +520,7 @@ async function fetchLastQualityStats(token) {
         }
       }),
       // 获取上月批次统计数据
-      axios.get('/api/quality-metrics/month-batch-stats', {
+      axios.get('/quality-metrics/month-batch-stats', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           month: lastMonth
@@ -555,7 +555,7 @@ async function fetchLastQualityStats(token) {
 async function fetchTrendData(token) {
   try {
     const currentYear = new Date().getFullYear()
-    const response = await axios.get('/api/quality-metrics/trends', {
+    const response = await axios.get('/quality-metrics/trends', {
       headers: { Authorization: `Bearer ${token}` },
       params: { year: currentYear }
     })

@@ -52,9 +52,14 @@ const config = {
     collation: 'Chinese_PRC_CI_AS' // 设置中文排序规则
   },
   pool: {
-    max: 10,                     // 连接池最大连接数
-    min: 0,                      // 连接池最小连接数
-    idleTimeoutMillis: 30000     // 空闲连接超时时间
+    max: 20,        // 增加最大连接数以支持更多并发请求
+    min: 2,         // 保持最小连接数以减少连接创建开销
+    idleTimeoutMillis: 60000,  // 增加空闲超时时间
+    acquireTimeoutMillis: 30000,  // 获取连接的超时时间
+    createTimeoutMillis: 30000,   // 创建连接的超时时间
+    destroyTimeoutMillis: 5000,   // 销毁连接的超时时间
+    reapIntervalMillis: 1000,     // 检查空闲连接的间隔
+    createRetryIntervalMillis: 200  // 重试创建连接的间隔
   }
 };
 
@@ -136,9 +141,14 @@ async function getDynamicConfig() {
           collation: 'Chinese_PRC_CI_AS' // 设置中文排序规则
         },
         pool: {
-          max: 10,
-          min: 0,
-          idleTimeoutMillis: 30000
+          max: 20,        // 增加最大连接数以支持更多并发请求
+          min: 2,         // 保持最小连接数以减少连接创建开销
+          idleTimeoutMillis: 60000,  // 增加空闲超时时间
+          acquireTimeoutMillis: 30000,  // 获取连接的超时时间
+          createTimeoutMillis: 30000,   // 创建连接的超时时间
+          destroyTimeoutMillis: 5000,   // 销毁连接的超时时间
+          reapIntervalMillis: 1000,     // 检查空闲连接的间隔
+          createRetryIntervalMillis: 200  // 重试创建连接的间隔
         }
       };
       configCacheTime = now;

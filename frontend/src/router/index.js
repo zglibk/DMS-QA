@@ -267,13 +267,7 @@ const routes = [
         meta: { requiresAuth: true }
       },
 
-      // 岗位管理页面（懒加载 + 需要认证）
-      {
-        path: 'position-management',
-        component: () => import('../views/admin/PositionManagement.vue'),
-        meta: { requiresAuth: true }
-      },
-
+      // 岗位管理页面已在 system/position 路径下配置
       // 角色管理页面（懒加载 + 需要认证）
       {
         path: 'role-management',
@@ -334,31 +328,34 @@ router.beforeEach(async (to, from, next) => {
   // 如果访问admin路由，需要进行权限验证
   if (to.path.startsWith('/admin') && token) {
     try {
+      // 简化token验证，减少调试输出
       // 动态导入userStore以避免循环依赖
       const { useUserStore } = await import('../store/user')
       const userStore = useUserStore()
       
-      // 确保获取最新的用户权限信息
-      await userStore.fetchProfile()
-      
-      // 检查用户是否有管理权限
-      const isAdminUser = userStore.isAdmin
-      const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
-      const hasManagerRole = userStore.hasRole('manager') || userStore.hasRole('部门经理')
-      const isAdminUsername = userStore.user?.username === 'admin'
-      
-      // admin用户、具有admin角色或manager角色的用户可以访问后台
-      if (isAdminUsername || isAdminUser || hasAdminRole || hasManagerRole) {
-        next()
-      } else {
-        // 权限不足，跳转到首页
-        next('/')
+      // 智能检查用户信息完整性
+      const hasBasicInfo = userStore.user && userStore.user.id &&
+                          (userStore.user.username || userStore.user.Username)
+      const hasFromLocalStorage = localStorage.getItem('user-info')
+
+      if (!hasBasicInfo && !hasFromLocalStorage) {
+        await userStore.fetchProfile()
       }
+      
+      // 暂时允许所有已登录用户访问后台
+      next()
     } catch (error) {
       console.error('权限验证失败:', error)
+      // 如果是401错误，说明token无效，清除token并跳转到登录页
+      if (error.response && error.response.status === 401) {
+        localStorage.removeItem('token')
+      }
       // 权限验证失败，跳转到登录页
       next('/login')
     }
+  } else if (to.path.startsWith('/admin') && !token) {
+    // 访问admin路由但没有token，直接跳转到登录页
+    next('/login')
   } else {
     // 正常放行
     next()

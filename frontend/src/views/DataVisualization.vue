@@ -278,7 +278,7 @@ const formatDate = (dateStr) => {
 const fetchBasicData = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/api/complaint/options', {
+    const res = await axios.get('/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -322,7 +322,7 @@ const fetchStatsData = async () => {
 const fetchRecentComplaints = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/api/complaint/list', {
+    const res = await axios.get('/complaint/list', {
       headers: { Authorization: `Bearer ${token}` },
       params: { page: 1, pageSize: 10 }
     })

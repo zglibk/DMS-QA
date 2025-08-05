@@ -2,8 +2,7 @@
   <div class="code-display">
     <div class="code-header" v-if="title">
       <span class="code-title">{{ title }}</span>
-      <el-button 
-        type="text" 
+      <el-button :link="true" 
         size="small" 
         @click="copyCode"
         class="copy-btn"

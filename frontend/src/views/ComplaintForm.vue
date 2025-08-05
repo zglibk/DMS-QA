@@ -468,7 +468,7 @@ const { user } = storeToRefs(userStore)
 const fetchOptions = async () => {
   try {
     const token = localStorage.getItem('token');
-    const res = await axios.get('/api/complaint/options', {
+    const res = await axios.get('/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -494,7 +494,7 @@ const handleCategoryChange = async (selectedCategory) => {
   if (selectedCategory && selectedCategory.ID) {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`/api/complaint/defective-items/${selectedCategory.ID}`, {
+      const res = await axios.get(`/complaint/defective-items/${selectedCategory.ID}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // 后端直接返回字符串数组，无需转换
@@ -527,12 +527,12 @@ const submitForm = () => {
         let res
         if (isEditMode.value) {
           // 编辑模式：使用PUT请求更新
-          res = await axios.put(`/api/complaint/${editId.value}`, submissionData, {
+          res = await axios.put(`/complaint/${editId.value}`, submissionData, {
             headers: { Authorization: `Bearer ${token}` }
           });
         } else {
           // 新增模式：使用POST请求创建
-          res = await axios.post('/api/complaint', submissionData, {
+          res = await axios.post('/complaint', submissionData, {
             headers: { Authorization: `Bearer ${token}` }
           });
         }
@@ -562,7 +562,7 @@ const loadEditData = async (id) => {
   try {
     loading.value = true
     const token = localStorage.getItem('token')
-    const response = await axios.get(`/api/complaint/detail/${id}`, {
+    const response = await axios.get(`/complaint/detail/${id}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 

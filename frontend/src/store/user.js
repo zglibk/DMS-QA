@@ -17,27 +17,52 @@ import { defineStore } from 'pinia'
 import apiService from '../services/apiService.js'
 
 export const useUserStore = defineStore('user', {
-  state: () => ({
-    // 用户认证token
-    token: localStorage.getItem('token') || null,
-    user: {
+  state: () => {
+    // 从localStorage恢复用户信息
+    const savedUser = localStorage.getItem('user-info')
+    let restoredUser = null
+
+    try {
+      restoredUser = savedUser ? JSON.parse(savedUser) : null
+      // 静默恢复用户信息，减少调试输出
+    } catch (error) {
+      localStorage.removeItem('user-info')
+    }
+
+    return {
+      // 用户认证token
+      token: localStorage.getItem('token') || null,
+    user: restoredUser || {
       id: null,
       username: '',
+      Username: '', // 兼容后端字段
       realName: '',
+      RealName: '', // 兼容后端字段
       email: '',
+      Email: '', // 兼容后端字段
       phone: '',
+      Phone: '', // 兼容后端字段
       gender: '',
+      Gender: '', // 兼容后端字段
       birthday: null,
+      Birthday: null, // 兼容后端字段
       address: '',
+      Address: '', // 兼容后端字段
       Avatar: '',
       status: 1,
+      Status: 1, // 兼容后端字段
       lastLoginTime: null, // 最后登录时间
       // 部门信息
       departmentId: null,
+      DepartmentID: null, // 兼容后端字段
       departmentName: '',
+      DepartmentName: '', // 兼容后端字段
       // 岗位信息
       positionId: null,
+      PositionID: null, // 兼容后端字段
       positionName: '',
+      PositionName: '', // 兼容后端字段
+      CreatedAt: null, // 后端字段
       // 角色信息（支持多角色）
       roles: [],
       // 权限信息
@@ -51,8 +76,13 @@ export const useUserStore = defineStore('user', {
     departments: [],
     positions: [],
     roles: [],
-    menus: []
-  }),
+    menus: [],
+
+    // 性能优化：缓存相关
+    lastFetchTime: 0, // 最后获取用户信息的时间戳
+    fetchCacheDuration: 5 * 60 * 1000 // 5分钟缓存时间
+    }
+  },
 
   getters: {
     // 获取用户的所有角色ID
@@ -94,24 +124,35 @@ export const useUserStore = defineStore('user', {
      */
     async fetchProfile(forceRefresh = false) {
       try {
-        console.log('fetchProfile调用，forceRefresh:', forceRefresh)
-        
-        // 如果用户信息已存在且不强制刷新，则跳过基本信息获取
-        if (!forceRefresh && this.user && this.user.id && this.user.username) {
-          console.log('用户基本信息已存在，跳过重复获取')
+        // 减少调试输出，只在强制刷新时输出
+
+        // 检查缓存是否有效
+        const now = Date.now()
+        const cacheValid = !forceRefresh &&
+                          this.lastFetchTime > 0 &&
+                          (now - this.lastFetchTime) < this.fetchCacheDuration
+
+        // 如果用户信息已存在且缓存有效，则跳过获取
+        const hasUsername = this.user && this.user.id && (this.user.username || this.user.Username)
+        if (cacheValid && hasUsername) {
           // 仅在权限信息缺失时获取权限
-          if (!this.user.roles || this.user.roles.length === 0) {
+          if (!this.user.roles || this.user.roles.length === 0 ||
+              !this.user.permissions || !this.user.permissions.menus) {
             await this.fetchUserRolesAndPermissions(this.user.id)
           }
           return { success: true, data: this.user }
         }
 
-        console.log('开始从后端获取用户资料...')
-        const response = await apiService.get('/api/auth/profile')
+        // 如果从localStorage恢复了完整的用户信息，也跳过API调用
+        if (!forceRefresh && hasUsername && this.user.roles && this.user.roles.length > 0) {
+          this.lastFetchTime = Date.now() // 更新缓存时间
+          return { success: true, data: this.user }
+        }
+
+        const response = await apiService.get('/auth/profile')
+
         if (response.data.success) {
           const userData = response.data.data
-          console.log('从后端获取到的用户数据:', userData)
-          console.log('更新前store中的头像:', this.user?.Avatar)
           
           // 设置基本用户信息 - 使用setUser方法确保响应式更新
           const newUserData = {
@@ -148,14 +189,14 @@ export const useUserStore = defineStore('user', {
           // 使用setUser方法确保响应式更新
           this.setUser(newUserData)
           
-          console.log('用户数据更新完成，新的头像:', this.user.Avatar)
-          
           // 获取用户角色和权限信息
           await this.fetchUserRolesAndPermissions(userData.ID)
+
+          // 更新缓存时间
+          this.lastFetchTime = Date.now()
         }
         return response.data
       } catch (error) {
-        console.error('获取用户资料失败:', error)
         throw error
       }
     },
@@ -169,7 +210,6 @@ export const useUserStore = defineStore('user', {
         // 使用传入的userId或当前用户ID，确保ID存在
         const targetUserId = userId || this.user.id
         if (!targetUserId) {
-          console.warn('用户ID不存在，无法获取权限信息')
           // 设置默认权限结构
           this.user.roles = []
           this.user.permissions = {
@@ -180,20 +220,23 @@ export const useUserStore = defineStore('user', {
           return
         }
 
-        const response = await apiService.get(`/api/auth/user/${targetUserId}/roles-permissions`)
+        const response = await apiService.get(`/auth/user/${targetUserId}/roles-permissions`)
         if (response.data.success) {
           const data = response.data.data
-          console.log('获取到的权限数据:', data)
           
           this.user.roles = data.roles || []
           this.user.permissions = {
             menus: data.menus || data.permissions || [],
             departments: data.departments || [],
             actions: data.actions || []
+          }      
+
+          // 保存更新后的用户信息（包含权限）到localStorage
+          try {
+            localStorage.setItem('user-info', JSON.stringify(this.user))
+          } catch (error) {
+            // 静默处理保存失败
           }
-          
-          console.log('设置的用户权限:', this.user.permissions)
-          console.log('菜单权限数量:', this.user.permissions.menus.length)
         }
       } catch (error) {
         console.error('获取用户权限失败:', error)
@@ -201,7 +244,7 @@ export const useUserStore = defineStore('user', {
         // 如果是401错误，说明token已失效，不需要额外处理
         // 响应拦截器会自动处理token清除和跳转
         if (error.response?.status === 401) {
-          console.log('权限验证失败，token可能已失效')
+          // token失效，静默处理
           return
         }
         
@@ -218,7 +261,7 @@ export const useUserStore = defineStore('user', {
     // 获取所有部门列表
     async fetchDepartments() {
       try {
-        const response = await apiService.get('/api/departments')
+        const response = await apiService.get('/departments')
         if (response.data.success) {
           this.departments = response.data.data
         }
@@ -232,7 +275,7 @@ export const useUserStore = defineStore('user', {
     // 获取所有岗位列表
     async fetchPositions() {
       try {
-        const response = await apiService.get('/api/positions')
+        const response = await apiService.get('/positions')
         if (response.data.success) {
           this.positions = response.data.data
         }
@@ -246,7 +289,7 @@ export const useUserStore = defineStore('user', {
     // 获取所有角色列表
     async fetchRoles() {
       try {
-        const response = await apiService.get('/api/roles')
+        const response = await apiService.get('/roles')
         if (response.data.success) {
           this.roles = response.data.data
         }
@@ -260,7 +303,7 @@ export const useUserStore = defineStore('user', {
     // 获取所有菜单列表
     async fetchMenus() {
       try {
-        const response = await apiService.get('/api/menus')
+        const response = await apiService.get('/menus')
         if (response.data.success) {
           this.menus = response.data.data
         }
@@ -289,6 +332,13 @@ export const useUserStore = defineStore('user', {
     setUser(userData) {
       // 完全替换user对象以确保响应式更新
       this.user = { ...this.user, ...userData }
+
+      // 保存用户信息到localStorage以支持页面刷新后恢复
+      try {
+        localStorage.setItem('user-info', JSON.stringify(this.user))
+      } catch (error) {
+        // 静默处理保存失败
+      }
     },
 
     // 更新用户权限
@@ -310,22 +360,36 @@ export const useUserStore = defineStore('user', {
     clearUser() {
       this.token = null
       localStorage.removeItem('token')
+      localStorage.removeItem('user-info') // 清除用户信息缓存
       this.user = {
         id: null,
         username: '',
+        Username: '',
         realName: '',
+        RealName: '',
         email: '',
+        Email: '',
         phone: '',
+        Phone: '',
         gender: '',
+        Gender: '',
         birthday: null,
+        Birthday: null,
         address: '',
-        avatar: '',
+        Address: '',
+        Avatar: '',
         status: 1,
+        Status: 1,
         lastLoginTime: null,
         departmentId: null,
+        DepartmentID: null,
         departmentName: '',
+        DepartmentName: '',
         positionId: null,
+        PositionID: null,
         positionName: '',
+        PositionName: '',
+        CreatedAt: null,
         roles: [],
         permissions: {
           menus: [],

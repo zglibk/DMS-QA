@@ -185,7 +185,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Setting, Plus, Delete, ArrowDown, Tools, OfficeBuilding } from '@element-plus/icons-vue'
 import axios from 'axios'
@@ -213,8 +213,11 @@ const config = reactive({
   ]
 })
 
-// 预览顺序
-const previewOrder = computed(() => {
+// 预览顺序 - 使用响应式数组而不是computed属性
+const previewOrder = ref([])
+
+// 更新预览顺序的函数
+const updatePreviewOrder = () => {
   const items = []
   
   if (config.showTodayCount) {
@@ -234,8 +237,11 @@ const previewOrder = computed(() => {
     })
   })
   
-  return items
-})
+  previewOrder.value = items
+}
+
+// 监听配置变化，自动更新预览顺序
+watch(() => [config.showTodayCount, config.showMonthCount, config.displayUnits], updatePreviewOrder, { deep: true })
 
 // 获取车间和部门数据
 const loadWorkshopsAndDepartments = async () => {
@@ -243,8 +249,8 @@ const loadWorkshopsAndDepartments = async () => {
   try {
     // 并行获取车间和部门数据
     const [workshopsRes, departmentsRes] = await Promise.all([
-      axios.get('/api/config/workshops'),
-      axios.get('/api/config/departments')
+      axios.get('/config/workshops'),
+      axios.get('/config/departments')
     ])
 
     if (workshopsRes.data.success) {
@@ -304,6 +310,8 @@ const handleAddUnit = (type) => {
     enabled: true
   })
 
+  // 更新预览顺序
+  updatePreviewOrder()
   ElMessage.success(`已添加${type === 'workshop' ? '车间' : '部门'}：${defaultOption.Name}`)
 }
 
@@ -384,18 +392,23 @@ const handleTypeChange = (unit, index) => {
 // 删除单位
 const removeUnit = (index) => {
   config.displayUnits.splice(index, 1)
+  // 更新预览顺序
+  updatePreviewOrder()
 }
 
 // 加载配置
 const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
-    const response = await axios.get('/api/config/home-cards')
+    const response = await axios.get('/config/home-cards')
     if (response.data.success) {
       const data = response.data.data
       config.showTodayCount = data.showTodayCount !== false
       config.showMonthCount = data.showMonthCount !== false
       config.displayUnits = data.displayUnits || config.displayUnits
+      
+      // 更新预览顺序
+      updatePreviewOrder()
       
       if (showMessage) {
         ElMessage.success('配置刷新成功')
@@ -414,7 +427,7 @@ const loadConfig = async (showMessage = false) => {
 const saveConfig = async (setAsDefault = false) => {
   isSubmitting.value = true
   try {
-    const response = await axios.put('/api/config/home-cards', {
+    const response = await axios.put('/config/home-cards', {
       showTodayCount: config.showTodayCount,
       showMonthCount: config.showMonthCount,
       displayUnits: config.displayUnits,
@@ -463,16 +476,21 @@ const onDragEnd = () => {
     }
 
     // 找到对应的displayUnit
+    // 注意：previewOrder中的type是中文（'部门'、'车间'），需要转换为英文进行匹配
+    const itemTypeEn = item.type === '部门' ? 'department' : 'workshop'
     const unit = config.displayUnits.find(u =>
-      u.name === item.title && u.type === item.type
+      u.name === item.title && u.type === itemTypeEn
     )
     if (unit) {
-      newOrder.push(unit)
+      newOrder.push({ ...unit }) // 创建副本避免引用问题
     }
   })
 
-  config.displayUnits = newOrder
-  ElMessage.success('显示顺序已更新，请保存配置')
+  // 只有当顺序真的发生变化时才更新
+  if (newOrder.length > 0) {
+    config.displayUnits.splice(0, config.displayUnits.length, ...newOrder)
+    ElMessage.success('显示顺序已更新，请保存配置')
+  }
 }
 
 // 重置配置
@@ -486,6 +504,8 @@ const resetConfig = () => {
     { name: '设计', type: 'department', enabled: true },
     { name: '品检', type: 'department', enabled: true }
   ]
+  // 更新预览顺序
+  updatePreviewOrder()
   ElMessage.success('配置已重置为默认值')
 }
 
@@ -495,6 +515,8 @@ onMounted(async () => {
     loadConfig(),
     loadWorkshopsAndDepartments()
   ])
+  // 初始化预览顺序
+  updatePreviewOrder()
 })
 </script>
 

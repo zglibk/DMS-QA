@@ -226,7 +226,7 @@ const testSingleFile = async () => {
   singleFileResult.value = null
 
   try {
-    const response = await axios.post('/api/import/test-file-copy', {
+    const response = await axios.post('/import/test-file-copy', {
       filePath: singleFilePath.value.trim()
     })
 
@@ -271,7 +271,7 @@ const testBatchFiles = async () => {
     const results = []
     for (const path of paths) {
       try {
-        const response = await axios.post('/api/import/test-file-copy', {
+        const response = await axios.post('/import/test-file-copy', {
           filePath: path.trim()
         })
         results.push(response.data.data)
@@ -303,7 +303,7 @@ const testBatchFiles = async () => {
 const loadConfig = async () => {
   configLoading.value = true
   try {
-    const response = await axios.get('/api/import/path-mapping-config')
+    const response = await axios.get('/import/path-mapping-config')
     if (response.data.success) {
       config.value = response.data.data
     }

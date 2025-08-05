@@ -4,8 +4,7 @@
     <div class="dialog-header">
       <h2 class="dialog-title">{{ props.editData ? '编辑投诉' : '新增投诉' }}</h2>
       <el-button
-        class="dialog-close-btn"
-        type="text"
+        class="dialog-close-btn" :link="true"
         @click="handleCancel"
         :icon="Close"
         size="large"
@@ -660,7 +659,7 @@ const loading = ref(false)
 const fetchOptions = async () => {
   try {
     const token = localStorage.getItem('token');
-    const res = await axios.get('/api/complaint/options', {
+    const res = await axios.get('/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -690,7 +689,7 @@ const fetchMaterialNames = async () => {
   try {
     materialLoading.value = true;
     const token = localStorage.getItem('token');
-    const res = await axios.get('/api/admin/material-prices/material-names', {
+    const res = await axios.get('/admin/material-prices/material-names', {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -730,7 +729,7 @@ const handleMaterialChange = async (materialType, materialName) => {
 
   try {
     const token = localStorage.getItem('token');
-    const res = await axios.get('/api/admin/material-prices/get-price', {
+    const res = await axios.get('/admin/material-prices/get-price', {
       params: { materialName },
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -1004,7 +1003,7 @@ const handleCategoryChange = async (selectedCategory) => {
   if (selectedCategory && selectedCategory.ID) {
     try {
       const token = localStorage.getItem('token');
-      const res = await axios.get(`/api/complaint/defective-items/${selectedCategory.ID}`, {
+      const res = await axios.get(`/complaint/defective-items/${selectedCategory.ID}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       // 后端直接返回字符串数组，无需转换
@@ -1057,12 +1056,12 @@ const submitForm = () => {
         let res
         if (props.editData && props.editData.ID) {
           // 编辑模式：使用PUT请求更新
-          res = await axios.put(`/api/complaint/${props.editData.ID}`, submissionData, {
+          res = await axios.put(`/complaint/${props.editData.ID}`, submissionData, {
             headers: { Authorization: `Bearer ${token}` }
           });
         } else {
           // 新增模式：使用POST请求创建
-          res = await axios.post('/api/complaint', submissionData, {
+          res = await axios.post('/complaint', submissionData, {
             headers: { Authorization: `Bearer ${token}` }
           });
         }
@@ -1123,22 +1122,15 @@ const isImageFile = (fileName) => {
   return imageExtensions.includes(extension)
 }
 
-// 智能获取API基础URL - 使用现有的环境管理系统
+// 获取API基础URL - 使用vite配置自动设置的地址
 const getApiBaseUrl = () => {
-  // 使用axios的当前baseURL，这个已经通过smartApiDetector智能设置了
+  // 使用axios的当前baseURL，这个已经通过vite配置自动设置了
   if (axios.defaults.baseURL) {
     console.log('ComplaintFormDialog 使用axios默认baseURL:', axios.defaults.baseURL)
     return axios.defaults.baseURL
   }
 
-  // 降级方案：使用localStorage中保存的api-base
-  const savedApiBase = localStorage.getItem('api-base')
-  if (savedApiBase) {
-    console.log('ComplaintFormDialog 使用localStorage中的api-base:', savedApiBase)
-    return savedApiBase
-  }
-
-  // 最后降级：使用环境变量
+  // 降级方案：使用环境变量
   const envApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
   console.log('ComplaintFormDialog 使用环境变量VITE_API_BASE_URL:', envApiBase)
   return envApiBase
@@ -1240,7 +1232,7 @@ const generateFileName = async (originalFileName) => {
     const recordDate = form.value.Date || new Date().toISOString().split('T')[0]
     const token = localStorage.getItem('token')
 
-    const response = await axios.get('/api/complaint/sequence-number', {
+    const response = await axios.get('/complaint/sequence-number', {
       params: {
         date: recordDate,
         editId: props.editData?.ID // 编辑模式时传递当前记录ID
@@ -1414,7 +1406,7 @@ const uploadFileToServer = async (file, generatedFileName) => {
     }
 
     // 上传文件
-    const response = await axios.post('/api/upload/complaint-attachment', formData, {
+    const response = await axios.post('/upload/complaint-attachment', formData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'

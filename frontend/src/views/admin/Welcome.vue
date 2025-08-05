@@ -162,7 +162,7 @@
               </div>
             </div>
             <div class="notice-more">
-              <el-button type="text" @click="navigateTo('/admin/system/notices')">查看更多</el-button>
+              <el-button :link="true" @click="navigateTo('/admin/system/notices')">查看更多</el-button>
             </div>
           </el-card>
         </div>

@@ -74,8 +74,7 @@
         
         <el-table-column label="操作" width="120">
           <template #default="scope">
-            <el-button 
-              type="text" 
+            <el-button :link="true" 
               size="small" 
               @click="testPathAccess(scope.row)"
               :disabled="!scope.row.isAccessible"
@@ -129,7 +128,7 @@ const fetchPathAnalysis = async () => {
   loading.value = true
   try {
     const token = localStorage.getItem('token')
-    const response = await axios.get('/api/import/analyze-paths', {
+    const response = await axios.get('/import/analyze-paths', {
       headers: { Authorization: `Bearer ${token}` }
     })
     

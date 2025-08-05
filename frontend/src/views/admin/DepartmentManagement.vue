@@ -284,7 +284,7 @@ function buildTree(list, parentId = null) {
 const fetchDepartments = async () => {
   try {
     loading.value = true
-    const response = await axios.get('/api/departments')
+    const response = await axios.get('/departments')
     departmentList.value = response.data.data || []
   } catch (error) {
     console.error('获取部门列表失败:', error)
@@ -351,7 +351,7 @@ const submitForm = async () => {
     await formRef.value.validate()
     submitting.value = true
     
-    const url = isEdit.value ? `/api/departments/${currentEditId.value}` : '/api/departments'
+    const url = isEdit.value ? `/departments/${currentEditId.value}` : '/departments'
     const method = isEdit.value ? 'put' : 'post'
     
     await axios[method](url, formData)
@@ -409,8 +409,8 @@ const deleteDepartment = async (dept) => {
     
     // 构建删除请求URL
     const deleteUrl = cascadeDelete 
-      ? `/api/departments/${dept.ID}?cascade=true`
-      : `/api/departments/${dept.ID}`
+      ? `/departments/${dept.ID}?cascade=true`
+      : `/departments/${dept.ID}`
     
     const response = await axios.delete(deleteUrl)
     

@@ -182,7 +182,7 @@ const config = reactive({
 const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
-    const response = await axios.get('/api/config/site-config')
+    const response = await axios.get('/config/site-config')
     if (response.data.success) {
       const data = response.data.data
       Object.assign(config, data)
@@ -204,7 +204,7 @@ const loadConfig = async (showMessage = false) => {
 const saveConfig = async () => {
   isSubmitting.value = true
   try {
-    const response = await axios.put('/api/config/site-config', config)
+    const response = await axios.put('/config/site-config', config)
 
     if (response.data.success) {
       ElMessage.success('网站配置保存成功')
@@ -297,7 +297,7 @@ const uploadLogo = async (options) => {
     formData.append('file', options.file)
     formData.append('type', 'logo')
 
-    const response = await axios.post('/api/upload/site-image', formData, {
+    const response = await axios.post('/upload/site-image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -332,7 +332,7 @@ const uploadFavicon = async (options) => {
     formData.append('file', options.file)
     formData.append('type', 'favicon')
 
-    const response = await axios.post('/api/upload/site-image', formData, {
+    const response = await axios.post('/upload/site-image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }

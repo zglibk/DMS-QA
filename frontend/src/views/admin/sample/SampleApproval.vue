@@ -681,7 +681,7 @@ const formRules = {
 }
 
 // 上传地址
-const uploadUrl = '/api/upload'
+const uploadUrl = '/upload'
 
 // 计算属性
 const dialogTitle = computed(() => {
@@ -693,7 +693,7 @@ const dialogTitle = computed(() => {
  */
 async function loadPersonList() {
   try {
-    const response = await axios.get('/api/person/list?pageSize=1000&includeInactive=false')
+    const response = await axios.get('/person/list?pageSize=1000&includeInactive=false')
     if (response.data.success) {
       personList.value = response.data.data
     }
@@ -707,7 +707,7 @@ async function loadPersonList() {
  */
 async function loadDepartmentTree() {
   try {
-    const response = await axios.get('/api/departments/tree')
+    const response = await axios.get('/departments/tree')
     if (response.data.success) {
       departmentTree.value = response.data.data
     }
@@ -770,7 +770,7 @@ async function loadTableData() {
       delete params.createDateRange
     }
     
-    const response = await axios.get('/api/sample/list', { params })
+    const response = await axios.get('/sample/list', { params })
     
     if (response.data.code === 200) {
       tableData.value = response.data.data.list
@@ -794,7 +794,7 @@ async function loadTableData() {
  */
 async function loadStatistics() {
   try {
-    const response = await axios.get('/api/sample/statistics')
+    const response = await axios.get('/sample/statistics')
     
     if (response.data.code === 200) {
       const data = response.data.data
@@ -846,7 +846,7 @@ async function handleAdd() {
   
   try {
     // 获取下一个样版编号预览
-    const response = await axios.get('/api/sample/next-certificate-no')
+    const response = await axios.get('/sample/next-certificate-no')
     if (response.data.code === 200) {
       formData.certificateNo = response.data.data.certificateNo
     } else {
@@ -903,7 +903,7 @@ async function handleDelete(row) {
       }
     )
     
-    const response = await axios.delete(`/api/sample/delete/${row.id}`)
+    const response = await axios.delete(`/sample/delete/${row.id}`)
     
     if (response.data.code === 200) {
       ElMessage.success('删除成功')
@@ -975,7 +975,7 @@ async function handleExportList() {
     }
     
     // 获取数据
-    const response = await axios.get('/api/sample/list', { params })
+    const response = await axios.get('/sample/list', { params })
     
     if (response.data.code === 200) {
       const allData = response.data.data.list
@@ -1168,7 +1168,7 @@ async function handleBatchDelete() {
     )
     
     const ids = selectedRows.value.map(row => row.id)
-    const response = await axios.delete('/api/sample/batch-delete', { data: { ids } })
+    const response = await axios.delete('/sample/batch-delete', { data: { ids } })
     
     if (response.data.code === 200) {
       ElMessage.success('批量删除成功')
@@ -1325,12 +1325,12 @@ async function handleSubmit() {
     let response
     if (submitData.id) {
       // 更新
-      response = await axios.put(`/api/sample/update/${submitData.id}`, submitData)
+      response = await axios.put(`/sample/update/${submitData.id}`, submitData)
     } else {
       // 新增 - 移除id和certificateNo字段，由后端自动生成样版编号
       delete submitData.id
       delete submitData.certificateNo
-      response = await axios.post('/api/sample/create', submitData)
+      response = await axios.post('/sample/create', submitData)
     }
     
     if (response.data.code === 200) {

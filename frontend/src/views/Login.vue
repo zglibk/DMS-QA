@@ -34,70 +34,92 @@
     <div class="floating-circle-18"></div>
     <div class="floating-circle-19"></div>
     <div class="floating-circle-20"></div>
-
-    <div class="api-base-switch">
-      <el-popover placement="bottom" width="320" trigger="click">
-        <template #reference>
-          <el-button size="small" type="info">API地址设置</el-button>
-        </template>
-        <div style="display:flex;align-items:center;gap:8px;">
-          <el-input v-model="apiBaseInput" placeholder="如 http://localhost:3001" style="width:220px" />
-          <el-button size="small" type="primary" @click="saveApiBase">保存</el-button>
-        </div>
-        <div style="margin-top:8px;font-size:12px;color:#888;">当前：{{ apiBaseCurrent }}</div>
-        <div style="margin-top:4px;font-size:11px;color:#666;">默认端口：3001</div>
-      </el-popover>
-    </div>
+    
+    <!-- 使用Element Plus响应式布局容器 -->
     <div class="login-center-wrap">
-      <!-- 左侧插画区域 -->
-      <div class="login-illustration">
-        <InteractiveIllustration />
-        <div class="illustration-text">
-          <h3>DMS质量管理系统</h3>
-          <p>现代化的生产质量管理平台</p>
-        </div>
-      </div>
+      <el-row class="login-row" :gutter="40" justify="center" align="middle">
+        <!-- 左侧插画区域 -->
+        <el-col :xs="24" :sm="24" :md="12" :lg="10" :xl="10" class="illustration-col">
+          <div class="login-illustration">
+            <InteractiveIllustration />
+            <div class="illustration-text">
+              <h3>DMS质量管理系统</h3>
+              <p>现代化的质量数据管理平台</p>
+            </div>
+          </div>
+        </el-col>
 
-      <!-- 右侧登录表单 -->
-      <div class="login-box">
+        <!-- 右侧登录表单 -->
+        <el-col :xs="24" :sm="24" :md="12" :lg="10" :xl="10" class="login-col">
+          <div class="login-box">
         <div class="logo-container">
           <img :src="siteConfig?.logoBase64Img || '/logo.png'" alt="Logo" class="logo" @error="handleLogoError" />
         </div>
+        
+        <!-- 登录标题 - 使用Element Plus布局组件 -->
+        <el-row :gutter="0" class="login-title-row">
+          <el-col :span="24" style="text-align: center;">
+            <h2 class="login-title-text">欢迎登录</h2>
+          </el-col>
+        </el-row>
+        
         <!-- 登录表单 -->
-        <el-form ref="formRef" :model="form" :rules="rules" @submit.prevent="login">
-          <el-form-item prop="username">
-            <el-input v-model="form.username" placeholder="用户名" size="large">
-              <template #prefix>
-                <el-icon><User /></el-icon>
-              </template>
-            </el-input>
-          </el-form-item>
-          <el-form-item prop="password">
-            <el-input
-              v-model="form.password"
-              type="password"
-              placeholder="密码"
-              size="large"
-              show-password
-            >
-              <template #prefix>
-                <el-icon><Lock /></el-icon>
-              </template>
-            </el-input>
-          </el-form-item>
-          <el-form-item class="remember-me-item">
-            <el-checkbox v-model="form.rememberMe">记住密码</el-checkbox>
-          </el-form-item>
-          <el-form-item>
-            <div class="button-container">
-              <el-button type="info" @click="reset" class="btn-reset">重置</el-button>
-              <el-button type="primary" native-type="submit" class="btn-login">登录</el-button>
-            </div>
-          </el-form-item>
+        <el-form ref="formRef" :model="form" :rules="rules" @submit.prevent="login" class="login-form">
+          <div class="form-inputs">
+            <el-form-item prop="username">
+              <el-input v-model="form.username" placeholder="用户名" size="large">
+                <template #prefix>
+                  <el-icon><User /></el-icon>
+                </template>
+              </el-input>
+            </el-form-item>
+            <el-form-item prop="password">
+                <el-input
+                  v-model="form.password"
+                  type="password"
+                  placeholder="密码"
+                  size="large"
+                  show-password
+                >
+                  <template #prefix>
+                    <el-icon><Lock /></el-icon>
+                  </template>
+                </el-input>
+              </el-form-item>
+              
+              <!-- 验证码输入框 -->
+              <el-form-item prop="captchaText">
+                <div class="captcha-container">
+                  <el-input
+                    v-model="form.captchaText"
+                    placeholder="请输入验证码"
+                    class="captcha-input"
+                    @keyup.enter="login"
+                  >
+                    <template #prefix>
+                      <el-icon><Key /></el-icon>
+                    </template>
+                  </el-input>
+                  <div class="captcha-image" @click="refreshCaptcha" v-html="captchaSvg"></div>
+                </div>
+              </el-form-item>
+          </div>
+          
+          <div class="form-actions">
+            <el-form-item class="remember-me-item">
+              <el-checkbox v-model="form.rememberMe">记住密码</el-checkbox>
+            </el-form-item>
+            <el-form-item>
+              <div class="button-container">
+                <el-button type="info" @click="reset" class="btn-reset">重置</el-button>
+                <el-button type="primary" native-type="submit" class="btn-login">登录</el-button>
+              </div>
+            </el-form-item>
+          </div>
         </el-form>
-      </div>
-
-
+          </div>
+        </el-col>
+      </el-row>
     </div>
   </div>
 </template>
@@ -129,7 +151,7 @@ import axios from 'axios'
 // 路由管理
 import { useRouter } from 'vue-router'
 // Element Plus图标
-import { User, Lock } from '@element-plus/icons-vue'
+import { User, Lock, Key } from '@element-plus/icons-vue'
 // Element Plus消息组件
 import { ElMessage } from 'element-plus'
 // 用户状态管理
@@ -149,8 +171,13 @@ const formRef = ref()
 const form = ref({
   username: 'admin',      // 默认用户名（开发环境便利）
   password: '',           // 密码
+  captchaText: '',        // 验证码
+  captchaId: '',          // 验证码ID
   rememberMe: false       // 记住密码选项
 })
+
+// 验证码相关数据
+const captchaSvg = ref('')  // 验证码SVG图片
 
 // 路由实例
 const router = useRouter()
@@ -175,6 +202,10 @@ const rules = reactive({
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, max: 15, message: '密码长度在 6 到 15 个字符', trigger: 'blur' },
   ],
+  captchaText: [
+    { required: true, message: '请输入验证码', trigger: 'blur' },
+    { min: 4, max: 4, message: '验证码长度为4位', trigger: 'blur' },
+  ],
 })
 
 
@@ -185,6 +216,34 @@ const rules = reactive({
 
 
 
+/**
+ * 获取验证码
+ * 从后端API获取SVG格式的验证码图片
+ */
+const getCaptcha = async () => {
+  try {
+    const response = await axios.get('/auth/captcha')
+    captchaSvg.value = response.data.captchaSvg
+    form.value.captchaId = response.data.captchaId
+    form.value.captchaText = '' // 清空验证码输入
+  } catch (error) {
+    console.error('获取验证码失败:', error)
+    ElMessage.error('获取验证码失败，请重试')
+  }
+}
+
+/**
+ * 刷新验证码
+ * 点击验证码图片时重新获取验证码
+ */
+const refreshCaptcha = () => {
+  getCaptcha()
+}
+
+/**
+ * 用户登录方法
+ * 包含表单验证、验证码验证和用户认证
+ */
 const login = async () => {
   if (!formRef.value) return
   await formRef.value.validate(async (valid) => {
@@ -199,7 +258,13 @@ const login = async () => {
         localStorage.removeItem('login-info')
       }
       try {
-        const res = await axios.post('/api/auth/login', form.value)
+        const loginData = {
+          username: form.value.username,
+          password: form.value.password,
+          captchaId: form.value.captchaId,
+          captchaText: form.value.captchaText
+        }
+        const res = await axios.post('/auth/login', loginData)
         // 设置token到store和localStorage
         userStore.setToken(res.data.token)
         // 直接使用登录接口返回的用户信息，包括最后登录时间
@@ -210,10 +275,15 @@ const login = async () => {
         ElMessage.success('登录成功')
         router.push('/')
       } catch (e) {
-        if (e.response && e.response.status === 403) {
-          ElMessage.error(e.response.data.message || '该用户已被禁用，请联系管理员')
+        // 登录失败后刷新验证码
+        refreshCaptcha()
+        
+        if (e.response && e.response.data && e.response.data.message) {
+          ElMessage.error(e.response.data.message)
+        } else if (e.response && e.response.status === 403) {
+          ElMessage.error('该用户已被禁用，请联系管理员')
         } else {
-          ElMessage.error('登录失败：用户名或密码错误')
+          ElMessage.error('登录失败，请检查用户名和密码')
         }
       }
     } else {
@@ -235,6 +305,9 @@ const handleLogoError = (event) => {
 onMounted(() => {
   // 加载网站配置
   loadSiteConfig()
+  
+  // 初始化验证码
+  getCaptcha()
 
   const loginInfo = localStorage.getItem('login-info')
   if (loginInfo) {
@@ -252,26 +325,16 @@ watch(() => form.value.rememberMe, (isRemembered) => {
   }
 })
 
-const apiBaseInput = ref(localStorage.getItem('api-base') || import.meta.env.VITE_API_BASE || 'http://localhost:3001')
-const apiBaseCurrent = ref(axios.defaults.baseURL)
-const saveApiBase = () => {
-  if (!apiBaseInput.value) return ElMessage.error('API地址不能为空')
-  localStorage.setItem('api-base', apiBaseInput.value)
-  if (window.setApiBase) window.setApiBase(apiBaseInput.value)
-  apiBaseCurrent.value = apiBaseInput.value
-  ElMessage.success('API基础地址已切换为：' + apiBaseInput.value)
-}
+// API地址设置功能已移除，现在完全依赖vite配置
 </script>
 
 <style scoped>
 .login-container-flex {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   min-height: 100vh;
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-direction: column;
-  transition: min-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   position: relative;
   overflow: hidden;
 }
@@ -300,18 +363,29 @@ const saveApiBase = () => {
   z-index: 1;
 }
 .login-center-wrap {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.login-row {
+  min-height: 80vh;
+  width: 100%;
+}
+
+.illustration-col {
   display: flex;
   align-items: center;
   justify-content: center;
-  position: relative;
-  height: auto;
-  min-height: 0;
-  transition: min-height 0.5s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-  z-index: 2;
-  gap: 4rem;
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 2rem;
+}
+
+.login-col {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 左侧插画区域 */
@@ -348,24 +422,27 @@ const saveApiBase = () => {
 /* 右侧登录表单 */
 .login-box {
   background-color: white;
-  padding: 2.5rem 2.5rem 2.5rem 2.5rem;
-  padding-top: 5rem;
+  padding: 2rem 2.5rem 2.5rem; /* 减小上下内边距 */
+  padding-top: 4rem; /* 减小顶部内边距 */
   border-radius: 0.3rem;
   box-shadow: 0 0 1.2rem #d0d6e1;
-  width: 30rem;
-  max-width: 92vw;
+  width: 100%;
+  max-width: 380px; /* 减小原始宽度，使登录框更紧凑 */
+  min-height: 500px; /* 减小最小高度 */
   position: relative;
   z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: 0;
+  justify-content: space-between;
+  margin: 0 auto;
+  margin-left: 10rem;
   font-size: 1.1rem;
   flex-shrink: 0;
 }
 .logo-container {
   position: absolute;
-  top: -3.125rem;
+  top: -3rem;
   left: 50%;
   transform: translateX(-50%);
   background: #fff;
@@ -386,7 +463,91 @@ const saveApiBase = () => {
   max-height: 100%;
 }
 
+/* 登录标题样式 - 使用Element Plus布局组件 */
+.login-title-row {
+  margin: 3px 0 3px 0;
+}
 
+.login-title-text {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #409eff;
+  letter-spacing: 0.5px;
+  line-height: 1.2;
+}
+
+/* 验证码样式 */
+.captcha-container {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+}
+
+.captcha-input {
+  flex: 1;
+}
+
+.captcha-image {
+  width: 120px;
+  height: 40px;
+  border: 1px solid #dcdfe6;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f7fa;
+  transition: all 0.3s;
+}
+
+.captcha-image:hover {
+  border-color: #409eff;
+  background: #ecf5ff;
+}
+
+.captcha-image svg {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+}
+
+/* 登录表单布局 */
+.login-form {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  margin-top: -8px; /* 减小表单与标题的间距 */
+}
+
+.form-inputs {
+  flex: 1;
+}
+
+.form-actions {
+  margin-top: auto;
+  padding-top: 2rem;
+}
+
+/* 记住密码样式 */
+.remember-me-item {
+  margin-bottom: 1.5rem !important;
+}
+
+/* 按钮容器样式 */
+.button-container {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+}
+
+.btn-reset,
+.btn-login {
+  flex: 1;
+  height: 2.5rem;
+}
 
 .config-drawer {
   background: #fff;
@@ -445,7 +606,7 @@ const saveApiBase = () => {
 
 /* 增加配置对话框中按钮的高度 */
 .config-drawer .el-button--small {
-  height: 40px; /* 原来约30px，增加1/3约为40px */
+  height: 40px;
   line-height: 38px;
   font-size: 13px;
 }
@@ -626,102 +787,154 @@ const saveApiBase = () => {
   flex: 0 0 25%;
   max-width: 25%;
 }
-@media (max-width: 900px) {
-  .login-container-flex { flex-direction: column; }
-  .login-center-wrap { flex-direction: column; align-items: center; gap: 2rem; }
+/* PC端登录框最大宽度设置 */
+.login-box {
+  max-width: 380px; /* PC端最大宽度限制，与原始宽度保持一致 */
+}
+
+/* 大屏幕设备优化 */
+@media (min-width: 1200px) {
+  .login-center-wrap {
+    max-width: 1600px;
+    padding: 3rem;
+  }
+  
+  .login-row {
+    min-height: 80vh;
+  }
+  
   .login-illustration {
-    max-width: 90vw;
-    min-height: 300px;
-    transform: scale(0.8);
+    max-width: 500px;
   }
-  .illustration-text h3 { font-size: 1.5rem; }
-  .illustration-text p { font-size: 1rem; }
-  .login-box { width: 95vw; min-width: 0; margin-bottom: 0; font-size: 1rem; }
-  .logo-container { min-width: 16vw; min-height: 16vw; max-width: 22vw; max-height: 22vw; }
-  .logo { max-width: 12vw; max-height: 12vw; }
-  .button-container { gap: 2vw; }
-  .config-drawer {
-    margin-left: 0;
-    margin-top: 1.5rem;
-    width: 95vw;
-    min-width: 0;
-    max-height: 70vh;
-    overflow-y: auto;
-    overflow-x: hidden;
+  
+  .login-box {
+    max-width: 420px; /* 大屏幕下稍大一些，但保持紧凑 */
   }
-  .login-container-flex.config-open,
-  .login-center-wrap.config-open {
-    min-height: unset;
-    height: unset;
-    justify-content: flex-start;
-    align-items: flex-start;
-  }
-  .config-toggle-btn {
-    position: static;
-    margin: 1.2rem auto 0 auto;
-    width: 8.5rem;
-    height: 2.5rem;
-    flex-direction: row;
-    border-radius: 1.25rem;
-    background: linear-gradient(90deg, #1677ff 0%, #4096ff 100%);
-    box-shadow: 0 4px 20px rgba(22, 119, 255, 0.3);
+}
+
+/* 平板和小屏幕设备 */
+@media (max-width: 992px) {
+  .login-center-wrap {
+    display: flex;
     justify-content: center;
     align-items: center;
-    right: unset;
-    left: unset;
-    top: unset;
-    transform: none;
-    z-index: 3;
+    min-height: 100vh;
   }
-
-  .config-toggle-btn::after {
-    display: none;
+  
+  .login-row {
+    min-height: auto;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
   }
-  .config-toggle-text {
-    writing-mode: horizontal-tb;
-    margin-bottom: 0;
-    margin-right: 0.5rem;
-    font-size: 0.95rem;
-    color: #ffffff;
+  
+  .illustration-col {
+    display: none; /* 隐藏插画 */
   }
-  .config-btn-row-col { width: 100%; }
-  .btn-confirm { width: 100%; max-width: 99vw; }
-  .config-btn-row { gap: 0.6rem 0; }
-}
-@media (max-width: 600px) {
-  .config-drawer, .login-box { width: 100vw; min-width: 0; font-size: 0.98rem; }
-  .config-box { max-width: 99vw; }
-  .logo-container {
-    position: static;
-    transform: none;
-    margin: 0.5rem auto 0.5rem auto;
-    width: 22vw;
-    height: 22vw;
-    min-width: 3.5rem;
-    min-height: 3.5rem;
-    max-width: 32vw;
-    max-height: 32vw;
+  
+  .login-col {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
   }
-  .logo {
-    width: 12vw;
-    height: 12vw;
-    min-width: 2rem;
-    min-height: 2rem;
-    max-width: 18vw;
-    max-height: 18vw;
-  }
+  
   .login-box {
-    padding-top: 2rem;
-    margin: 0 auto;
-    left: 0;
-    right: 0;
-    box-sizing: border-box;
+    max-width: 90vw;
+    width: 100%;
+    font-size: 1rem;
+    margin: 0 auto !important; /* 确保水平居中，覆盖大屏幕的margin-left */
+    margin-left: 0 !important; /* 强制移除左边距 */
   }
-  .login-container-flex, .login-center-wrap {
-    justify-content: center !important;
-    align-items: center !important;
+  
+  .logo-container {
+    width: 5rem;
+    height: 5rem;
   }
-  .button-container { gap: 3vw; }
+  
+  .logo {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+  
+  /* 平板端登录标题样式 */
+  .login-title-row {
+    margin: 6px 0 10px 0;
+  }
+  
+  .login-title-text {
+    font-size: 1.3rem;
+  }
+  
+
+  
+  .button-container {
+    gap: 1rem;
+  }
+}
+/* 手机设备 */
+@media (max-width: 600px) {
+  .login-center-wrap {
+    padding: 1rem;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+  }
+  
+  .login-row {
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+  }
+  
+  .login-col {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    width: 100%;
+  }
+  
+  .login-box {
+    max-width: 95vw;
+    width: 100%;
+    font-size: 0.95rem;
+    padding: 1.5rem 1.5rem 2rem 1.5rem; /* 减小上下内边距 */
+    padding-top: 3.5rem; /* 减小顶部内边距 */
+    min-height: 400px; /* 减小最小高度 */
+    margin: 0 auto !important; /* 确保水平居中，覆盖大屏幕的margin-left */
+    margin-left: 0 !important; /* 强制移除左边距 */
+  }
+  
+  .logo-container {
+    width: 4rem;
+    height: 4rem;
+    top: -2rem;
+  }
+  
+  .logo {
+    width: 2rem;
+    height: 2rem;
+  }
+  
+  /* 手机端登录标题样式 */
+  .login-title-row {
+    margin: 4px 0 8px 0;
+  }
+  
+  .login-title-text {
+    font-size: 1.2rem;
+  }
+   
+  .button-container {
+    gap: 0.8rem;
+    flex-direction: column;
+  }
+  
+  .btn-reset,
+  .btn-login {
+    width: 100%;
+  }
 }
 /* 优化的滑动动画 */
 @media (max-width: 900px) {

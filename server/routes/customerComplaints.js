@@ -5,7 +5,7 @@
 
 const express = require('express');
 const router = express.Router();
-const { getConnection, sql } = require('../db');
+const { getConnection, sql, executeQuery } = require('../db');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
@@ -51,7 +51,6 @@ const upload = multer({
  */
 router.get('/', async (req, res) => {
   try {
-    const pool = await getConnection();
     const { 
       page = 1, 
       pageSize = 10, 
@@ -90,6 +89,8 @@ router.get('/', async (req, res) => {
     let whereConditions = [];
     let params = [];
     let paramIndex = 1;
+    
+    const result = await executeQuery(async (pool) => {
     
     if (search) {
       whereConditions.push(`(
@@ -262,19 +263,27 @@ router.get('/', async (req, res) => {
     
     const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
     
+    // 创建统一的request对象
+    const request = pool.request();
+    
+    // 添加所有参数
+    params.forEach(param => {
+      request.input(param.name, sql[param.type], param.value);
+    });
+    
     // 查询总数
     const countQuery = `SELECT COUNT(*) as total FROM CustomerComplaints ${whereClause}`;
-    const countRequest = pool.request();
-    params.forEach(param => {
-      countRequest.input(param.name, sql[param.type], param.value);
-    });
-    const countResult = await countRequest.query(countQuery);
+    const countResult = await request.query(countQuery);
     const total = countResult.recordset[0].total;
-    
+
     // 查询数据 - 使用ROW_NUMBER()方式兼容SQL Server 2008 R2
     const startRow = offset + 1;
     const endRow = offset + parseInt(pageSize);
     
+    // 为分页查询添加额外参数
+    request.input('startRow', sql.Int, startRow);
+    request.input('endRow', sql.Int, endRow);
+
     const dataQuery = `
       SELECT * FROM (
         SELECT 
@@ -291,26 +300,36 @@ router.get('/', async (req, res) => {
       WHERE T.RowNum BETWEEN @startRow AND @endRow
       ORDER BY T.RowNum
     `;
+
+    const dataResult = await request.query(dataQuery);
     
-    const dataRequest = pool.request();
-    params.forEach(param => {
-      dataRequest.input(param.name, sql[param.type], param.value);
+      return {
+        success: true,
+        data: dataResult.recordset,
+        pagination: {
+          current: parseInt(page),
+          pageSize: parseInt(pageSize),
+          total: total,
+          pages: Math.ceil(total / pageSize)
+        }
+      };
     });
-    dataRequest.input('startRow', sql.Int, startRow);
-    dataRequest.input('endRow', sql.Int, endRow);
-    
-    const dataResult = await dataRequest.query(dataQuery);
-    
-    res.json({
-      success: true,
-      data: dataResult.recordset,
-      pagination: {
-        current: parseInt(page),
-        pageSize: parseInt(pageSize),
-        total: total,
-        pages: Math.ceil(total / pageSize)
-      }
-    });
+
+    if (result) {
+      res.json(result);
+    } else {
+      // executeQuery返回null时的默认处理
+      res.json({
+        success: true,
+        data: [],
+        pagination: {
+          current: parseInt(page),
+          pageSize: parseInt(pageSize),
+          total: 0,
+          pages: 0
+        }
+      });
+    }
   } catch (error) {
     console.error('获取客户投诉记录失败:', error);
     res.status(500).json({ success: false, message: '获取客户投诉记录失败', error: error.message });
@@ -323,27 +342,30 @@ router.get('/', async (req, res) => {
  */
 router.get('/:id', async (req, res) => {
   try {
-    const pool = await getConnection();
     const { id } = req.params;
     
-    const query = `
-      SELECT 
-        ID, Date, CustomerCode, WorkOrderNo, ProductName, Specification,
-        OrderQuantity, ProblemDescription, ProblemImages, DefectQuantity, DefectRate,
-        ComplaintMethod, ProcessingDeadline, RequireReport, CauseAnalysis,
-        CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
-        ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor, 
-        ImprovementVerification, VerificationDate, Status, 
-        CreatedAt, CreatedBy, UpdatedAt, UpdatedBy
-      FROM CustomerComplaints 
-      WHERE ID = @id
-    `;
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      const query = `
+        SELECT 
+          ID, Date, CustomerCode, WorkOrderNo, ProductName, Specification,
+          OrderQuantity, ProblemDescription, ProblemImages, DefectQuantity, DefectRate,
+          ComplaintMethod, ProcessingDeadline, RequireReport, CauseAnalysis,
+          CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
+          ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor, 
+          ImprovementVerification, VerificationDate, Status, 
+          CreatedAt, CreatedBy, UpdatedAt, UpdatedBy
+        FROM CustomerComplaints 
+        WHERE ID = @id
+      `;
+      
+      request.input('id', sql.Int, id);
+      const queryResult = await request.query(query);
+      
+      return queryResult;
+    });
     
-    const result = await pool.request()
-      .input('id', pool.types.Int, id)
-      .query(query);
-    
-    if (result.recordset.length === 0) {
+    if (!result || result.recordset.length === 0) {
       return res.status(404).json({ success: false, message: '客户投诉记录不存在' });
     }
     
@@ -383,7 +405,6 @@ router.get('/:id', async (req, res) => {
  */
 router.post('/', async (req, res) => {
   try {
-    const pool = await getConnection();
     const {
       date, customerCode, workOrderNo, productName, specification,
       orderQuantity, problemDescription, problemImages, defectQuantity, defectRate,
@@ -395,61 +416,69 @@ router.post('/', async (req, res) => {
     
     const currentUser = req.user?.username || '系统用户';
     
-    const query = `
-      INSERT INTO CustomerComplaints (
-        Date, CustomerCode, WorkOrderNo, ProductName, Specification,
-        OrderQuantity, ProblemDescription, ProblemImages, DefectQuantity, DefectRate,
-        ComplaintMethod, ProcessingDeadline, RequireReport, CauseAnalysis,
-        CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
-        ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor,
-        ImprovementVerification, VerificationDate, Status,
-        CreatedBy, UpdatedBy
-      ) VALUES (
-        @date, @customerCode, @workOrderNo, @productName, @specification,
-        @orderQuantity, @problemDescription, @problemImages, @defectQuantity, @defectRate,
-        @complaintMethod, @processingDeadline, @requireReport, @causeAnalysis,
-        @correctiveActions, @disposalMeasures, @responsibleDepartment, @responsiblePerson,
-        @replyDate, @reportAttachments, @feedbackPerson, @feedbackDate, @processor,
-        @improvementVerification, @verificationDate, @status,
-        @createdBy, @updatedBy
-      );
-      SELECT SCOPE_IDENTITY() as ID;
-    `;
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      const query = `
+        INSERT INTO CustomerComplaints (
+          Date, CustomerCode, WorkOrderNo, ProductName, Specification,
+          OrderQuantity, ProblemDescription, ProblemImages, DefectQuantity, DefectRate,
+          ComplaintMethod, ProcessingDeadline, RequireReport, CauseAnalysis,
+          CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
+          ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor,
+          ImprovementVerification, VerificationDate, Status,
+          CreatedBy, UpdatedBy
+        ) VALUES (
+          @date, @customerCode, @workOrderNo, @productName, @specification,
+          @orderQuantity, @problemDescription, @problemImages, @defectQuantity, @defectRate,
+          @complaintMethod, @processingDeadline, @requireReport, @causeAnalysis,
+          @correctiveActions, @disposalMeasures, @responsibleDepartment, @responsiblePerson,
+          @replyDate, @reportAttachments, @feedbackPerson, @feedbackDate, @processor,
+          @improvementVerification, @verificationDate, @status,
+          @createdBy, @updatedBy
+        );
+        SELECT SCOPE_IDENTITY() as ID;
+      `;
+      
+      request.input('date', sql.Date, date);
+      request.input('customerCode', sql.NVarChar, customerCode);
+      request.input('workOrderNo', sql.NVarChar, workOrderNo);
+      request.input('productName', sql.NVarChar, productName);
+      request.input('specification', sql.NVarChar, specification);
+      request.input('orderQuantity', sql.Int, orderQuantity || 0);
+      request.input('problemDescription', sql.NVarChar, problemDescription);
+      request.input('problemImages', sql.NVarChar, JSON.stringify(problemImages || []));
+      request.input('defectQuantity', sql.Int, defectQuantity || 0);
+      request.input('defectRate', sql.Decimal(5, 2), defectRate || 0);
+      request.input('complaintMethod', sql.NVarChar, complaintMethod);
+      request.input('processingDeadline', sql.Date, processingDeadline);
+      request.input('requireReport', sql.Bit, requireReport || false);
+      request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
+      request.input('correctiveActions', sql.NVarChar, correctiveActions || null);
+      request.input('disposalMeasures', sql.NVarChar, disposalMeasures || null);
+      request.input('responsibleDepartment', sql.NVarChar, responsibleDepartment);
+      request.input('responsiblePerson', sql.NVarChar, responsiblePerson);
+      request.input('replyDate', sql.Date, replyDate || null);
+      request.input('reportAttachments', sql.NVarChar, JSON.stringify(reportAttachments || []));
+      request.input('feedbackPerson', sql.NVarChar, feedbackPerson || null);
+      request.input('feedbackDate', sql.Date, feedbackDate || null);
+      request.input('processor', sql.NVarChar, processor || null);
+      request.input('improvementVerification', sql.NVarChar, improvementVerification || null);
+      request.input('verificationDate', sql.Date, verificationDate || null);
+      request.input('status', sql.NVarChar, status || 'pending');
+      request.input('createdBy', sql.NVarChar, currentUser);
+      request.input('updatedBy', sql.NVarChar, currentUser);
+      
+      const queryResult = await request.query(query);
+      
+      return queryResult;
+    });
     
-    const result = await pool.request()
-      .input('date', sql.Date, date)
-      .input('customerCode', sql.NVarChar, customerCode)
-      .input('workOrderNo', sql.NVarChar, workOrderNo)
-      .input('productName', sql.NVarChar, productName)
-      .input('specification', sql.NVarChar, specification)
-      .input('orderQuantity', sql.Int, orderQuantity || 0)
-      .input('problemDescription', sql.NVarChar, problemDescription)
-      .input('problemImages', sql.NVarChar, JSON.stringify(problemImages || []))
-      .input('defectQuantity', sql.Int, defectQuantity || 0)
-      .input('defectRate', sql.Decimal(5, 2), defectRate || 0)
-      .input('complaintMethod', sql.NVarChar, complaintMethod)
-      .input('processingDeadline', sql.Date, processingDeadline)
-      .input('requireReport', sql.Bit, requireReport || false)
-      .input('causeAnalysis', sql.NVarChar, causeAnalysis || null)
-      .input('correctiveActions', sql.NVarChar, correctiveActions || null)
-      .input('disposalMeasures', sql.NVarChar, disposalMeasures || null)
-      .input('responsibleDepartment', sql.NVarChar, responsibleDepartment)
-      .input('responsiblePerson', sql.NVarChar, responsiblePerson)
-      .input('replyDate', sql.Date, replyDate || null)
-      .input('reportAttachments', sql.NVarChar, JSON.stringify(reportAttachments || []))
-      .input('feedbackPerson', sql.NVarChar, feedbackPerson || null)
-      .input('feedbackDate', sql.Date, feedbackDate || null)
-      .input('processor', sql.NVarChar, processor || null)
-      .input('improvementVerification', sql.NVarChar, improvementVerification || null)
-      .input('verificationDate', sql.Date, verificationDate || null)
-      .input('status', sql.NVarChar, status || 'pending')
-      .input('createdBy', sql.NVarChar, currentUser)
-      .input('updatedBy', sql.NVarChar, currentUser)
-      .query(query);
-    
-    const newId = result.recordset[0].ID;
-    
-    res.json({ success: true, message: '客户投诉记录创建成功', data: { id: newId } });
+    if (result && result.recordset && result.recordset.length > 0) {
+      const newId = result.recordset[0].ID;
+      res.json({ success: true, message: '客户投诉记录创建成功', data: { id: newId } });
+    } else {
+      res.status(500).json({ success: false, message: '创建客户投诉记录失败' });
+    }
   } catch (error) {
     console.error('创建客户投诉记录失败:', error);
     res.status(500).json({ success: false, message: '创建客户投诉记录失败', error: error.message });
@@ -462,7 +491,6 @@ router.post('/', async (req, res) => {
  */
 router.put('/:id', async (req, res) => {
   try {
-    const pool = await getConnection();
     const { id } = req.params;
     const {
       date, customerCode, workOrderNo, productName, specification,
@@ -475,71 +503,76 @@ router.put('/:id', async (req, res) => {
     
     const currentUser = req.user?.username || '系统用户';
     
-    const query = `
-      UPDATE CustomerComplaints SET
-        Date = @date,
-        CustomerCode = @customerCode,
-        WorkOrderNo = @workOrderNo,
-        ProductName = @productName,
-        Specification = @specification,
-        OrderQuantity = @orderQuantity,
-        ProblemDescription = @problemDescription,
-        ProblemImages = @problemImages,
-        DefectQuantity = @defectQuantity,
-        DefectRate = @defectRate,
-        ComplaintMethod = @complaintMethod,
-        ProcessingDeadline = @processingDeadline,
-        RequireReport = @requireReport,
-        CauseAnalysis = @causeAnalysis,
-        CorrectiveActions = @correctiveActions,
-        DisposalMeasures = @disposalMeasures,
-        ResponsibleDepartment = @responsibleDepartment,
-        ResponsiblePerson = @responsiblePerson,
-        ReplyDate = @replyDate,
-        ReportAttachments = @reportAttachments,
-        FeedbackPerson = @feedbackPerson,
-        FeedbackDate = @feedbackDate,
-        Processor = @processor,
-        ImprovementVerification = @improvementVerification,
-        VerificationDate = @verificationDate,
-        Status = @status,
-        UpdatedAt = GETDATE(),
-        UpdatedBy = @updatedBy
-      WHERE ID = @id
-    `;
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      const query = `
+        UPDATE CustomerComplaints SET
+          Date = @date,
+          CustomerCode = @customerCode,
+          WorkOrderNo = @workOrderNo,
+          ProductName = @productName,
+          Specification = @specification,
+          OrderQuantity = @orderQuantity,
+          ProblemDescription = @problemDescription,
+          ProblemImages = @problemImages,
+          DefectQuantity = @defectQuantity,
+          DefectRate = @defectRate,
+          ComplaintMethod = @complaintMethod,
+          ProcessingDeadline = @processingDeadline,
+          RequireReport = @requireReport,
+          CauseAnalysis = @causeAnalysis,
+          CorrectiveActions = @correctiveActions,
+          DisposalMeasures = @disposalMeasures,
+          ResponsibleDepartment = @responsibleDepartment,
+          ResponsiblePerson = @responsiblePerson,
+          ReplyDate = @replyDate,
+          ReportAttachments = @reportAttachments,
+          FeedbackPerson = @feedbackPerson,
+          FeedbackDate = @feedbackDate,
+          Processor = @processor,
+          ImprovementVerification = @improvementVerification,
+          VerificationDate = @verificationDate,
+          Status = @status,
+          UpdatedAt = GETDATE(),
+          UpdatedBy = @updatedBy
+        WHERE ID = @id
+      `;
+      
+      request.input('id', sql.Int, id);
+      request.input('date', sql.Date, date);
+      request.input('customerCode', sql.NVarChar, customerCode);
+      request.input('workOrderNo', sql.NVarChar, workOrderNo);
+      request.input('productName', sql.NVarChar, productName);
+      request.input('specification', sql.NVarChar, specification);
+      request.input('orderQuantity', sql.Int, orderQuantity || 0);
+      request.input('problemDescription', sql.NVarChar, problemDescription);
+      request.input('problemImages', sql.NVarChar, JSON.stringify(problemImages || []));
+      request.input('defectQuantity', sql.Int, defectQuantity || 0);
+      request.input('defectRate', sql.Decimal(5, 2), defectRate || 0);
+      request.input('complaintMethod', sql.NVarChar, complaintMethod);
+      request.input('processingDeadline', sql.Date, processingDeadline);
+      request.input('requireReport', sql.Bit, requireReport || false);
+      request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
+      request.input('correctiveActions', sql.NVarChar, correctiveActions || null);
+      request.input('disposalMeasures', sql.NVarChar, disposalMeasures || null);
+      request.input('responsibleDepartment', sql.NVarChar, responsibleDepartment);
+      request.input('responsiblePerson', sql.NVarChar, responsiblePerson);
+      request.input('replyDate', sql.Date, replyDate || null);
+      request.input('reportAttachments', sql.NVarChar, JSON.stringify(reportAttachments || []));
+      request.input('feedbackPerson', sql.NVarChar, feedbackPerson || null);
+      request.input('feedbackDate', sql.Date, feedbackDate || null);
+      request.input('processor', sql.NVarChar, processor || null);
+      request.input('improvementVerification', sql.NVarChar, improvementVerification || null);
+      request.input('verificationDate', sql.Date, verificationDate || null);
+      request.input('status', sql.NVarChar, status || 'pending');
+      request.input('updatedBy', sql.NVarChar, currentUser);
+      
+      const queryResult = await request.query(query);
+      
+      return queryResult;
+    });
     
-    const result = await pool.request()
-      .input('id', pool.types.Int, id)
-      .input('date', pool.types.Date, date)
-      .input('customerCode', pool.types.NVarChar, customerCode)
-      .input('workOrderNo', pool.types.NVarChar, workOrderNo)
-      .input('productName', pool.types.NVarChar, productName)
-      .input('specification', pool.types.NVarChar, specification)
-      .input('orderQuantity', pool.types.Int, orderQuantity || 0)
-      .input('problemDescription', pool.types.NVarChar, problemDescription)
-      .input('problemImages', pool.types.NVarChar, JSON.stringify(problemImages || []))
-      .input('defectQuantity', pool.types.Int, defectQuantity || 0)
-      .input('defectRate', pool.types.Decimal(5, 2), defectRate || 0)
-      .input('complaintMethod', pool.types.NVarChar, complaintMethod)
-      .input('processingDeadline', pool.types.Date, processingDeadline)
-      .input('requireReport', pool.types.Bit, requireReport || false)
-      .input('causeAnalysis', pool.types.NVarChar, causeAnalysis || null)
-      .input('correctiveActions', pool.types.NVarChar, correctiveActions || null)
-      .input('disposalMeasures', pool.types.NVarChar, disposalMeasures || null)
-      .input('responsibleDepartment', pool.types.NVarChar, responsibleDepartment)
-      .input('responsiblePerson', pool.types.NVarChar, responsiblePerson)
-      .input('replyDate', pool.types.Date, replyDate || null)
-      .input('reportAttachments', pool.types.NVarChar, JSON.stringify(reportAttachments || []))
-      .input('feedbackPerson', pool.types.NVarChar, feedbackPerson || null)
-      .input('feedbackDate', pool.types.Date, feedbackDate || null)
-      .input('processor', pool.types.NVarChar, processor || null)
-      .input('improvementVerification', pool.types.NVarChar, improvementVerification || null)
-      .input('verificationDate', pool.types.Date, verificationDate || null)
-      .input('status', pool.types.NVarChar, status || 'pending')
-      .input('updatedBy', pool.types.NVarChar, currentUser)
-      .query(query);
-    
-    if (result.rowsAffected[0] === 0) {
+    if (!result || result.rowsAffected[0] === 0) {
       return res.status(404).json({ success: false, message: '客户投诉记录不存在' });
     }
     
@@ -556,15 +589,18 @@ router.put('/:id', async (req, res) => {
  */
 router.delete('/:id', async (req, res) => {
   try {
-    const pool = await getConnection();
     const { id } = req.params;
     
-    const query = 'DELETE FROM CustomerComplaints WHERE ID = @id';
-    const result = await pool.request()
-      .input('id', sql.Int, id)
-      .query(query);
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      const query = 'DELETE FROM CustomerComplaints WHERE ID = @id';
+      request.input('id', sql.Int, id);
+      const queryResult = await request.query(query);
+      
+      return queryResult;
+    });
     
-    if (result.rowsAffected[0] === 0) {
+    if (!result || result.rowsAffected[0] === 0) {
       return res.status(404).json({ success: false, message: '客户投诉记录不存在' });
     }
     
@@ -679,23 +715,41 @@ router.post('/upload', upload.array('files', 10), (req, res) => {
  */
 router.get('/statistics/overview', async (req, res) => {
   try {
-    const pool = await getConnection();
+    const result = await executeQuery(async (request) => {
+      const query = `
+        SELECT 
+          COUNT(*) as total,
+          SUM(CASE WHEN Status = 'pending' THEN 1 ELSE 0 END) as pending,
+          SUM(CASE WHEN Status = 'processing' THEN 1 ELSE 0 END) as processing,
+          SUM(CASE WHEN Status = 'completed' THEN 1 ELSE 0 END) as completed,
+          SUM(CASE WHEN Status = 'closed' THEN 1 ELSE 0 END) as closed,
+          AVG(CAST(DefectRate as FLOAT)) as avgDefectRate,
+          SUM(DefectQuantity) as totalDefects
+        FROM CustomerComplaints
+      `;
+      
+      const queryResult = await request.query(query);
+      
+      return queryResult;
+    });
     
-    const query = `
-      SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN Status = 'pending' THEN 1 ELSE 0 END) as pending,
-        SUM(CASE WHEN Status = 'processing' THEN 1 ELSE 0 END) as processing,
-        SUM(CASE WHEN Status = 'completed' THEN 1 ELSE 0 END) as completed,
-        SUM(CASE WHEN Status = 'closed' THEN 1 ELSE 0 END) as closed,
-        AVG(CAST(DefectRate as FLOAT)) as avgDefectRate,
-        SUM(DefectQuantity) as totalDefects
-      FROM CustomerComplaints
-    `;
-    
-    const result = await pool.request().query(query);
-    
-    res.json({ success: true, data: result.recordset[0] });
+    if (result && result.recordset && result.recordset.length > 0) {
+      res.json({ success: true, data: result.recordset[0] });
+    } else {
+      // 返回默认统计数据
+      res.json({ 
+        success: true, 
+        data: {
+          total: 0,
+          pending: 0,
+          processing: 0,
+          completed: 0,
+          closed: 0,
+          avgDefectRate: 0,
+          totalDefects: 0
+        }
+      });
+    }
   } catch (error) {
     console.error('获取统计数据失败:', error);
     res.status(500).json({ success: false, message: '获取统计数据失败', error: error.message });

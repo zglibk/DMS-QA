@@ -178,8 +178,7 @@
       
       <!-- 底部控制 -->
       <div class="chart-footer">
-        <el-button 
-          type="text" 
+        <el-button :link="true" 
           @click="showTable = !showTable"
           size="small"
         >
@@ -187,8 +186,7 @@
           {{ showTable ? '隐藏数据表' : '显示数据表' }}
         </el-button>
         
-        <el-button 
-          type="text" 
+        <el-button :link="true" 
           @click="exportData"
           size="small"
         >
@@ -228,8 +226,7 @@
             </div>
           </div>
           <div class="header-right">
-            <el-button
-              type="text"
+            <el-button :link="true"
               @click="close"
               class="close-btn"
               size="large"
@@ -391,8 +388,7 @@
             </div>
           </div>
           <div class="header-right">
-            <el-button
-              type="text"
+            <el-button :link="true"
               @click="close"
               class="close-btn"
               size="large"
@@ -677,7 +673,7 @@ const loadData = async () => {
       complaintType: selectedComplaintType.value
     }
 
-    const response = await axios.get('/api/complaint/analysis', { params })
+    const response = await axios.get('/complaint/analysis', { params })
 
     if (response.data.success) {
       chartData.value = Array.isArray(response.data.chartData) ? response.data.chartData : []
@@ -740,7 +736,7 @@ const handleDetailRowDoubleClick = async (row) => {
   try {
     // 获取完整的投诉记录详情
     const token = localStorage.getItem('token')
-    const response = await axios.get(`/api/complaint/detail/${row.ID}`, {
+    const response = await axios.get(`/complaint/detail/${row.ID}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -771,7 +767,7 @@ const handleDetailRowDoubleClick = async (row) => {
 const drillDownToTimeDetail = async (row) => {
   try {
     // 使用现有的投诉列表API进行数据钻取
-    const response = await axios.get('/api/complaint/list', {
+    const response = await axios.get('/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
@@ -796,7 +792,7 @@ const drillDownToTimeDetail = async (row) => {
 const drillDownToWorkshopDetail = async (row) => {
   try {
     // 使用现有的投诉列表API进行数据钻取
-    const response = await axios.get('/api/complaint/list', {
+    const response = await axios.get('/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
@@ -820,7 +816,7 @@ const drillDownToWorkshopDetail = async (row) => {
 const drillDownToCategoryDetail = async (row) => {
   try {
     // 使用现有的投诉列表API进行数据钻取
-    const response = await axios.get('/api/complaint/list', {
+    const response = await axios.get('/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
@@ -844,7 +840,7 @@ const drillDownToCategoryDetail = async (row) => {
 const drillDownToCustomerDetail = async (row) => {
   try {
     // 使用现有的投诉列表API进行数据钻取
-    const response = await axios.get('/api/complaint/list', {
+    const response = await axios.get('/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
@@ -921,7 +917,7 @@ const exportDetailData = () => {
 const fetchExportFields = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/api/complaint/fields', {
+    const res = await axios.get('/complaint/fields', {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -1089,8 +1085,14 @@ const updateChart = () => {
   try {
     let option = {}
 
-    // 如果没有数据，显示空状态
-    if (!chartData.value || !Array.isArray(chartData.value) || !chartData.value.length) {
+    // 严格验证数据结构
+    const isValidData = chartData.value && 
+                       Array.isArray(chartData.value) && 
+                       chartData.value.length > 0 &&
+                       chartData.value.every(item => item && typeof item === 'object')
+
+    // 如果没有数据或数据结构无效，显示空状态
+    if (!isValidData) {
       option = getEmptyChartOption()
     } else {
       switch (selectedDimension.value) {
@@ -1111,10 +1113,21 @@ const updateChart = () => {
       }
     }
 
-    if (option && typeof option === 'object') {
+    // 验证 option 结构
+    if (option && typeof option === 'object' && option.series) {
+      // 确保 series 中的每个项都有 type 属性
+      if (Array.isArray(option.series)) {
+        option.series = option.series.filter(series => 
+          series && typeof series === 'object' && series.type
+        )
+      }
       chartInstance.value.setOption(option, true)
+    } else {
+      // 如果 option 结构无效，显示空状态
+      chartInstance.value.setOption(getEmptyChartOption(), true)
     }
   } catch (error) {
+    console.warn('图表更新出错:', error)
     // 发生错误时显示空状态
     if (chartInstance.value) {
       chartInstance.value.setOption(getEmptyChartOption(), true)
@@ -1127,8 +1140,15 @@ const getTimeChartOption = () => {
   const baseOption = getBaseChartOption()
   const data = chartData.value || []
   const xData = data.map(item => item.period || '')
-  const innerData = data.map(item => item.innerCount || 0)
-  const outerData = data.map(item => item.outerCount || 0)
+  // 安全地提取数据，确保没有undefined或null值
+  const innerData = data.map(item => {
+    const count = item.innerCount
+    return (count !== null && count !== undefined && !isNaN(count)) ? Number(count) : 0
+  })
+  const outerData = data.map(item => {
+    const count = item.outerCount
+    return (count !== null && count !== undefined && !isNaN(count)) ? Number(count) : 0
+  })
 
   return {
     ...baseOption,
@@ -1244,8 +1264,15 @@ const getWorkshopChartOption = () => {
   const baseOption = getBaseChartOption()
   const data = chartData.value || []
   const xData = data.map(item => item.workshop || '')
-  const innerData = data.map(item => item.innerCount || 0)
-  const outerData = data.map(item => item.outerCount || 0)
+  // 安全地提取数据，确保没有undefined或null值
+  const innerData = data.map(item => {
+    const count = item.innerCount
+    return (count !== null && count !== undefined && !isNaN(count)) ? Number(count) : 0
+  })
+  const outerData = data.map(item => {
+    const count = item.outerCount
+    return (count !== null && count !== undefined && !isNaN(count)) ? Number(count) : 0
+  })
 
   return {
     ...baseOption,
@@ -1427,7 +1454,11 @@ const getCustomerChartOption = () => {
   const baseOption = getBaseChartOption()
   const data = chartData.value || []
   const xData = data.slice(0, 10).map(item => item.customer || '') // 只显示前10个客户
-  const totalData = data.slice(0, 10).map(item => item.totalCount || 0)
+  // 安全地提取数据，确保没有undefined或null值
+  const totalData = data.slice(0, 10).map(item => {
+    const count = item.totalCount
+    return (count !== null && count !== undefined && !isNaN(count)) ? Number(count) : 0
+  })
 
   return {
     ...baseOption,

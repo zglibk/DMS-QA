@@ -215,6 +215,8 @@ const handleLogoError = (event) => {
   border-radius: 8px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   overflow: hidden;
+  font-size: 16px;
+  font-weight: 500;
 }
 
 /* 悬停背景效果 - 已禁用 */
@@ -286,6 +288,83 @@ const handleLogoError = (event) => {
   color: #606266;
   display: flex;
   align-items: center;
+  padding: 8px;
+  border-radius: 6px;
+  transition: all 0.3s ease;
+}
+
+.el-dropdown-link:hover {
+  background-color: #f5f7fa;
+  color: #409EFF;
+  transform: translateY(-1px);
+}
+
+/* 下拉菜单美化样式 */
+:deep(.el-dropdown-menu) {
+  border: none;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+  padding: 8px;
+  min-width: 200px;
+  background: #ffffff;
+  backdrop-filter: blur(10px);
+  animation: dropdownFadeIn 0.3s ease-out;
+}
+
+:deep(.el-dropdown-menu__item) {
+  border-radius: 8px;
+  margin: 2px 0;
+  padding: 12px 16px;
+  font-size: 14px;
+  color: #606266;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+:deep(.el-dropdown-menu__item:hover) {
+  background: #f5f7fa;
+  color: #409EFF;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+}
+
+:deep(.el-dropdown-menu__item.is-divided) {
+  border-top: 1px solid #f0f0f0;
+  margin-top: 8px;
+  padding-top: 16px;
+}
+
+:deep(.el-dropdown-menu__item.is-divided::before) {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 16px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, #e4e7ed, transparent);
+}
+
+/* 下拉菜单动画 */
+@keyframes dropdownFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-10px) scale(0.95);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 下拉箭头美化 */
+:deep(.el-popper__arrow) {
+  display: none;
+}
+
+/* 为下拉菜单添加毛玻璃效果 */
+:deep(.el-popper) {
+  backdrop-filter: blur(10px);
 }
 
 /* 响应式设计 */
@@ -297,6 +376,7 @@ const handleLogoError = (event) => {
   .nav-menu :deep(.el-menu-item) {
     padding: 0 16px !important;
     margin: 0 4px;
+    font-size: 15px;
   }
   
   .header-right {

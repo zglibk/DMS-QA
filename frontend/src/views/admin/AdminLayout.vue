@@ -42,7 +42,7 @@
                   </el-timeline-item>
                 </el-timeline>
                 <el-divider style="margin: 8px 0;" />
-                <el-button type="text" style="width:100%;color:#409EFF;">查看全部</el-button>
+                <el-button :link="true" style="width:100%;color:#409EFF;">查看全部</el-button>
               </el-card>
             </template>
           </el-dropdown>
@@ -70,9 +70,10 @@
                 </div>
                 <el-divider style="margin: 8px 0;" />
                 <el-menu class="user-menu" mode="vertical" :default-active="''">
-                  <el-menu-item @click="goProfile"><el-icon><User /></el-icon> 个人中心</el-menu-item>
-                  <el-menu-item @click="goDocs"><el-icon><Document /></el-icon> 使用文档</el-menu-item>
-                  <el-menu-item disabled><el-icon><Lock /></el-icon> 锁定屏幕</el-menu-item>
+                  <el-menu-item index="profile" @click="goProfile"><el-icon><User /></el-icon> 个人中心</el-menu-item>
+                  <el-menu-item index="home" @click="goHome"><el-icon><HomeFilled /></el-icon> 回到前台</el-menu-item>
+                  <el-menu-item index="docs" @click="goDocs"><el-icon><Document /></el-icon> 使用文档</el-menu-item>
+                  <el-menu-item index="lock" disabled><el-icon><Lock /></el-icon> 锁定屏幕</el-menu-item>
                 </el-menu>
                 <el-divider style="margin: 8px 0;" />
                 <el-button type="default" class="logout-btn" @click="logout" style="width:100%;">退出登录</el-button>
@@ -150,6 +151,14 @@ const goDocs = () => {
 
 const goProfile = () => {
   router.push('/admin/profile')
+}
+
+/**
+ * 跳转到前台首页
+ * 功能：从后台管理界面返回到前台首页
+ */
+const goHome = () => {
+  router.push('/')
 }
 
 const isFullscreen = ref(false)
@@ -270,17 +279,25 @@ onMounted(async () => {
   align-items: center;
 }
 .user-dropdown-card {
-  min-width: 16rem;
-  box-shadow: 0 0.25rem 1.5rem rgba(0,0,0,0.08);
-  border-radius: 0.75rem;
-  padding: 1rem 0 0.5rem 0;
-  background: #fff;
+  min-width: 22rem;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+  border-radius: 16px;
+  padding: 1.5rem 0 1rem 0;
+  background: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(20px);
+  animation: userDropdownFadeIn 0.3s ease-out;
+  position: relative;
+  overflow: hidden;
 }
+
+
 .user-info {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  padding: 0 1rem;
+  gap: 1rem;
+  padding: 0 1.5rem;
+  margin-bottom: 0.5rem;
 }
 .user-meta {
   display: flex;
@@ -288,40 +305,104 @@ onMounted(async () => {
   justify-content: center;
 }
 .user-name {
-  font-weight: bold;
-  font-size: 1rem;
-  color: #222;
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #2c3e50;
+  margin-bottom: 2px;
 }
 .user-role {
-  font-size: 0.85rem;
-  color: #009587;
+  font-size: 0.875rem;
+  color: #409EFF;
   font-weight: 500;
+  padding: 2px 8px;
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 12px;
+  display: inline-block;
+}
+.user-dept {
+  font-size: 0.8rem;
+  color: #909399;
+  margin-top: 2px;
 }
 .user-menu {
   border: none;
   box-shadow: none;
   background: transparent;
-  padding: 0 0.5rem;
+  padding: 0 1rem;
 }
 .user-menu .el-menu-item {
-  height: 2.4rem;
-  line-height: 2.4rem;
-  border-radius: 0.4rem;
-  margin-bottom: 0.15rem;
-  color: #333;
+  height: 2.8rem;
+  line-height: 2.8rem;
+  border-radius: 10px;
+  margin-bottom: 0.25rem;
+  color: #606266;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  font-size: 0.9rem;
+}
+.user-menu .el-menu-item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 0;
+  background: #409EFF;
+  transition: width 0.3s ease;
+  border-radius: 10px 0 0 10px;
 }
 .user-menu .el-menu-item.is-active,
 .user-menu .el-menu-item:hover {
-  background: #f5f6fa;
-  color: #009587;
+  background: #f5f7fa;
+  color: #409EFF;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+}
+.user-menu .el-menu-item:hover::before {
+  width: 4px;
+}
+.user-menu .el-menu-item.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.user-menu .el-menu-item.is-disabled:hover {
+  transform: none;
+  background: transparent;
+  box-shadow: none;
 }
 .logout-btn {
-  margin: 0 auto 0.5rem auto;
-  border-radius: 0.4rem;
-  color: #222;
-  border: 1px solid #eee;
-  display: block;
-  width: 90%;
+  margin: 0.5rem 1rem 0.5rem 1rem;
+  border-radius: 10px;
+  color: #ffffff;
+  background: #F56C6C;
+  border: none;
+  height: 2.5rem;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.3);
+}
+.logout-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(245, 108, 108, 0.4);
+  background: #E6A23C;
+}
+
+/* 用户下拉菜单动画 */
+@keyframes userDropdownFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-15px) scale(0.9);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 隐藏下拉箭头 */
+:deep(.el-popper__arrow) {
+  display: none !important;
 }
 .admin-main {
   background: #fafbfc;

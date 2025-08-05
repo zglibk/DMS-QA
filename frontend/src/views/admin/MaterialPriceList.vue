@@ -572,7 +572,7 @@ const fetchData = async () => {
       maxPrice: searchForm.maxPrice
     }
 
-    const response = await axios.get('/api/admin/material-prices', {
+    const response = await axios.get('/admin/material-prices', {
       headers: { Authorization: `Bearer ${token}` },
       params: params
     })
@@ -655,7 +655,7 @@ const viewHistory = async (row) => {
       supplier: row.Supplier || ''
     }
 
-    const response = await axios.get('/api/admin/material-prices/history', {
+    const response = await axios.get('/admin/material-prices/history', {
       headers: { Authorization: `Bearer ${token}` },
       params: params
     })
@@ -740,7 +740,7 @@ const deleteItem = async (row) => {
       return
     }
 
-    const response = await axios.delete(`/api/admin/material-prices/${row.ID}`, {
+    const response = await axios.delete(`/admin/material-prices/${row.ID}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -780,9 +780,9 @@ const submitForm = async () => {
 
     let response
     if (editingItem.value) {
-      response = await axios.put(`/api/admin/material-prices/${editingItem.value.ID}`, formData, config)
+      response = await axios.put(`/admin/material-prices/${editingItem.value.ID}`, formData, config)
     } else {
-      response = await axios.post('/api/admin/material-prices', formData, config)
+      response = await axios.post('/admin/material-prices', formData, config)
     }
 
     if (response.data.success) {
@@ -889,7 +889,7 @@ const confirmImport = async () => {
       return
     }
 
-    const response = await axios.post('/api/admin/material-prices/import',
+    const response = await axios.post('/admin/material-prices/import',
       { data: previewData.value },
       {
         headers: {
@@ -932,7 +932,7 @@ const loadFilterOptions = async () => {
       return
     }
 
-    const response = await axios.get('/api/admin/material-prices/filter-options', {
+    const response = await axios.get('/admin/material-prices/filter-options', {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -1000,7 +1000,7 @@ const exportData = async (filters = {}) => {
     }
 
     const queryString = params.toString()
-    const url = `/api/admin/material-prices/export${queryString ? '?' + queryString : ''}`
+    const url = `/admin/material-prices/export${queryString ? '?' + queryString : ''}`
 
     const response = await axios.get(url, {
       headers: { Authorization: `Bearer ${token}` }

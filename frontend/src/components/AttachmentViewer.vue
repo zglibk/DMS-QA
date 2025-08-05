@@ -194,7 +194,7 @@ const fetchAttachmentPath = async () => {
   console.log(`AttachmentViewer实例ID: ${attachmentViewerInstanceId.value}`)
 
   try {
-    const response = await apiService.get(`/api/complaint/attachment-path/${props.recordId}`)
+    const response = await apiService.get(`/complaint/attachment-path/${props.recordId}`)
 
     if (response.data.success) {
       attachmentPath.value = response.data.path || ''
@@ -244,7 +244,7 @@ const openAttachment = async () => {
     } else {
       // 对于非图片文件，使用API方式下载
       ElMessage.info('正在打开文件...')
-      const fileServiceUrl = `/api/complaint/file/${props.recordId}`
+      const fileServiceUrl = `/complaint/file/${props.recordId}`
       window.open(fileServiceUrl, '_blank')
       ElMessage.success('文件已在新窗口中打开')
     }

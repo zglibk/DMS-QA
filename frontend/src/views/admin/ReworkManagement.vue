@@ -1403,15 +1403,8 @@ const loadData = async () => {
       params.endDate = searchForm.dateRange[1]
     }
     
-    const response = await axios.get('/api/rework/list', { params })
-    
+    const response = await axios.get('/rework/list', { params })    
     if (response.data.success) {
-      console.log('=== 前端调试 - 返工列表数据 ===', response.data.data)
-      // 检查第一条记录的ReworkCategory字段
-      if (response.data.data.length > 0) {
-        console.log('=== 前端调试 - 第一条记录的ReworkCategory ===', response.data.data[0].ReworkCategory)
-        console.log('=== 前端调试 - 第一条记录的完整数据 ===', response.data.data[0])
-      }
       tableData.value = response.data.data
       pagination.total = response.data.pagination.total
     } else {
@@ -1428,7 +1421,7 @@ const loadData = async () => {
 const loadOptions = async () => {
   try {
     // 加载基础选项数据
-    const response = await axios.get('/api/rework/options')
+    const response = await axios.get('/rework/options')
     if (response.data.success) {
       Object.assign(options, response.data.data)
     } else {
@@ -1437,7 +1430,7 @@ const loadOptions = async () => {
     }
     
     // 加载返工类别数据
-    const categoriesResponse = await axios.get('/api/rework/rework-categories')
+    const categoriesResponse = await axios.get('/rework/rework-categories')
     if (categoriesResponse.data.success) {
       options.reworkCategories = categoriesResponse.data.data
     } else {
@@ -1488,7 +1481,7 @@ const refreshData = async () => {
           params.endDate = searchForm.dateRange[1]
         }
         
-        const response = await axios.get('/api/rework/list', { params })
+        const response = await axios.get('/rework/list', { params })
         
         if (response.data.success) {
           tableData.value = response.data.data
@@ -1503,7 +1496,7 @@ const refreshData = async () => {
     
     const loadOptionsSilent = async () => {
       // 加载基础选项数据
-      const response = await axios.get('/api/rework/options')
+      const response = await axios.get('/rework/options')
       if (response.data.success) {
         Object.assign(options, response.data.data)
       } else {
@@ -1511,7 +1504,7 @@ const refreshData = async () => {
       }
       
       // 加载返工类别数据
-      const categoriesResponse = await axios.get('/api/rework/rework-categories')
+      const categoriesResponse = await axios.get('/rework/rework-categories')
       if (categoriesResponse.data.success) {
         options.reworkCategories = categoriesResponse.data.data
       } else {
@@ -1577,7 +1570,7 @@ const deleteSelectedRecords = async () => {
     
     // 执行批量删除
     const ids = selectedRows.value.map(row => row.ID)
-    const response = await apiService.post('/api/rework/batch-delete', {
+    const response = await apiService.post('/rework/batch-delete', {
       ids: ids
     })
     
@@ -1613,12 +1606,10 @@ const editRecord = async (row) => {
     cleanupResources()
     
     // 从后端获取完整的记录数据
-    const response = await axios.get(`/api/rework/${row.ID}`)
+    const response = await axios.get(`/rework/${row.ID}`)
     
     if (response.data.success) {
       const recordData = response.data.data
-      console.log('编辑对话框 - 从后端获取的记录数据:', recordData)
-      console.log('编辑对话框 - ReworkCategory字段值:', recordData.ReworkCategory)
       
       // 填充表单数据，使用数据库中的完整数据
       Object.keys(formData).forEach(key => {
@@ -1626,14 +1617,10 @@ const editRecord = async (row) => {
         const dbFieldName = key.charAt(0).toUpperCase() + key.slice(1)
         if (recordData[dbFieldName] !== undefined) {
           formData[key] = recordData[dbFieldName]
-          console.log(`映射字段 ${key} <- ${dbFieldName}:`, recordData[dbFieldName])
         } else if (recordData[key] !== undefined) {
           formData[key] = recordData[key]
-          console.log(`直接映射字段 ${key}:`, recordData[key])
         }
       })
-      
-      console.log('编辑对话框 - 填充后的表单数据:', formData)
       
       // 特殊处理日期字段，使用formatDate函数避免时区偏移
       if (recordData.ReworkDate) {
@@ -1702,7 +1689,7 @@ const deleteRecord = async (row) => {
       }
     )
     
-    const response = await axios.delete(`/api/rework/${row.ID}`)
+    const response = await axios.delete(`/rework/${row.ID}`)
     
     if (response.data.success) {
       ElMessage.success('删除成功')
@@ -1738,7 +1725,7 @@ const submitForm = async () => {
       }
     }
     
-    const url = isEdit.value ? `/api/rework/${currentRecord.value.ID}` : '/api/rework'
+    const url = isEdit.value ? `/rework/${currentRecord.value.ID}` : '/rework'
     const method = isEdit.value ? 'put' : 'post'
     
     // 准备提交数据，将返工人员数组转换为字符串
@@ -1870,7 +1857,7 @@ const exportData = async () => {
       params.endDate = searchForm.dateRange[1]
     }
     
-    const response = await axios.get('/api/rework/export', { params })
+    const response = await axios.get('/rework/export', { params })
     
     if (response.data.success) {
       const data = response.data.data
@@ -2384,7 +2371,7 @@ const originalQualityLevelSettings = ref([])
 
 const loadQualityLevelSettings = async () => {
   try {
-    const response = await axios.get('/api/rework/quality-levels')
+    const response = await axios.get('/rework/quality-levels')
     if (response.data.success) {
       qualityLevelSettings.value = response.data.data.map(item => ({
         ...item,
@@ -2404,7 +2391,7 @@ const loadQualityLevelSettings = async () => {
 const saveQualityLevel = async (row, index) => {
   try {
     row.saving = true
-    const response = await axios.put(`/api/rework/quality-levels/${row.id}`, {
+    const response = await axios.put(`/rework/quality-levels/${row.id}`, {
       title: row.title,
       description: row.description,
       range: row.range
@@ -2454,7 +2441,7 @@ const saveAllQualityLevels = async () => {
     }
     
     savingAllLevels.value = true
-    const response = await axios.put('/api/rework/quality-levels/batch', {
+    const response = await axios.put('/rework/quality-levels/batch', {
       levels: validLevels.map(item => ({
         id: item.id,
         grade: item.grade.trim(),

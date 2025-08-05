@@ -84,16 +84,12 @@ class DeploymentChecker {
     } else {
       this.warnings.push('建议使用绝对路径引用资源')
     }
-
-    console.log('   ✓ index.html 检查完成')
   }
 
   /**
    * 检查静态资源
    */
-  checkAssets() {
-    console.log('🎨 检查静态资源...')
-    
+  checkAssets() {    
     const assetsDir = path.join(this.distDir, 'assets')
     if (!fs.existsSync(assetsDir)) {
       this.warnings.push('assets 目录不存在')
@@ -107,13 +103,11 @@ class DeploymentChecker {
     if (jsFiles.length === 0) {
       this.errors.push('没有找到 JavaScript 文件')
     } else {
-      console.log(`   ✓ 找到 ${jsFiles.length} 个 JavaScript 文件`)
     }
 
     if (cssFiles.length === 0) {
       this.warnings.push('没有找到 CSS 文件')
     } else {
-      console.log(`   ✓ 找到 ${cssFiles.length} 个 CSS 文件`)
     }
 
     // 检查文件大小
@@ -131,20 +125,15 @@ class DeploymentChecker {
   /**
    * 检查环境配置
    */
-  checkEnvironmentConfig() {
-    console.log('⚙️ 检查环境配置...')
-    
-    // 检查是否包含环境配置文件
+  checkEnvironmentConfig() {   
+    // 检查是否包含必要的配置文件
     const configFiles = [
-      'config/environment.js',
-      'utils/smartApiDetector.js',
       'services/apiService.js'
     ]
 
     configFiles.forEach(configFile => {
       const fullPath = this.findFileInDist(configFile)
       if (fullPath) {
-        console.log(`   ✓ 找到配置文件: ${configFile}`)
       } else {
         this.warnings.push(`配置文件可能未正确打包: ${configFile}`)
       }
@@ -154,9 +143,7 @@ class DeploymentChecker {
   /**
    * 检查 API 配置
    */
-  checkApiConfiguration() {
-    console.log('🔌 检查 API 配置...')
-    
+  checkApiConfiguration() {   
     // 查找包含 API 配置的文件
     const jsFiles = this.findJSFiles()
     let hasApiConfig = false

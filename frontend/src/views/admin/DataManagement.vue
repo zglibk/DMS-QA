@@ -405,13 +405,16 @@
                 </div>
               </template>
 
-              <div class="table-categories">
-                <!-- 业务数据表 -->
-                <div class="table-category">
-                  <h4 class="category-title">
-                    <el-icon><Document /></el-icon>
-                    业务数据表
-                  </h4>
+              <!-- 数据表分类标签页 -->
+              <el-tabs v-model="activeTableTab" class="table-tabs">
+                <!-- 业务数据表标签页 -->
+                <el-tab-pane label="业务数据表" name="business">
+                  <template #label>
+                    <span class="tab-label">
+                      <el-icon><Document /></el-icon>
+                      业务数据表 ({{ businessTables.length }})
+                    </span>
+                  </template>
                   <div class="table-grid">
                     <div
                       v-for="table in businessTables"
@@ -425,23 +428,27 @@
                         <div class="table-details">
                           <span class="table-code">{{ table.tableName }}</span>
                           <span class="record-count" v-if="tableStats[table.tableName]">
-                            {{ tableStats[table.tableName].recordCount }} 条记录
+                            {{ formatNumber(tableStats[table.tableName].recordCount) }} 条记录
                           </span>
                         </div>
                       </div>
                       <div class="table-actions">
+                        <el-tag type="success" size="small">业务数据</el-tag>
                         <el-tag v-if="table.hasIdentity" type="info" size="small">自增ID</el-tag>
+                        <el-tag v-if="tableStats[table.tableName] && tableStats[table.tableName].recordCount > 1000" type="warning" size="small">大数据量</el-tag>
                       </div>
                     </div>
                   </div>
-                </div>
+                </el-tab-pane>
 
-                <!-- 基础数据表 -->
-                <div class="table-category">
-                  <h4 class="category-title">
-                    <el-icon><Collection /></el-icon>
-                    基础数据表
-                  </h4>
+                <!-- 基础数据表标签页 -->
+                <el-tab-pane label="基础数据表" name="basic">
+                  <template #label>
+                    <span class="tab-label">
+                      <el-icon><Collection /></el-icon>
+                      基础数据表 ({{ basicTables.length }})
+                    </span>
+                  </template>
                   <div class="table-grid">
                     <div
                       v-for="table in basicTables"
@@ -455,23 +462,27 @@
                         <div class="table-details">
                           <span class="table-code">{{ table.tableName }}</span>
                           <span class="record-count" v-if="tableStats[table.tableName]">
-                            {{ tableStats[table.tableName].recordCount }} 条记录
+                            {{ formatNumber(tableStats[table.tableName].recordCount) }} 条记录
                           </span>
                         </div>
                       </div>
                       <div class="table-actions">
+                        <el-tag type="primary" size="small">基础数据</el-tag>
                         <el-tag v-if="table.hasIdentity" type="info" size="small">自增ID</el-tag>
+                        <el-tag v-if="tableStats[table.tableName] && tableStats[table.tableName].recordCount > 1000" type="warning" size="small">大数据量</el-tag>
                       </div>
                     </div>
                   </div>
-                </div>
+                </el-tab-pane>
 
-                <!-- 系统配置表 -->
-                <div class="table-category">
-                  <h4 class="category-title">
-                    <el-icon><Setting /></el-icon>
-                    系统配置表
-                  </h4>
+                <!-- 系统配置表标签页 -->
+                <el-tab-pane label="系统配置表" name="system">
+                  <template #label>
+                    <span class="tab-label">
+                      <el-icon><Setting /></el-icon>
+                      系统配置表 ({{ systemTables.length }})
+                    </span>
+                  </template>
                   <div class="table-grid">
                     <div
                       v-for="table in systemTables"
@@ -488,18 +499,20 @@
                         <div class="table-details">
                           <span class="table-code">{{ table.tableName }}</span>
                           <span class="record-count" v-if="tableStats[table.tableName]">
-                            {{ tableStats[table.tableName].recordCount }} 条记录
+                            {{ formatNumber(tableStats[table.tableName].recordCount) }} 条记录
                           </span>
                         </div>
                       </div>
                       <div class="table-actions">
+                        <el-tag type="warning" size="small">系统配置</el-tag>
                         <el-tag v-if="table.hasIdentity" type="info" size="small">自增ID</el-tag>
                         <el-tag v-if="['User', 'DbConfig'].includes(table.tableName)" type="danger" size="small">受保护</el-tag>
+                        <el-tag v-if="tableStats[table.tableName] && tableStats[table.tableName].recordCount > 1000" type="warning" size="small">大数据量</el-tag>
                       </div>
                     </div>
                   </div>
-                </div>
-              </div>
+                </el-tab-pane>
+              </el-tabs>
 
               <!-- 操作区域 -->
               <div class="operation-area" v-if="selectedTable">
@@ -1509,8 +1522,7 @@
                   </el-table-column>
                   <el-table-column label="操作" width="100" align="center">
                     <template #default="scope">
-                      <el-button
-                        type="text"
+                      <el-button :link="true"
                         size="small"
                         @click="showRowDetails(scope.row)"
                         v-if="scope.row.rowData"
@@ -1583,6 +1595,7 @@
     width="600px"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
+    @keyup.enter="handleInitializeDialogEnter"
   >
     <div class="initialize-confirm-content">
       <el-alert
@@ -1684,7 +1697,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { UploadFilled, Download, Warning, InfoFilled, Refresh, Document, Collection, Setting, Delete, SuccessFilled, FolderAdd, ArrowDown, Edit, Check, Folder, EditPen, CopyDocument } from '@element-plus/icons-vue'
+import { UploadFilled, Download, Warning, InfoFilled, Refresh, Document, Collection, Setting, Delete, SuccessFilled, FolderAdd, ArrowDown, Edit, Check, Folder, EditPen, CopyDocument, Clock } from '@element-plus/icons-vue'
 import axios from 'axios'
 
 
@@ -1751,6 +1764,9 @@ const initializeLoading = ref(false)
 const showInitializeConfirmDialog = ref(false)
 const showInitializeResultDialog = ref(false)
 const initializeResult = ref({})
+
+// 数据表标签页相关
+const activeTableTab = ref('business')
 
 // 确认步骤
 const confirmStep1 = ref(false)
@@ -2001,7 +2017,7 @@ const previewFile = async () => {
     formData.append('file', selectedFile.value)
 
     loadingText.value = '正在解析Excel工作表...'
-    const response = await axios.post('/api/import/preview', formData, {
+    const response = await axios.post('/import/preview', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -2049,7 +2065,7 @@ const previewSelectedSheet = async (sheetName) => {
     formData.append('sheetName', sheetName)
 
     loadingText.value = `正在解析工作表"${sheetName}"的数据...`
-    const response = await axios.post('/api/import/preview-sheet', formData, {
+    const response = await axios.post('/import/preview-sheet', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -2313,7 +2329,7 @@ const validateData = async (applyConversions = null) => {
     }
 
     loadingText.value = '正在校验数据格式和完整性。。。'
-    const response = await axios.post('/api/import/validate', formData, {
+    const response = await axios.post('/import/validate', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -2410,7 +2426,7 @@ const executeImport = async () => {
   // 开始轮询进度
   const progressInterval = setInterval(async () => {
     try {
-      const response = await axios.get(`/api/import/progress/${sessionId.value}`)
+      const response = await axios.get(`/import/progress/${sessionId.value}`)
       if (response.data.success) {
         importProgress.value = response.data.data
 
@@ -2451,7 +2467,7 @@ const executeImport = async () => {
     }
 
     // 使用文件拷贝模式的API端点
-    const apiEndpoint = '/api/import/execute-with-copy'
+    const apiEndpoint = '/import/execute-with-copy'
 
     loadingText.value = '正在执行数据导入（文件拷贝模式），请查看进度对话框...'
 
@@ -2504,7 +2520,7 @@ const formatRowDataForDisplay = (rowData) => {
 // 获取字段映射
 const fetchFieldMapping = async () => {
   try {
-    const response = await axios.get('/api/import/field-mapping')
+    const response = await axios.get('/import/field-mapping')
     if (response.data.success) {
       fieldMapping.value = response.data.data
     }
@@ -2516,7 +2532,7 @@ const fetchFieldMapping = async () => {
 // 下载Excel模板
 const downloadTemplate = async () => {
   try {
-    const response = await axios.get('/api/import/template', {
+    const response = await axios.get('/import/template', {
       responseType: 'blob'
     })
 
@@ -2545,7 +2561,7 @@ const downloadTemplate = async () => {
 const fetchTableList = async () => {
   tableListLoading.value = true
   try {
-    const response = await axios.get('/api/config/table-list')
+    const response = await axios.get('/config/table-list')
     if (response.data.success) {
       tableList.value = response.data.data
       // 获取每个表的统计信息
@@ -2569,7 +2585,7 @@ const fetchAllTableStats = async () => {
 // 获取单个表的统计信息
 const fetchTableStats = async (tableName) => {
   try {
-    const response = await axios.get(`/api/config/table-stats/${tableName}`)
+    const response = await axios.get(`/config/table-stats/${tableName}`)
     if (response.data.success) {
       tableStats.value[tableName] = response.data.data
     }
@@ -2634,7 +2650,7 @@ const executeInitialize = async () => {
 
   initializeLoading.value = true
   try {
-    const response = await axios.post('/api/config/initialize-table', {
+    const response = await axios.post('/config/initialize-table', {
       tableName: selectedTable.value.tableName,
       confirmPassword: confirmPassword.value
     })
@@ -2668,6 +2684,14 @@ const executeInitialize = async () => {
     initializeLoading.value = false
     showInitializeConfirmDialog.value = false
     showInitializeResultDialog.value = true
+  }
+}
+
+// 处理初始化确认对话框的回车键事件
+const handleInitializeDialogEnter = () => {
+  // 只有当所有确认条件都满足时才执行初始化
+  if (canExecuteInitialize.value && !initializeLoading.value) {
+    executeInitialize()
   }
 }
 
@@ -2766,7 +2790,7 @@ const handleTabChange = (tabName) => {
 const fetchDatabaseInfo = async () => {
   databaseInfoLoading.value = true
   try {
-    const response = await axios.get('/api/config/database-info')
+    const response = await axios.get('/config/database-info')
     if (response.data.success) {
       databaseInfo.value = response.data.data
       // 同时获取备份路径配置
@@ -2787,7 +2811,7 @@ const fetchDatabaseInfo = async () => {
 const fetchBackupList = async () => {
   backupListLoading.value = true
   try {
-    const response = await axios.get('/api/config/backup-list')
+    const response = await axios.get('/config/backup-list')
     if (response.data.success) {
       backupList.value = response.data.data
     } else {
@@ -2819,7 +2843,7 @@ const createDatabaseBackup = async () => {
     )
 
     backupLoading.value = true
-    const response = await axios.post('/api/config/create-backup', {
+    const response = await axios.post('/config/create-backup', {
       backupName: backupForm.value.backupName.trim(),
       backupType: backupForm.value.backupType,
       description: backupForm.value.description.trim(),
@@ -2928,7 +2952,7 @@ const saveBackupPath = async () => {
 
   backupPathSaving.value = true
   try {
-    const response = await axios.post('/api/config/backup-path', {
+    const response = await axios.post('/config/backup-path', {
       backupPath: backupPathConfig.value.trim()
     })
 
@@ -2955,7 +2979,7 @@ const createBackupFolder = async () => {
 
   folderCreating.value = true
   try {
-    const response = await axios.post('/api/config/create-backup-folder', {
+    const response = await axios.post('/config/create-backup-folder', {
       backupPath: backupPathConfig.value.trim()
     })
 
@@ -2992,7 +3016,7 @@ const handleBackupTabChange = (tabName) => {
 const saveDefaultBackupPath = async () => {
   defaultPathSaving.value = true
   try {
-    const response = await axios.post('/api/config/default-backup-path', {
+    const response = await axios.post('/config/default-backup-path', {
       serverPath: defaultBackupConfig.value.serverPath.trim()
     })
 
@@ -3017,7 +3041,7 @@ const saveAlternativeBackupPath = async () => {
 
   alternativePathSaving.value = true
   try {
-    const response = await axios.post('/api/config/alternative-backup-path', {
+    const response = await axios.post('/config/alternative-backup-path', {
       networkPath: alternativeBackupConfig.value.networkPath.trim()
     })
 
@@ -3048,7 +3072,7 @@ const updateBackupPath = async (backup) => {
     )
 
     if (newPath && newPath.trim() !== backup.BackupPath) {
-      const response = await axios.post('/api/config/update-backup-path', {
+      const response = await axios.post('/config/update-backup-path', {
         backupId: backup.ID,
         newPath: newPath.trim()
       })
@@ -3071,7 +3095,7 @@ const updateBackupPath = async (backup) => {
 const verifyBackupFile = async (backup) => {
   try {
     ElMessage.info('正在验证备份文件...')
-    const response = await axios.post('/api/config/verify-backup', {
+    const response = await axios.post('/config/verify-backup', {
       backupId: backup.ID,
       backupPath: backup.BackupPath
     })
@@ -3112,7 +3136,7 @@ const deleteBackupRecord = async (backup) => {
       }
     )
 
-    const response = await axios.delete(`/api/config/backup-record/${backup.ID}`)
+    const response = await axios.delete(`/config/backup-record/${backup.ID}`)
 
     if (response.data.success) {
       ElMessage.success('备份记录删除成功')
@@ -3135,7 +3159,7 @@ const deleteBackupRecord = async (backup) => {
 const fetchAutoBackupConfig = async () => {
   autoBackupConfigLoading.value = true
   try {
-    const response = await axios.get('/api/config/auto-backup-config')
+    const response = await axios.get('/config/auto-backup-config')
     if (response.data.success) {
       // 合并配置，保留默认值
       autoBackupConfig.value = {
@@ -3156,7 +3180,7 @@ const fetchAutoBackupConfig = async () => {
 const saveAutoBackupConfig = async () => {
   autoBackupConfigSaving.value = true
   try {
-    const response = await axios.post('/api/config/auto-backup-config', autoBackupConfig.value)
+    const response = await axios.post('/config/auto-backup-config', autoBackupConfig.value)
     if (response.data.success) {
       ElMessage.success('自动备份配置保存成功')
       // 刷新状态
@@ -3211,7 +3235,7 @@ const handleAutoBackupToggle = async (enabled) => {
 const fetchAutoBackupStatus = async () => {
   autoBackupStatusLoading.value = true
   try {
-    const response = await axios.get('/api/config/auto-backup-status')
+    const response = await axios.get('/config/auto-backup-status')
     if (response.data.success) {
       autoBackupStatus.value = response.data.data
       autoBackupLogs.value = response.data.data.recentLogs || []
@@ -3239,7 +3263,7 @@ const triggerManualBackup = async () => {
     )
 
     manualBackupTriggering.value = true
-    const response = await axios.post('/api/config/trigger-auto-backup')
+    const response = await axios.post('/config/trigger-auto-backup')
 
     if (response.data.success) {
       ElMessage.success('备份任务已触发，请稍后查看备份状态')
@@ -3453,9 +3477,42 @@ const triggerManualBackup = async () => {
 }
 
 /* 响应式设计 */
+@media (max-width: 1200px) {
+  .table-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px;
+  }
+  
+  .table-item {
+    max-width: 300px;
+  }
+}
+
 @media (max-width: 768px) {
   .data-management {
     padding: 10px;
+  }
+
+  .table-grid {
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    gap: 8px;
+  }
+  
+  .table-item {
+    max-width: 280px;
+    min-height: 100px;
+    padding: 10px;
+  }
+  
+  .table-name {
+    font-size: 14px;
+  }
+  
+  .table-actions .el-tag {
+    font-size: 10px;
+    height: 18px;
+    line-height: 16px;
+    padding: 0 4px;
   }
 
   .el-col {
@@ -3474,6 +3531,16 @@ const triggerManualBackup = async () => {
 
   .mapping-select {
     width: 100%;
+  }
+}
+
+@media (max-width: 480px) {
+  .table-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .table-item {
+    max-width: 100%;
   }
 }
 
@@ -3578,17 +3645,23 @@ const triggerManualBackup = async () => {
 
 .table-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 15px;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 12px;
+  max-width: 100%;
 }
 
 .table-item {
   border: 2px solid #e4e7ed;
   border-radius: 8px;
-  padding: 15px;
+  padding: 12px;
   cursor: pointer;
   transition: all 0.3s ease;
   background: #fff;
+  max-width: 320px;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .table-item:hover {
@@ -3616,35 +3689,55 @@ const triggerManualBackup = async () => {
 }
 
 .table-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
   color: #303133;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+  line-height: 1.3;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .table-details {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  flex-direction: column;
+  gap: 4px;
   font-size: 12px;
   color: #909399;
+  margin-bottom: 8px;
+}
+
+
+
+.table-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: auto;
+}
+
+.table-actions .el-tag {
+  font-size: 11px;
+  height: 20px;
+  line-height: 18px;
+  padding: 0 6px;
+  border-radius: 3px;
 }
 
 .table-code {
   font-family: 'Courier New', monospace;
   background: #f5f7fa;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 11px;
+  color: #606266;
 }
 
 .record-count {
   font-weight: 500;
-}
-
-.table-actions {
-  display: flex;
-  gap: 5px;
-  margin-top: 10px;
+  color: #909399;
+  font-size: 11px;
 }
 
 .operation-area {

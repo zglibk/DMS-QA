@@ -433,7 +433,7 @@ const loadAllData = async () => {
 
 const loadSummaryData = async () => {
   try {
-    const response = await axios.get('/api/rework/statistics/summary', {
+    const response = await axios.get('/rework/statistics/summary', {
       params: { year: selectedYear.value }
     })
     
@@ -475,7 +475,7 @@ const loadTrendData = async () => {
     const startDate = new Date(selectedYear.value, 0, 1).toISOString().split('T')[0]
     const endDate = new Date(selectedYear.value, 11, 31).toISOString().split('T')[0]
     
-    const response = await axios.get('/api/rework/statistics/trend', {
+    const response = await axios.get('/rework/statistics/trend', {
       params: {
         startDate,
         endDate,
@@ -496,7 +496,7 @@ const loadTrendData = async () => {
 const loadTableData = async () => {
   try {
     tableLoading.value = true
-    const response = await axios.get('/api/rework/list', {
+    const response = await axios.get('/rework/list', {
       params: {
         page: tablePagination.current,
         pageSize: tablePagination.pageSize,
@@ -580,20 +580,32 @@ const updateTrendChart = (data) => {
       {
         name: '返工次数',
         type: 'bar',
-        data: data.map(item => item.ReworkCount),
+        data: data.map(item => {
+          const count = item.ReworkCount
+          return (count !== null && count !== undefined && !isNaN(count)) ? Number(count) : 0
+        }),
         itemStyle: { color: '#409EFF' }
       },
       {
         name: '不良数量',
         type: 'bar',
-        data: data.map(item => item.TotalDefectiveQty),
+        data: data.map(item => {
+          const qty = item.TotalDefectiveQty
+          return (qty !== null && qty !== undefined && !isNaN(qty)) ? Number(qty) : 0
+        }),
         itemStyle: { color: '#E6A23C' }
       },
       {
         name: '不良率',
         type: 'line',
         yAxisIndex: 1,
-        data: data.map(item => item.AvgDefectiveRate?.toFixed(2) || 0),
+        data: data.map(item => {
+          const rate = item.AvgDefectiveRate
+          if (rate !== null && rate !== undefined && !isNaN(rate)) {
+            return Number(rate.toFixed(2))
+          }
+          return 0
+        }),
         itemStyle: { color: '#F56C6C' }
       }
     ]

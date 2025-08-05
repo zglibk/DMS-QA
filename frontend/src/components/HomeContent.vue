@@ -272,8 +272,7 @@
                 <el-icon><Search /></el-icon>
                 <span>高级查询</span>
               </div>
-              <el-button 
-                type="text" 
+              <el-button :link="true" 
                 size="small" 
                 @click="showAdvancedQuery = false"
                 class="close-btn"
@@ -1427,7 +1426,7 @@ const exportFields = ref([])
 const fetchExportFields = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/api/complaint/fields', {
+    const res = await axios.get('/complaint/fields', {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -1577,7 +1576,7 @@ const { user } = storeToRefs(userStore)
 
 const fetchProfile = async () => {
   const token = localStorage.getItem('token')
-  const res = await axios.get('/api/auth/profile', {
+  const res = await axios.get('/auth/profile', {
     headers: { Authorization: `Bearer ${token}` }
   })
   if (res.data.success) {
@@ -1656,7 +1655,7 @@ const fetchTableData = async () => {
       if (searchKeyword.value) params.search = searchKeyword.value
     }
 
-    const res = await axios.get('/api/complaint/list', {
+    const res = await axios.get('/complaint/list', {
       params,
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -1722,7 +1721,7 @@ const fetchStats = async () => {
       month: selectedMonth.value
     }
 
-    const res = await axios.get('/api/complaint/month-stats', {
+    const res = await axios.get('/complaint/month-stats', {
       headers: { Authorization: `Bearer ${token}` },
       params: params
     })
@@ -1769,7 +1768,7 @@ const fetchQualityStats = async () => {
     // 并行获取数据
     const [innerComplaintRes, outerComplaintRes, batchStatsRes] = await Promise.all([
       // 获取内诉数量（不合格数）
-      axios.get('/api/complaint/list', {
+      axios.get('/complaint/list', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           page: 1,
@@ -1780,7 +1779,7 @@ const fetchQualityStats = async () => {
         }
       }),
       // 获取客诉批次数量
-      axios.get('/api/complaint/list', {
+      axios.get('/complaint/list', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           page: 1,
@@ -1791,7 +1790,7 @@ const fetchQualityStats = async () => {
         }
       }),
       // 获取月度批次统计数据
-      axios.get('/api/quality-metrics/month-batch-stats', {
+      axios.get('/quality-metrics/month-batch-stats', {
         headers: { Authorization: `Bearer ${token}` },
         params: {
           month: selectedMonth.value
@@ -1840,7 +1839,7 @@ const fetchQualityStats = async () => {
 const fetchChartOptions = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/api/complaint/options', {
+    const res = await axios.get('/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     })
     // 转换数据格式：从 [{Name: "xxx"}] 转换为 ["xxx"]，与fetchOptions保持一致
@@ -1991,7 +1990,7 @@ const fetchChartData = async () => {
     const token = localStorage.getItem('token')
 
     // 获取车间统计数据
-    const workshopRes = await axios.get('/api/complaint/workshop-stats', {
+    const workshopRes = await axios.get('/complaint/workshop-stats', {
       headers: { Authorization: `Bearer ${token}` },
       params: {
         startDate: selectedMonth.value + '-01',
@@ -2009,7 +2008,7 @@ const fetchChartData = async () => {
     }
 
     // 获取趋势数据（最近6个月）
-    const trendRes = await axios.get('/api/complaint/trend-stats', {
+    const trendRes = await axios.get('/complaint/trend-stats', {
       headers: { Authorization: `Bearer ${token}` },
       params: { months: 6 }
     }).catch(() => ({ data: { success: false } }))
@@ -2030,7 +2029,7 @@ const fetchChartData = async () => {
     }
 
     // 获取不良类别分布数据
-    const categoryRes = await axios.get('/api/complaint/category-stats', {
+    const categoryRes = await axios.get('/complaint/category-stats', {
       headers: { Authorization: `Bearer ${token}` },
       params: {
         startDate: selectedMonth.value + '-01',
@@ -2124,7 +2123,7 @@ const toggleAdvancedQuery = () => {
 const fetchOptions = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/api/complaint/options', {
+    const res = await axios.get('/complaint/options', {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -2174,7 +2173,7 @@ const viewDetail = async (row) => {
     detailLoading.value = true
     const token = localStorage.getItem('token')
 
-    const response = await axios.get(`/api/complaint/detail/${row.ID}`, {
+    const response = await axios.get(`/complaint/detail/${row.ID}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -2218,7 +2217,7 @@ const fetchEditOptions = async () => {
 
     // 并行获取表单选项和材料名称
     const [optionsResponse] = await Promise.all([
-      axios.get('/api/complaint/options', {
+      axios.get('/complaint/options', {
         headers: { Authorization: `Bearer ${token}` }
       }),
       fetchEditMaterialNames()
@@ -2247,7 +2246,7 @@ const fetchEditMaterialNames = async () => {
   try {
     editMaterialLoading.value = true;
     const token = localStorage.getItem('token');
-    const res = await axios.get('/api/admin/material-prices/material-names', {
+    const res = await axios.get('/admin/material-prices/material-names', {
       headers: { Authorization: `Bearer ${token}` }
     });
 
@@ -2287,7 +2286,7 @@ const handleEditMaterialChange = async (materialType, materialName) => {
 
   try {
     const token = localStorage.getItem('token');
-    const res = await axios.get('/api/admin/material-prices/get-price', {
+    const res = await axios.get('/admin/material-prices/get-price', {
       params: { materialName },
       headers: { Authorization: `Bearer ${token}` }
     });
@@ -2588,7 +2587,7 @@ const handleEditCategoryChange = async (categoryObj) => {
 
   try {
     const token = localStorage.getItem('token')
-    const response = await axios.get(`/api/complaint/defective-items/${categoryObj.ID}`, {
+    const response = await axios.get(`/complaint/defective-items/${categoryObj.ID}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -2610,7 +2609,7 @@ const editRecord = async (row) => {
     await fetchEditOptions()
 
     // 获取记录详情
-    const response = await axios.get(`/api/complaint/detail/${row.ID}`, {
+    const response = await axios.get(`/complaint/detail/${row.ID}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -2873,7 +2872,7 @@ const saveEdit = async () => {
       }
     }
 
-    const response = await axios.put(`/api/complaint/${submitData.ID}`, submitData, {
+    const response = await axios.put(`/complaint/${submitData.ID}`, submitData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json'
@@ -2977,24 +2976,17 @@ const isImageFile = (fileName) => {
   return imageExtensions.includes(extension)
 }
 
-// 智能获取API基础URL - 使用现有的环境管理系统
+// 获取API基础URL - 使用vite配置自动设置的地址
 const getApiBaseUrl = () => {
-  // 使用axios的当前baseURL，这个已经通过smartApiDetector智能设置了
+  // 使用axios的当前baseURL，这个已经通过vite配置自动设置了
   if (axios.defaults.baseURL) {
     console.log('使用axios默认baseURL:', axios.defaults.baseURL)
     return axios.defaults.baseURL
   }
 
-  // 降级方案：使用localStorage中保存的api-base
-  const savedApiBase = localStorage.getItem('api-base')
-  if (savedApiBase) {
-    console.log('使用localStorage中的api-base:', savedApiBase)
-    return savedApiBase
-  }
-
-  // 最后降级：使用环境变量
+  // 降级方案：使用环境变量或默认地址
   const envApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
-  console.log('使用环境变量VITE_API_BASE_URL:', envApiBase)
+  console.log('使用环境变量或默认地址:', envApiBase)
   return envApiBase
 }
 
@@ -3037,7 +3029,7 @@ const getFilePreviewUrl = (filePath) => {
     console.log('判断结果: isServerUpload =', isServerUpload)
 
     if (isServerUpload) {
-      // 服务器上传的文件，使用智能检测的后端API地址
+      // 服务器上传的文件，使用vite配置的后端API地址
       const backendUrl = getApiBaseUrl()
       const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
       const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
@@ -3101,7 +3093,7 @@ const generateEditFileName = async (originalFileName) => {
   // 获取流水号
   try {
     const token = localStorage.getItem('token')
-    const response = await axios.get('/api/complaint/sequence-number', {
+    const response = await axios.get('/complaint/sequence-number', {
       params: {
         date: formDate, // 使用表单中的日期
         editId: editFormData.value.ID // 编辑模式时排除当前记录
@@ -3162,7 +3154,7 @@ const uploadEditFileToServer = async (file, generatedFileName) => {
     }
 
     // 上传文件
-    const response = await axios.post('/api/upload/complaint-attachment', formData, {
+    const response = await axios.post('/upload/complaint-attachment', formData, {
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
@@ -3200,7 +3192,7 @@ const uploadFileToServer = async (file) => {
 
     // 上传文件到服务器
     const token = localStorage.getItem('token')
-    const response = await axios.post('/api/upload/complaint-attachment', formData, {
+    const response = await axios.post('/upload/complaint-attachment', formData, {
       headers: {
         'Content-Type': 'multipart/form-data',
         'Authorization': `Bearer ${token}`
@@ -3459,7 +3451,7 @@ const deleteRecord = async (row) => {
     )
 
     const token = localStorage.getItem('token')
-    const response = await axios.delete(`/api/complaint/${row.ID}`, {
+    const response = await axios.delete(`/complaint/${row.ID}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
 
@@ -4002,7 +3994,7 @@ const exportToExcel = async () => {
     params.page = 1
     params.pageSize = 10000
 
-    const res = await axios.get('/api/complaint/list', {
+    const res = await axios.get('/complaint/list', {
       params,
       headers: { Authorization: `Bearer ${token}` }
     })

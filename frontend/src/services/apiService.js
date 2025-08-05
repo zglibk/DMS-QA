@@ -1,11 +1,9 @@
 /**
  * API服务封装
- * 自动处理环境切换和API地址检测
+ * 使用固定的API地址配置
  */
 
 import axios from 'axios'
-import smartApiDetector from '../utils/smartApiDetector.js'
-import environmentManager from '../config/environment.js'
 
 class ApiService {
   constructor() {
@@ -33,22 +31,15 @@ class ApiService {
 
   async _doInitialize() {
     try {
-      console.log('🚀 初始化API服务...')
-
-      // 获取最佳API地址
-      const apiUrl = await smartApiDetector.getApiUrl()
-      
-      if (!apiUrl) {
-        throw new Error('无法获取可用的API地址')
-      }
-
+      // 直接使用vite配置的代理路径，与main.js保持一致
+      const apiUrl = '/api'
+      console.log('🔧 ApiService初始化，使用vite代理路径:', apiUrl)
       this.currentBaseURL = apiUrl
-      console.log(`✅ API服务初始化完成: ${apiUrl}`)
 
       // 创建axios实例
+      // 注意：不设置baseURL，使用main.js中已设置的axios.defaults.baseURL
       this.axiosInstance = axios.create({
-        baseURL: apiUrl,
-        timeout: 10000,
+        timeout: 10000, // 10秒超时
         headers: {
           'Content-Type': 'application/json'
         }
@@ -82,8 +73,8 @@ class ApiService {
         }
 
         // 添加环境标识
-        const env = environmentManager.getCurrentEnvironment()
-        config.headers['X-Environment'] = env
+        // 设置环境标识
+        config.headers['X-Environment'] = 'production'
 
         // 添加时间戳防止缓存
         if (config.method === 'get') {
@@ -92,8 +83,6 @@ class ApiService {
             _t: Date.now()
           }
         }
-
-        console.log(`📤 API请求: ${config.method?.toUpperCase()} ${config.url}`)
         return config
       },
       (error) => {
@@ -109,54 +98,19 @@ class ApiService {
   setupResponseInterceptor() {
     this.axiosInstance.interceptors.response.use(
       (response) => {
-        console.log(`📥 API响应: ${response.status} ${response.config.url}`)
         return response
       },
       async (error) => {
         console.error(`📥 API错误: ${error.response?.status || 'Network'} ${error.config?.url}`)
 
-        // 网络错误或连接失败时尝试切换API地址
-        if (!error.response || error.code === 'NETWORK_ERROR') {
-          console.log('🔄 检测到网络错误，尝试切换API地址...')
-          
-          try {
-            // 重新检测API地址
-            const newApiUrl = await smartApiDetector.getApiUrl({ forceDetect: true })
-            
-            if (newApiUrl && newApiUrl !== this.currentBaseURL) {
-              console.log(`🔄 切换到新的API地址: ${newApiUrl}`)
-              
-              // 更新baseURL
-              this.currentBaseURL = newApiUrl
-              this.axiosInstance.defaults.baseURL = newApiUrl
-              
-              // 重试原请求
-              const originalRequest = error.config
-              originalRequest.baseURL = newApiUrl
-              
-              return this.axiosInstance.request(originalRequest)
-            }
-          } catch (switchError) {
-            console.error('🔄 API地址切换失败:', switchError)
-          }
-        }
+        // 移除API地址切换逻辑，使用固定地址
 
         // 处理认证错误
         if (error.response?.status === 401) {
-          console.log('🔐 认证失败，清除token并跳转到登录页')
+          // 认证失败，清除token
           localStorage.removeItem('token')
           
-          // 使用程序化导航跳转到登录页面，避免强制刷新
-          if (typeof window !== 'undefined' && window.location.pathname !== '/login') {
-            // 导入router实例并进行导航
-            import('../router/index.js').then(({ default: router }) => {
-              router.push('/login')
-            }).catch(err => {
-              console.error('导航到登录页失败:', err)
-              // 如果程序化导航失败，回退到强制跳转
-              window.location.href = '/login'
-            })
-          }
+          // 由路由守卫处理跳转逻辑，避免重复跳转
         }
 
         return Promise.reject(error)
@@ -281,9 +235,7 @@ class ApiService {
   /**
    * 重新初始化（强制重新检测API地址）
    */
-  async reinitialize() {
-    console.log('🔄 重新初始化API服务...')
-    
+  async reinitialize() {        
     this.isInitialized = false
     this.initPromise = null
     this.axiosInstance = null
@@ -293,16 +245,7 @@ class ApiService {
   }
 
   /**
-   * 手动设置API地址
-   */
-  async setApiUrl(url) {
-    console.log(`🎯 手动设置API地址: ${url}`)
-    
-    smartApiDetector.setApiUrl(url)
-    await this.reinitialize()
-  }
-
-  /**
+   * 根据vite配置和环境获取API地址列表
    * 获取当前API地址
    */
   getCurrentApiUrl() {
@@ -314,10 +257,10 @@ class ApiService {
    */
   async getStatus() {
     const connectionTest = await this.testConnection()
-    const apiStatus = await smartApiDetector.getApiStatus()
     
     return {
-      ...apiStatus,
+      currentBaseURL: this.currentBaseURL,
+      isInitialized: this.isInitialized,
       connectionTest,
       axiosInstance: {
         baseURL: this.currentBaseURL,

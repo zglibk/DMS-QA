@@ -411,7 +411,7 @@
               <UploadImg 
                 shape="round" 
                 :currentAvatar="addUserForm.Avatar || ''"
-                :uploadUrl="'/api/users/update-avatar'" 
+                :uploadUrl="'/users/update-avatar'" 
                 @upload-success="handleAvatarUploadSuccess"
               />
             </el-form-item>
@@ -1382,7 +1382,7 @@ const submitAddUser = () => {
     submitLoading.value = true
     try {
       const token = localStorage.getItem('token')
-      const url = isEdit.value ? '/api/auth/update-user' : '/api/auth/add-user'
+      const url = isEdit.value ? '/auth/update-user' : '/auth/add-user'
       const method = isEdit.value ? 'put' : 'post'
       
       const formData = { ...addUserForm.value }
@@ -1391,20 +1391,16 @@ const submitAddUser = () => {
         delete formData.ConfirmPassword
       }
       
-      // 头像数据处理：优先使用表单中的Avatar数据（与个人中心逻辑一致）
       // 如果有新上传的头像数据，使用新数据；否则保持原有数据
       if (avatarBase64.value) {
         // 有新裁剪的头像数据
         formData.Avatar = avatarBase64.value
-        console.log('保存新裁剪的头像base64数据到数据库')
       } else if (addUserForm.value.Avatar) {
         // 保持表单中现有的头像数据
         formData.Avatar = addUserForm.value.Avatar
-        console.log('保持现有头像数据')
       } else {
         // 没有头像数据
         formData.Avatar = ''
-        console.log('清空头像数据')
       }
       
       const res = await axios[method](url, formData, {
@@ -1434,7 +1430,7 @@ const submitAddUser = () => {
              addUserForm.value.Avatar = userStore.user.Avatar
            }
            
-           console.log('用户store数据重新获取完成，头像应该已更新')
+           // 用户store数据重新获取完成
          }
         
         showAddUser.value = false
@@ -1460,7 +1456,7 @@ const positions = ref([])
  */
 const fetchDepartments = async () => {
   const token = localStorage.getItem('token')
-  const res = await axios.get('/api/complaint/options', {
+  const res = await axios.get('/complaint/options', {
     headers: { Authorization: `Bearer ${token}` }
   })
   if (res.data && res.data.departments) {
@@ -1474,7 +1470,7 @@ const fetchDepartments = async () => {
 const fetchPositions = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/api/positions', {
+    const res = await axios.get('/positions', {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (res.data && res.data.success) {
@@ -1507,7 +1503,7 @@ const fetchUsers = async () => {
     if (filterRole.value) params.role = filterRole.value
     if (filterStatus.value !== '') params.status = filterStatus.value
     
-    const res = await axios.get('/api/auth/user-list', {
+    const res = await axios.get('/auth/user-list', {
       params,
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -1717,18 +1713,12 @@ const editUser = async (row) => {
     // 显示加载状态
     loading.value = true
     
-    console.log('🔍 开始编辑用户:', row)
-    
     // 使用apiService调用API获取最新的用户详细信息
     const apiInstance = await apiService.getInstance()
-    const res = await apiInstance.get(`/api/auth/user/${row.ID}`)
-    
-    console.log('📡 API响应:', res.data)
+    const res = await apiInstance.get(`/auth/user/${row.ID}`)
     
     if (res.data && res.data.success) {
       const latestUserData = res.data.data
-      
-      console.log('✅ 获取用户数据成功:', latestUserData)
       
       // 设置编辑模式
       isEdit.value = true
@@ -1798,7 +1788,7 @@ const deleteUser = async (row) => {
     )
     
     const token = localStorage.getItem('token')
-    const res = await axios.delete(`/api/auth/user/${row.ID}`, {
+    const res = await axios.delete(`/auth/user/${row.ID}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     
@@ -1832,7 +1822,7 @@ const roleTable = ref(null)
 // 获取所有角色列表
 const fetchAllRoles = async () => {
   try {
-    const response = await axios.get('/api/roles', {
+    const response = await axios.get('/roles', {
       params: { page: 1, size: 1000 } // 获取所有角色
     })
     availableRoles.value = response.data.data?.list || []
@@ -1845,7 +1835,7 @@ const fetchAllRoles = async () => {
 // 获取用户当前角色
 const fetchUserRoles = async (userId) => {
   try {
-    const response = await axios.get(`/api/auth/user/${userId}/roles-permissions`)
+    const response = await axios.get(`/auth/user/${userId}/roles-permissions`)
     const userRoles = response.data.data?.roles || []
     selectedRoleIds.value = userRoles.map(role => role.ID)
     
@@ -1875,7 +1865,7 @@ const handleRoleSelectionChange = (selection) => {
 const saveUserRoles = async () => {
   try {
     permissionLoading.value = true
-    await axios.post(`/api/auth/user/${currentPermissionUser.value.ID}/assign-roles`, {
+    await axios.post(`/auth/user/${currentPermissionUser.value.ID}/assign-roles`, {
       roleIds: selectedRoleIds.value
     })
     ElMessage.success('角色分配成功')
@@ -1924,7 +1914,7 @@ const exportUsers = async () => {
 
     ElMessage.info('正在导出用户数据...')
     
-    const res = await axios.get('/api/auth/user-list', {
+    const res = await axios.get('/auth/user-list', {
       params,
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -2115,7 +2105,7 @@ const exportUsersAsCSV = async () => {
     if (filterRole.value !== '') params.role = filterRole.value
     if (filterStatus.value !== '') params.status = filterStatus.value
 
-    const res = await axios.get('/api/auth/user-list', {
+    const res = await axios.get('/auth/user-list', {
       params,
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -2380,7 +2370,7 @@ const doResetPassword = async () => {
   
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.post('/api/auth/reset-user-password', {
+    const res = await axios.post('/auth/reset-user-password', {
       userId: currentUser.value.ID,
       username: currentUser.value.Username,
       newPassword: resetPasswordForm.value.newPassword,
@@ -2410,7 +2400,7 @@ const changeStatus = async (row, val) => {
   row.Status = val;
   const token = localStorage.getItem('token');
   try {
-    const res = await axios.post('/api/auth/user-status', {
+    const res = await axios.post('/auth/user-status', {
       username: row.Username,
       status: val
     }, {
@@ -2451,7 +2441,7 @@ const batchEnable = async () => {
     const token = localStorage.getItem('token')
     const userIds = selectedUsers.value.map(user => user.ID)
     
-    const res = await axios.post('/api/auth/batch-status', {
+    const res = await axios.post('/auth/batch-status', {
       userIds,
       status: 1
     }, {
@@ -2502,7 +2492,7 @@ const batchDisable = async () => {
     const token = localStorage.getItem('token')
     const userIds = selectedUsers.value.map(user => user.ID)
     
-    const res = await axios.post('/api/auth/batch-status', {
+    const res = await axios.post('/auth/batch-status', {
       userIds,
       status: 0
     }, {
@@ -2553,7 +2543,7 @@ const batchDelete = async () => {
     const token = localStorage.getItem('token')
     const userIds = selectedUsers.value.map(user => user.ID)
     
-    const res = await axios.post('/api/auth/batch-delete', {
+    const res = await axios.post('/auth/batch-delete', {
       userIds
     }, {
       headers: { Authorization: `Bearer ${token}` }
@@ -2687,8 +2677,6 @@ const handleAvatarUploadSuccess = (avatarData) => {
   // 更新头像预览
   avatarPreviewUrl.value = avatarData
   avatarBase64.value = avatarData
-  
-  console.log('头像已更新到表单数据')
 }
 
 /**

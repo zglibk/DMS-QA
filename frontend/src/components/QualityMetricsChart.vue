@@ -142,8 +142,7 @@
       
       <!-- 底部控制 -->
       <div class="chart-footer">
-        <el-button 
-          type="text" 
+        <el-button :link="true" 
           @click="showTable = !showTable"
           size="small"
         >
@@ -601,12 +600,12 @@ const loadData = async () => {
   loading.value = true
   try {
     // 获取趋势数据
-    const trendsResponse = await axios.get('/api/quality-metrics/trends', {
+    const trendsResponse = await axios.get('/quality-metrics/trends', {
       params: { year: selectedYear.value }
     })
 
     // 获取汇总数据
-    const summaryResponse = await axios.get('/api/quality-metrics/summary', {
+    const summaryResponse = await axios.get('/quality-metrics/summary', {
       params: { year: selectedYear.value }
     })
 
@@ -637,43 +636,68 @@ const updateChart = () => {
     return
   }
 
-  // 处理空数据的情况
-  if (!chartData.value || !chartData.value.length) {
-    const emptyOption = {
+  try {
+    // 处理空数据的情况
+    if (!chartData.value || !Array.isArray(chartData.value) || !chartData.value.length) {
+      const emptyOption = {
+        xAxis: {
+          data: []
+        },
+        series: [
+          { data: [] },    // 交检批次
+          { data: [] },    // 发货批次
+          { data: [] },    // 一次交检合格率
+          { data: [] }     // 交货批次合格率
+        ]
+      }
+      chartInstance.value.setOption(emptyOption, true)
+      return
+    }
+
+    // 安全地提取数据，确保没有undefined或null值
+    const months = chartData.value.map(item => item.MonthLabel || '')
+    const firstPassRates = chartData.value.map(item => {
+      const rate = item.FirstPassRate
+      return (rate !== null && rate !== undefined && !isNaN(rate)) ? Number(rate) : 0
+    })
+    const deliveryPassRates = chartData.value.map(item => {
+      const rate = item.DeliveryPassRate
+      return (rate !== null && rate !== undefined && !isNaN(rate)) ? Number(rate) : 0
+    })
+    const inspectionBatches = chartData.value.map(item => {
+      const batches = item.InspectionBatches
+      return (batches !== null && batches !== undefined && !isNaN(batches)) ? Number(batches) : 0
+    })
+    const deliveryBatches = chartData.value.map(item => {
+      const batches = item.DeliveryBatches
+      return (batches !== null && batches !== undefined && !isNaN(batches)) ? Number(batches) : 0
+    })
+
+    // 更新图表数据 - 使用完整的配置选项
+    const updateOption = {
+      ...chartOption.value,  // 包含完整的基础配置
       xAxis: {
-        data: []
+        ...chartOption.value.xAxis,
+        data: months
       },
       series: [
-        { data: [] },    // 交检批次
-        { data: [] },    // 发货批次
-        { data: [] },    // 一次交检合格率
-        { data: [] }     // 交货批次合格率
+        { ...chartOption.value.series[0], data: inspectionBatches },    // 交检批次
+        { ...chartOption.value.series[1], data: deliveryBatches },      // 发货批次
+        { ...chartOption.value.series[2], data: firstPassRates },       // 一次交检合格率
+        { ...chartOption.value.series[3], data: deliveryPassRates }     // 交货批次合格率
       ]
     }
-    chartInstance.value.setOption(emptyOption, false, true)
-    return
+
+    chartInstance.value.setOption(updateOption, false) // 使用notMerge=false进行合并更新
+  } catch (error) {
+    console.error('图表更新失败:', error)
+    // 发生错误时显示空状态
+    const emptyOption = {
+      xAxis: { data: [] },
+      series: [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
+    }
+    chartInstance.value.setOption(emptyOption, true)
   }
-
-  const months = chartData.value.map(item => item.MonthLabel)
-  const firstPassRates = chartData.value.map(item => item.FirstPassRate)
-  const deliveryPassRates = chartData.value.map(item => item.DeliveryPassRate)
-  const inspectionBatches = chartData.value.map(item => item.InspectionBatches)
-  const deliveryBatches = chartData.value.map(item => item.DeliveryBatches)
-
-  // 更新图表数据
-  const updateOption = {
-    xAxis: {
-      data: months
-    },
-    series: [
-      { data: inspectionBatches },    // 交检批次
-      { data: deliveryBatches },      // 发货批次
-      { data: firstPassRates },       // 一次交检合格率
-      { data: deliveryPassRates }     // 交货批次合格率
-    ]
-  }
-
-  chartInstance.value.setOption(updateOption, false, true) // notMerge=false, lazyUpdate=true
 }
 
 // 刷新数据

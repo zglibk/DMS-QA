@@ -6,7 +6,7 @@
 const express = require('express')
 const router = express.Router()
 const sql = require('mssql')
-const { getConnection } = require('../db')
+const { getConnection, executeQuery } = require('../db')
 const authMiddleware = require('../middleware/auth')
 
 // 获取菜单树形列表
@@ -73,8 +73,8 @@ router.get('/tree', async (req, res) => {
   }
 })
 
-// 获取菜单列表（支持分页和搜索）
-router.get('/', async (req, res) => {
+// 获取菜单列表
+router.get('/', authMiddleware, async (req, res) => {
   try {
     const {
       page = 1,
@@ -86,152 +86,167 @@ router.get('/', async (req, res) => {
     } = req.query
     
     const offset = (page - 1) * size
-    const pool = await getConnection()
     
-    // 构建查询条件
-    let whereConditions = ['1=1'] // 移除Status=1的硬编码限制，允许显示所有状态的菜单
-    let queryParams = []
-    
-    if (keyword) {
-      whereConditions.push('(m.MenuName LIKE @keyword OR m.MenuCode LIKE @keyword)')
-      queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
-    }
-
-    if (type) {
-      whereConditions.push('m.MenuType = @type')
-      queryParams.push({ name: 'type', type: sql.NVarChar(20), value: type })
-    }
-    
-    if (parentId !== null && parentId !== '') {
-      if (parentId === '0') {
-        whereConditions.push('m.ParentID IS NULL')
-      } else {
-        whereConditions.push('m.ParentID = @parentId')
-        queryParams.push({ name: 'parentId', type: sql.Int, value: parseInt(parentId) })
+    const result = await executeQuery(async (pool) => {
+      // 构建查询条件
+      let whereConditions = ['1=1'] // 移除Status=1的硬编码限制，允许显示所有状态的菜单
+      let queryParams = []
+      
+      if (keyword) {
+        whereConditions.push('(m.MenuName LIKE @keyword OR m.MenuCode LIKE @keyword)')
+        queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
       }
-    }
-    
-    if (status !== null && status !== '') {
-      whereConditions.push('m.Status = @status')
-      queryParams.push({ name: 'status', type: sql.Bit, value: status === 'true' })
-    }
-    
-    const whereClause = whereConditions.join(' AND ')
-    
-    // 获取总数（只计算顶级菜单数量，用于分页）
-    let countRequest = pool.request()
-    queryParams.forEach(param => {
-      countRequest.input(param.name, param.type, param.value)
-    })
-    
-    const countResult = await countRequest.query(`
-      SELECT COUNT(*) as total
-      FROM Menus m
-      WHERE ${whereClause} AND (m.ParentID IS NULL OR m.ParentID = 0)
-    `)
-    
-    // 获取分页数据
-    let dataRequest = pool.request()
-    queryParams.forEach(param => {
-      dataRequest.input(param.name, param.type, param.value)
-    })
-    dataRequest.input('offset', sql.Int, offset)
-    dataRequest.input('size', sql.Int, parseInt(size))
-    
-    // 先获取分页的顶级菜单ID
-    const topMenuResult = await dataRequest.query(`
-      SELECT * FROM (
-        SELECT
-          ROW_NUMBER() OVER (ORDER BY m.SortOrder ASC, m.CreatedAt DESC) as RowNum,
-          m.ID
+
+      if (type) {
+        whereConditions.push('m.MenuType = @type')
+        queryParams.push({ name: 'type', type: sql.NVarChar(20), value: type })
+      }
+      
+      if (parentId !== null && parentId !== '') {
+        if (parentId === '0') {
+          whereConditions.push('m.ParentID IS NULL')
+        } else {
+          whereConditions.push('m.ParentID = @parentId')
+          queryParams.push({ name: 'parentId', type: sql.Int, value: parseInt(parentId) })
+        }
+      }
+      
+      if (status !== null && status !== '') {
+        whereConditions.push('m.Status = @status')
+        queryParams.push({ name: 'status', type: sql.Bit, value: status === 'true' })
+      }
+      
+      const whereClause = whereConditions.join(' AND ')
+      
+      // 获取总数（只计算顶级菜单数量，用于分页）
+      let countRequest = pool.request()
+      queryParams.forEach(param => {
+        countRequest.input(param.name, param.type, param.value)
+      })
+      
+      const countResult = await countRequest.query(`
+        SELECT COUNT(*) as total
         FROM Menus m
         WHERE ${whereClause} AND (m.ParentID IS NULL OR m.ParentID = 0)
-      ) AS T
-      WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
-      ORDER BY T.RowNum
-    `)
+      `)
+      
+      // 获取分页数据
+      let dataRequest = pool.request()
+      queryParams.forEach(param => {
+        dataRequest.input(param.name, param.type, param.value)
+      })
+      dataRequest.input('offset', sql.Int, offset)
+      dataRequest.input('size', sql.Int, parseInt(size))
     
-    const topMenuIds = topMenuResult.recordset.map(item => item.ID)
-    
-    // 如果没有顶级菜单，返回空结果
-    if (topMenuIds.length === 0) {
-      return res.json({
-        success: true,
-        data: {
+      // 先获取分页的顶级菜单ID
+      const topMenuResult = await dataRequest.query(`
+        SELECT * FROM (
+          SELECT
+            ROW_NUMBER() OVER (ORDER BY m.SortOrder ASC, m.CreatedAt DESC) as RowNum,
+            m.ID
+          FROM Menus m
+          WHERE ${whereClause} AND (m.ParentID IS NULL OR m.ParentID = 0)
+        ) AS T
+        WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
+        ORDER BY T.RowNum
+      `)
+      
+      const topMenuIds = topMenuResult.recordset.map(item => item.ID)
+      
+      // 如果没有顶级菜单，返回空结果
+      if (topMenuIds.length === 0) {
+        return {
           list: [],
           total: countResult.recordset[0].total,
+          page: parseInt(page),
+          size: parseInt(size)
+        }
+      }
+      
+      // 获取这些顶级菜单及其所有子菜单
+      const allMenusRequest = pool.request()
+      queryParams.forEach(param => {
+        allMenusRequest.input(param.name, param.type, param.value)
+      })
+      
+      const dataResult = await allMenusRequest.query(`
+        WITH MenuHierarchy AS (
+          -- 获取分页的顶级菜单
+          SELECT
+            m.ID,
+            m.MenuName as Name,
+            m.MenuCode as Code,
+            m.ParentID,
+            m.MenuType as Type,
+            m.Icon,
+            m.Path,
+            m.Component,
+            m.Permission,
+            m.SortOrder,
+            CAST(m.Status as BIT) as Status,
+            m.CreatedAt,
+            m.UpdatedAt,
+            0 as Level
+          FROM Menus m
+          WHERE m.ID IN (${topMenuIds.join(',')}) AND ${whereClause}
+          
+          UNION ALL
+          
+          -- 递归获取所有子菜单（不应用筛选条件，只获取子菜单）
+          SELECT
+            m.ID,
+            m.MenuName as Name,
+            m.MenuCode as Code,
+            m.ParentID,
+            m.MenuType as Type,
+            m.Icon,
+            m.Path,
+            m.Component,
+            m.Permission,
+            m.SortOrder,
+            CAST(m.Status as BIT) as Status,
+            m.CreatedAt,
+            m.UpdatedAt,
+            mh.Level + 1
+          FROM Menus m
+          INNER JOIN MenuHierarchy mh ON m.ParentID = mh.ID
+        )
+        SELECT * FROM MenuHierarchy
+        ORDER BY Level ASC, SortOrder ASC, CreatedAt DESC
+      `)
+      
+      // 将bit类型的Status字段转换为布尔值
+      const processedData = dataResult.recordset.map(item => ({
+        ...item,
+        Status: Boolean(item.Status)
+      }))
+      
+      return {
+        list: processedData,
+        total: countResult.recordset[0].total,
+        page: parseInt(page),
+        size: parseInt(size)
+      }
+    })
+    
+    // 检查 executeQuery 是否返回 null（数据库连接失败）
+    if (!result) {
+      console.error('获取菜单列表失败: executeQuery 返回 null，可能是数据库连接问题')
+      return res.status(500).json({
+        success: false,
+        message: '获取菜单列表失败，数据库连接异常',
+        data: {
+          list: [],
+          total: 0,
           page: parseInt(page),
           size: parseInt(size)
         }
       })
     }
     
-    // 获取这些顶级菜单及其所有子菜单
-    const allMenusRequest = pool.request()
-    queryParams.forEach(param => {
-      allMenusRequest.input(param.name, param.type, param.value)
-    })
-    
-    const dataResult = await allMenusRequest.query(`
-      WITH MenuHierarchy AS (
-        -- 获取分页的顶级菜单
-        SELECT
-          m.ID,
-          m.MenuName as Name,
-          m.MenuCode as Code,
-          m.ParentID,
-          m.MenuType as Type,
-          m.Icon,
-          m.Path,
-          m.Component,
-          m.Permission,
-          m.SortOrder,
-          CAST(m.Status as BIT) as Status,
-          m.CreatedAt,
-          m.UpdatedAt,
-          0 as Level
-        FROM Menus m
-        WHERE m.ID IN (${topMenuIds.join(',')}) AND ${whereClause}
-        
-        UNION ALL
-        
-        -- 递归获取所有子菜单（不应用筛选条件，只获取子菜单）
-        SELECT
-          m.ID,
-          m.MenuName as Name,
-          m.MenuCode as Code,
-          m.ParentID,
-          m.MenuType as Type,
-          m.Icon,
-          m.Path,
-          m.Component,
-          m.Permission,
-          m.SortOrder,
-          CAST(m.Status as BIT) as Status,
-          m.CreatedAt,
-          m.UpdatedAt,
-          mh.Level + 1
-        FROM Menus m
-        INNER JOIN MenuHierarchy mh ON m.ParentID = mh.ID
-      )
-      SELECT * FROM MenuHierarchy
-      ORDER BY Level ASC, SortOrder ASC, CreatedAt DESC
-    `)
-    
-    // 将bit类型的Status字段转换为布尔值
-    const processedData = dataResult.recordset.map(item => ({
-      ...item,
-      Status: Boolean(item.Status)
-    }))
-    
     res.json({
       success: true,
-      data: {
-        list: processedData,
-        total: countResult.recordset[0].total,
-        page: parseInt(page),
-        size: parseInt(size)
-      }
+      data: result
     })
   } catch (error) {
     console.error('获取菜单列表失败:', error)
@@ -254,58 +269,69 @@ router.get('/user-menus', authMiddleware, async (req, res) => {
       })
     }
 
-    const pool = await getConnection()
-    
-    // 查询用户角色权限菜单
-    // 这里简化处理，实际应该根据用户角色权限来过滤菜单
-    const result = await pool.request()
-      .input('userId', sql.Int, userId)
-      .query(`
-        SELECT DISTINCT
-          m.ID,
-          m.MenuName as Name,
-          m.MenuCode as Code,
-          m.ParentID,
-          m.MenuType as Type,
-          m.Icon,
-          CASE 
-            WHEN m.Path LIKE '/admin/%' THEN m.Path
-            WHEN m.Path = '/' THEN '/admin/dashboard'
-            ELSE '/admin' + m.Path
-          END as Path,
-          m.Component,
-          m.Permission,
-          m.SortOrder,
-          m.Status
-        FROM Menus m
-        LEFT JOIN RoleMenus rm ON m.ID = rm.MenuID
-        LEFT JOIN UserRoles ur ON rm.RoleID = ur.RoleID
-        WHERE m.Status = 1 
-          AND (ur.UserID = @userId OR m.Permission IS NULL OR m.Permission = '')
-        ORDER BY m.SortOrder ASC, m.ID ASC
-      `)
-    
-    // 构建树形结构
-    const menuMap = new Map()
-    const rootMenus = []
-    
-    // 先创建所有菜单的映射
-    result.recordset.forEach(menu => {
-      menu.children = []
-      menuMap.set(menu.ID, menu)
+    const result = await executeQuery(async (pool) => {
+      // 查询用户角色权限菜单
+      // 这里简化处理，实际应该根据用户角色权限来过滤菜单
+      const queryResult = await pool.request()
+        .input('userId', sql.Int, userId)
+        .query(`
+          SELECT DISTINCT
+            m.ID,
+            m.MenuName as Name,
+            m.MenuCode as Code,
+            m.ParentID,
+            m.MenuType as Type,
+            m.Icon,
+            CASE 
+              WHEN m.Path LIKE '/admin/%' THEN m.Path
+              WHEN m.Path = '/' THEN '/admin/dashboard'
+              ELSE '/admin' + m.Path
+            END as Path,
+            m.Component,
+            m.Permission,
+            m.SortOrder,
+            m.Status
+          FROM Menus m
+          LEFT JOIN RoleMenus rm ON m.ID = rm.MenuID
+          LEFT JOIN UserRoles ur ON rm.RoleID = ur.RoleID
+          WHERE m.Status = 1 
+            AND (ur.UserID = @userId OR m.Permission IS NULL OR m.Permission = '')
+          ORDER BY m.SortOrder ASC, m.ID ASC
+        `)
+      
+      // 构建树形结构
+      const menuMap = new Map()
+      const rootMenus = []
+      
+      // 先创建所有菜单的映射
+      queryResult.recordset.forEach(menu => {
+        menu.children = []
+        menuMap.set(menu.ID, menu)
+      })
+      
+      // 构建父子关系
+      queryResult.recordset.forEach(menu => {
+        if (menu.ParentID && menuMap.has(menu.ParentID)) {
+          menuMap.get(menu.ParentID).children.push(menu)
+        } else {
+          rootMenus.push(menu)
+        }
+      })
+      
+      return rootMenus
     })
     
-    // 构建父子关系
-    result.recordset.forEach(menu => {
-      if (menu.ParentID && menuMap.has(menu.ParentID)) {
-        menuMap.get(menu.ParentID).children.push(menu)
-      } else {
-        rootMenus.push(menu)
-      }
-    })
+    // 检查 executeQuery 是否返回 null（数据库连接失败）
+    if (!result) {
+      console.error('获取用户菜单失败: executeQuery 返回 null，可能是数据库连接问题')
+      return res.json({
+        success: true,
+        data: getDefaultMenus()
+      })
+    }
     
     // 如果没有查询到菜单数据，返回默认菜单
-    if (rootMenus.length === 0) {
+    if (result.length === 0) {
       return res.json({
         success: true,
         data: getDefaultMenus()
@@ -314,7 +340,7 @@ router.get('/user-menus', authMiddleware, async (req, res) => {
     
     res.json({
       success: true,
-      data: rootMenus
+      data: result
     })
   } catch (error) {
     console.error('获取用户菜单失败:', error)
@@ -330,31 +356,44 @@ router.get('/user-menus', authMiddleware, async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const pool = await getConnection()
-    const result = await pool.request()
-      .input('id', sql.Int, id)
-      .query(`
-        SELECT
-          m.ID,
-          m.MenuName as Name,
-          m.MenuCode as Code,
-          m.ParentID,
-          p.MenuName as ParentName,
-          m.MenuType as Type,
-          m.Icon,
-          m.Path,
-          m.Component,
-          m.Permission,
-          m.SortOrder,
-          m.Status,
-          m.CreatedAt,
-          m.UpdatedAt
-        FROM Menus m
-        LEFT JOIN Menus p ON m.ParentID = p.ID
-        WHERE m.ID = @id
-      `)
     
-    if (result.recordset.length === 0) {
+    const result = await executeQuery(async (pool) => {
+      const queryResult = await pool.request()
+        .input('id', sql.Int, id)
+        .query(`
+          SELECT
+            m.ID,
+            m.MenuName as Name,
+            m.MenuCode as Code,
+            m.ParentID,
+            p.MenuName as ParentName,
+            m.MenuType as Type,
+            m.Icon,
+            m.Path,
+            m.Component,
+            m.Permission,
+            m.SortOrder,
+            m.Status,
+            m.CreatedAt,
+            m.UpdatedAt
+          FROM Menus m
+          LEFT JOIN Menus p ON m.ParentID = p.ID
+          WHERE m.ID = @id
+        `)
+      
+      return queryResult.recordset[0] || null
+    })
+    
+    // 检查 executeQuery 是否返回 null（数据库连接失败）
+    if (result === null) {
+      console.error('获取菜单详情失败: executeQuery 返回 null，可能是数据库连接问题')
+      return res.status(500).json({
+        success: false,
+        message: '获取菜单详情失败，数据库连接异常'
+      })
+    }
+    
+    if (!result) {
       return res.status(404).json({
         success: false,
         message: '菜单不存在'
@@ -363,7 +402,7 @@ router.get('/:id', async (req, res) => {
     
     res.json({
       success: true,
-      data: result.recordset[0]
+      data: result
     })
   } catch (error) {
     console.error('获取菜单详情失败:', error)
@@ -399,62 +438,67 @@ router.post('/', async (req, res) => {
       })
     }
 
-    const pool = await getConnection()
+    const result = await executeQuery(async (pool) => {
+      // 检查菜单编码是否已存在
+      const checkResult = await pool.request()
+        .input('code', sql.NVarChar(50), Code)
+        .query('SELECT COUNT(*) as count FROM Menus WHERE MenuCode = @code')
+      
+      if (checkResult.recordset[0].count > 0) {
+        throw new Error('菜单编码已存在')
+      }
+      
+      // 如果有父菜单，检查父菜单是否存在
+      if (ParentID) {
+        const parentResult = await pool.request()
+          .input('parentId', sql.Int, ParentID)
+          .query('SELECT COUNT(*) as count FROM Menus WHERE ID = @parentId')
+        
+        if (parentResult.recordset[0].count === 0) {
+          throw new Error('父菜单不存在')
+        }
+      }
+      
+      // 插入新菜单
+      const insertResult = await pool.request()
+        .input('name', sql.NVarChar(50), Name)
+        .input('code', sql.NVarChar(50), Code)
+        .input('parentId', sql.Int, ParentID)
+        .input('type', sql.NVarChar(10), Type)
+        .input('icon', sql.NVarChar(50), Icon)
+        .input('path', sql.NVarChar(200), Path)
+        .input('component', sql.NVarChar(200), Component)
+        .input('permission', sql.NVarChar(100), Permission)
+        .input('sortOrder', sql.Int, SortOrder)
+        .input('status', sql.Bit, Status)
+        .query(`
+          INSERT INTO Menus (
+            MenuName, MenuCode, ParentID, MenuType, Icon, Path, Component, Permission,
+            SortOrder, Status, CreatedAt, UpdatedAt
+          )
+          OUTPUT INSERTED.ID
+          VALUES (
+            @name, @code, @parentId, @type, @icon, @path, @component, @permission,
+            @sortOrder, @status, GETDATE(), GETDATE()
+          )
+        `)
+      
+      return insertResult.recordset[0].ID
+    })
     
-    // 检查菜单编码是否已存在
-    const checkResult = await pool.request()
-      .input('code', sql.NVarChar(50), Code)
-      .query('SELECT COUNT(*) as count FROM Menus WHERE MenuCode = @code')
-    
-    if (checkResult.recordset[0].count > 0) {
-      return res.status(400).json({
+    // 检查 executeQuery 是否返回 null（数据库连接失败）
+    if (result === null) {
+      console.error('创建菜单失败: executeQuery 返回 null，可能是数据库连接问题')
+      return res.status(500).json({
         success: false,
-        message: '菜单编码已存在'
+        message: '创建菜单失败，数据库连接异常'
       })
     }
-    
-    // 如果有父菜单，检查父菜单是否存在
-    if (ParentID) {
-      const parentResult = await pool.request()
-        .input('parentId', sql.Int, ParentID)
-        .query('SELECT COUNT(*) as count FROM Menus WHERE ID = @parentId')
-      
-      if (parentResult.recordset[0].count === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '父菜单不存在'
-        })
-      }
-    }
-    
-    // 插入新菜单
-    const result = await pool.request()
-      .input('name', sql.NVarChar(50), Name)
-      .input('code', sql.NVarChar(50), Code)
-      .input('parentId', sql.Int, ParentID)
-      .input('type', sql.NVarChar(10), Type)
-      .input('icon', sql.NVarChar(50), Icon)
-      .input('path', sql.NVarChar(200), Path)
-      .input('component', sql.NVarChar(200), Component)
-      .input('permission', sql.NVarChar(100), Permission)
-      .input('sortOrder', sql.Int, SortOrder)
-      .input('status', sql.Bit, Status)
-      .query(`
-        INSERT INTO Menus (
-          MenuName, MenuCode, ParentID, MenuType, Icon, Path, Component, Permission,
-          SortOrder, Status, CreatedAt, UpdatedAt
-        )
-        OUTPUT INSERTED.ID
-        VALUES (
-          @name, @code, @parentId, @type, @icon, @path, @component, @permission,
-          @sortOrder, @status, GETDATE(), GETDATE()
-        )
-      `)
     
     res.status(201).json({
       success: true,
       message: '菜单创建成功',
-      data: { id: result.recordset[0].ID }
+      data: { id: result }
     })
   } catch (error) {
     console.error('创建菜单失败:', error)
@@ -491,82 +535,81 @@ router.put('/:id', async (req, res) => {
       })
     }
 
-    const pool = await getConnection()
-    
-    // 检查菜单是否存在
-    const existResult = await pool.request()
-      .input('id', sql.Int, id)
-      .query('SELECT COUNT(*) as count FROM Menus WHERE ID = @id')
-    
-    if (existResult.recordset[0].count === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '菜单不存在'
-      })
-    }
-    
-    // 检查菜单编码是否已被其他菜单使用
-    const checkResult = await pool.request()
-      .input('code', sql.NVarChar(50), Code)
-      .input('id', sql.Int, id)
-      .query('SELECT COUNT(*) as count FROM Menus WHERE MenuCode = @code AND ID != @id')
-    
-    if (checkResult.recordset[0].count > 0) {
-      return res.status(400).json({
-        success: false,
-        message: '菜单编码已存在'
-      })
-    }
-    
-    // 如果有父菜单，检查父菜单是否存在且不是自己
-    if (ParentID) {
-      if (ParentID == id) {
-        return res.status(400).json({
-          success: false,
-          message: '不能将自己设为父菜单'
-        })
+    const result = await executeQuery(async (pool) => {
+      // 检查菜单是否存在
+      const existResult = await pool.request()
+        .input('id', sql.Int, id)
+        .query('SELECT COUNT(*) as count FROM Menus WHERE ID = @id')
+      
+      if (existResult.recordset[0].count === 0) {
+        throw new Error('菜单不存在')
       }
       
-      const parentResult = await pool.request()
+      // 检查菜单编码是否已被其他菜单使用
+      const checkResult = await pool.request()
+        .input('code', sql.NVarChar(50), Code)
+        .input('id', sql.Int, id)
+        .query('SELECT COUNT(*) as count FROM Menus WHERE MenuCode = @code AND ID != @id')
+      
+      if (checkResult.recordset[0].count > 0) {
+        throw new Error('菜单编码已存在')
+      }
+      
+      // 如果有父菜单，检查父菜单是否存在且不是自己
+      if (ParentID) {
+        if (ParentID == id) {
+          throw new Error('不能将自己设为父菜单')
+        }
+        
+        const parentResult = await pool.request()
+          .input('parentId', sql.Int, ParentID)
+          .query('SELECT COUNT(*) as count FROM Menus WHERE ID = @parentId')
+        
+        if (parentResult.recordset[0].count === 0) {
+          throw new Error('父菜单不存在')
+        }
+      }
+      
+      // 更新菜单
+      await pool.request()
+        .input('id', sql.Int, id)
+        .input('name', sql.NVarChar(50), Name)
+        .input('code', sql.NVarChar(50), Code)
         .input('parentId', sql.Int, ParentID)
-        .query('SELECT COUNT(*) as count FROM Menus WHERE ID = @parentId')
+        .input('type', sql.NVarChar(10), Type)
+        .input('icon', sql.NVarChar(50), Icon)
+        .input('path', sql.NVarChar(200), Path)
+        .input('component', sql.NVarChar(200), Component)
+        .input('permission', sql.NVarChar(100), Permission)
+        .input('sortOrder', sql.Int, SortOrder)
+        .input('status', sql.Bit, Status)
+        .query(`
+          UPDATE Menus SET
+            MenuName = @name,
+            MenuCode = @code,
+            ParentID = @parentId,
+            MenuType = @type,
+            Icon = @icon,
+            Path = @path,
+            Component = @component,
+            Permission = @permission,
+            SortOrder = @sortOrder,
+            Status = @status,
+            UpdatedAt = GETDATE()
+          WHERE ID = @id
+        `)
       
-      if (parentResult.recordset[0].count === 0) {
-        return res.status(400).json({
-          success: false,
-          message: '父菜单不存在'
-        })
-      }
-    }
+      return true
+    })
     
-    // 更新菜单
-    await pool.request()
-      .input('id', sql.Int, id)
-      .input('name', sql.NVarChar(50), Name)
-      .input('code', sql.NVarChar(50), Code)
-      .input('parentId', sql.Int, ParentID)
-      .input('type', sql.NVarChar(10), Type)
-      .input('icon', sql.NVarChar(50), Icon)
-      .input('path', sql.NVarChar(200), Path)
-      .input('component', sql.NVarChar(200), Component)
-      .input('permission', sql.NVarChar(100), Permission)
-      .input('sortOrder', sql.Int, SortOrder)
-      .input('status', sql.Bit, Status)
-      .query(`
-        UPDATE Menus SET
-          MenuName = @name,
-          MenuCode = @code,
-          ParentID = @parentId,
-          MenuType = @type,
-          Icon = @icon,
-          Path = @path,
-          Component = @component,
-          Permission = @permission,
-          SortOrder = @sortOrder,
-          Status = @status,
-          UpdatedAt = GETDATE()
-        WHERE ID = @id
-      `)
+    // 检查 executeQuery 是否返回 null（数据库连接失败）
+    if (result === null) {
+      console.error('更新菜单失败: executeQuery 返回 null，可能是数据库连接问题')
+      return res.status(500).json({
+        success: false,
+        message: '更新菜单失败，数据库连接异常'
+      })
+    }
     
     res.json({
       success: true,
@@ -586,48 +629,51 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const pool = await getConnection()
     
-    // 检查菜单是否存在
-    const existResult = await pool.request()
-      .input('id', sql.Int, id)
-      .query('SELECT COUNT(*) as count FROM Menus WHERE ID = @id')
+    const result = await executeQuery(async (pool) => {
+      // 检查菜单是否存在
+      const existResult = await pool.request()
+        .input('id', sql.Int, id)
+        .query('SELECT COUNT(*) as count FROM Menus WHERE ID = @id')
+      
+      if (existResult.recordset[0].count === 0) {
+        throw new Error('菜单不存在')
+      }
+      
+      // 检查是否有子菜单
+      const childResult = await pool.request()
+        .input('parentId', sql.Int, id)
+        .query('SELECT COUNT(*) as count FROM Menus WHERE ParentID = @parentId')
+      
+      if (childResult.recordset[0].count > 0) {
+        throw new Error('该菜单下还有子菜单，无法删除')
+      }
+      
+      // 检查是否有角色关联
+      const roleResult = await pool.request()
+        .input('menuId', sql.Int, id)
+        .query('SELECT COUNT(*) as count FROM RoleMenus WHERE MenuID = @menuId')
+      
+      if (roleResult.recordset[0].count > 0) {
+        throw new Error('该菜单已分配给角色，无法删除')
+      }
+      
+      // 删除菜单
+      await pool.request()
+        .input('id', sql.Int, id)
+        .query('DELETE FROM Menus WHERE ID = @id')
+      
+      return true
+    })
     
-    if (existResult.recordset[0].count === 0) {
-      return res.status(404).json({
+    // 检查 executeQuery 是否返回 null（数据库连接失败）
+    if (result === null) {
+      console.error('删除菜单失败: executeQuery 返回 null，可能是数据库连接问题')
+      return res.status(500).json({
         success: false,
-        message: '菜单不存在'
+        message: '删除菜单失败，数据库连接异常'
       })
     }
-    
-    // 检查是否有子菜单
-    const childResult = await pool.request()
-      .input('parentId', sql.Int, id)
-      .query('SELECT COUNT(*) as count FROM Menus WHERE ParentID = @parentId')
-    
-    if (childResult.recordset[0].count > 0) {
-      return res.status(400).json({
-        success: false,
-        message: '该菜单下还有子菜单，无法删除'
-      })
-    }
-    
-    // 检查是否有角色关联
-    const roleResult = await pool.request()
-      .input('menuId', sql.Int, id)
-      .query('SELECT COUNT(*) as count FROM RoleMenus WHERE MenuID = @menuId')
-    
-    if (roleResult.recordset[0].count > 0) {
-      return res.status(400).json({
-        success: false,
-        message: '该菜单已分配给角色，无法删除'
-      })
-    }
-    
-    // 删除菜单
-    await pool.request()
-      .input('id', sql.Int, id)
-      .query('DELETE FROM Menus WHERE ID = @id')
     
     res.json({
       success: true,
@@ -646,22 +692,34 @@ router.delete('/:id', async (req, res) => {
 // 获取菜单选项（用于下拉选择）
 router.get('/options/list', async (req, res) => {
   try {
-    const pool = await getConnection()
-    const result = await pool.request()
-      .query(`
-        SELECT
-          ID as value,
-          MenuName as label,
-          ParentID,
-          MenuType as Type
-        FROM Menus
-        WHERE Status = 1
-        ORDER BY SortOrder ASC, CreatedAt ASC
-      `)
+    const result = await executeQuery(async (pool) => {
+      const queryResult = await pool.request()
+        .query(`
+          SELECT
+            ID as value,
+            MenuName as label,
+            ParentID,
+            MenuType as Type
+          FROM Menus
+          WHERE Status = 1
+          ORDER BY SortOrder ASC, CreatedAt ASC
+        `)
+      
+      return queryResult.recordset
+    })
+    
+    // 检查 executeQuery 是否返回 null（数据库连接失败）
+    if (result === null) {
+      console.error('获取菜单选项失败: executeQuery 返回 null，可能是数据库连接问题')
+      return res.status(500).json({
+        success: false,
+        message: '获取菜单选项失败，数据库连接异常'
+      })
+    }
     
     res.json({
       success: true,
-      data: result.recordset
+      data: result
     })
   } catch (error) {
     console.error('获取菜单选项失败:', error)

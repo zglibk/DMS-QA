@@ -2,7 +2,7 @@
   <div class="system-config">
     <div class="page-header">
       <h2>系统配置</h2>
-      <p>管理数据库连接、文件存储和路径映射等系统配置</p>
+      <p>管理数据库连接、文件存储、路径映射、网站配置和主页卡片等系统配置</p>
     </div>
 
     <el-tabs v-model="activeTab" class="config-tabs">
@@ -33,6 +33,13 @@
           <SiteConfig />
         </div>
       </el-tab-pane>
+
+      <!-- 主页卡片配置标签页 -->
+      <el-tab-pane label="主页卡片配置" name="homecard">
+        <div class="tab-content">
+          <HomeCardConfig />
+        </div>
+      </el-tab-pane>
     </el-tabs>
   </div>
 </template>
@@ -43,6 +50,7 @@ import ConnectionConfig from '@/components/admin/ConnectionConfig.vue'
 import StorageConfig from '@/components/admin/StorageConfig.vue'
 import PathMappingConfig from '@/components/admin/PathMappingConfig.vue'
 import SiteConfig from '@/components/admin/SiteConfig.vue'
+import HomeCardConfig from '@/components/admin/HomeCardConfig.vue'
 
 const activeTab = ref('connection')
 </script>

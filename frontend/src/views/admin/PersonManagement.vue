@@ -211,7 +211,7 @@ const getHeaders = () => {
 const loadPersonList = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/person/list', {
+    const response = await axios.get('/person/list', {
       params: {
         page: pagination.current,
         pageSize: pagination.pageSize,
@@ -238,7 +238,7 @@ const loadPersonList = async () => {
 // 加载部门列表
 const loadDepartments = async () => {
   try {
-    const response = await axios.get('/api/person/departments', {
+    const response = await axios.get('/person/departments', {
       headers: getHeaders()
     })
     
@@ -284,7 +284,7 @@ const togglePersonStatus = async (row) => {
     )
     
     const response = await axios.post(
-      `/api/person/${row.ID}/toggle-status`,
+      `/person/${row.ID}/toggle-status`,
       {},
       { headers: getHeaders() }
     )
@@ -316,7 +316,7 @@ const deletePerson = async (row) => {
       }
     )
     
-    const response = await axios.delete(`/api/person/${row.ID}`, {
+    const response = await axios.delete(`/person/${row.ID}`, {
       headers: getHeaders()
     })
     
@@ -343,7 +343,7 @@ const submitForm = async () => {
     
     submitting.value = true
     
-    const url = isEdit.value ? `/api/person/${formData.id}` : '/api/person'
+    const url = isEdit.value ? `/person/${formData.id}` : '/person'
     const method = isEdit.value ? 'put' : 'post'
     
     const response = await axios[method](url, {

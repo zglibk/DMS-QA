@@ -86,7 +86,7 @@ class ImagePreviewService {
       console.log(`调用API: /api/complaint/file/${recordId}`)
 
       // 通过后端API获取图片数据
-      const response = await apiService.get(`/api/complaint/file/${recordId}`, {
+      const response = await apiService.get(`/complaint/file/${recordId}`, {
         responseType: 'blob'
       })
 

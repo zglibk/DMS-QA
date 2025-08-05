@@ -192,7 +192,7 @@ const dbRules = {
 const loadConfigs = async () => {
   isLoadingConfigs.value = true
   try {
-    const response = await axios.get('/api/config/db-list')
+    const response = await axios.get('/config/db-list')
     if (response.data.success) {
       dbConfigs.value = response.data.data
     }
@@ -266,8 +266,8 @@ const saveConfig = async () => {
       isSubmitting.value = true
       try {
         const url = selectedConfigId.value 
-          ? `/api/config/db-config/${selectedConfigId.value}`
-          : '/api/config/db-config'
+          ? `/config/db-config/${selectedConfigId.value}`
+          : '/config/db-config'
         
         const method = selectedConfigId.value ? 'put' : 'post'
         
@@ -298,7 +298,7 @@ const testConnection = async () => {
     if (valid) {
       isTesting.value = true
       try {
-        const response = await axios.post('/api/config/test-connection', dbConfig)
+        const response = await axios.post('/config/test-connection', dbConfig)
         if (response.data.success) {
           ElMessage.success('连接测试成功')
         } else {
@@ -322,7 +322,7 @@ const deleteConfig = async () => {
       type: 'warning'
     })
 
-    const response = await axios.delete(`/api/config/db/${selectedConfigId.value}`)
+    const response = await axios.delete(`/config/db/${selectedConfigId.value}`)
     if (response.data.success) {
       ElMessage.success('配置删除成功')
       selectedConfigId.value = null

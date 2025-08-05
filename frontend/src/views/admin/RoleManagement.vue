@@ -303,7 +303,8 @@ import {
   Key,
   OfficeBuilding,
   Grid,
-  UserFilled
+  UserFilled,
+  Setting
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 
@@ -417,7 +418,7 @@ const fetchRoles = async () => {
       size: pagination.size,
       ...searchForm
     }
-    const response = await axios.get('/api/roles', { params })
+    const response = await axios.get('/roles', { params })
     const data = response.data.data || {}
     roleList.value = data.list || []
     pagination.total = data.total || 0
@@ -433,7 +434,7 @@ const fetchRoles = async () => {
 const fetchMenus = async () => {
   try {
     // 获取所有菜单数据，设置足够大的分页参数
-    const response = await axios.get('/api/menus?size=1000')
+    const response = await axios.get('/menus?size=1000')
     // 修复：从分页数据结构中提取list数组
     const data = response.data.data || {}
     menuList.value = data.list || []
@@ -445,7 +446,7 @@ const fetchMenus = async () => {
 // 获取部门列表
 const fetchDepartments = async () => {
   try {
-    const response = await axios.get('/api/departments')
+    const response = await axios.get('/departments')
     departmentList.value = response.data.data || []
   } catch (error) {
     console.error('获取部门列表失败:', error)
@@ -509,7 +510,7 @@ const showPermissionDialog = async (role) => {
     await fetchMenus()
     
     // 然后获取角色的权限数据
-    const response = await axios.get(`/api/roles/${role.ID}/menus`)
+    const response = await axios.get(`/roles/${role.ID}/menus`)
     selectedMenuIds.value = response.data.data || []
   } catch (error) {
     console.error('获取角色权限失败:', error)
@@ -522,7 +523,7 @@ const showPermissionDialog = async (role) => {
 const showDepartmentDialog = async (role) => {
   currentRole.value = role
   try {
-    const response = await axios.get(`/api/roles/${role.ID}/departments`)
+    const response = await axios.get(`/roles/${role.ID}/departments`)
     selectedDepartmentIds.value = response.data.data || []
   } catch (error) {
     console.error('获取角色部门失败:', error)
@@ -553,7 +554,7 @@ const submitForm = async () => {
     await formRef.value.validate()
     submitting.value = true
     
-    const url = isEdit.value ? `/api/roles/${currentEditId.value}` : '/api/roles'
+    const url = isEdit.value ? `/roles/${currentEditId.value}` : '/roles'
     const method = isEdit.value ? 'put' : 'post'
     
     await axios[method](url, formData)
@@ -588,7 +589,7 @@ const savePermissions = async () => {
     // 合并完全选中和半选中的节点ID
     const allSelectedKeys = [...checkedKeys, ...halfCheckedKeys]
     
-    await axios.post(`/api/roles/${currentRole.value.ID}/menus`, {
+    await axios.post(`/roles/${currentRole.value.ID}/menus`, {
       menuIds: allSelectedKeys
     })
     
@@ -610,7 +611,7 @@ const saveDepartments = async () => {
     departmentSubmitting.value = true
     const checkedKeys = departmentTreeRef.value.getCheckedKeys()
     
-    await axios.post(`/api/roles/${currentRole.value.ID}/departments`, {
+    await axios.post(`/roles/${currentRole.value.ID}/departments`, {
       departmentIds: checkedKeys
     })
     
@@ -639,7 +640,7 @@ const deleteRole = async (role) => {
       }
     )
     
-    await axios.delete(`/api/roles/${role.ID}`)
+    await axios.delete(`/roles/${role.ID}`)
     ElMessage.success('删除成功')
     await fetchRoles()
   } catch (error) {

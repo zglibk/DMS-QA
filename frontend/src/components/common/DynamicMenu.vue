@@ -163,22 +163,13 @@ const fetchUserMenus = async () => {
     loading.value = true
     error.value = null
     
-    console.log('=== DynamicMenu: 开始获取用户菜单 ===')
-    console.log('当前token状态:', {
-      store_token: !!userStore.token,
-      localStorage_token: !!localStorage.getItem('token'),
-      token_length: userStore.token?.length || 0
-    })
-    
     if (!userStore.token) {
-      console.log('Token不存在，使用默认菜单')
       menuList.value = getDefaultMenus()
       return
     }
     
     // 检查用户信息是否存在，如果不存在则先获取用户信息
     if (!userStore.user || !userStore.user.id) {
-      console.log('用户信息不存在，先获取用户基本信息')
       try {
         await userStore.fetchProfile()
       } catch (profileError) {
@@ -189,12 +180,9 @@ const fetchUserMenus = async () => {
       }
     }
     
-    console.log('调用API获取用户菜单')
     // 直接调用API获取最新的菜单数据
-    const response = await apiService.get('/api/menus/user-menus')
-    console.log('API响应:', response)
+    const response = await apiService.get('/menus/user-menus')
     if (response.data.success) {
-      console.log('API获取菜单成功，菜单数量:', response.data.data?.length || 0)
       menuList.value = response.data.data || []
     } else {
       throw new Error(response.data.message || '获取菜单数据失败')
@@ -404,14 +392,11 @@ watch(() => userStore.token, (newToken) => {
 
 // 监听菜单列表变化
 watch(menuList, (newMenus) => {
-  console.log('=== DynamicMenu: 菜单列表已更新 ===')
-  console.log('新菜单数据:', newMenus)
-  console.log('菜单数量:', newMenus?.length || 0)
+  // 菜单列表已更新
 }, { deep: true })
 
 // 组件挂载时获取菜单
 onMounted(() => {
-  console.log('=== DynamicMenu: 组件已挂载，开始获取菜单 ===')
   fetchUserMenus()
 })
 

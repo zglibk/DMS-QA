@@ -357,7 +357,7 @@ const saveLoading = ref(false)
 // 获取当前用户信息，填充user和form
 const fetchProfile = async () => {
   const token = localStorage.getItem('token')
-  const res = await axios.get('/api/auth/profile', {
+  const res = await axios.get('/auth/profile', {
     headers: { Authorization: `Bearer ${token}` }
   })
   if (res.data.success) {
@@ -408,7 +408,7 @@ const saveProfile = async () => {
       Address: form.Address,
       Remark: form.Remark
     }
-    const res = await axios.post('/api/auth/profile', profileData, {
+    const res = await axios.post('/auth/profile', profileData, {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (res.data.success) {
@@ -482,7 +482,7 @@ const changePwd = () => {
     const token = localStorage.getItem('token')
     
     try {
-      const res = await axios.post('/api/auth/change-password', pwdForm, {
+      const res = await axios.post('/auth/change-password', pwdForm, {
         headers: { Authorization: `Bearer ${token}` }
       })
       
@@ -652,7 +652,7 @@ const handleFileSelect = async (e) => {
 const fetchDepartments = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/api/departments', {
+    const res = await axios.get('/departments', {
       headers: { Authorization: `Bearer ${token}` }
     })
     if (res.data.success) {

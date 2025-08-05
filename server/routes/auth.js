@@ -35,6 +35,11 @@ const router = express.Router();
 const SECRET = 'dms-secret';
 // 导入认证中间件
 const authMiddleware = require('../middleware/auth');
+// 导入svg-captcha库，用于生成验证码
+const svgCaptcha = require('svg-captcha');
+
+// 验证码存储（生产环境建议使用Redis）
+const captchaStore = new Map();
 
 /**
  * 用户登录接口
@@ -53,18 +58,105 @@ const authMiddleware = require('../middleware/auth');
  * - 200: 登录成功
  * - 401: 用户名或密码错误
  * - 403: 用户被禁用
- * - 500: 服务器错误
- *
- * 安全机制：
- * 1. 密码使用bcrypt哈希存储和验证
+ * - 500: 服务器错误/**
+ * 生成验证码接口
+ * 返回SVG格式的验证码图片和验证码ID
+ */
+router.get('/captcha', (req, res) => {
+  try {
+    // 生成验证码
+    const captcha = svgCaptcha.create({
+      size: 4, // 验证码长度
+      noise: 5, // 增加干扰线条数
+      color: true, // 彩色验证码
+      background: '#f0f0f0', // 背景色
+      width: 120, // 宽度
+      height: 38, // 高度
+      charPreset: '0123456789' // 只使用数字
+    });
+    
+    // 生成唯一ID
+    const captchaId = Date.now() + Math.random().toString(36).substr(2, 9);
+    
+    // 存储验证码（5分钟过期）
+    const expiresTime = Date.now() + 5 * 60 * 1000; // 5分钟过期
+    captchaStore.set(captchaId, {
+      text: captcha.text.toLowerCase(),
+      expires: expiresTime,
+      created: Date.now()
+    });
+    
+    // 清理过期验证码（批量清理，提高性能）
+    const currentTime = Date.now();
+    const expiredKeys = [];
+    for (const [key, value] of captchaStore.entries()) {
+      if (currentTime >= value.expires) {
+        expiredKeys.push(key);
+      }
+    }
+    // 批量删除过期验证码
+    expiredKeys.forEach(key => captchaStore.delete(key));
+    
+    console.log(`验证码生成成功，ID: ${captchaId}，当前存储数量: ${captchaStore.size}，清理过期数量: ${expiredKeys.length}`);
+    
+    res.json({
+      captchaId,
+      captchaSvg: captcha.data
+    });
+  } catch (error) {
+    console.error('生成验证码失败:', error);
+    res.status(500).json({ message: '生成验证码失败' });
+  }
+});
+
+/**
+ * 用户登录接口
+ * 安全特性：
+ * 1. 密码使用bcrypt加密验证
  * 2. JWT token有效期2小时
  * 3. 检查用户状态（是否被禁用）
  * 4. 不泄露具体错误原因（用户名不存在vs密码错误）
+ * 5. 验证码验证
  */
 router.post('/login', async (req, res) => {
-  const { username, password } = req.body;
+  const { username, password, captchaId, captchaText } = req.body;
 
   try {
+    // 验证验证码参数
+    if (!captchaId || !captchaText) {
+      console.log('登录失败：缺少验证码参数');
+      return res.status(400).json({ message: '请输入验证码' });
+    }
+    
+    // 获取存储的验证码信息
+    const storedCaptcha = captchaStore.get(captchaId);
+    if (!storedCaptcha) {
+      console.log(`登录失败：验证码不存在，ID: ${captchaId}，当前存储数量: ${captchaStore.size}`);
+      return res.status(400).json({ message: '验证码不存在或已过期，请重新获取' });
+    }
+    
+    // 检查验证码是否过期（使用更严格的时间检查）
+    const currentTime = Date.now();
+    const timeRemaining = storedCaptcha.expires - currentTime;
+    if (currentTime >= storedCaptcha.expires) {
+      // 立即删除过期的验证码
+      captchaStore.delete(captchaId);
+      console.log(`登录失败：验证码已过期，ID: ${captchaId}，过期时间: ${timeRemaining}ms`);
+      return res.status(400).json({ message: '验证码已过期，请重新获取' });
+    }
+    
+    // 验证验证码内容（不区分大小写）
+    const inputText = captchaText.toLowerCase().trim();
+    const storedText = storedCaptcha.text.toLowerCase().trim();
+    if (inputText !== storedText) {
+      console.log(`登录失败：验证码错误，输入: ${inputText}，期望: ${storedText}`);
+      return res.status(400).json({ message: '验证码错误，请重新输入' });
+    }
+    
+    // 验证码验证成功，立即删除已使用的验证码，防止重复使用
+    captchaStore.delete(captchaId);
+    console.log(`验证码验证成功，ID: ${captchaId}，剩余时间: ${timeRemaining}ms`);
+
     // 连接数据库
     let pool = await sql.connect(await getDynamicConfig());
 
@@ -92,10 +184,10 @@ router.post('/login', async (req, res) => {
     }
 
     // 更新用户最后登录时间
-    const currentTime = new Date();
+    const loginTime = new Date();
     await pool.request()
       .input('UserId', sql.Int, user.ID)
-      .input('LoginTime', sql.DateTime, currentTime)
+      .input('LoginTime', sql.DateTime, loginTime)
       .query('UPDATE [User] SET LastLoginTime = @LoginTime WHERE ID = @UserId');
 
     // 重新查询用户信息以获取更新后的LastLoginTime
@@ -128,7 +220,11 @@ router.post('/login', async (req, res) => {
 
   } catch (err) {
     console.error('登录错误:', err);
-    res.status(500).json({ message: err.message });
+    // 登录过程中出现异常时，确保删除当前验证码
+    if (req.body.captchaId) {
+      captchaStore.delete(req.body.captchaId);
+    }
+    res.status(500).json({ message: '登录失败，请重试' });
   }
 });
 
@@ -553,10 +649,8 @@ router.post('/add-user', authMiddleware, async (req, res) => {
 // PUT /api/auth/update-user
 // 更新用户信息（管理员功能）
 router.put('/update-user', authMiddleware, async (req, res) => {
-  console.log('收到更新用户请求:', req.body);
   const { Username, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
   if (!Username || !Department || !RealName || !Phone) {
-    console.log('缺少必填项:', { Username, Department, RealName, Phone });
     return res.json({ success: false, message: '请填写所有必填项' });
   }
   try {

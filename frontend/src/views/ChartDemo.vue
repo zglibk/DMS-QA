@@ -8,10 +8,10 @@
       <div class="chart-header">
         <div class="chart-title">{{ new Date().getFullYear() }}年质量指标趋势分析</div>
         <div class="chart-tools">
-          <el-button size="small" type="text" @click="refreshChart">
+          <el-button size="small" :link="true" @click="refreshChart">
             <el-icon><Refresh /></el-icon>
           </el-button>
-          <el-button size="small" type="text" @click="exportChart">
+          <el-button size="small" :link="true" @click="exportChart">
             <el-icon><Download /></el-icon>
           </el-button>
         </div>

@@ -227,7 +227,7 @@ const getConvertedExample = (mapping) => {
 const loadConfig = async () => {
   loading.value = true
   try {
-    const response = await axios.get('/api/import/path-mapping-config')
+    const response = await axios.get('/import/path-mapping-config')
     if (response.data.success) {
       const { data } = response.data
       serverIP.value = data.serverIP
