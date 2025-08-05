@@ -34,7 +34,7 @@ const router = express.Router();
 // JWT密钥（生产环境应使用环境变量）
 const SECRET = 'dms-secret';
 // 导入认证中间件
-const authMiddleware = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 // 导入svg-captcha库，用于生成验证码
 const svgCaptcha = require('svg-captcha');
 
@@ -302,7 +302,7 @@ router.get('/init-admin', async (req, res) => {
 // ===================== 获取当前用户信息 =====================
 // GET /api/auth/profile
 // 需登录(token)，返回当前用户所有主要字段
-router.get('/profile', authMiddleware, async (req, res) => {
+router.get('/profile', authenticateToken, async (req, res) => {
   const username = req.user.username;
   try {
     let pool = await sql.connect(await getDynamicConfig());
@@ -362,7 +362,7 @@ router.get('/profile', authMiddleware, async (req, res) => {
 // POST /api/auth/profile
 // 参数: RealName, Email, Phone, Department, Avatar
 // 只允许用户修改自己的部分信息
-router.post('/profile', authMiddleware, async (req, res) => {
+router.post('/profile', authenticateToken, async (req, res) => {
   const username = req.user.username;
   let { RealName, Email, Phone, DepartmentID, Avatar, Gender, Birthday, Address, Remark } = req.body;
   try {
@@ -421,7 +421,7 @@ router.post('/profile', authMiddleware, async (req, res) => {
 // POST /api/auth/change-password
 // 参数: oldPwd, newPwd
 // 校验原密码，成功后加密保存新密码
-router.post('/change-password', authMiddleware, async (req, res) => {
+router.post('/change-password', authenticateToken, async (req, res) => {
   const username = req.user.username;
   const { oldPwd, newPwd } = req.body;
   try {
@@ -449,7 +449,7 @@ router.post('/change-password', authMiddleware, async (req, res) => {
 
 // ===================== 用户列表接口 =====================
 // GET /api/auth/user-list?page=1&pageSize=10&search=xxx
-router.get('/user-list', authMiddleware, async (req, res) => {
+router.get('/user-list', authenticateToken, async (req, res) => {
   const { page = 1, pageSize = 10, search = '' } = req.query
   try {
     let pool = await sql.connect(await getDynamicConfig())
@@ -501,7 +501,7 @@ router.get('/user-list', authMiddleware, async (req, res) => {
  * @param {number} userId - 用户ID
  * @returns {Object} 用户详细信息
  */
-router.get('/user/:userId', authMiddleware, async (req, res) => {
+router.get('/user/:userId', authenticateToken, async (req, res) => {
   const { userId } = req.params;
   
   try {
@@ -560,7 +560,7 @@ router.get('/user/:userId', authMiddleware, async (req, res) => {
 // POST /api/auth/user-status
 // 参数: username, status
 // 只允许用户修改自己的状态
-router.post('/user-status', authMiddleware, async (req, res) => {
+router.post('/user-status', authenticateToken, async (req, res) => {
   const { username, status } = req.body;
   try {
     let pool = await sql.connect(await getDynamicConfig());
@@ -594,7 +594,7 @@ router.post('/user-status', authMiddleware, async (req, res) => {
 // ===================== 添加用户接口 =====================
 // POST /api/auth/add-user
 // 参数: Username, Password, Role, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark
-router.post('/add-user', authMiddleware, async (req, res) => {
+router.post('/add-user', authenticateToken, async (req, res) => {
   const { Username, Password, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
   if (!Username || !Password || !Department || !RealName || !Phone) {
     return res.json({ success: false, message: '请填写所有必填项' });
@@ -648,7 +648,7 @@ router.post('/add-user', authMiddleware, async (req, res) => {
 // ===================== 更新用户信息 =====================
 // PUT /api/auth/update-user
 // 更新用户信息（管理员功能）
-router.put('/update-user', authMiddleware, async (req, res) => {
+router.put('/update-user', authenticateToken, async (req, res) => {
   const { Username, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
   if (!Username || !Department || !RealName || !Phone) {
     return res.json({ success: false, message: '请填写所有必填项' });
@@ -691,7 +691,7 @@ router.put('/update-user', authMiddleware, async (req, res) => {
 // ===================== 获取用户角色和权限信息 =====================
 // GET /api/auth/user/:userId/roles-permissions
 // 获取指定用户的角色和权限信息
-router.get('/user/:userId/roles-permissions', authMiddleware, async (req, res) => {
+router.get('/user/:userId/roles-permissions', authenticateToken, async (req, res) => {
   const { userId } = req.params;
   
   try {
@@ -752,7 +752,7 @@ router.get('/user/:userId/roles-permissions', authMiddleware, async (req, res) =
 // POST /api/auth/reset-user-password
 // 参数: userID, username, newPassword, notifyMethod
 // 管理员重置指定用户的密码
-router.post('/reset-user-password', authMiddleware, async (req, res) => {
+router.post('/reset-user-password', authenticateToken, async (req, res) => {
   const { userId, username, newPassword, notifyMethod } = req.body;
   
   // 参数验证
@@ -818,7 +818,7 @@ router.post('/reset-user-password', authMiddleware, async (req, res) => {
 // ===================== 用户角色分配 =====================
 // POST /api/auth/user/:userId/assign-roles
 // 为指定用户分配角色
-router.post('/user/:userId/assign-roles', authMiddleware, async (req, res) => {
+router.post('/user/:userId/assign-roles', authenticateToken, async (req, res) => {
   const { userId } = req.params;
   const { roleIds } = req.body;
   

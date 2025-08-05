@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, config, getDynamicConfig } = require('../db');
-const auth = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 // 添加请求日志中间件
 router.use((req, res, next) => {
@@ -12,7 +12,7 @@ router.use((req, res, next) => {
   next();
 });
 
-router.use(auth);
+router.use(authenticateToken);
 
 // ===================== 新增投诉登记 =====================
 // POST /api/complaint

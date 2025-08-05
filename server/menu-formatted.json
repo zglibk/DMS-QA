@@ -1,0 +1,913 @@
+﻿{
+    "success":  true,
+    "data":  [
+                 {
+                     "ID":  1,
+                     "Name":  "仪表盘",
+                     "Code":  "dashboard",
+                     "ParentID":  null,
+                     "Type":  "menu",
+                     "Icon":  "Dashboard",
+                     "Path":  "/dashboard",
+                     "Component":  null,
+                     "Permission":  "dashboard:view",
+                     "SortOrder":  10,
+                     "Status":  true,
+                     "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                     "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                     "children":  [
+
+                                  ]
+                 },
+                 {
+                     "ID":  3,
+                     "Name":  "质量管理",
+                     "Code":  "quality",
+                     "ParentID":  null,
+                     "Type":  "menu",
+                     "Icon":  "DocumentChecked",
+                     "Path":  "/quality",
+                     "Component":  null,
+                     "Permission":  "quality:view",
+                     "SortOrder":  20,
+                     "Status":  true,
+                     "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                     "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                     "children":  [
+                                      {
+                                          "ID":  10,
+                                          "Name":  "投诉管理",
+                                          "Code":  "complaint-management",
+                                          "ParentID":  3,
+                                          "Type":  "menu",
+                                          "Icon":  "Warning",
+                                          "Path":  "/admin/quality/complaint",
+                                          "Component":  null,
+                                          "Permission":  "quality:complaint:view",
+                                          "SortOrder":  10,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "children":  [
+                                                           {
+                                                               "ID":  33,
+                                                               "Name":  "内部投诉",
+                                                               "Code":  "internal-complaint",
+                                                               "ParentID":  10,
+                                                               "Type":  "menu",
+                                                               "Icon":  "User",
+                                                               "Path":  "/admin/quality/complaint/internal",
+                                                               "Component":  "quality/complaint/index",
+                                                               "Permission":  "quality:complaint:internal:view",
+                                                               "SortOrder":  10,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-04T05:17:32.870Z",
+                                                               "UpdatedAt":  "2025-08-04T05:17:32.870Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           },
+                                                           {
+                                                               "ID":  34,
+                                                               "Name":  "客户投诉",
+                                                               "Code":  "customer-complaint",
+                                                               "ParentID":  10,
+                                                               "Type":  "menu",
+                                                               "Icon":  "Phone",
+                                                               "Path":  "/admin/quality/complaint/customer",
+                                                               "Component":  "admin/CustomerComplaint",
+                                                               "Permission":  "quality:complaint:customer:view",
+                                                               "SortOrder":  20,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-04T05:17:32.887Z",
+                                                               "UpdatedAt":  "2025-08-04T05:17:32.887Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           }
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  11,
+                                          "Name":  "返工管理",
+                                          "Code":  "rework-management",
+                                          "ParentID":  3,
+                                          "Type":  "menu",
+                                          "Icon":  "Refresh",
+                                          "Path":  "/quality/rework",
+                                          "Component":  "quality/rework/index",
+                                          "Permission":  "quality:rework:view",
+                                          "SortOrder":  20,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  12,
+                                          "Name":  "人员管理",
+                                          "Code":  "person-management",
+                                          "ParentID":  3,
+                                          "Type":  "menu",
+                                          "Icon":  "Avatar",
+                                          "Path":  "/quality/person",
+                                          "Component":  "quality/person/index",
+                                          "Permission":  "quality:person:view",
+                                          "SortOrder":  30,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  14,
+                                          "Name":  "质量异常数据导入",
+                                          "Code":  "data-management",
+                                          "ParentID":  3,
+                                          "Type":  "menu",
+                                          "Icon":  "Upload",
+                                          "Path":  "/admin/quality/data-management",
+                                          "Component":  "quality/data-management/index",
+                                          "Permission":  "quality:list",
+                                          "SortOrder":  40,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T03:22:24.687Z",
+                                          "UpdatedAt":  "2025-08-02T03:23:14.953Z",
+                                          "children":  [
+
+                                                       ]
+                                      }
+                                  ]
+                 },
+                 {
+                     "ID":  4,
+                     "Name":  "成本损失",
+                     "Code":  "copq",
+                     "ParentID":  null,
+                     "Type":  "menu",
+                     "Icon":  "Operation",
+                     "Path":  "/copq",
+                     "Component":  "/copq/material-price",
+                     "Permission":  "copq:view",
+                     "SortOrder":  30,
+                     "Status":  true,
+                     "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                     "UpdatedAt":  "2025-07-31T03:53:02.143Z",
+                     "children":  [
+                                      {
+                                          "ID":  13,
+                                          "Name":  "物料单价",
+                                          "Code":  "material-price",
+                                          "ParentID":  4,
+                                          "Type":  "menu",
+                                          "Icon":  "ShoppingCart",
+                                          "Path":  "/copq/material-price",
+                                          "Component":  "copq/material-price/index",
+                                          "Permission":  "copq:view",
+                                          "SortOrder":  10,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "children":  [
+
+                                                       ]
+                                      }
+                                  ]
+                 },
+                 {
+                     "ID":  35,
+                     "Name":  "工作计划",
+                     "Code":  "work-plan",
+                     "ParentID":  null,
+                     "Type":  "menu",
+                     "Icon":  "Calendar",
+                     "Path":  "/admin/work-plan",
+                     "Component":  null,
+                     "Permission":  "work-plan:view",
+                     "SortOrder":  45,
+                     "Status":  true,
+                     "CreatedAt":  "2025-08-05T12:26:52.597Z",
+                     "UpdatedAt":  "2025-08-05T12:26:52.597Z",
+                     "children":  [
+                                      {
+                                          "ID":  36,
+                                          "Name":  "工作台",
+                                          "Code":  "work-dashboard",
+                                          "ParentID":  35,
+                                          "Type":  "menu",
+                                          "Icon":  "Monitor",
+                                          "Path":  "/admin/work-plan/dashboard",
+                                          "Component":  "work-plan/WorkDashboard",
+                                          "Permission":  "work-plan:dashboard:view",
+                                          "SortOrder":  10,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-05T12:26:52.597Z",
+                                          "UpdatedAt":  "2025-08-05T12:26:52.597Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  37,
+                                          "Name":  "计划管理",
+                                          "Code":  "plan-management",
+                                          "ParentID":  35,
+                                          "Type":  "menu",
+                                          "Icon":  "List",
+                                          "Path":  "/admin/work-plan/plans",
+                                          "Component":  "work-plan/PlanManagement",
+                                          "Permission":  "work-plan:plan:view",
+                                          "SortOrder":  20,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-05T12:26:52.597Z",
+                                          "UpdatedAt":  "2025-08-05T12:26:52.597Z",
+                                          "children":  [
+                                                           {
+                                                               "ID":  42,
+                                                               "Name":  "新增计划",
+                                                               "Code":  "plan-add",
+                                                               "ParentID":  37,
+                                                               "Type":  "button",
+                                                               "Icon":  null,
+                                                               "Path":  null,
+                                                               "Component":  null,
+                                                               "Permission":  "work-plan:plan:add",
+                                                               "SortOrder":  1,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-05T12:26:52.620Z",
+                                                               "UpdatedAt":  "2025-08-05T12:26:52.620Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           },
+                                                           {
+                                                               "ID":  43,
+                                                               "Name":  "编辑计划",
+                                                               "Code":  "plan-edit",
+                                                               "ParentID":  37,
+                                                               "Type":  "button",
+                                                               "Icon":  null,
+                                                               "Path":  null,
+                                                               "Component":  null,
+                                                               "Permission":  "work-plan:plan:edit",
+                                                               "SortOrder":  2,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-05T12:26:52.620Z",
+                                                               "UpdatedAt":  "2025-08-05T12:26:52.620Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           },
+                                                           {
+                                                               "ID":  44,
+                                                               "Name":  "删除计划",
+                                                               "Code":  "plan-delete",
+                                                               "ParentID":  37,
+                                                               "Type":  "button",
+                                                               "Icon":  null,
+                                                               "Path":  null,
+                                                               "Component":  null,
+                                                               "Permission":  "work-plan:plan:delete",
+                                                               "SortOrder":  3,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-05T12:26:52.620Z",
+                                                               "UpdatedAt":  "2025-08-05T12:26:52.620Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           },
+                                                           {
+                                                               "ID":  45,
+                                                               "Name":  "导出计划",
+                                                               "Code":  "plan-export",
+                                                               "ParentID":  37,
+                                                               "Type":  "button",
+                                                               "Icon":  null,
+                                                               "Path":  null,
+                                                               "Component":  null,
+                                                               "Permission":  "work-plan:plan:export",
+                                                               "SortOrder":  4,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-05T12:26:52.620Z",
+                                                               "UpdatedAt":  "2025-08-05T12:26:52.620Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           }
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  38,
+                                          "Name":  "工作日志",
+                                          "Code":  "work-log",
+                                          "ParentID":  35,
+                                          "Type":  "menu",
+                                          "Icon":  "EditPen",
+                                          "Path":  "/admin/work-plan/logs",
+                                          "Component":  "work-plan/WorkLogManagement",
+                                          "Permission":  "work-plan:log:view",
+                                          "SortOrder":  30,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-05T12:26:52.597Z",
+                                          "UpdatedAt":  "2025-08-05T12:26:52.597Z",
+                                          "children":  [
+                                                           {
+                                                               "ID":  46,
+                                                               "Name":  "新增日志",
+                                                               "Code":  "log-add",
+                                                               "ParentID":  38,
+                                                               "Type":  "button",
+                                                               "Icon":  null,
+                                                               "Path":  null,
+                                                               "Component":  null,
+                                                               "Permission":  "work-plan:log:add",
+                                                               "SortOrder":  1,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-05T12:26:52.623Z",
+                                                               "UpdatedAt":  "2025-08-05T12:26:52.623Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           },
+                                                           {
+                                                               "ID":  47,
+                                                               "Name":  "编辑日志",
+                                                               "Code":  "log-edit",
+                                                               "ParentID":  38,
+                                                               "Type":  "button",
+                                                               "Icon":  null,
+                                                               "Path":  null,
+                                                               "Component":  null,
+                                                               "Permission":  "work-plan:log:edit",
+                                                               "SortOrder":  2,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-05T12:26:52.623Z",
+                                                               "UpdatedAt":  "2025-08-05T12:26:52.623Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           },
+                                                           {
+                                                               "ID":  48,
+                                                               "Name":  "删除日志",
+                                                               "Code":  "log-delete",
+                                                               "ParentID":  38,
+                                                               "Type":  "button",
+                                                               "Icon":  null,
+                                                               "Path":  null,
+                                                               "Component":  null,
+                                                               "Permission":  "work-plan:log:delete",
+                                                               "SortOrder":  3,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-05T12:26:52.623Z",
+                                                               "UpdatedAt":  "2025-08-05T12:26:52.623Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           },
+                                                           {
+                                                               "ID":  49,
+                                                               "Name":  "导出日志",
+                                                               "Code":  "log-export",
+                                                               "ParentID":  38,
+                                                               "Type":  "button",
+                                                               "Icon":  null,
+                                                               "Path":  null,
+                                                               "Component":  null,
+                                                               "Permission":  "work-plan:log:export",
+                                                               "SortOrder":  4,
+                                                               "Status":  true,
+                                                               "CreatedAt":  "2025-08-05T12:26:52.623Z",
+                                                               "UpdatedAt":  "2025-08-05T12:26:52.623Z",
+                                                               "children":  [
+
+                                                                            ]
+                                                           }
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  50,
+                                          "Name":  "工作日志",
+                                          "Code":  "work-logs",
+                                          "ParentID":  35,
+                                          "Type":  "menu",
+                                          "Icon":  "BookOpen",
+                                          "Path":  "/admin/work-plan/logs",
+                                          "Component":  "work-plan/WorkLogs",
+                                          "Permission":  "work-plan:logs:view",
+                                          "SortOrder":  30,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-05T13:01:38.577Z",
+                                          "UpdatedAt":  "2025-08-05T13:01:38.577Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  39,
+                                          "Name":  "进度跟踪",
+                                          "Code":  "progress-tracking",
+                                          "ParentID":  35,
+                                          "Type":  "menu",
+                                          "Icon":  "TrendCharts",
+                                          "Path":  "/admin/work-plan/progress",
+                                          "Component":  "work-plan/ProgressTracking",
+                                          "Permission":  "work-plan:progress:view",
+                                          "SortOrder":  40,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-05T12:26:52.600Z",
+                                          "UpdatedAt":  "2025-08-05T12:26:52.600Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  40,
+                                          "Name":  "统计分析",
+                                          "Code":  "work-statistics",
+                                          "ParentID":  35,
+                                          "Type":  "menu",
+                                          "Icon":  "DataAnalysis",
+                                          "Path":  "/admin/work-plan/statistics",
+                                          "Component":  "work-plan/WorkStatistics",
+                                          "Permission":  "work-plan:statistics:view",
+                                          "SortOrder":  50,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-05T12:26:52.600Z",
+                                          "UpdatedAt":  "2025-08-05T12:26:52.600Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  51,
+                                          "Name":  "统计分析",
+                                          "Code":  "statistics-analysis",
+                                          "ParentID":  35,
+                                          "Type":  "menu",
+                                          "Icon":  "BarChart3",
+                                          "Path":  "/admin/work-plan/statistics",
+                                          "Component":  "work-plan/StatisticsAnalysis",
+                                          "Permission":  "work-plan:statistics:view",
+                                          "SortOrder":  50,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-05T13:01:38.593Z",
+                                          "UpdatedAt":  "2025-08-05T13:01:38.593Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  41,
+                                          "Name":  "计划模板",
+                                          "Code":  "plan-templates",
+                                          "ParentID":  35,
+                                          "Type":  "menu",
+                                          "Icon":  "Files",
+                                          "Path":  "/admin/work-plan/templates",
+                                          "Component":  "work-plan/PlanTemplates",
+                                          "Permission":  "work-plan:template:view",
+                                          "SortOrder":  60,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-05T12:26:52.600Z",
+                                          "UpdatedAt":  "2025-08-05T12:26:52.600Z",
+                                          "children":  [
+
+                                                       ]
+                                      }
+                                  ]
+                 },
+                 {
+                     "ID":  16,
+                     "Name":  "供应商管理",
+                     "Code":  "supplier-management",
+                     "ParentID":  null,
+                     "Type":  "menu",
+                     "Icon":  "Briefcase",
+                     "Path":  "/supplier/list",
+                     "Component":  "admin/SupplierList",
+                     "Permission":  "supplier:view",
+                     "SortOrder":  60,
+                     "Status":  true,
+                     "CreatedAt":  "2025-08-02T03:49:01.073Z",
+                     "UpdatedAt":  "2025-08-02T03:49:01.073Z",
+                     "children":  [
+                                      {
+                                          "ID":  17,
+                                          "Name":  "供应商基础信息",
+                                          "Code":  "supplier-basic-info",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "Document",
+                                          "Path":  "/supplier/basic-info",
+                                          "Component":  "admin/supplier/BasicInfo",
+                                          "Permission":  "supplier:basic:view",
+                                          "SortOrder":  10,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T03:58:43.203Z",
+                                          "UpdatedAt":  "2025-08-02T03:58:43.203Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  18,
+                                          "Name":  "原材料供应商",
+                                          "Code":  "material-suppliers",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "Box",
+                                          "Path":  "/supplier/materials",
+                                          "Component":  "admin/supplier/MaterialSuppliers",
+                                          "Permission":  "supplier:materials:view",
+                                          "SortOrder":  20,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T03:58:43.213Z",
+                                          "UpdatedAt":  "2025-08-02T03:58:43.213Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  19,
+                                          "Name":  "仪器供应商",
+                                          "Code":  "equipment-suppliers",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "Tools",
+                                          "Path":  "/supplier/equipment",
+                                          "Component":  "admin/supplier/EquipmentSuppliers",
+                                          "Permission":  "supplier:equipment:view",
+                                          "SortOrder":  30,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T03:58:43.223Z",
+                                          "UpdatedAt":  "2025-08-02T03:58:43.223Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  20,
+                                          "Name":  "供应商质量评估",
+                                          "Code":  "supplier-quality",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "Medal",
+                                          "Path":  "/supplier/quality",
+                                          "Component":  "admin/supplier/QualityAssessment",
+                                          "Permission":  "supplier:quality:view",
+                                          "SortOrder":  40,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T03:58:43.233Z",
+                                          "UpdatedAt":  "2025-08-02T03:58:43.233Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  21,
+                                          "Name":  "供应商绩效管理",
+                                          "Code":  "supplier-performance",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "TrendCharts",
+                                          "Path":  "/supplier/performance",
+                                          "Component":  "admin/supplier/Performance",
+                                          "Permission":  "supplier:performance:view",
+                                          "SortOrder":  50,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T03:58:43.243Z",
+                                          "UpdatedAt":  "2025-08-02T03:58:43.243Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  22,
+                                          "Name":  "供应商合同管理",
+                                          "Code":  "supplier-contracts",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "Files",
+                                          "Path":  "/supplier/contracts",
+                                          "Component":  "admin/supplier/Contracts",
+                                          "Permission":  "supplier:contracts:view",
+                                          "SortOrder":  60,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T03:58:43.253Z",
+                                          "UpdatedAt":  "2025-08-02T03:58:43.253Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  23,
+                                          "Name":  "合格供应商清单",
+                                          "Code":  "qualified-suppliers",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "CircleCheck",
+                                          "Path":  "/supplier/qualified",
+                                          "Component":  "admin/supplier/QualifiedSuppliers",
+                                          "Permission":  "supplier:qualified:view",
+                                          "SortOrder":  70,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T05:11:31.800Z",
+                                          "UpdatedAt":  "2025-08-02T05:11:31.800Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  24,
+                                          "Name":  "供应商审核",
+                                          "Code":  "supplier-audit",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "View",
+                                          "Path":  "/supplier/audit",
+                                          "Component":  "admin/supplier/SupplierAudit",
+                                          "Permission":  "supplier:audit:view",
+                                          "SortOrder":  80,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T05:11:31.823Z",
+                                          "UpdatedAt":  "2025-08-02T05:11:31.823Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  25,
+                                          "Name":  "出厂检验报告",
+                                          "Code":  "inspection-reports",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "Document",
+                                          "Path":  "/supplier/inspection",
+                                          "Component":  "admin/supplier/InspectionReports",
+                                          "Permission":  "supplier:inspection:view",
+                                          "SortOrder":  90,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T05:11:31.837Z",
+                                          "UpdatedAt":  "2025-08-02T05:11:31.837Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  26,
+                                          "Name":  "年度审核计划",
+                                          "Code":  "annual-audit-plan",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "Calendar",
+                                          "Path":  "/supplier/annual-audit-plan",
+                                          "Component":  "admin/supplier/AnnualAuditPlan",
+                                          "Permission":  "supplier:annual_audit:view",
+                                          "SortOrder":  100,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T05:27:13.653Z",
+                                          "UpdatedAt":  "2025-08-02T05:27:13.653Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  27,
+                                          "Name":  "审核报告管理",
+                                          "Code":  "audit-reports",
+                                          "ParentID":  16,
+                                          "Type":  "menu",
+                                          "Icon":  "Files",
+                                          "Path":  "/supplier/audit-reports",
+                                          "Component":  "admin/supplier/AuditReports",
+                                          "Permission":  "supplier:audit_reports:view",
+                                          "SortOrder":  110,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T05:27:13.660Z",
+                                          "UpdatedAt":  "2025-08-02T05:27:13.660Z",
+                                          "children":  [
+
+                                                       ]
+                                      }
+                                  ]
+                 },
+                 {
+                     "ID":  28,
+                     "Name":  "样版管理",
+                     "Code":  "sample-management",
+                     "ParentID":  null,
+                     "Type":  "menu",
+                     "Icon":  "Document",
+                     "Path":  "/admin/sample",
+                     "Component":  null,
+                     "Permission":  "sample:view",
+                     "SortOrder":  60,
+                     "Status":  true,
+                     "CreatedAt":  "2025-08-02T06:19:02.950Z",
+                     "UpdatedAt":  "2025-08-02T06:19:02.950Z",
+                     "children":  [
+                                      {
+                                          "ID":  29,
+                                          "Name":  "样品承认书",
+                                          "Code":  "sample-approval",
+                                          "ParentID":  28,
+                                          "Type":  "menu",
+                                          "Icon":  "Document",
+                                          "Path":  "/admin/sample/approval",
+                                          "Component":  "admin/sample/SampleApproval",
+                                          "Permission":  "sample:approval:view",
+                                          "SortOrder":  10,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T06:19:02.960Z",
+                                          "UpdatedAt":  "2025-08-02T06:19:02.960Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  30,
+                                          "Name":  "内部色卡",
+                                          "Code":  "internal-color-card",
+                                          "ParentID":  28,
+                                          "Type":  "menu",
+                                          "Icon":  "Picture",
+                                          "Path":  "/admin/sample/color-card",
+                                          "Component":  "admin/sample/InternalColorCard",
+                                          "Permission":  "sample:color-card:view",
+                                          "SortOrder":  20,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T06:19:02.967Z",
+                                          "UpdatedAt":  "2025-08-02T06:19:02.967Z",
+                                          "children":  [
+
+                                                       ]
+                                      }
+                                  ]
+                 },
+                 {
+                     "ID":  2,
+                     "Name":  "系统管理",
+                     "Code":  "system",
+                     "ParentID":  null,
+                     "Type":  "menu",
+                     "Icon":  "Setting",
+                     "Path":  "/system",
+                     "Component":  null,
+                     "Permission":  "system:view",
+                     "SortOrder":  90,
+                     "Status":  true,
+                     "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                     "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                     "children":  [
+                                      {
+                                          "ID":  5,
+                                          "Name":  "用户管理",
+                                          "Code":  "user-management",
+                                          "ParentID":  2,
+                                          "Type":  "menu",
+                                          "Icon":  "User",
+                                          "Path":  "/system/user",
+                                          "Component":  "system/user/index",
+                                          "Permission":  "system:user:view",
+                                          "SortOrder":  10,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  6,
+                                          "Name":  "角色管理",
+                                          "Code":  "role-management",
+                                          "ParentID":  2,
+                                          "Type":  "menu",
+                                          "Icon":  "UserFilled",
+                                          "Path":  "/system/role",
+                                          "Component":  "system/role/index",
+                                          "Permission":  "system:role:view",
+                                          "SortOrder":  20,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  7,
+                                          "Name":  "菜单管理",
+                                          "Code":  "menu-management",
+                                          "ParentID":  2,
+                                          "Type":  "menu",
+                                          "Icon":  "Menu",
+                                          "Path":  "/system/menu",
+                                          "Component":  "system/menu/index",
+                                          "Permission":  "system:menu:view",
+                                          "SortOrder":  30,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  8,
+                                          "Name":  "部门管理",
+                                          "Code":  "dept-management",
+                                          "ParentID":  2,
+                                          "Type":  "menu",
+                                          "Icon":  "OfficeBuilding",
+                                          "Path":  "/system/dept",
+                                          "Component":  "system/dept/index",
+                                          "Permission":  "system:dept:view",
+                                          "SortOrder":  40,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  9,
+                                          "Name":  "岗位管理",
+                                          "Code":  "position-management",
+                                          "ParentID":  2,
+                                          "Type":  "menu",
+                                          "Icon":  "Suitcase",
+                                          "Path":  "/system/position",
+                                          "Component":  "system/position/index",
+                                          "Permission":  "system:position:view",
+                                          "SortOrder":  50,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "UpdatedAt":  "2025-07-29T09:30:30.323Z",
+                                          "children":  [
+
+                                                       ]
+                                      },
+                                      {
+                                          "ID":  15,
+                                          "Name":  "系统配置",
+                                          "Code":  "system-config",
+                                          "ParentID":  2,
+                                          "Type":  "menu",
+                                          "Icon":  "Setting",
+                                          "Path":  "/system/config",
+                                          "Component":  "admin/SystemConfig",
+                                          "Permission":  "system:config:view",
+                                          "SortOrder":  50,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-02T03:42:37.233Z",
+                                          "UpdatedAt":  "2025-08-02T03:42:37.233Z",
+                                          "children":  [
+
+                                                       ]
+                                      }
+                                  ]
+                 },
+                 {
+                     "ID":  31,
+                     "Name":  "二次开发",
+                     "Code":  "development",
+                     "ParentID":  null,
+                     "Type":  "menu",
+                     "Icon":  "Tools",
+                     "Path":  "/development",
+                     "Component":  null,
+                     "Permission":  "development:view",
+                     "SortOrder":  100,
+                     "Status":  true,
+                     "CreatedAt":  "2025-08-04T02:55:13.220Z",
+                     "UpdatedAt":  "2025-08-04T02:55:13.220Z",
+                     "children":  [
+                                      {
+                                          "ID":  32,
+                                          "Name":  "结构组件",
+                                          "Code":  "structure-components",
+                                          "ParentID":  31,
+                                          "Type":  "menu",
+                                          "Icon":  "Grid",
+                                          "Path":  "/development/structure-components",
+                                          "Component":  "development/StructureComponents",
+                                          "Permission":  "development:structure:view",
+                                          "SortOrder":  10,
+                                          "Status":  true,
+                                          "CreatedAt":  "2025-08-04T02:55:13.230Z",
+                                          "UpdatedAt":  "2025-08-04T02:55:13.230Z",
+                                          "children":  [
+
+                                                       ]
+                                      }
+                                  ]
+                 }
+             ]
+}

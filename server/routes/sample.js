@@ -12,7 +12,7 @@ const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
 const { executeQuery } = require('../db');
-const auth = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 /**
  * 生成样版编号流水号
@@ -59,7 +59,7 @@ async function generateCertificateNo() {
  * 获取下一个样版编号预览
  * GET /api/sample/next-certificate-no
  */
-router.get('/next-certificate-no', auth, async (req, res) => {
+router.get('/next-certificate-no', authenticateToken, async (req, res) => {
   try {
     const nextCertificateNo = await generateCertificateNo();
     res.json({
@@ -82,7 +82,7 @@ router.get('/next-certificate-no', auth, async (req, res) => {
  * 获取样板承认书列表
  * GET /api/sample/list
  */
-router.get('/list', auth, async (req, res) => {
+router.get('/list', authenticateToken, async (req, res) => {
   try {
     const { 
       page = 1, 
@@ -233,7 +233,7 @@ router.get('/list', auth, async (req, res) => {
  * 创建样板承认书
  * POST /api/sample/create
  */
-router.post('/create', auth, async (req, res) => {
+router.post('/create', authenticateToken, async (req, res) => {
   try {
     const {
       customerNo,
@@ -329,7 +329,7 @@ router.post('/create', auth, async (req, res) => {
  * 更新样板承认书
  * PUT /api/sample/update/:id
  */
-router.put('/update/:id', auth, async (req, res) => {
+router.put('/update/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
     const {
@@ -439,7 +439,7 @@ router.put('/update/:id', auth, async (req, res) => {
  * 删除样板承认书
  * DELETE /api/sample/delete/:id
  */
-router.delete('/delete/:id', auth, async (req, res) => {
+router.delete('/delete/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
 
@@ -475,7 +475,7 @@ router.delete('/delete/:id', auth, async (req, res) => {
  * 批量删除样板承认书
  * DELETE /api/sample/batch-delete
  */
-router.delete('/batch-delete', auth, async (req, res) => {
+router.delete('/batch-delete', authenticateToken, async (req, res) => {
   try {
     const { ids } = req.body;
     if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -520,7 +520,7 @@ router.delete('/batch-delete', auth, async (req, res) => {
  * 获取样板统计数据
  * GET /api/sample/statistics
  */
-router.get('/statistics', auth, async (req, res) => {
+router.get('/statistics', authenticateToken, async (req, res) => {
   try {
     // 获取总数统计
     const totalQuery = 'SELECT COUNT(*) as total FROM SampleApproval';

@@ -7,7 +7,7 @@ const express = require('express')
 const router = express.Router()
 const sql = require('mssql')
 const { getConnection, executeQuery } = require('../db')
-const authMiddleware = require('../middleware/auth')
+const { authenticateToken } = require('../middleware/auth')
 
 // 获取菜单树形列表
 router.get('/tree', async (req, res) => {
@@ -74,7 +74,7 @@ router.get('/tree', async (req, res) => {
 })
 
 // 获取菜单列表
-router.get('/', authMiddleware, async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
   try {
     const {
       page = 1,
@@ -259,7 +259,7 @@ router.get('/', authMiddleware, async (req, res) => {
 })
 
 // 获取用户权限菜单
-router.get('/user-menus', authMiddleware, async (req, res) => {
+router.get('/user-menus', authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id
     if (!userId) {

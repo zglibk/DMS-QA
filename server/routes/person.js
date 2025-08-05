@@ -1,13 +1,13 @@
 const express = require('express');
 const sql = require('mssql');
 const { getDynamicConfig } = require('../config/database');
-const authMiddleware = require('../middleware/auth');
+const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
 // ===================== 获取人员列表 =====================
 // GET /api/person/list?page=1&pageSize=10&search=xxx&includeInactive=false
-router.get('/list', authMiddleware, async (req, res) => {
+router.get('/list', authenticateToken, async (req, res) => {
   const { page = 1, pageSize = 10, search = '', includeInactive = 'false' } = req.query;
   
   try {
@@ -72,7 +72,7 @@ router.get('/list', authMiddleware, async (req, res) => {
 
 // ===================== 新增人员 =====================
 // POST /api/person
-router.post('/', authMiddleware, async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   const { name, departmentId, isActive = true } = req.body;
   
   if (!name) {
@@ -117,7 +117,7 @@ router.post('/', authMiddleware, async (req, res) => {
 
 // ===================== 更新人员信息 =====================
 // PUT /api/person/:id
-router.put('/:id', authMiddleware, async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   const { name, departmentId, isActive } = req.body;
   
@@ -171,7 +171,7 @@ router.put('/:id', authMiddleware, async (req, res) => {
 
 // ===================== 删除人员 =====================
 // DELETE /api/person/:id
-router.delete('/:id', authMiddleware, async (req, res) => {
+router.delete('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -234,7 +234,7 @@ router.delete('/:id', authMiddleware, async (req, res) => {
 
 // ===================== 切换人员状态 =====================
 // POST /api/person/:id/toggle-status
-router.post('/:id/toggle-status', authMiddleware, async (req, res) => {
+router.post('/:id/toggle-status', authenticateToken, async (req, res) => {
   const { id } = req.params;
   
   try {
@@ -275,7 +275,7 @@ router.post('/:id/toggle-status', authMiddleware, async (req, res) => {
 
 // ===================== 获取部门列表 =====================
 // GET /api/person/departments
-router.get('/departments', authMiddleware, async (req, res) => {
+router.get('/departments', authenticateToken, async (req, res) => {
   try {
     const pool = await sql.connect(await getDynamicConfig());
     

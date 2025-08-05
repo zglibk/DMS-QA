@@ -17,10 +17,10 @@
 const express = require('express')
 const router = express.Router()
 const { sql, getDynamicConfig } = require('../db')
-const authMiddleware = require('../middleware/auth')
+const { authenticateToken } = require('../middleware/auth')
 
 // ===================== 获取部门树形列表 =====================
-router.get('/tree', authMiddleware, async (req, res) => {
+router.get('/tree', authenticateToken, async (req, res) => {
   try {
     const pool = await sql.connect(await getDynamicConfig())
     
@@ -59,7 +59,7 @@ router.get('/tree', authMiddleware, async (req, res) => {
 })
 
 // ===================== 获取部门列表（平铺） =====================
-router.get('/list', authMiddleware, async (req, res) => {
+router.get('/list', authenticateToken, async (req, res) => {
   const { page = 1, pageSize = 10, name, status } = req.query
   
   try {
@@ -508,7 +508,7 @@ router.delete('/:id', async (req, res) => {
 })
 
 // ===================== 获取部门选项列表 =====================
-router.get('/options/list', authMiddleware, async (req, res) => {
+router.get('/options/list', authenticateToken, async (req, res) => {
   try {
     const pool = await sql.connect(await getDynamicConfig())
     
