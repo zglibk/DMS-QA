@@ -212,6 +212,33 @@ BEGIN
 END
 
 -- =====================================================
+-- 7. 计划进度历史表 (PlanProgressHistory)
+-- 功能：记录计划进度变更历史
+-- =====================================================
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[PlanProgressHistory]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[PlanProgressHistory] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,
+        [PlanID] INT NOT NULL,                          -- 计划ID
+        [OldProgress] DECIMAL(5,2) NOT NULL,            -- 原进度
+        [NewProgress] DECIMAL(5,2) NOT NULL,            -- 新进度
+        [Description] NVARCHAR(500),                    -- 变更说明
+        [UpdaterID] INT NOT NULL,                       -- 更新人ID
+        [UpdatedAt] DATETIME DEFAULT GETDATE(),         -- 更新时间
+        
+        CONSTRAINT FK_PlanProgressHistory_Plan 
+            FOREIGN KEY (PlanID) REFERENCES [dbo].[WorkPlans](ID) ON DELETE CASCADE,
+        CONSTRAINT FK_PlanProgressHistory_Updater 
+            FOREIGN KEY (UpdaterID) REFERENCES [dbo].[User](ID)
+    );
+    PRINT '✅ PlanProgressHistory 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ PlanProgressHistory 表已存在，跳过创建';
+END
+
+-- =====================================================
 -- 创建索引以优化查询性能
 -- =====================================================
 PRINT '创建索引...';
@@ -250,8 +277,15 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanMilestones_PlanID'
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkReminders_UserID')
     CREATE NONCLUSTERED INDEX [IX_WorkReminders_UserID] ON [dbo].[WorkReminders] ([UserID]);
 
-IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkReminders_ReminderTime')
-    CREATE NONCLUSTERED INDEX [IX_WorkReminders_ReminderTime] ON [dbo].[WorkReminders] ([ReminderTime]);
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkReminders_ReminderDate')
+    CREATE NONCLUSTERED INDEX [IX_WorkReminders_ReminderDate] ON [dbo].[WorkReminders] ([ReminderDate]);
+
+-- PlanProgressHistory 表索引
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanProgressHistory_PlanID')
+    CREATE NONCLUSTERED INDEX [IX_PlanProgressHistory_PlanID] ON [dbo].[PlanProgressHistory] ([PlanID]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanProgressHistory_UpdatedAt')
+    CREATE NONCLUSTERED INDEX [IX_PlanProgressHistory_UpdatedAt] ON [dbo].[PlanProgressHistory] ([UpdatedAt]);
 
 PRINT '✅ 索引创建完成';
 
@@ -261,17 +295,24 @@ PRINT '✅ 索引创建完成';
 PRINT '插入基础数据...';
 
 -- 插入工作类型基础数据
-IF NOT EXISTS (SELECT * FROM [dbo].[WorkTypes] WHERE TypeCode = 'DEV')
+IF NOT EXISTS (SELECT * FROM [dbo].[WorkTypes] WHERE TypeCode = 'REPORT')
 BEGIN
     INSERT INTO [dbo].[WorkTypes] ([TypeName], [TypeCode], [Description], [Color], [Icon], [SortOrder]) VALUES
-    (N'开发工作', 'DEV', N'软件开发、编程相关工作', '#409EFF', 'Cpu', 1),
-    (N'测试工作', 'TEST', N'软件测试、质量保证工作', '#67C23A', 'CircleCheck', 2),
-    (N'设计工作', 'DESIGN', N'UI/UX设计、产品设计工作', '#E6A23C', 'Edit', 3),
-    (N'会议沟通', 'MEETING', N'会议、沟通、协调工作', '#F56C6C', 'ChatDotRound', 4),
-    (N'文档编写', 'DOC', N'文档编写、整理工作', '#909399', 'Document', 5),
-    (N'学习培训', 'LEARN', N'学习、培训、研究工作', '#9C27B0', 'Reading', 6),
-    (N'维护运营', 'MAINTAIN', N'系统维护、运营工作', '#FF9800', 'Tools', 7),
-    (N'其他工作', 'OTHER', N'其他类型工作', '#607D8B', 'MoreFilled', 8);
+    (N'编制报表', 'REPORT', N'各类质量报表的编制工作', '#1890ff', 'file-text', 10),
+    (N'数据记录', 'DATA_RECORD', N'质量数据的记录和录入工作', '#52c41a', 'edit', 20),
+    (N'数据统计', 'DATA_STAT', N'质量数据的统计汇总工作', '#722ed1', 'bar-chart', 30),
+    (N'数据分析', 'DATA_ANALYSIS', N'质量数据的深度分析工作', '#fa8c16', 'line-chart', 40),
+    (N'统计分析', 'STAT_ANALYSIS', N'质量统计分析和趋势分析', '#13c2c2', 'pie-chart', 50),
+    (N'文件开发', 'FILE_DEV', N'质量文件和程序的开发', '#eb2f96', 'file-add', 60),
+    (N'文件更新', 'FILE_UPDATE', N'质量文件和程序的更新维护', '#faad14', 'file-sync', 70),
+    (N'来料检验', 'IQC', N'来料质量检验工作', '#f5222d', 'inbox', 80),
+    (N'制程检验', 'IPQC', N'制程质量检验工作', '#fa541c', 'tool', 90),
+    (N'出货检验', 'OQC', N'出货质量检验工作', '#fadb14', 'export', 100),
+    (N'测试', 'TEST', N'产品测试和验证工作', '#a0d911', 'experiment', 110),
+    (N'会议', 'MEETING', N'质量会议和讨论工作', '#52c41a', 'team', 120),
+    (N'培训', 'TRAINING', N'质量培训和学习工作', '#1890ff', 'read', 130),
+    (N'校准', 'CALIBRATION', N'设备校准和维护工作', '#722ed1', 'setting', 140),
+    (N'其他', 'OTHER', N'其他质量相关工作', '#8c8c8c', 'ellipsis', 150);
     
     PRINT '✅ 工作类型基础数据插入完成';
 END
@@ -281,21 +322,30 @@ BEGIN
 END
 
 -- 插入计划模板示例数据
-IF NOT EXISTS (SELECT * FROM [dbo].[PlanTemplates] WHERE TemplateName = N'软件开发项目模板')
+IF NOT EXISTS (SELECT * FROM [dbo].[PlanTemplates] WHERE TemplateName = N'质量报表编制计划模板')
 BEGIN
     DECLARE @AdminUserId INT = (SELECT TOP 1 ID FROM [dbo].[User] WHERE Username = 'admin');
     
     IF @AdminUserId IS NOT NULL
     BEGIN
         INSERT INTO [dbo].[PlanTemplates] ([TemplateName], [Category], [Description], [TemplateData], [EstimatedDays], [EstimatedHours], [IsPublic], [CreatedBy]) VALUES
-        (N'软件开发项目模板', N'开发', N'标准的软件开发项目模板，包含需求分析、设计、开发、测试等阶段', 
-         N'{"phases":[{"name":"需求分析","duration":3,"tasks":["需求收集","需求分析","需求评审"]},{"name":"系统设计","duration":5,"tasks":["架构设计","数据库设计","接口设计"]},{"name":"开发实现","duration":15,"tasks":["前端开发","后端开发","接口联调"]},{"name":"测试验收","duration":5,"tasks":["单元测试","集成测试","用户验收"]}]}', 
-         28, 224, 1, @AdminUserId),
-        (N'质量改进计划模板', N'质量', N'质量管理和改进计划模板', 
-         N'{"phases":[{"name":"问题识别","duration":2,"tasks":["问题收集","问题分析"]},{"name":"改进方案","duration":3,"tasks":["方案设计","方案评审"]},{"name":"实施改进","duration":10,"tasks":["方案实施","效果监控"]},{"name":"总结评估","duration":2,"tasks":["效果评估","经验总结"]}]}', 
-         17, 136, 1, @AdminUserId),
-        (N'培训计划模板', N'培训', N'员工培训计划模板', 
-         N'{"phases":[{"name":"培训准备","duration":3,"tasks":["需求调研","课程设计","资料准备"]},{"name":"培训实施","duration":5,"tasks":["理论培训","实践操作","答疑解惑"]},{"name":"效果评估","duration":2,"tasks":["考核测试","效果评估","改进建议"]}]}', 
+        (N'质量报表编制计划模板', N'报表', N'月度/季度质量报表编制工作计划模板', 
+         N'{"phases":[{"name":"数据收集","duration":2,"tasks":["收集检验数据","收集统计数据"]},{"name":"数据整理","duration":1,"tasks":["数据清洗","数据分类"]},{"name":"报表编制","duration":2,"tasks":["编制月报","编制分析报告"]},{"name":"数据分析","duration":1,"tasks":["趋势分析","问题分析"]},{"name":"报表审核","duration":1,"tasks":["内容审核","数据核实"]}]}', 
+         7, 56, 1, @AdminUserId),
+        (N'质量检验计划模板', N'检验', N'产品质量检验工作计划模板', 
+         N'{"phases":[{"name":"检验准备","duration":1,"tasks":["检验计划制定","检验设备准备"]},{"name":"来料检验","duration":2,"tasks":["原材料检验","检验记录"]},{"name":"制程检验","duration":3,"tasks":["过程检验","质量控制"]},{"name":"出货检验","duration":2,"tasks":["成品检验","包装检验"]},{"name":"检验记录整理","duration":1,"tasks":["数据汇总","报告编制"]}]}', 
+         9, 72, 1, @AdminUserId),
+        (N'质量文件开发计划模板', N'文件', N'质量管理文件开发和更新计划模板', 
+         N'{"phases":[{"name":"需求分析","duration":2,"tasks":["需求调研","现状分析"]},{"name":"文件起草","duration":5,"tasks":["文件编写","流程设计"]},{"name":"内部评审","duration":2,"tasks":["技术评审","管理评审"]},{"name":"修订完善","duration":3,"tasks":["问题修正","内容完善"]},{"name":"发布实施","duration":1,"tasks":["正式发布","培训实施"]}]}', 
+         13, 104, 1, @AdminUserId),
+        (N'设备校准计划模板', N'校准', N'测量设备校准工作计划模板', 
+         N'{"phases":[{"name":"校准准备","duration":1,"tasks":["设备清单","校准计划"]},{"name":"设备校准","duration":2,"tasks":["内部校准","外部校准"]},{"name":"校准记录","duration":1,"tasks":["记录整理","数据录入"]},{"name":"结果分析","duration":1,"tasks":["偏差分析","趋势分析"]},{"name":"证书管理","duration":1,"tasks":["证书归档","到期提醒"]}]}', 
+         6, 48, 1, @AdminUserId),
+        (N'质量培训计划模板', N'培训', N'质量管理培训工作计划模板', 
+         N'{"phases":[{"name":"培训需求调研","duration":2,"tasks":["需求收集","技能评估"]},{"name":"培训方案设计","duration":3,"tasks":["课程设计","教材准备"]},{"name":"培训材料准备","duration":2,"tasks":["PPT制作","案例收集"]},{"name":"培训实施","duration":5,"tasks":["理论培训","实操培训"]},{"name":"培训效果评估","duration":1,"tasks":["考核测试","效果评估"]}]}', 
+         13, 104, 1, @AdminUserId),
+        (N'数据统计分析计划模板', N'统计', N'质量数据统计分析工作计划模板', 
+         N'{"phases":[{"name":"数据收集","duration":2,"tasks":["数据采集","数据验证"]},{"name":"数据清洗","duration":1,"tasks":["异常值处理","数据标准化"]},{"name":"统计分析","duration":3,"tasks":["描述性统计","相关性分析"]},{"name":"趋势分析","duration":2,"tasks":["时间序列分析","预测分析"]},{"name":"报告编制","duration":2,"tasks":["分析报告","图表制作"]}]}', 
          10, 80, 1, @AdminUserId);
          
         PRINT '✅ 计划模板示例数据插入完成';
@@ -326,8 +376,8 @@ PRINT '  ✅ 日期相关索引';
 PRINT '  ✅ 状态相关索引';
 PRINT '';
 PRINT '已插入的基础数据：';
-PRINT '  ✅ 8种工作类型';
-PRINT '  ✅ 3个计划模板';
+PRINT '  ✅ 15种工作类型（制造业质量管理专用）';
+PRINT '  ✅ 6个计划模板（制造业质量管理专用）';
 PRINT '';
 PRINT '下一步：';
 PRINT '  1. 在菜单管理中添加工作计划管理相关菜单';

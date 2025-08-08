@@ -78,16 +78,16 @@ router.get('/captcha', (req, res) => {
     // 生成唯一ID
     const captchaId = Date.now() + Math.random().toString(36).substr(2, 9);
     
-    // 存储验证码（5分钟过期）
-    const expiresTime = Date.now() + 5 * 60 * 1000; // 5分钟过期
+    // 存储验证码（30分钟过期）
+    const currentTime = Date.now();
+    const expiresTime = currentTime + 30 * 60 * 1000; // 30分钟过期
     captchaStore.set(captchaId, {
       text: captcha.text.toLowerCase(),
       expires: expiresTime,
-      created: Date.now()
+      created: currentTime
     });
     
     // 清理过期验证码（批量清理，提高性能）
-    const currentTime = Date.now();
     const expiredKeys = [];
     for (const [key, value] of captchaStore.entries()) {
       if (currentTime >= value.expires) {
@@ -96,8 +96,6 @@ router.get('/captcha', (req, res) => {
     }
     // 批量删除过期验证码
     expiredKeys.forEach(key => captchaStore.delete(key));
-    
-    console.log(`验证码生成成功，ID: ${captchaId}，当前存储数量: ${captchaStore.size}，清理过期数量: ${expiredKeys.length}`);
     
     res.json({
       captchaId,
@@ -124,38 +122,33 @@ router.post('/login', async (req, res) => {
   try {
     // 验证验证码参数
     if (!captchaId || !captchaText) {
-      console.log('登录失败：缺少验证码参数');
       return res.status(400).json({ message: '请输入验证码' });
     }
     
     // 获取存储的验证码信息
     const storedCaptcha = captchaStore.get(captchaId);
     if (!storedCaptcha) {
-      console.log(`登录失败：验证码不存在，ID: ${captchaId}，当前存储数量: ${captchaStore.size}`);
       return res.status(400).json({ message: '验证码不存在或已过期，请重新获取' });
     }
     
-    // 检查验证码是否过期（使用更严格的时间检查）
+    // 检查验证码是否过期
     const currentTime = Date.now();
-    const timeRemaining = storedCaptcha.expires - currentTime;
     if (currentTime >= storedCaptcha.expires) {
       // 立即删除过期的验证码
       captchaStore.delete(captchaId);
-      console.log(`登录失败：验证码已过期，ID: ${captchaId}，过期时间: ${timeRemaining}ms`);
       return res.status(400).json({ message: '验证码已过期，请重新获取' });
     }
     
     // 验证验证码内容（不区分大小写）
     const inputText = captchaText.toLowerCase().trim();
     const storedText = storedCaptcha.text.toLowerCase().trim();
+    
     if (inputText !== storedText) {
-      console.log(`登录失败：验证码错误，输入: ${inputText}，期望: ${storedText}`);
       return res.status(400).json({ message: '验证码错误，请重新输入' });
     }
     
     // 验证码验证成功，立即删除已使用的验证码，防止重复使用
     captchaStore.delete(captchaId);
-    console.log(`验证码验证成功，ID: ${captchaId}，剩余时间: ${timeRemaining}ms`);
 
     // 连接数据库
     let pool = await sql.connect(await getDynamicConfig());
@@ -169,8 +162,8 @@ router.post('/login', async (req, res) => {
 
     // 用户不存在
     if (!user) {
-       return res.status(401).json({ message: '用户名或密码错误' });
-     }
+      return res.status(401).json({ message: '用户名或密码错误' });
+    }
 
     // 用户被禁用
     if (user.Status === 0) {
@@ -179,6 +172,7 @@ router.post('/login', async (req, res) => {
 
     // 验证密码
     const valid = await bcrypt.compare(password, user.Password);
+    
     if (!valid) {
       return res.status(401).json({ message: '用户名或密码错误' });
     }
@@ -197,11 +191,33 @@ router.post('/login', async (req, res) => {
     
     const updatedUser = updatedUserResult.recordset[0];
 
-    // 生成JWT token
+    // 获取用户角色信息
+    const rolesResult = await pool.request()
+      .input('UserID', sql.Int, user.ID)
+      .query(`
+        SELECT r.ID, r.RoleName, r.RoleCode
+        FROM [UserRoles] ur
+        JOIN [Roles] r ON ur.RoleID = r.ID
+        WHERE ur.UserID = @UserID AND r.Status = 1
+      `);
+    
+    const userRoles = rolesResult.recordset;
+    
+    // 检查是否为管理员角色
+    const isAdmin = userRoles.some(role => 
+      role.RoleCode === 'admin' || 
+      role.RoleName === '系统管理员' ||
+      role.RoleName === 'admin'
+    );
+
+    // 生成JWT token（包含角色信息）
     const token = jwt.sign(
       {
         id: user.ID,
-        username: user.Username
+        username: user.Username,
+        role: isAdmin ? 'admin' : 'user',
+        roleCode: isAdmin ? 'admin' : 'user',
+        roles: userRoles
       },
       SECRET,
       { expiresIn: '2h' }
@@ -219,11 +235,13 @@ router.post('/login', async (req, res) => {
     });
 
   } catch (err) {
-    console.error('登录错误:', err);
+    console.error('登录过程中发生异常:', err);
+    
     // 登录过程中出现异常时，确保删除当前验证码
     if (req.body.captchaId) {
       captchaStore.delete(req.body.captchaId);
     }
+    
     res.status(500).json({ message: '登录失败，请重试' });
   }
 });

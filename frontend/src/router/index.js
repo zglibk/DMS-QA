@@ -133,6 +133,37 @@ const routes = [
         meta: { requiresAuth: true }
       },
 
+      // 工作计划管理模块
+      {
+        path: 'work-plan',
+        redirect: '/admin/work-plan/dashboard'
+      },
+      {
+        path: 'work-plan/dashboard',
+        component: () => import('../views/admin/work-plan/WorkDashboard.vue'), // 工作台首页
+        meta: { title: '工作台', requiresAuth: true }
+      },
+      {
+        path: 'work-plan/plans',
+        component: () => import('../views/admin/work-plan/PlanManagement.vue'), // 计划管理页面
+        meta: { title: '计划管理', requiresAuth: true }
+      },
+      {
+        path: 'work-plan/logs',
+        component: () => import('../views/admin/work-plan/WorkLogs.vue'), // 工作日志页面
+        meta: { title: '工作日志', requiresAuth: true }
+      },
+      {
+        path: 'work-plan/progress',
+        component: () => import('../views/admin/work-plan/ProgressTracking.vue'), // 进度跟踪页面
+        meta: { title: '进度跟踪', requiresAuth: true }
+      },
+      {
+        path: 'work-plan/statistics',
+        component: () => import('../views/admin/work-plan/WorkStatistics.vue'), // 统计分析页面
+        meta: { title: '统计分析', requiresAuth: true }
+      },
+
       // 质量成本损失模块
       {
         path: 'copq',

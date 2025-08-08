@@ -16,39 +16,42 @@ const { authenticateToken } = require('../middleware/auth');
 
 /**
  * 生成样版编号流水号
- * 规则：检查当前年份、月份的总记录数，顺序编号001、002、003...每月初从001开始
+ * 规则：检查当前年份、月份的最大编号，顺序编号001、002、003...每月初从001开始
+ * 使用最大编号+1的方式避免并发冲突
  */
 async function generateCertificateNo() {
   try {
     const now = new Date();
     const year = now.getFullYear();
     const month = (now.getMonth() + 1).toString().padStart(2, '0');
+    const yearMonth = `SP${year.toString().slice(-2)}${month}`;
     
-    // 查询当前年月的记录数
+    // 查询当前年月的最大编号
     const query = `
-      SELECT COUNT(*) as count 
+      SELECT MAX(CertificateNo) as maxNo
       FROM SampleApproval 
-      WHERE YEAR(CreateDate) = @year 
-      AND MONTH(CreateDate) = @month
+      WHERE CertificateNo LIKE @yearMonth + '%'
     `;
     
     const result = await executeQuery(async (pool) => {
       const request = pool.request();
-      request.input('year', sql.Int, year);
-      request.input('month', sql.Int, parseInt(month));
+      request.input('yearMonth', sql.NVarChar, yearMonth);
       return await request.query(query);
     });
-    if (!result || !result.recordset || result.recordset.length === 0) {
-      throw new Error('无法获取样版编号计数');
+    
+    let sequence = 1;
+    if (result && result.recordset && result.recordset.length > 0 && result.recordset[0].maxNo) {
+      const maxNo = result.recordset[0].maxNo;
+      // 提取最后3位数字并加1
+      const lastSequence = parseInt(maxNo.slice(-3));
+      sequence = lastSequence + 1;
     }
     
-    const count = result.recordset[0].count;
-    
-    // 生成流水号：下一个序号
-    const sequence = (count + 1).toString().padStart(3, '0');
+    // 生成流水号：格式化为3位数字
+    const sequenceStr = sequence.toString().padStart(3, '0');
     
     // 返回格式：SP + 年份后两位 + 月份 + 流水号
-    return `SP${year.toString().slice(-2)}${month}${sequence}`;
+    return `${yearMonth}${sequenceStr}`;
   } catch (error) {
     console.error('生成样版编号失败:', error);
     throw error;

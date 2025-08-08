@@ -406,7 +406,8 @@ onMounted(async () => {
 }
 .admin-main {
   background: #fafbfc;
-  height: calc(100vh - 3.75rem);
+  /* 修复高度计算，头部实际高度为5rem（80px） */
+  height: calc(100vh - 5rem);
   padding: 1.5rem;
   overflow-y: auto;
   overflow-x: hidden;

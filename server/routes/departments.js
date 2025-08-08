@@ -152,9 +152,14 @@ router.get('/', async (req, res) => {
         ORDER BY SortOrder ASC, CreatedAt DESC
       `)
     
+    // 构建适合el-cascader的树形结构数据
+    const departments = result.recordset
+    const tree = buildDepartmentTreeForCascader(departments)
+    
     res.json({
       success: true,
-      data: result.recordset
+      data: tree,
+      message: '部门列表获取成功'
     })
   } catch (error) {
     console.error('获取部门列表失败:', error)
@@ -549,6 +554,30 @@ function buildDepartmentTree(departments, parentId = null) {
       const children = buildDepartmentTree(departments, dept.ID || dept.value)
       const node = {
         ...dept,
+        children: children.length > 0 ? children : undefined
+      }
+      tree.push(node)
+    }
+  }
+  
+  return tree
+}
+
+/**
+ * 构建适合el-cascader组件的部门树形结构数据
+ * @param {Array} departments - 部门数据数组
+ * @param {Number} parentId - 父部门ID，默认为null（根节点）
+ * @returns {Array} 树形结构的部门数据，格式为{value, label, children}
+ */
+function buildDepartmentTreeForCascader(departments, parentId = null) {
+  const tree = []
+  
+  for (const dept of departments) {
+    if (dept.ParentID === parentId) {
+      const children = buildDepartmentTreeForCascader(departments, dept.ID)
+      const node = {
+        value: dept.ID,
+        label: dept.Name,
         children: children.length > 0 ? children : undefined
       }
       tree.push(node)

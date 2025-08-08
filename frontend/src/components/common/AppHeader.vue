@@ -93,7 +93,7 @@ const logout = () => {
 
 /**
  * 进入后台管理页面
- * 检查用户登录状态和权限，避免不必要的API调用导致token失效
+ * 基于菜单权限系统进行权限验证
  */
 const goAdmin = async () => {
   // 检查用户是否已登录
@@ -108,34 +108,24 @@ const goAdmin = async () => {
     try {
       await userStore.fetchProfile()
     } catch (error) {
-      console.error('获取用户信息失败:', error)
       ElMessage.error('获取用户信息失败，请重新登录')
       return
     }
   }
 
-  // 使用现有的用户信息进行权限检查，避免重复API调用
-  const currentUser = userStore.user
+  // 基于菜单权限系统进行权限验证
+  // 使用正则表达式检查用户是否有任何 /admin 路由下的权限
+  const hasAnyAdminRoutePermission = userStore.hasAnyAdminPermission
   
-  // 检查用户是否为管理员或具有管理权限
-  // 注意：后端返回的用户名字段是Username（大写U），不是username（小写u）
-  const isAdminUser = currentUser?.Username === 'admin'
-  const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
-  const hasManagerRole = userStore.hasRole('manager') || userStore.hasRole('部门经理')
+  // 检查用户是否有后台管理相关的操作权限
+  const hasAdminActionPermission = userStore.hasActionPermission('admin:dashboard:view') ||
+                                   userStore.hasActionPermission('admin:access')
   
-  console.log('权限检查调试信息:', {
-    currentUser: currentUser,
-    isAdminUser: isAdminUser,
-    hasAdminRole: hasAdminRole,
-    hasManagerRole: hasManagerRole,
-    userRoles: userStore.user?.roles
-  })
-  
-  // admin用户、具有admin角色或manager角色的用户可以进入后台
-  if (isAdminUser || hasAdminRole || hasManagerRole) {
+  // 如果用户有任何 /admin 路由权限或操作权限，则允许进入后台
+  if (hasAnyAdminRoutePermission || hasAdminActionPermission) {
     router.push('/admin/dashboard')
   } else {
-    ElMessage.error('您没有后台管理权限，请联系管理员')
+    ElMessage.error('您没有后台访问权限，请联系管理员')
   }
 }
 
@@ -146,7 +136,7 @@ const handleLogoError = (event) => {
 
 <style scoped>
 .app-header {
-  background: #fff;
+  background: #FFF; /*背景填充色 */
   box-shadow: 0 0.125rem 0.5rem 0 rgba(0,0,0,0.04);
   display: flex;
   align-items: center;

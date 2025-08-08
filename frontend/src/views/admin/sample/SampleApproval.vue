@@ -590,8 +590,8 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document, Check, Clock, Close, Plus, Download, CircleClose, SuccessFilled } from '@element-plus/icons-vue'
 import axios from 'axios'
-import * as XLSX from 'xlsx-js-style'
-import { saveAs } from 'file-saver'
+// ExcelJS 将在需要时动态导入
+// 导出相关库将在需要时动态导入
 
 // 响应式数据
 const loading = ref(false)
@@ -928,18 +928,14 @@ function handleExport(row) {
 }
 
 /**
- * 导出清单处理
- * 根据当前搜索条件导出所有符合条件的数据到Excel
- */
-/**
- * 导出清单功能
- * 在导出前询问用户确认，并在工作表首列添加序号字段
+ * 导出样品承认书清单到Excel文件
+ * 使用XLSX库生成Excel文件，参考返工管理模块的成功实现
  */
 async function handleExportList() {
   try {
     // 导出前询问用户确认
     const confirmResult = await ElMessageBox.confirm(
-      '确定要导出当前筛选条件下的样板承认书清单吗？',
+      '确定要导出当前筛选条件下的样品承认书清单吗？',
       '导出确认',
       {
         confirmButtonText: '确定导出',
@@ -985,10 +981,14 @@ async function handleExportList() {
         return
       }
       
+      // 动态导入XLSX库和样式库
+       const XLSX = await import('xlsx-style-vite')
+       const { saveAs } = await import('file-saver')
+      
       // 准备导出数据，在首列添加序号字段
       const exportData = allData.map((item, index) => ({
         '序号': index + 1,
-        '样板编号': item.certificateNo,
+        '样品编号': item.certificateNo,
         '客户编号': item.customerNo,
         '工单号': item.workOrderNo,
         '产品编号': item.productNo,
@@ -1004,118 +1004,104 @@ async function handleExportList() {
         '签收人': item.receiver || '',
         '签收日期': item.receiveDate || '',
         '判定': item.judgment || '',
-        '样板状态': item.sampleStatus,
+        '样品状态': item.sampleStatus,
         '到期日期': item.expiryDate || '',
         '分发数量(本)': item.distributionQuantity || 0,
         '备注': item.remark || ''
       }))
       
-      // 创建工作簿
-      const wb = XLSX.utils.book_new()
-      // 使用json_to_sheet创建工作表，数据会从A1开始，但我们需要从B2开始写入后端数据
-      const ws = XLSX.utils.json_to_sheet(exportData)
-      
-      // 设置列宽
-      const colWidths = [
-        { wch: 8 },  // 序号
-        { wch: 15 }, // 样板编号
-        { wch: 12 }, // 客户编号
-        { wch: 12 }, // 工单号
-        { wch: 12 }, // 产品编号
-        { wch: 68 }, // 品名
-        { wch: 15 }, // 产品规格
-        { wch: 12 }, // 色卡数量
-        { wch: 12 }, // 制作日期
-        { wch: 10 }, // 制作人
-        { wch: 10 }, // 跟单员
-        { wch: 10 }, // 签字人
-        { wch: 12 }, // 签字日期
-        { wch: 12 }, // 回签数量
-        { wch: 10 }, // 签收人
-        { wch: 12 }, // 签收日期
-        { wch: 10 }, // 判定
-        { wch: 10 }, // 样板状态
-        { wch: 12 }, // 到期日期
-        { wch: 12 }, // 分发数量
-        { wch: 20 }  // 备注
-      ]
-      ws['!cols'] = colWidths
-      
-      // 美化工作表样式
-      const range = XLSX.utils.decode_range(ws['!ref'])
-      
-      // 设置行高
-      ws['!rows'] = []
-      ws['!rows'][0] = { hpt: 24 } // 标题行固定高度24磅
-      for (let row = 1; row <= range.e.r; row++) {
-        ws['!rows'][row] = { hpt: 22 } // 数据行高度22磅
-      }
-      
-      // 设置表头样式（第一行）
-      for (let col = range.s.c; col <= range.e.c; col++) {
-        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: col })
-        if (!ws[cellAddress]) continue
-        
-        ws[cellAddress].s = {
-          font: {
-            bold: false,
-            color: { rgb: '000000' },
-            sz: 11
-          },
-          fill: {
-            fgColor: { rgb: 'D9D9D9' }
-          },
-          alignment: {
-            horizontal: 'center',
-            vertical: 'center'
-          },
-          border: {
-            top: { style: 'thin', color: { rgb: '808080' } },
-            bottom: { style: 'thin', color: { rgb: '808080' } },
-            left: { style: 'thin', color: { rgb: '808080' } },
-            right: { style: 'thin', color: { rgb: '808080' } }
-          }
-        }
-      }
-      
-      // 设置数据行样式
-      for (let row = 1; row <= range.e.r; row++) {
-        for (let col = range.s.c; col <= range.e.c; col++) {
-          const cellAddress = XLSX.utils.encode_cell({ r: row, c: col })
-          if (!ws[cellAddress]) {
-            // 为空单元格创建对象
-            ws[cellAddress] = { v: '', t: 's' }
-          }
-          
-          // 品名列（第5列，索引为5）使用左对齐，其他列使用居中对齐
-          const isProductNameColumn = col === 5
-          
-          ws[cellAddress].s = {
-            font: {
-              sz: 10
-            },
-            alignment: {
-              horizontal: isProductNameColumn ? 'left' : 'center',
-              vertical: 'center'
-            },
-            border: {
-              top: { style: 'thin', color: { rgb: '808080' } },
-              bottom: { style: 'thin', color: { rgb: '808080' } },
-              left: { style: 'thin', color: { rgb: '808080' } },
-              right: { style: 'thin', color: { rgb: '808080' } }
-            },
-            fill: {
-              fgColor: { rgb: row % 2 === 0 ? 'F8F9FA' : 'FFFFFF' }
-            }
-          }
-        }
-      }
-      
-      // 关闭表格网格线显示
-      ws['!views'] = [{ showGridLines: false }]
+      // 创建工作簿和工作表
+       const workbook = XLSX.utils.book_new()
+       const worksheet = XLSX.utils.json_to_sheet(exportData)
+       
+       // 设置列宽
+       const columnWidths = [
+         { wch: 8 },   // 序号
+         { wch: 15 },  // 样品编号
+         { wch: 12 },  // 客户编号
+         { wch: 12 },  // 工单号
+         { wch: 12 },  // 产品编号
+         { wch: 25 },  // 品名
+         { wch: 15 },  // 产品规格
+         { wch: 12 },  // 色卡数量
+         { wch: 12 },  // 制作日期
+         { wch: 10 },  // 制作人
+         { wch: 10 },  // 跟单员
+         { wch: 10 },  // 签字人
+         { wch: 12 },  // 签字日期
+         { wch: 12 },  // 回签数量
+         { wch: 10 },  // 签收人
+         { wch: 12 },  // 签收日期
+         { wch: 10 },  // 判定
+         { wch: 10 },  // 样品状态
+         { wch: 12 },  // 到期日期
+         { wch: 12 },  // 分发数量
+         { wch: 20 }   // 备注
+       ]
+       worksheet['!cols'] = columnWidths
+       
+       // 设置表格样式
+       const range = XLSX.utils.decode_range(worksheet['!ref'])
+       
+       // 定义样式
+       const headerStyle = {
+         font: { bold: true, sz: 11, color: { rgb: '000000' } },
+         fill: { fgColor: { rgb: 'D9D9D9' } },
+         alignment: { horizontal: 'center', vertical: 'center' },
+         border: {
+           top: { style: 'thin', color: { rgb: '808080' } },
+           bottom: { style: 'thin', color: { rgb: '808080' } },
+           left: { style: 'thin', color: { rgb: '808080' } },
+           right: { style: 'thin', color: { rgb: '808080' } }
+         }
+       }
+       
+       const dataStyle = {
+         font: { sz: 10, color: { rgb: '000000' } },
+         alignment: { horizontal: 'center', vertical: 'center' },
+         border: {
+           top: { style: 'thin', color: { rgb: '808080' } },
+           bottom: { style: 'thin', color: { rgb: '808080' } },
+           left: { style: 'thin', color: { rgb: '808080' } },
+           right: { style: 'thin', color: { rgb: '808080' } }
+         }
+       }
+       
+       const dataStyleLeft = {
+         ...dataStyle,
+         alignment: { horizontal: 'left', vertical: 'center' }
+       }
+       
+       // 应用样式到单元格
+       for (let R = range.s.r; R <= range.e.r; ++R) {
+         for (let C = range.s.c; C <= range.e.c; ++C) {
+           const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+           if (!worksheet[cellAddress]) continue
+           
+           if (R === 0) {
+             // 表头行样式
+             worksheet[cellAddress].s = headerStyle
+           } else {
+             // 数据行样式
+             if (C === 5) { // 品名列使用左对齐
+               worksheet[cellAddress].s = dataStyleLeft
+             } else {
+               worksheet[cellAddress].s = dataStyle
+             }
+             
+             // 交替行背景色
+             if (R % 2 === 0) {
+               worksheet[cellAddress].s = {
+                 ...worksheet[cellAddress].s,
+                 fill: { fgColor: { rgb: 'F8F9FA' } }
+               }
+             }
+           }
+         }
+       }
       
       // 添加工作表到工作簿
-      XLSX.utils.book_append_sheet(wb, ws, '样板承认书清单')
+      XLSX.utils.book_append_sheet(workbook, worksheet, '样品承认书清单')
       
       // 生成文件名
       const now = new Date()
@@ -1128,11 +1114,11 @@ async function handleExportList() {
       
       const dateStr = `${year}${month}${day}`
       const timeStr = `${hours}${minutes}${seconds}`
-      const fileName = `样板承认书清单_${dateStr}_${timeStr}.xlsx`
+      const fileName = `样品承认书清单_${dateStr}_${timeStr}.xlsx`
       
       // 导出文件
-      const buffer = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
-      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+      const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' })
+      const blob = new Blob([wbout], { type: 'application/octet-stream' })
       saveAs(blob, fileName)
       
       ElMessage.success(`导出成功！共导出 ${allData.length} 条记录`)
@@ -1141,7 +1127,7 @@ async function handleExportList() {
     }
   } catch (error) {
     console.error('导出失败:', error)
-    ElMessage.error('导出失败，请重试')
+    ElMessage.error(`导出失败: ${error.message || '未知错误'}`)
   } finally {
     loading.value = false
   }

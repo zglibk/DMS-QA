@@ -295,6 +295,8 @@ router.get('/user-menus', authenticateToken, async (req, res) => {
           LEFT JOIN RoleMenus rm ON m.ID = rm.MenuID
           LEFT JOIN UserRoles ur ON rm.RoleID = ur.RoleID
           WHERE m.Status = 1 
+            AND m.Visible = 1
+            AND m.MenuType IN ('catalog', 'menu')
             AND (ur.UserID = @userId OR m.Permission IS NULL OR m.Permission = '')
           ORDER BY m.SortOrder ASC, m.ID ASC
         `)

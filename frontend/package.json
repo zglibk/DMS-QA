@@ -30,6 +30,7 @@
     "cropperjs": "^1.6.1",
     "echarts": "^5.4.3",
     "element-plus": "^2.0.0",
+    "events": "^3.3.0",
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "mime-types": "^3.0.1",
@@ -42,7 +43,8 @@
     "vue-router": "^4.0.0",
     "vuedraggable": "^4.1.0",
     "xlsx": "^0.18.5",
-    "xlsx-js-style": "^1.2.0"
+    "xlsx-js-style": "^1.2.0",
+    "xlsx-style-vite": "^0.0.2"
   },
   "_devDependencies_comment": "开发环境依赖包",
   "devDependencies": {

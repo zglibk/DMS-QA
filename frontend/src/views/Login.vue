@@ -64,7 +64,7 @@
         </el-row>
         
         <!-- 登录表单 -->
-        <el-form ref="formRef" :model="form" :rules="rules" @submit.prevent="login" class="login-form">
+        <el-form ref="formRef" :model="form" :rules="rules" class="login-form">
           <div class="form-inputs">
             <el-form-item prop="username">
               <el-input v-model="form.username" placeholder="用户名" size="large">
@@ -112,7 +112,7 @@
             <el-form-item>
               <div class="button-container">
                 <el-button type="info" @click="reset" class="btn-reset">重置</el-button>
-                <el-button type="primary" native-type="submit" class="btn-login">登录</el-button>
+                <el-button type="primary" @click="login" class="btn-login">登录</el-button>
               </div>
             </el-form-item>
           </div>
@@ -227,7 +227,6 @@ const getCaptcha = async () => {
     form.value.captchaId = response.data.captchaId
     form.value.captchaText = '' // 清空验证码输入
   } catch (error) {
-    console.error('获取验证码失败:', error)
     ElMessage.error('获取验证码失败，请重试')
   }
 }
@@ -275,8 +274,16 @@ const login = async () => {
         ElMessage.success('登录成功')
         router.push('/')
       } catch (e) {
-        // 登录失败后刷新验证码
-        refreshCaptcha()
+        // 只有在验证码相关错误时才刷新验证码
+        const errorMessage = e.response?.data?.message || ''
+        const isCaptchaError = errorMessage.includes('验证码') || 
+                              errorMessage.includes('captcha') ||
+                              errorMessage.includes('过期') ||
+                              errorMessage.includes('不存在')
+        
+        if (isCaptchaError) {
+          refreshCaptcha()
+        }
         
         if (e.response && e.response.data && e.response.data.message) {
           ElMessage.error(e.response.data.message)

@@ -1,4 +1,6 @@
 const jwt = require('jsonwebtoken');
+const sql = require('mssql');
+const { getDynamicConfig } = require('../db');
 const SECRET = 'dms-secret';
 
 /**
@@ -24,18 +26,97 @@ const authenticateToken = function (req, res, next) {
 };
 
 /**
+ * 检查用户是否为管理员
+ * @param {Object} user - 用户信息
+ * @returns {boolean} 是否为管理员
+ */
+function isAdmin(user) {
+  if (!user) return false;
+  
+  // 检查用户角色信息
+  if (user.isAdmin === true) return true;
+  if (user.role === 'admin' || user.roleCode === 'admin') return true;
+  
+  // 检查角色数组
+  if (user.roles && Array.isArray(user.roles)) {
+    return user.roles.some(role => 
+      role === 'admin' || 
+      role.code === 'admin' || 
+      role.roleCode === 'admin'
+    );
+  }
+  
+  return false;
+}
+
+/**
+ * 查询用户权限
+ * @param {number} userId - 用户ID
+ * @param {string} permission - 权限标识
+ * @returns {Promise<boolean>} 是否具有权限
+ */
+async function checkUserPermission(userId, permission) {
+  try {
+    const pool = await sql.connect(await getDynamicConfig());
+    
+    // 查询用户是否具有指定权限
+    const result = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .input('Permission', sql.NVarChar, permission)
+      .query(`
+        SELECT COUNT(*) as count
+        FROM [UserRoles] ur
+        INNER JOIN [RoleMenus] rm ON ur.RoleID = rm.RoleID
+        INNER JOIN [Menus] m ON rm.MenuID = m.ID
+        WHERE ur.UserID = @UserId 
+          AND m.Permission = @Permission 
+          AND m.Status = 1
+      `);
+    
+    return result.recordset[0].count > 0;
+  } catch (error) {
+    console.error('查询用户权限失败:', error);
+    return false;
+  }
+}
+
+/**
  * 权限检查中间件
  * 功能：检查用户是否具有指定权限
  * @param {string} permission - 需要检查的权限代码
  */
 const checkPermission = (permission) => {
-  return (req, res, next) => {
-    // 简化权限检查，实际项目中应该查询数据库验证用户权限
-    // 这里假设管理员拥有所有权限
-    if (req.user && (req.user.role === 'admin' || req.user.roleCode === 'admin')) {
-      next();
-    } else {
-      return res.status(403).json({ message: '权限不足，拒绝访问' });
+  return async (req, res, next) => {
+    try {
+      // 检查用户是否已登录
+      if (!req.user) {
+        return res.status(401).json({ message: '用户未登录' });
+      }
+
+      // 检查是否为管理员，管理员拥有所有权限
+      if (isAdmin(req.user)) {
+        return next();
+      }
+
+      // 如果没有指定权限标识，则拒绝访问
+      if (!permission) {
+        return res.status(403).json({ message: '权限不足，拒绝访问' });
+      }
+
+      // 查询用户是否具有指定权限
+      const hasPermission = await checkUserPermission(req.user.id, permission);
+      
+      if (hasPermission) {
+        next();
+      } else {
+        return res.status(403).json({ 
+          message: '权限不足，拒绝访问',
+          requiredPermission: permission
+        });
+      }
+    } catch (error) {
+      console.error('权限验证失败:', error);
+      return res.status(500).json({ message: '权限验证失败' });
     }
   };
 };

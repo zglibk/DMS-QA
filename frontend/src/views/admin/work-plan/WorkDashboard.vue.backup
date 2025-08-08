@@ -1,0 +1,2194 @@
+<template>
+  <div class="modern-dashboard">
+    <!-- 页面标题和时间范围选择 -->
+    <div class="page-header">
+      <div class="header-content">
+        <div class="header-left">
+          <h1 class="page-title">
+            <el-icon class="title-icon"><DataBoard /></el-icon>
+            工作台
+          </h1>
+          <div class="welcome-message">
+            <p class="welcome-line">
+              <span class="greeting-section">
+                <span class="greeting-emoji">{{ getGreeting().split(' ')[1] || '👋' }}</span>
+                <span class="greeting-words">{{ getGreeting().split(' ')[0] }}，</span>
+                <span class="user-name">{{ getCurrentUser() }}</span>
+                <span class="exclamation">！</span>
+              </span>
+              <span class="date-section">
+                <el-icon class="calendar-icon"><Calendar /></el-icon>
+                今天是 {{ getCurrentDate() }}
+                <el-tag size="small" type="primary" class="weekday-tag">
+                  {{ getCurrentWeekday() }}
+                </el-tag>
+              </span>
+            </p>
+          </div>
+        </div>
+        <div class="header-right">
+          <div class="time-filter">
+            <span class="filter-label">时间范围：</span>
+            <el-select v-model="selectedTimeRange" @change="handleTimeRangeChange" class="time-select">
+              <el-option label="今天" value="today" />
+              <el-option label="本周" value="week" />
+              <el-option label="本月" value="month" />
+              <el-option label="本季度" value="quarter" />
+              <el-option label="本年" value="year" />
+            </el-select>
+          </div>
+          <div class="quick-actions">
+            <el-button type="primary" @click="createNewPlan" class="action-btn">
+              <el-icon><Plus /></el-icon>
+              新建计划
+            </el-button>
+            <el-button @click="refreshData" class="action-btn">
+              <el-icon><Refresh /></el-icon>
+              刷新
+            </el-button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 顶部统计数据展示行 -->
+    <div class="stats-row">
+      <el-row :gutter="20">
+        <!-- 第一列：包含原来的1、2、3列和新增的通知公告模块 -->
+        <el-col :span="18">
+          <!-- 上部分：原来的1、2、3列 -->
+          <div class="upper-section">
+            <el-row :gutter="20">
+              <!-- 原第一列：完成情况 -->
+              <el-col :span="8">
+                <div class="stat-card left-card">
+                  <div class="completion-grid">
+                    <div class="completion-item">
+                      <span class="completion-label">总体完成率</span>
+                      <div class="completion-progress">
+                        <el-progress :percentage="overallProgress" :stroke-width="12" :show-text="false" color="#409eff" />
+                        <span class="progress-text progress-text-blue">{{ overallProgress }}%</span>
+                      </div>
+                    </div>
+                    <div class="completion-item">
+                      <span class="completion-label">平均进度</span>
+                      <div class="completion-progress">
+                        <el-progress :percentage="dashboardData.planStats?.avgProgress || 0" :stroke-width="12" :show-text="false" color="#67c23a" />
+                        <span class="progress-text progress-text-green">{{ (dashboardData.planStats?.avgProgress || 0).toFixed(1) }}%</span>
+                      </div>
+                    </div>
+                    <div class="completion-item">
+                      <span class="completion-label">本周完成率</span>
+                      <div class="completion-progress">
+                        <el-progress :percentage="weeklyTargetRate" :stroke-width="12" :show-text="false" color="#e6a23c" />
+                        <span class="progress-text progress-text-orange">{{ weeklyTargetRate }}%</span>
+                      </div>
+                    </div>
+                    <div class="completion-item">
+                      <span class="completion-label">任务效率</span>
+                      <div class="completion-progress">
+                        <el-progress :percentage="85" :stroke-width="12" :show-text="false" color="#f56c6c" />
+                        <span class="progress-text progress-text-red">85%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </el-col>
+
+              <!-- 原第二列：计划统计和柱形图 -->
+              <el-col :span="8">
+                <div class="stat-card middle-card">
+                  <div class="middle-content">
+                    <!-- 上部：统计标签 -->
+                    <el-row :gutter="32" justify="center" align="middle" class="stats-tags">
+                      <el-col :span="12" class="text-center">
+                        <span class="stat-tag stat-tag-total">总计划</span>
+                        <span class="stat-tag-value">{{ dashboardData.planStats?.totalPlans || 0 }}项</span>
+                      </el-col>
+                      <el-col :span="12" class="text-center">
+                        <span class="stat-tag stat-tag-completed">已完成</span>
+                        <span class="stat-tag-value">{{ dashboardData.planStats?.completedPlans || 0 }}项</span>
+                      </el-col>
+                    </el-row>
+                    <!-- 下部：ECharts柱形图 -->
+                    <div class="bar-chart">
+                      <div ref="barChartRef" class="echarts-container"></div>
+                    </div>
+                  </div>
+                </div>
+              </el-col>
+
+              <!-- 原第三列：圆环图 -->
+              <el-col :span="8">
+                <div class="stat-card right-card">
+                  <div class="pie-charts">
+                    <div class="pie-item">
+                      <el-progress
+                        type="circle"
+                        :percentage="getPercentage('inProgress')"
+                        :width="80"
+                        :stroke-width="12"
+                        color="#409eff"
+                      >
+                        <template #default="{ percentage }">
+                          <div class="pie-center">
+                            <div class="pie-value">{{ percentage }}%</div>
+                          </div>
+                        </template>
+                      </el-progress>
+                      <div class="pie-label">进行中</div>
+                    </div>
+                    <div class="pie-item">
+                      <el-progress
+                        type="circle"
+                        :percentage="getPercentage('completed')"
+                        :width="80"
+                        :stroke-width="12"
+                        color="#67c23a"
+                      >
+                        <template #default="{ percentage }">
+                          <div class="pie-center">
+                            <div class="pie-value">{{ percentage }}%</div>
+                          </div>
+                        </template>
+                      </el-progress>
+                      <div class="pie-label">已完成</div>
+                    </div>
+                    <div class="pie-item">
+                      <el-progress
+                        type="circle"
+                        :percentage="getPercentage('overdue')"
+                        :width="80"
+                        :stroke-width="12"
+                        color="#f56c6c"
+                      >
+                        <template #default="{ percentage }">
+                          <div class="pie-center">
+                            <div class="pie-value">{{ percentage }}%</div>
+                          </div>
+                        </template>
+                      </el-progress>
+                      <div class="pie-label">已逾期</div>
+                    </div>
+                  </div>
+                </div>
+              </el-col>
+            </el-row>
+          </div>
+
+          <!-- 下部分：新增的通知公告模块 -->
+          <div class="lower-section">
+            <div class="stat-card notice-card">
+              <el-row :gutter="8">
+                <!-- 左侧标题区域 -->
+                <el-col :span="6">
+                  <div class="notice-header">
+                    <h3 class="notice-title">
+                      <el-icon><Bell /></el-icon>
+                      <span>通知公告</span>
+                    </h3>
+                  </div>
+                </el-col>
+                <!-- 右侧滚动显示区域 -->
+                <el-col :span="18">
+                  <div class="notice-content">
+                    <div class="notice-scroll" ref="noticeScrollRef">
+                      <div class="notice-item" v-for="(notice, index) in noticeList" :key="index">
+                        <div class="notice-dot"></div>
+                        <div class="notice-text">{{ notice.content }}</div>
+                        <div class="notice-time">{{ notice.time }}</div>
+                      </div>
+                    </div>
+                  </div>
+                </el-col>
+              </el-row>
+            </div>
+          </div>
+        </el-col>
+
+        <!-- 第二列：日历组件（原第四列） -->
+        <el-col :span="6">
+          <div class="stat-card calendar-card">
+            <div class="calendar-content">
+              <el-calendar v-model="currentDate" class="dashboard-calendar">
+                <template #date-cell="{ data }">
+                  <div class="calendar-day" :class="{ 'is-today': isToday(data.day) }">
+                    {{ data.day.split('-').pop() }}
+                  </div>
+                </template>
+              </el-calendar>
+            </div>
+          </div>
+        </el-col>
+      </el-row>
+    </div>
+
+    <!-- 主要内容区域 -->
+    <div class="main-content">
+      <div class="content-grid">
+        <!-- 待办事项 -->
+        <div class="content-section todo-section">
+          <div class="section-header">
+            <h3 class="section-title">
+              <el-icon><Clock /></el-icon>
+              待办事项
+              <el-badge :value="todoList.length" class="todo-badge" />
+            </h3>
+            <div class="section-actions">
+              <el-button text @click="viewAllTodos" class="view-all-btn">
+                查看全部
+                <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+          </div>
+          <div class="todo-container">
+            <div v-if="loading.todos" class="loading-state">
+              <el-skeleton :rows="3" animated />
+            </div>
+            <div v-else-if="todoList.length === 0" class="empty-state">
+              <el-empty description="暂无待办事项">
+                <el-button type="primary" @click="createNewPlan">创建新计划</el-button>
+              </el-empty>
+            </div>
+            <div v-else class="todo-list">
+              <div
+                v-for="todo in todoList.slice(0, 6)"
+                :key="todo.ID"
+                class="todo-item"
+                @click="viewPlanDetail(todo.ID)"
+              >
+                <div class="todo-priority" :class="`priority-${todo.Priority}`"></div>
+                <div class="todo-main">
+                  <div class="todo-header">
+                    <h4 class="todo-title">{{ todo.Title }}</h4>
+                    <el-tag :type="getUrgencyType(todo.DaysRemaining)" size="small" class="urgency-tag">
+                      {{ formatUrgency(todo.DaysRemaining) }}
+                    </el-tag>
+                  </div>
+                  <div class="todo-meta">
+                    <span class="todo-type">
+                      <el-icon><Folder /></el-icon>
+                      {{ todo.WorkTypeName }}
+                    </span>
+                    <span class="todo-deadline">
+                      <el-icon><Calendar /></el-icon>
+                      {{ formatDate(todo.EndDate) }}
+                    </span>
+                  </div>
+                  <div class="todo-progress">
+                    <el-progress
+                      :percentage="todo.Progress"
+                      :stroke-width="4"
+                      :show-text="false"
+                      :color="getProgressColorGradient(todo.Progress)"
+                    />
+                    <span class="progress-text">{{ todo.Progress }}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 最近动态 -->
+        <div class="content-section activity-section">
+          <div class="section-header">
+            <h3 class="section-title">
+              <el-icon><Bell /></el-icon>
+              最近动态
+            </h3>
+            <div class="section-actions">
+              <el-button text @click="viewAllLogs" class="view-all-btn">
+                查看全部
+                <el-icon class="el-icon--right"><ArrowRight /></el-icon>
+              </el-button>
+            </div>
+          </div>
+          <div class="activity-container">
+            <div v-if="loading.logs" class="loading-state">
+              <el-skeleton :rows="3" animated />
+            </div>
+            <div v-else-if="recentLogs.length === 0" class="empty-state">
+              <el-empty description="暂无工作记录">
+                <el-button type="primary" @click="addWorkLog">添加工作记录</el-button>
+              </el-empty>
+            </div>
+            <div v-else class="activity-timeline">
+              <div
+                v-for="log in recentLogs.slice(0, 5)"
+                :key="log.ID"
+                class="activity-item"
+                @click="viewLogDetail(log.ID)"
+              >
+                <div class="activity-time">
+                  <div class="time-dot" :class="getActivityType(log)"></div>
+                  <div class="time-text">{{ formatTimeAgo(log.LogDate) }}</div>
+                </div>
+                <div class="activity-content">
+                  <div class="activity-header">
+                    <h4 class="activity-title">{{ log.PlanTitle || '独立工作记录' }}</h4>
+                    <div class="activity-meta">
+                      <el-tag size="small" type="info">
+                        <el-icon><Clock /></el-icon>
+                        {{ log.WorkHours }}h
+                      </el-tag>
+                    </div>
+                  </div>
+                  <p class="activity-description">{{ truncateText(log.Content, 80) }}</p>
+                  <div v-if="log.Progress !== null" class="activity-progress">
+                    <el-progress
+                      :percentage="log.Progress"
+                      :stroke-width="3"
+                      :show-text="false"
+                      :color="getProgressColorGradient(log.Progress)"
+                    />
+                    <span class="progress-text">{{ log.Progress }}%</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 快速统计面板 -->
+    <div class="stats-panel">
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="stat-icon completed">
+            <el-icon><Check /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-number">{{ dashboardData.planStats?.completedPlans || 0 }}</div>
+            <div class="stat-label">本月完成</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon in-progress">
+            <el-icon><Loading /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-number">{{ dashboardData.planStats?.inProgressPlans || 0 }}</div>
+            <div class="stat-label">进行中</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon warning">
+            <el-icon><Warning /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-number">{{ dashboardData.planStats?.overduePlans || 0 }}</div>
+            <div class="stat-label">需关注</div>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon total">
+            <el-icon><DataBoard /></el-icon>
+          </div>
+          <div class="stat-info">
+            <div class="stat-number">{{ totalWorkHours }}</div>
+            <div class="stat-label">本月工时</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, reactive, onMounted, onUnmounted, computed, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/store/user'
+import {
+  Sunny,
+  Plus,
+  EditPen,
+  Refresh,
+  DataBoard,
+  ArrowDown,
+  TrendCharts,
+  Timer,
+  Clock,
+  ArrowRight,
+  Folder,
+  Calendar,
+  Bell,
+  Check,
+  Loading,
+  Warning
+} from '@element-plus/icons-vue'
+import * as echarts from 'echarts'
+import api from '@/services/api'
+
+// 路由实例
+const router = useRouter()
+
+// 用户状态管理
+const userStore = useUserStore()
+
+// 响应式数据
+const dashboardData = ref({})
+const todoList = ref([])
+const recentLogs = ref([])
+const selectedTimeRange = ref('month') // 默认选择本月
+const todayWorkHours = ref(8.5)
+const weeklyTargetRate = ref(85)
+const totalWorkHours = ref(168)
+
+// 通知公告数据
+const noticeList = ref([
+  {
+    content: '系统将于本周六进行维护升级，请提前保存工作进度',
+    time: '2024-01-20 09:00'
+  },
+  {
+    content: '新版本工作计划管理系统已上线，欢迎体验新功能',
+    time: '2024-01-19 14:30'
+  },
+  {
+    content: '请各部门及时提交本月工作总结报告',
+    time: '2024-01-18 16:45'
+  },
+  {
+    content: '质量管理培训将于下周三举行，请相关人员准时参加',
+    time: '2024-01-17 10:20'
+  },
+  {
+    content: '年度工作计划制定会议定于下周五召开',
+    time: '2024-01-16 11:15'
+  }
+])
+
+// ECharts相关引用
+const barChartRef = ref(null)
+let barChart = null
+
+// 通知滚动相关引用
+const noticeScrollRef = ref(null)
+let noticeScrollTimer = null
+
+// 日历相关数据
+const currentDate = ref(new Date())
+
+// 加载状态
+const loading = reactive({
+  dashboard: false,
+  todos: false,
+  logs: false
+})
+
+// 模拟一周效率数据
+const weeklyEfficiency = ref([
+  { day: '周一', percentage: 85 },
+  { day: '周二', percentage: 92 },
+  { day: '周三', percentage: 78 },
+  { day: '周四', percentage: 95 },
+  { day: '周五', percentage: 88 },
+  { day: '周六', percentage: 60 },
+  { day: '周日', percentage: 45 }
+])
+
+// 计算属性：整体进度
+const overallProgress = computed(() => {
+  const stats = dashboardData.value.planStats
+  if (!stats || !stats.totalPlans) return 0
+  return Math.round((stats.completedPlans / stats.totalPlans) * 100)
+})
+
+/**
+ * 获取问候语
+ */
+const getGreeting = () => {
+  const hour = new Date().getHours()
+  const greetings = {
+    morning: ['早上好 🌅', '新的一天开始了 🌞'],
+    afternoon: ['下午好 🌤️', '下午时光 🌻'],
+    evening: ['晚上好 🌙', '夜幕降临 🌃']
+  }
+  
+  let timeOfDay, messages
+  if (hour >= 5 && hour < 12) {
+    timeOfDay = 'morning'
+    messages = greetings.morning
+  } else if (hour >= 12 && hour < 18) {
+    timeOfDay = 'afternoon' 
+    messages = greetings.afternoon
+  } else {
+    timeOfDay = 'evening'
+    messages = greetings.evening
+  }
+  
+  // 根据日期选择不同的问候语，让每天都有新鲜感
+  const dayIndex = new Date().getDate() % messages.length
+  return messages[dayIndex]
+}
+
+/**
+ * 获取当前用户名
+ */
+const getCurrentUser = () => {
+  // 从用户状态管理中获取真实用户信息
+  const user = userStore.user
+  if (user && (user.realName || user.RealName)) {
+    return user.realName || user.RealName
+  }
+  if (user && (user.username || user.Username)) {
+    return user.username || user.Username
+  }
+  return '用户'
+}
+
+/**
+ * 获取当前日期（不包含星期几）
+ */
+const getCurrentDate = () => {
+  const today = new Date()
+  const options = { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric'
+  }
+  return today.toLocaleDateString('zh-CN', options)
+}
+
+/**
+ * 获取当前星期几
+ */
+const getCurrentWeekday = () => {
+  const today = new Date()
+  const options = { 
+    weekday: 'long'
+  }
+  return today.toLocaleDateString('zh-CN', options)
+}
+
+/**
+ * 获取工作台数据
+ */
+const getDashboardData = async () => {
+  try {
+    loading.dashboard = true
+    const response = await api.get('/work-plan/dashboard')
+    if (response.data.success) {
+      dashboardData.value = response.data.data
+    }
+  } catch (error) {
+    console.error('获取工作台数据失败:', error)
+    // 使用模拟数据
+    dashboardData.value = {
+      planStats: {
+        totalPlans: 15,
+        inProgressPlans: 6,
+        completedPlans: 8,
+        overduePlans: 1,
+        avgProgress: 78.5,
+        weeklyNew: 3,
+        upcomingDeadlines: 2
+      }
+    }
+  } finally {
+    loading.dashboard = false
+  }
+}
+
+/**
+ * 获取待办事项列表
+ */
+const getTodoList = async () => {
+  try {
+    loading.todos = true
+    const response = await api.get('/work-plan/dashboard/todos', {
+      params: { limit: 10 }
+    })
+    if (response.data.success) {
+      todoList.value = response.data.data
+    }
+  } catch (error) {
+    console.error('获取待办事项失败:', error)
+    // 使用模拟数据
+    todoList.value = [
+      {
+        ID: 1,
+        Title: '完成系统架构设计文档',
+        Priority: 'high',
+        WorkTypeName: '系统设计',
+        EndDate: '2024-01-25',
+        DaysRemaining: 2,
+        Progress: 75
+      },
+      {
+        ID: 2,
+        Title: '用户界面原型设计',
+        Priority: 'medium',
+        WorkTypeName: 'UI设计',
+        EndDate: '2024-01-28',
+        DaysRemaining: 5,
+        Progress: 45
+      },
+      {
+        ID: 3,
+        Title: '数据库性能优化',
+        Priority: 'high',
+        WorkTypeName: '数据库',
+        EndDate: '2024-01-22',
+        DaysRemaining: -1,
+        Progress: 90
+      }
+    ]
+  } finally {
+    loading.todos = false
+  }
+}
+
+/**
+ * 获取最近工作日志
+ */
+const getRecentLogs = async () => {
+  try {
+    loading.logs = true
+    const response = await api.get('/work-plan/dashboard/recent-logs', {
+      params: { limit: 8 }
+    })
+    if (response.data.success) {
+      recentLogs.value = response.data.data
+    }
+  } catch (error) {
+    console.error('获取最近工作日志失败:', error)
+    // 使用模拟数据
+    recentLogs.value = [
+      {
+        ID: 1,
+        PlanTitle: '系统架构设计',
+        Content: '完成了核心模块的架构设计，包括用户管理、权限控制和数据流设计',
+        LogDate: '2024-01-20 14:30:00',
+        WorkHours: 4,
+        Progress: 75
+      },
+      {
+        ID: 2,
+        PlanTitle: 'UI界面设计',
+        Content: '设计了主要页面的交互原型，包括登录页面、仪表盘和用户管理页面',
+        LogDate: '2024-01-20 10:15:00',
+        WorkHours: 3,
+        Progress: 45
+      }
+    ]
+  } finally {
+    loading.logs = false
+  }
+}
+
+/**
+ * 初始化ECharts柱状图
+ */
+const initBarChart = () => {
+  if (!barChartRef.value) return
+  
+  // 销毁已存在的图表实例
+  if (barChart) {
+    barChart.dispose()
+  }
+  
+  // 创建新的图表实例
+  barChart = echarts.init(barChartRef.value)
+  
+  // 更新图表数据
+  updateBarChart()
+}
+
+/**
+ * 更新ECharts柱状图数据
+ */
+const updateBarChart = () => {
+  if (!barChart || !dashboardData.value.planStats) return
+  
+  const stats = dashboardData.value.planStats
+  const data = [
+    {
+      name: '进行中',
+      value: stats.inProgressPlans || 0,
+      itemStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#4A90E2' },
+          { offset: 1, color: '#8EC1F7' }
+        ])
+      }
+    },
+    {
+       name: '已完成',
+       value: stats.completedPlans || 0,
+       itemStyle: {
+         color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+           { offset: 0, color: '#67C23A' },
+           { offset: 1, color: '#95D475' }
+         ])
+       }
+     },
+    {
+      name: '已逾期',
+      value: stats.overduePlans || 0,
+      itemStyle: {
+        color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+          { offset: 0, color: '#D0021B' },
+          { offset: 1, color: '#F78B9B' }
+        ])
+      }
+    }
+  ]
+  
+  const option = {
+    grid: {
+      left: '10%',
+      right: '10%',
+      top: '20%',
+      bottom: '25%'
+    },
+    xAxis: {
+      type: 'category',
+      data: data.map(item => item.name),
+      axisLine: {
+        show: true,
+        lineStyle: {
+          color: '#e0e0e0'
+        }
+      },
+      axisTick: {
+        show: false
+      },
+      axisLabel: {
+        color: '#666',
+        fontSize: 12
+      }
+    },
+    yAxis: {
+      type: 'value',
+      show: false
+    },
+    series: [{
+      type: 'bar',
+      data: data,
+      barWidth: '40%',
+      label: {
+        show: true,
+        position: 'top',
+        formatter: '{c}项',
+        color: '#333',
+        fontFamily: 'Microsoft YaHei, Arial, sans-serif',
+        fontSize: 12,
+        fontWeight: 'normal'
+      },
+      emphasis: {
+        itemStyle: {
+          shadowBlur: 10,
+          shadowColor: 'rgba(0, 0, 0, 0.3)'
+        }
+      }
+    }]
+  }
+  
+  barChart.setOption(option)
+}
+
+/**
+ * 刷新所有数据
+ */
+const refreshData = async () => {
+  await Promise.all([
+    getDashboardData(),
+    getTodoList(),
+    getRecentLogs()
+  ])
+  
+  // 数据更新后刷新图表
+  await nextTick()
+  updateBarChart()
+  
+  ElMessage.success('数据刷新成功')
+}
+
+/**
+ * 处理时间范围变化
+ */
+const handleTimeRangeChange = (value) => {
+  selectedTimeRange.value = value
+  // 根据时间范围重新获取数据
+  refreshDataByTimeRange()
+}
+
+/**
+ * 根据时间范围刷新数据
+ */
+const refreshDataByTimeRange = async () => {
+  try {
+    loading.dashboard = true
+    // 这里可以根据selectedTimeRange.value调用不同的API
+    await Promise.all([
+      getDashboardData(),
+      getTodoList(),
+      getRecentLogs()
+    ])
+  } catch (error) {
+    console.error('刷新数据失败:', error)
+  } finally {
+    loading.dashboard = false
+  }
+}
+
+
+
+/**
+ * 计算圆环图百分比
+ */
+const getPercentage = (type) => {
+  const stats = dashboardData.value.planStats
+  if (!stats || !stats.totalPlans) return 0
+  
+  let value = 0
+  switch (type) {
+    case 'inProgress':
+      value = stats.inProgressPlans || 0
+      break
+    case 'completed':
+      value = stats.completedPlans || 0
+      break
+    case 'overdue':
+      value = stats.overduePlans || 0
+      break
+  }
+  
+  return Math.round((value / stats.totalPlans) * 100)
+}
+
+/**
+ * 获取进度条渐变色
+ */
+const getProgressColorGradient = (percentage) => {
+  if (percentage >= 80) {
+    return [{ color: '#67c23a', percentage: 100 }]
+  } else if (percentage >= 60) {
+    return [{ color: '#e6a23c', percentage: 100 }]
+  } else if (percentage >= 40) {
+    return [{ color: '#f56c6c', percentage: 100 }]
+  } else {
+    return [{ color: '#909399', percentage: 100 }]
+  }
+}
+
+/**
+ * 格式化紧急程度
+ */
+const formatUrgency = (daysRemaining) => {
+  if (daysRemaining < 0) return '已逾期'
+  if (daysRemaining === 0) return '今天到期'
+  if (daysRemaining <= 3) return '紧急'
+  if (daysRemaining <= 7) return '即将到期'
+  return '正常'
+}
+
+/**
+ * 获取紧急程度类型
+ */
+const getUrgencyType = (daysRemaining) => {
+  if (daysRemaining < 0) return 'danger'
+  if (daysRemaining <= 3) return 'warning'
+  return 'info'
+}
+
+/**
+ * 格式化日期
+ */
+const formatDate = (dateStr) => {
+  const date = new Date(dateStr)
+  return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric' })
+}
+
+/**
+ * 格式化时间距离
+ */
+const formatTimeAgo = (dateStr) => {
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diff = now - date
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  const days = Math.floor(hours / 24)
+  
+  if (days > 0) return `${days}天前`
+  if (hours > 0) return `${hours}小时前`
+  return '刚刚'
+}
+
+/**
+ * 判断是否为今天
+ */
+const isToday = (dateStr) => {
+  const today = new Date()
+  const date = new Date(dateStr)
+  return today.toDateString() === date.toDateString()
+}
+
+/**
+ * 获取活动类型
+ */
+const getActivityType = (log) => {
+  if (log.Progress >= 100) return 'completed'
+  if (log.Issues) return 'warning'
+  return 'normal'
+}
+
+/**
+ * 截断文本
+ */
+const truncateText = (text, maxLength) => {
+  if (!text) return ''
+  return text.length > maxLength ? text.substring(0, maxLength) + '...' : text
+}
+
+/**
+ * 创建新计划
+ */
+const createNewPlan = () => {
+  router.push('/admin/work-plan/plans/create')
+}
+
+/**
+ * 添加工作记录
+ */
+const addWorkLog = () => {
+  router.push('/admin/work-plan/logs/create')
+}
+
+/**
+ * 查看计划详情
+ */
+const viewPlanDetail = (planId) => {
+  router.push(`/admin/work-plan/plans/${planId}`)
+}
+
+/**
+ * 查看日志详情
+ */
+const viewLogDetail = (logId) => {
+  router.push(`/admin/work-plan/logs/${logId}`)
+}
+
+/**
+ * 查看所有待办事项
+ */
+const viewAllTodos = () => {
+  router.push('/admin/work-plan/plans?status=pending,in_progress')
+}
+
+/**
+ * 查看所有工作日志
+ */
+const viewAllLogs = () => {
+  router.push('/admin/work-plan/logs')
+}
+
+/**
+ * 初始化通知自动滚动（水平向左滚动）
+ */
+const initNoticeAutoScroll = () => {
+  if (!noticeScrollRef.value) return
+  
+  const scrollContainer = noticeScrollRef.value
+  let scrollLeft = 0
+  const scrollStep = 1 // 每次滚动的像素
+  const scrollDelay = 30 // 滚动间隔（毫秒）
+  const pauseTime = 1000 // 滚动到右端后的暂停时间（毫秒）
+  
+  const autoScroll = () => {
+    if (!scrollContainer) return
+    
+    const maxScrollLeft = scrollContainer.scrollWidth - scrollContainer.clientWidth
+    
+    if (maxScrollLeft <= 0) {
+      // 内容不足以滚动
+      return
+    }
+    
+    if (scrollLeft >= maxScrollLeft) {
+      // 滚动到右端，短暂暂停后平滑重置到左端
+      setTimeout(() => {
+        scrollLeft = 0
+        scrollContainer.scrollLeft = 0
+      }, pauseTime)
+    } else {
+      scrollLeft += scrollStep
+      scrollContainer.scrollLeft = scrollLeft
+    }
+  }
+  
+  // 启动自动滚动
+  noticeScrollTimer = setInterval(autoScroll, scrollDelay)
+  
+  // 鼠标悬停时暂停滚动
+  scrollContainer.addEventListener('mouseenter', () => {
+    if (noticeScrollTimer) {
+      clearInterval(noticeScrollTimer)
+      noticeScrollTimer = null
+    }
+  })
+  
+  // 鼠标离开时恢复滚动
+  scrollContainer.addEventListener('mouseleave', () => {
+    if (!noticeScrollTimer) {
+      noticeScrollTimer = setInterval(autoScroll, scrollDelay)
+    }
+  })
+}
+
+/**
+ * 清理自动滚动定时器
+ */
+const clearNoticeAutoScroll = () => {
+  if (noticeScrollTimer) {
+    clearInterval(noticeScrollTimer)
+    noticeScrollTimer = null
+  }
+}
+
+// 组件挂载时获取数据
+onMounted(async () => {
+  // 获取用户信息
+  try {
+    await userStore.fetchProfile()
+  } catch (error) {
+    console.error('获取用户信息失败:', error)
+  }
+  
+  await refreshData()
+  // 确保DOM渲染完成后初始化图表和自动滚动
+  await nextTick()
+  initBarChart()
+  initNoticeAutoScroll()
+})
+
+// 组件卸载时清理定时器
+onUnmounted(() => {
+  clearNoticeAutoScroll()
+})
+</script>
+
+<style scoped>
+.modern-dashboard {
+  min-height: 100vh;
+  background: #fff;
+  padding: 20px;
+  font-family: 'Tahoma', Arial, sans-serif;
+}
+
+/* 页面头部 */
+.page-header {
+  background: #f5f5f5;
+  border-radius: 20px;
+  padding: 16px 24px;
+  margin-bottom: 24px;
+  color: #333;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+}
+
+.page-header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+  pointer-events: none;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+  z-index: 1;
+}
+
+.header-left {
+  flex: 1;
+}
+
+.page-title {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 6px 0;
+  font-size: 24px;
+  font-weight: 700;
+  color: #333;
+}
+
+.title-icon {
+  font-size: 28px;
+  color: #f39c12;
+}
+
+/* 美化的欢迎词样式 */
+.welcome-message {
+  margin: 0;
+  animation: fadeInUp 0.8s ease-out;
+}
+ 
+.welcome-line {
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.greeting-section {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.greeting-emoji {
+  font-size: 20px;
+  animation: bounce 2s infinite;
+  display: inline-block;
+}
+
+.greeting-words {
+  color: #409eff;
+  font-weight: normal;
+  text-shadow: 0 1px 2px rgba(64, 158, 255, 0.1);
+}
+
+.user-name {
+  color: #e6a23c;
+  font-weight: normal;
+  background: linear-gradient(45deg, #e6a23c, #f39c12);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.exclamation {
+  color: #f56c6c;
+  font-weight: normal;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.date-section {
+  color: #666;
+  font-size: 13px;
+  font-weight: 400;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0.9;
+}
+
+.calendar-icon {
+  color: #909399;
+  font-size: 14px;
+}
+
+.weekday-tag {
+  margin-left: 8px;
+  font-weight: 500;
+  border-radius: 12px;
+  animation: fadeInUp 0.6s ease-out;
+}
+
+/* 动画效果 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-3px);
+  }
+  60% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.time-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filter-label {
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.time-select {
+  width: 120px;
+}
+
+.quick-actions {
+  display: flex;
+  gap: 12px;
+}
+
+.action-btn {
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+/* 顶部统计数据展示行 */
+.stats-row {
+  margin-bottom: 30px;
+  max-height: 300px; /* 以日历模块高度为基准设置第二行最大高度 */
+  overflow: hidden; /* 防止内容超出容器底部 */
+}
+
+.stat-card {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.card-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.card-icon {
+  font-size: 20px;
+  color: #667eea;
+}
+
+.filter-btn {
+  color: #667eea;
+  font-weight: 500;
+}
+
+/* 左卡片：完成情况 */
+.left-card {
+  width: 100%;
+  overflow: hidden;
+}
+
+.left-card .completion-grid {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  padding: 0 0 10px 0;
+}
+
+.left-card .completion-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  flex: 1;
+  justify-content: space-around;
+}
+
+.completion-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 4px 0;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.completion-label {
+  font-size: 13px;
+  color: #7f8c8d;
+  font-weight: 500;
+  min-width: 70px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.completion-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.completion-progress .el-progress {
+  flex: 1;
+  min-width: 0;
+}
+
+.completion-progress .progress-text {
+  font-size: 13px;
+  color: #2c3e50;
+  font-weight: normal;
+  min-width: 35px;
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.progress-text-blue {
+  color: #409eff !important;
+}
+
+.progress-text-green {
+  color: #67c23a !important;
+}
+
+.progress-text-orange {
+  color: #e6a23c !important;
+}
+
+.progress-text-red {
+  color: #f56c6c !important;
+}
+
+/* 中部卡片：计划统计和柱形图 */
+.middle-card {
+  width: 100%;
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.middle-card .middle-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  gap: 8px;
+  width: 100%;
+  padding: 0 0 20px 0;
+}
+
+.stats-text {
+  display: flex;
+  justify-content: space-around;
+  gap: 20px;
+  white-space: nowrap;
+}
+
+.stats-tags {
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  min-height: 32px;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.stat-tag {
+  padding: 3px 10px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: white;
+  white-space: nowrap;
+  flex-shrink: 0;
+  line-height: 1.4;
+  min-height: 20px;
+  display: inline-block;
+}
+
+.stat-tag-total {
+  background-color: #ff6b6b;
+}
+
+.stat-tag-completed {
+  background-color: #51cf66;
+}
+
+.stat-tag-value {
+  font-size: 13px;
+  color: #2c3e50;
+  font-weight: 600;
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+.stat-text-item {
+  text-align: center;
+}
+
+.stat-label {
+  display: block;
+  font-size: 12px;
+  color: #7f8c8d;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.stat-number {
+  font-size: 24px;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.stat-number.completed { color: #27ae60; }
+
+.bar-chart {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+  overflow: hidden;
+}
+
+.echarts-container {
+  width: 100%;
+  height: 120px;
+  min-width: 0;
+}
+
+/* 右卡片：圆环图 */
+.right-card {
+  width: 100%;
+  overflow: hidden;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.right-card .pie-charts {
+  flex: 1;
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  padding: 0 0 20px 0;
+}
+
+.pie-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.pie-center {
+  text-align: center;
+}
+
+.pie-value {
+  font-size: 11px;
+  color: #2c3e50;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pie-label {
+  font-size: 12px;
+  color: #7f8c8d;
+  font-weight: 500;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 所有圆环进度条背景色设置 */
+.pie-charts .pie-item :deep(.el-progress-circle__track) {
+  stroke: #EBEEF5;
+}
+
+
+
+/* 主要内容区域 */
+.main-content {
+  margin-bottom: 30px;
+}
+
+.content-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.content-section {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #ecf0f1;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #2c3e50;
+}
+
+.todo-badge {
+  margin-left: 8px;
+}
+
+.view-all-btn {
+  color: #667eea;
+  font-weight: 500;
+}
+
+/* 待办事项 */
+.todo-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.todo-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  border-left: 4px solid transparent;
+}
+
+.todo-item:hover {
+  background: #e9ecef;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.todo-priority {
+  width: 4px;
+  height: 40px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.priority-high { background: #e74c3c; }
+.priority-medium { background: #f39c12; }
+.priority-low { background: #27ae60; }
+
+.todo-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.todo-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.todo-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  line-height: 1.4;
+}
+
+.urgency-tag {
+  flex-shrink: 0;
+}
+
+.todo-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 12px;
+  font-size: 12px;
+  color: #7f8c8d;
+}
+
+.todo-type,
+.todo-deadline {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.todo-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.progress-text {
+  font-size: 12px;
+  color: #7f8c8d;
+  font-weight: 500;
+  min-width: 35px;
+}
+
+/* 活动时间线 */
+.activity-container {
+  max-height: 400px;
+  overflow-y: auto;
+}
+
+.activity-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.activity-item {
+  display: flex;
+  gap: 16px;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.activity-item:hover {
+  background: #e9ecef;
+  transform: translateX(4px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.activity-time {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.time-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #bdc3c7;
+}
+
+.time-dot.completed { background: #27ae60; }
+.time-dot.warning { background: #f39c12; }
+.time-dot.normal { background: #3498db; }
+
+.time-text {
+  font-size: 10px;
+  color: #7f8c8d;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.activity-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.activity-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 8px;
+  gap: 12px;
+}
+
+.activity-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  line-height: 1.4;
+}
+
+.activity-meta {
+  flex-shrink: 0;
+}
+
+.activity-description {
+  margin: 0 0 12px 0;
+  font-size: 13px;
+  color: #7f8c8d;
+  line-height: 1.4;
+}
+
+.activity-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 统计面板 */
+.stats-panel {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  border-radius: 16px;
+  padding: 24px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.stat-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 20px;
+  background: #f8f9fa;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  color: white;
+}
+
+.stat-icon.completed { background: #27ae60; }
+.stat-icon.in-progress { background: #3498db; }
+.stat-icon.warning { background: #f39c12; }
+.stat-icon.total { background: #9b59b6; }
+
+.stat-info {
+  flex: 1;
+}
+
+.stat-number {
+  font-size: 20px;
+  font-weight: 700;
+  color: #2c3e50;
+  margin-bottom: 4px;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #7f8c8d;
+  font-weight: 500;
+}
+
+/* 加载和空状态 */
+.loading-state,
+.empty-state {
+  padding: 40px 20px;
+  text-align: center;
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .pie-charts {
+    flex-direction: column;
+    align-items: center;
+  }
+}
+
+@media (max-width: 768px) {
+  .modern-dashboard {
+    padding: 15px;
+  }
+  
+  .header-content {
+    flex-direction: column;
+    gap: 16px;
+    text-align: center;
+  }
+  
+  .header-right {
+    flex-direction: column;
+    gap: 16px;
+  }
+  
+  .content-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  
+  .bars-container {
+    height: 60px;
+  }
+  
+  .pie-charts {
+    flex-direction: column;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-title {
+    font-size: 24px;
+  }
+  
+  .quick-actions {
+    width: 100%;
+    justify-content: center;
+  }
+  
+  .stats-text {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .bars-container {
+    height: 50px;
+  }
+}
+
+/* 滚动条样式 */
+.todo-container::-webkit-scrollbar,
+.activity-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.todo-container::-webkit-scrollbar-track,
+.activity-container::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+/* 日历卡片样式 */
+.calendar-card {
+  height: 100%;
+  max-height: 300px;
+  display: flex;
+  flex-direction: column;
+}
+
+.calendar-content {
+  flex: 1;
+  padding: 4px;
+  overflow: hidden;
+}
+
+.dashboard-calendar {
+  height: 100%;
+}
+
+.dashboard-calendar :deep(.el-calendar__header) {
+  padding: 8px 0;
+  border-bottom: 1px solid #ebeef5;
+  text-align: center;
+}
+
+.dashboard-calendar :deep(.el-calendar__title) {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2c3e50;
+  text-align: center;
+  margin: 0 auto;
+}
+
+.dashboard-calendar :deep(.el-calendar__button-group) {
+  display: none;
+}
+
+.dashboard-calendar :deep(.el-calendar__body) {
+  padding: 8px 0;
+}
+
+.dashboard-calendar :deep(.el-calendar-table) {
+  font-size: 12px;
+}
+
+.dashboard-calendar :deep(.el-calendar-table thead th) {
+  padding: 0;
+  font-weight: 600;
+  color: white;
+  background-color: #409EFF;
+  border-bottom: 1px solid #ebeef5;
+  width: 24px;
+  height: 24px;
+  text-align: center;
+  vertical-align: middle;
+  line-height: 24px;
+}
+
+.dashboard-calendar :deep(.el-calendar-table .el-calendar-day) {
+  padding: 0;
+  max-height: 24px;
+  width: 24px;
+  height: 24px;
+  text-align: center;
+  vertical-align: middle;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dashboard-calendar :deep(.el-calendar-table td) {
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  text-align: center;
+  vertical-align: middle;
+  border: none;
+}
+
+.calendar-day {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 2px;
+  font-size: 11px;
+  transition: all 0.2s ease;
+  margin: auto;
+}
+
+.calendar-day.is-today {
+  background: #F56C6C;
+  color: white;
+  font-weight: 600;
+}
+
+/* 星期日的日期字体颜色为红色 */
+.dashboard-calendar :deep(.el-calendar-table td:first-child .calendar-day) {
+  color: #f56c6c;
+}
+
+.dashboard-calendar :deep(.el-calendar-table td:first-child .calendar-day.is-today) {
+  background: #F56C6C;
+  color: white;
+}
+
+/* 上下部分布局样式 */
+.upper-section {
+  margin-bottom: 20px;
+}
+
+.lower-section {
+  margin-top: 20px;
+  height: 160px; /* 固定高度，防止超出 */
+}
+
+/* 通知公告模块样式 */
+.notice-card {
+  height: 100%;
+  max-height: 280px; /* 与日历模块高度保持一致，留20px边距 */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 防止内容溢出 */
+}
+
+.notice-card .el-row {
+  height: 100%;
+  margin: 0;
+}
+
+.notice-card .el-col {
+  height: 100%;
+}
+
+.notice-header {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid #ebeef5;
+  padding: 16px 12px;
+  background: #ffffff;
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.05);
+  min-height: 120px;
+}
+
+.notice-title {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: #1a1a1a;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.notice-title .el-icon {
+  color: #409eff;
+  font-size: 24px;
+}
+
+.notice-title span {
+  white-space: nowrap;
+  color: #1a1a1a;
+}
+
+.notice-content {
+  height: 100%;
+  overflow: hidden;
+  padding: 12px 8px;
+  display: flex;
+  align-items: center;
+}
+
+.notice-scroll {
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.notice-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  margin-right: 24px;
+  background: transparent;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.notice-item:hover {
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 6px;
+}
+
+.notice-dot {
+  width: 8px;
+  height: 8px;
+  background: #409eff;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.notice-text {
+  flex: 1;
+  font-size: 15px;
+  color: #2c3e50;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.notice-time {
+  font-size: 13px;
+  color: #909399;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 隐藏水平滚动条以获得更好的视觉效果 */
+.notice-scroll::-webkit-scrollbar {
+  display: none; /* Chrome, Safari and Opera */
+}
+
+.dashboard-calendar :deep(.el-calendar-table .el-calendar-day:hover .calendar-day) {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.dashboard-calendar :deep(.el-calendar-table .el-calendar-day:hover .calendar-day.is-today) {
+  background: #e85a5a;
+  color: white;
+}
+
+.todo-container::-webkit-scrollbar-thumb,
+.activity-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.todo-container::-webkit-scrollbar-thumb:hover,
+.activity-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+</style>

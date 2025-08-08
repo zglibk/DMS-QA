@@ -114,6 +114,14 @@ export const useUserStore = defineStore('user', {
     // 检查是否为管理员
     isAdmin: (state) => {
       return (state.user?.roles || []).some(role => role.name === 'admin' || role.name === '系统管理员')
+    },
+
+    // 检查用户是否有任何 /admin 路由下的权限（使用正则表达式）
+    hasAnyAdminPermission: (state) => {
+      const adminRouteRegex = /^\/admin(\/.*)?$/
+      return (state.user?.permissions?.menus || []).some(menu => 
+        menu.path && adminRouteRegex.test(menu.path)
+      )
     }
   },
 

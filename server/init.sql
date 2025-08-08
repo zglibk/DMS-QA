@@ -1267,4 +1267,468 @@ BEGIN
 END
 
 PRINT '客户投诉记录表结构创建完成！';
+
+-- =====================================================
+-- 工作计划管理系统相关表
+-- 功能：工作计划管理、任务跟踪、进度监控
+-- 用途：项目管理、工作安排、绩效考核
+-- =====================================================
+
+-- 1. 工作计划表 (WorkPlans)
+-- 功能：存储工作计划的基本信息
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[WorkPlans]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[WorkPlans] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+        [PlanCode] NVARCHAR(50) NOT NULL UNIQUE,         -- 计划编号，唯一
+        [PlanName] NVARCHAR(200) NOT NULL,               -- 计划名称
+        [Description] NVARCHAR(1000),                    -- 计划描述
+        [StartDate] DATE NOT NULL,                       -- 开始日期
+        [EndDate] DATE NOT NULL,                         -- 结束日期
+        [Status] NVARCHAR(20) NOT NULL DEFAULT 'pending', -- 状态：pending/in_progress/completed/cancelled
+        [Priority] NVARCHAR(20) NOT NULL DEFAULT 'medium', -- 优先级：low/medium/high/urgent
+        [Progress] DECIMAL(5,2) DEFAULT 0,               -- 进度百分比
+        [WorkTypeID] INT,                                -- 工作类型ID
+        [EstimatedHours] DECIMAL(8,2),                   -- 预估工时
+        [ActualHours] DECIMAL(8,2),                      -- 实际工时
+        [CreatedBy] INT NOT NULL,                        -- 创建人ID
+        [AssignedTo] INT,                                -- 负责人ID
+        [DepartmentID] INT,                              -- 所属部门ID
+        [UpdatedBy] INT,                                 -- 更新人ID
+        [ParentPlanID] INT,                              -- 父计划ID（用于子任务）
+        [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 创建时间
+        [UpdatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 更新时间
+        [CompletedAt] DATETIME,                          -- 完成时间
+        [Tags] NVARCHAR(500),                            -- 标签（JSON格式）
+        [Attachments] NVARCHAR(1000),                    -- 附件路径（JSON格式）
+        
+        -- 外键约束
+        CONSTRAINT FK_WorkPlans_Creator
+            FOREIGN KEY (CreatedBy) REFERENCES [dbo].[User](ID),
+        CONSTRAINT FK_WorkPlans_Assignee
+            FOREIGN KEY (AssignedTo) REFERENCES [dbo].[User](ID),
+        CONSTRAINT FK_WorkPlans_Department
+            FOREIGN KEY (DepartmentID) REFERENCES [dbo].[Department](ID),
+        CONSTRAINT FK_WorkPlans_UpdatedBy
+            FOREIGN KEY (UpdatedBy) REFERENCES [dbo].[User](ID),
+        CONSTRAINT FK_WorkPlans_Parent
+            FOREIGN KEY (ParentPlanID) REFERENCES [dbo].[WorkPlans](ID)
+    );
+    PRINT '✅ WorkPlans 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ WorkPlans 表已存在，跳过创建';
+END
+
+-- 2. 工作日志表 (WorkLogs)
+-- 功能：记录工作计划的执行日志
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[WorkLogs]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[WorkLogs] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+        [PlanID] INT NOT NULL,                           -- 关联的计划ID
+        [UserID] INT NOT NULL,                           -- 记录人ID
+        [LogDate] DATE NOT NULL,                         -- 日志日期
+        [WorkHours] DECIMAL(4,2) NOT NULL,               -- 工作时长
+        [WorkContent] NVARCHAR(1000) NOT NULL,           -- 工作内容
+        [Progress] DECIMAL(5,2),                         -- 当日进度
+        [Issues] NVARCHAR(1000),                         -- 遇到的问题
+        [NextPlan] NVARCHAR(1000),                       -- 下一步计划
+        [Attachments] NVARCHAR(1000),                    -- 附件路径（JSON格式）
+        [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 创建时间
+        [UpdatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 更新时间
+        
+        -- 外键约束
+        CONSTRAINT FK_WorkLogs_User
+            FOREIGN KEY (UserID) REFERENCES [dbo].[User](ID),
+        CONSTRAINT FK_WorkLogs_Plan
+            FOREIGN KEY (PlanID) REFERENCES [dbo].[WorkPlans](ID)
+    );
+    PRINT '✅ WorkLogs 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ WorkLogs 表已存在，跳过创建';
+END
+
+-- 3. 工作计划执行人关联表 (WorkPlanExecutors)
+-- 功能：管理工作计划的多个执行人
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[WorkPlanExecutors]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[WorkPlanExecutors] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+        [PlanID] INT NOT NULL,                           -- 工作计划ID
+        [ExecutorID] INT NOT NULL,                       -- 执行人ID
+        [Role] NVARCHAR(50) DEFAULT '执行人',             -- 执行角色（执行人、协助人等）
+        [AssignedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 分配时间
+        [AssignedBy] INT,                                -- 分配人ID
+        [Status] NVARCHAR(20) DEFAULT 'active',          -- 状态：active/inactive
+        [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 创建时间
+        [UpdatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 更新时间
+        
+        -- 外键约束
+        CONSTRAINT FK_WorkPlanExecutors_Plan
+            FOREIGN KEY (PlanID) REFERENCES [dbo].[WorkPlans](ID) ON DELETE CASCADE,
+        CONSTRAINT FK_WorkPlanExecutors_Executor
+            FOREIGN KEY (ExecutorID) REFERENCES [dbo].[User](ID),
+        CONSTRAINT FK_WorkPlanExecutors_AssignedBy
+            FOREIGN KEY (AssignedBy) REFERENCES [dbo].[User](ID),
+            
+        -- 唯一约束：同一计划下同一执行人只能有一条活跃记录
+        CONSTRAINT UK_WorkPlanExecutors_Plan_Executor
+            UNIQUE (PlanID, ExecutorID)
+    );
+    
+    -- 创建索引优化查询性能
+    CREATE INDEX IX_WorkPlanExecutors_PlanID ON [dbo].[WorkPlanExecutors](PlanID);
+    CREATE INDEX IX_WorkPlanExecutors_ExecutorID ON [dbo].[WorkPlanExecutors](ExecutorID);
+    
+    PRINT '✅ WorkPlanExecutors 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ WorkPlanExecutors 表已存在，跳过创建';
+END
+
+-- 4. 计划里程碑表 (PlanMilestones)
+-- 功能：记录计划的重要节点
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[PlanMilestones]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[PlanMilestones] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+        [PlanID] INT NOT NULL,                           -- 关联的计划ID
+        [MilestoneName] NVARCHAR(200) NOT NULL,          -- 里程碑名称
+        [Description] NVARCHAR(500),                     -- 描述
+        [TargetDate] DATE NOT NULL,                      -- 目标完成日期
+        [ActualDate] DATE,                               -- 实际完成日期
+        [Status] NVARCHAR(20) NOT NULL DEFAULT 'pending', -- 状态：pending/completed/overdue
+        [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 创建时间
+        
+        -- 外键约束
+        CONSTRAINT FK_PlanMilestones_Plan
+            FOREIGN KEY (PlanID) REFERENCES [dbo].[WorkPlans](ID) ON DELETE CASCADE
+    );
+    PRINT '✅ PlanMilestones 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ PlanMilestones 表已存在，跳过创建';
+END
+
+-- 4. 计划模板表 (PlanTemplates)
+-- 功能：存储可重复使用的计划模板
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[PlanTemplates]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[PlanTemplates] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+        [TemplateName] NVARCHAR(200) NOT NULL,           -- 模板名称
+        [Category] NVARCHAR(50),                         -- 模板分类
+        [Description] NVARCHAR(1000),                    -- 模板描述
+        [TemplateData] NVARCHAR(MAX),                    -- 模板数据（JSON格式）
+        [EstimatedDays] INT,                             -- 预估天数
+        [EstimatedHours] DECIMAL(8,2),                   -- 预估工时
+        [IsPublic] BIT NOT NULL DEFAULT 1,               -- 是否公开
+        [CreatedBy] INT NOT NULL,                        -- 创建人ID
+        [DepartmentID] INT,                              -- 所属部门ID
+        [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 创建时间
+        [UpdatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 更新时间
+        
+        -- 外键约束
+        CONSTRAINT FK_PlanTemplates_Creator
+            FOREIGN KEY (CreatedBy) REFERENCES [dbo].[User](ID),
+        CONSTRAINT FK_PlanTemplates_Department
+            FOREIGN KEY (DepartmentID) REFERENCES [dbo].[Department](ID)
+    );
+    PRINT '✅ PlanTemplates 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ PlanTemplates 表已存在，跳过创建';
+END
+
+-- 5. 工作提醒表 (WorkReminders)
+-- 功能：存储工作计划相关的提醒信息
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[WorkReminders]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[WorkReminders] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+        [PlanID] INT NOT NULL,                           -- 关联的计划ID
+        [UserID] INT NOT NULL,                           -- 提醒用户ID
+        [ReminderType] NVARCHAR(50) NOT NULL,            -- 提醒类型：deadline/milestone/custom
+        [ReminderTime] DATETIME NOT NULL,                -- 提醒时间
+        [Message] NVARCHAR(500),                         -- 提醒消息
+        [IsRead] BIT NOT NULL DEFAULT 0,                 -- 是否已读
+        [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(), -- 创建时间
+        
+        -- 外键约束
+        CONSTRAINT FK_WorkReminders_User
+            FOREIGN KEY (UserID) REFERENCES [dbo].[User](ID),
+        CONSTRAINT FK_WorkReminders_Plan
+            FOREIGN KEY (PlanID) REFERENCES [dbo].[WorkPlans](ID)
+    );
+    PRINT '✅ WorkReminders 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ WorkReminders 表已存在，跳过创建';
+END
+
+-- 6. 工作类型字典表 (WorkTypes)
+-- 功能：定义工作类型的字典数据
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[WorkTypes]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[WorkTypes] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,              -- 主键，自增ID
+        [TypeName] NVARCHAR(50) NOT NULL,                -- 类型名称
+        [TypeCode] NVARCHAR(20) NOT NULL UNIQUE,         -- 类型编码
+        [Description] NVARCHAR(200),                     -- 描述
+        [Color] NVARCHAR(20),                            -- 显示颜色
+        [Icon] NVARCHAR(50),                             -- 图标
+        [SortOrder] INT NOT NULL DEFAULT 0,              -- 排序
+        [IsActive] BIT NOT NULL DEFAULT 1                -- 是否启用
+    );
+    PRINT '✅ WorkTypes 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ WorkTypes 表已存在，跳过创建';
+END
+
+-- =====================================================
+-- 创建索引以优化查询性能
+-- =====================================================
+
+-- WorkPlans 表索引
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkPlans_CreatedBy')
+    CREATE NONCLUSTERED INDEX [IX_WorkPlans_CreatedBy] ON [dbo].[WorkPlans] ([CreatedBy]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkPlans_AssignedTo')
+    CREATE NONCLUSTERED INDEX [IX_WorkPlans_AssignedTo] ON [dbo].[WorkPlans] ([AssignedTo]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkPlans_DepartmentID')
+    CREATE NONCLUSTERED INDEX [IX_WorkPlans_DepartmentID] ON [dbo].[WorkPlans] ([DepartmentID]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkPlans_Status')
+    CREATE NONCLUSTERED INDEX [IX_WorkPlans_Status] ON [dbo].[WorkPlans] ([Status]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkPlans_StartDate')
+    CREATE NONCLUSTERED INDEX [IX_WorkPlans_StartDate] ON [dbo].[WorkPlans] ([StartDate]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkPlans_UpdatedBy')
+    CREATE NONCLUSTERED INDEX [IX_WorkPlans_UpdatedBy] ON [dbo].[WorkPlans] ([UpdatedBy]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkPlans_WorkTypeID')
+    CREATE NONCLUSTERED INDEX [IX_WorkPlans_WorkTypeID] ON [dbo].[WorkPlans] ([WorkTypeID]);
+
+-- WorkLogs 表索引
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkLogs_UserID')
+    CREATE NONCLUSTERED INDEX [IX_WorkLogs_UserID] ON [dbo].[WorkLogs] ([UserID]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkLogs_LogDate')
+    CREATE NONCLUSTERED INDEX [IX_WorkLogs_LogDate] ON [dbo].[WorkLogs] ([LogDate]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkLogs_PlanID')
+    CREATE NONCLUSTERED INDEX [IX_WorkLogs_PlanID] ON [dbo].[WorkLogs] ([PlanID]);
+
+-- PlanMilestones 表索引
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanMilestones_PlanID')
+    CREATE NONCLUSTERED INDEX [IX_PlanMilestones_PlanID] ON [dbo].[PlanMilestones] ([PlanID]);
+
+-- WorkReminders 表索引
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkReminders_UserID')
+    CREATE NONCLUSTERED INDEX [IX_WorkReminders_UserID] ON [dbo].[WorkReminders] ([UserID]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_WorkReminders_ReminderTime')
+    CREATE NONCLUSTERED INDEX [IX_WorkReminders_ReminderTime] ON [dbo].[WorkReminders] ([ReminderTime]);
+
+PRINT '✅ 工作计划相关索引创建完成';
+
+-- =====================================================
+-- 插入基础数据
+-- =====================================================
+
+-- 插入工作类型基础数据
+IF NOT EXISTS (SELECT * FROM [dbo].[WorkTypes] WHERE TypeCode = 'REPORT')
+BEGIN
+    INSERT INTO [dbo].[WorkTypes] ([TypeName], [TypeCode], [Description], [Color], [Icon], [SortOrder]) VALUES
+    (N'编制报表', 'REPORT', N'各类质量报表的编制工作', '#1890ff', 'file-text', 10),
+    (N'数据记录', 'DATA_RECORD', N'质量数据的记录和录入工作', '#52c41a', 'edit', 20),
+    (N'数据统计', 'DATA_STAT', N'质量数据的统计汇总工作', '#722ed1', 'bar-chart', 30),
+    (N'数据分析', 'DATA_ANALYSIS', N'质量数据的深度分析工作', '#fa8c16', 'line-chart', 40),
+    (N'统计分析', 'STAT_ANALYSIS', N'质量统计分析和趋势分析', '#13c2c2', 'pie-chart', 50),
+    (N'文件开发', 'FILE_DEV', N'质量文件和程序的开发', '#eb2f96', 'file-add', 60),
+    (N'文件更新', 'FILE_UPDATE', N'质量文件和程序的更新维护', '#faad14', 'file-sync', 70),
+    (N'来料检验', 'IQC', N'来料质量检验工作', '#f5222d', 'inbox', 80),
+    (N'制程检验', 'IPQC', N'制程质量检验工作', '#fa541c', 'tool', 90),
+    (N'出货检验', 'OQC', N'出货质量检验工作', '#fadb14', 'export', 100),
+    (N'测试', 'TEST', N'产品测试和验证工作', '#a0d911', 'experiment', 110),
+    (N'会议', 'MEETING', N'质量会议和讨论工作', '#52c41a', 'team', 120),
+    (N'培训', 'TRAINING', N'质量培训和学习工作', '#1890ff', 'read', 130),
+    (N'校准', 'CALIBRATION', N'设备校准和维护工作', '#722ed1', 'setting', 140),
+    (N'其他', 'OTHER', N'其他质量相关工作', '#8c8c8c', 'ellipsis', 150);
+    
+    PRINT '✅ 工作类型基础数据插入完成';
+END
+
+-- 插入计划模板基础数据
+IF NOT EXISTS (SELECT * FROM [dbo].[PlanTemplates] WHERE TemplateName = N'质量报表编制计划模板')
+BEGIN
+    -- 注意：这里的CreatedBy需要根据实际的用户ID调整
+    -- 建议在系统初始化后，由管理员手动创建模板
+    INSERT INTO [dbo].[PlanTemplates] ([TemplateName], [Category], [Description], [TemplateData], [EstimatedDays], [EstimatedHours], [IsPublic], [CreatedBy]) VALUES
+    (N'质量报表编制计划模板', N'报表', N'月度/季度质量报表编制工作计划模板', N'{"phases":[{"name":"数据收集","days":2},{"name":"数据整理","days":1},{"name":"报表编制","days":2},{"name":"数据分析","days":1},{"name":"报表审核","days":1}]}', 7, 56, 1, 1),
+    (N'质量检验计划模板', N'检验', N'产品质量检验工作计划模板', N'{"phases":[{"name":"检验准备","days":1},{"name":"来料检验","days":2},{"name":"制程检验","days":3},{"name":"出货检验","days":2},{"name":"检验记录整理","days":1}]}', 9, 72, 1, 1),
+    (N'质量文件开发计划模板', N'文件', N'质量管理文件开发和更新计划模板', N'{"phases":[{"name":"需求分析","days":2},{"name":"文件起草","days":5},{"name":"内部评审","days":2},{"name":"修订完善","days":3},{"name":"发布实施","days":1}]}', 13, 104, 1, 1),
+    (N'设备校准计划模板', N'校准', N'测量设备校准工作计划模板', N'{"phases":[{"name":"校准准备","days":1},{"name":"设备校准","days":2},{"name":"校准记录","days":1},{"name":"结果分析","days":1},{"name":"证书管理","days":1}]}', 6, 48, 1, 1),
+    (N'质量培训计划模板', N'培训', N'质量管理培训工作计划模板', N'{"phases":[{"name":"培训需求调研","days":2},{"name":"培训方案设计","days":3},{"name":"培训材料准备","days":2},{"name":"培训实施","days":5},{"name":"培训效果评估","days":1}]}', 13, 104, 1, 1),
+    (N'数据统计分析计划模板', N'统计', N'质量数据统计分析工作计划模板', N'{"phases":[{"name":"数据收集","days":2},{"name":"数据清洗","days":1},{"name":"统计分析","days":3},{"name":"趋势分析","days":2},{"name":"报告编制","days":2}]}', 10, 80, 1, 1);
+    
+    PRINT '✅ 计划模板基础数据插入完成';
+END
+
+PRINT '';
+PRINT '🎉 工作计划管理系统数据库初始化完成！';
+PRINT '';
+PRINT '已创建的表：';
+PRINT '  ✅ ComplaintRegister - 投诉登记表';
+PRINT '  ✅ MaterialPrice - 材料价格表';
+PRINT '  ✅ User - 用户表';
+PRINT '  ✅ Positions - 岗位管理表';
+PRINT '  ✅ Department - 部门管理表';
+PRINT '  ✅ Roles - 角色管理表';
+PRINT '  ✅ Menus - 菜单管理表';
+PRINT '  ✅ WorkPlans - 工作计划表';
+PRINT '  ✅ WorkLogs - 工作日志表';
+PRINT '  ✅ PlanMilestones - 计划里程碑表';
+PRINT '  ✅ PlanTemplates - 计划模板表';
+PRINT '  ✅ WorkReminders - 工作提醒表';
+PRINT '  ✅ WorkTypes - 工作类型字典表';
+PRINT '  ✅ Notices - 通知公告表';
+PRINT '';
+PRINT '已创建的索引：';
+PRINT '  ✅ 工作计划相关查询优化索引';
+PRINT '';
+PRINT '已插入的基础数据：';
+PRINT '  ✅ 15种工作类型（制造业质量管理专用）';
+PRINT '  ✅ 6个计划模板（制造业质量管理专用）';
+PRINT '';
+PRINT '下一步操作：';
+PRINT '  1. 在系统中为用户分配工作计划菜单权限';
+PRINT '  2. 根据实际需要调整计划模板的CreatedBy字段';
+PRINT '  3. 开始使用工作计划管理功能';
+PRINT '';
+
+-- =====================================================
+-- 通知公告表 (Notices)
+-- 功能：存储系统通知和公告信息
+-- 用途：系统消息推送、重要公告发布、用户通知管理
+-- =====================================================
+CREATE TABLE [dbo].[Notices] (
+    -- 基础信息字段
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,                    -- 主键，自增ID
+    [Title] NVARCHAR(200) NOT NULL,                        -- 通知标题，必填
+    [Content] NVARCHAR(MAX) NOT NULL,                      -- 通知内容，必填
+    [Type] NVARCHAR(50) NOT NULL DEFAULT 'notice',         -- 通知类型：notice(通知)、announcement(公告)、urgent(紧急)
+    [Priority] NVARCHAR(20) NOT NULL DEFAULT 'normal',     -- 优先级：high(高)、normal(普通)、low(低)
+    
+    -- 时间管理字段
+    [PublishDate] DATETIME NOT NULL DEFAULT GETDATE(),     -- 发布时间
+    [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(),       -- 创建时间
+    [UpdatedAt] DATETIME NULL,                             -- 更新时间
+    
+    -- 管理字段
+    [CreatedBy] INT NOT NULL,                              -- 创建人ID（关联User表）
+    [IsActive] BIT NOT NULL DEFAULT 1,                     -- 是否有效（软删除标记）
+    [ViewCount] INT NOT NULL DEFAULT 0                     -- 浏览次数统计
+);
+
+-- 创建性能优化索引
+CREATE INDEX IX_Notices_Type ON [dbo].[Notices] ([Type]);
+CREATE INDEX IX_Notices_Priority ON [dbo].[Notices] ([Priority]);
+CREATE INDEX IX_Notices_PublishDate ON [dbo].[Notices] ([PublishDate]);
+CREATE INDEX IX_Notices_IsActive ON [dbo].[Notices] ([IsActive]);
+CREATE INDEX IX_Notices_CreatedBy ON [dbo].[Notices] ([CreatedBy]);
+
+-- 添加外键约束（关联用户表）
+ALTER TABLE [dbo].[Notices] ADD CONSTRAINT FK_Notices_User 
+    FOREIGN KEY ([CreatedBy]) REFERENCES [dbo].[User]([ID]);
+
+-- 添加表注释
+EXEC sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'通知公告表，用于存储系统通知和公告信息，支持多种类型和优先级管理', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'Notices';
+
+-- 添加字段注释
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'主键，自增ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'ID';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'通知标题', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'Title';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'通知内容', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'Content';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'通知类型：notice(通知)、announcement(公告)、urgent(紧急)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'Type';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'优先级：high(高)、normal(普通)、low(低)', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'Priority';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'发布时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'PublishDate';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'创建人ID', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'CreatedBy';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'CreatedAt';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'UpdatedAt';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'是否有效（软删除标记）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'IsActive';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'浏览次数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'ViewCount';
+
+-- 插入通知公告示例数据
+INSERT INTO [dbo].[Notices] ([Title], [Content], [Type], [Priority], [CreatedBy]) VALUES
+(N'系统维护通知', N'系统将于本周六晚上22:00-24:00进行例行维护，期间可能影响正常使用，请提前做好相关准备。', 'notice', 'high', 1),
+(N'新功能上线公告', N'工作计划管理模块已正式上线，支持计划创建、进度跟踪、日志记录等功能，欢迎大家使用。', 'announcement', 'normal', 1),
+(N'安全提醒', N'请定期更换密码，不要在公共场所登录系统，保护好个人账户安全。', 'notice', 'normal', 1),
+(N'培训通知', N'质量管理系统使用培训将于下周三下午2点在会议室举行，请相关人员准时参加。', 'notice', 'normal', 1),
+(N'重要更新', N'系统已修复若干已知问题，优化了用户体验，建议清除浏览器缓存后重新登录。', 'announcement', 'high', 1);
+
+PRINT '✅ 通知公告表创建完成，已插入示例数据';
+
+-- =====================================================
+-- 创建工作计划相关触发器
+-- 功能：自动更新 UpdatedAt 和 UpdatedBy 字段
+-- =====================================================
+
+-- 为现有数据设置默认更新人（设置为创建人）
+UPDATE [dbo].[WorkPlans] 
+SET [UpdatedBy] = [CreatedBy] 
+WHERE [UpdatedBy] IS NULL;
+
+PRINT '✅ 现有WorkPlans记录的UpdatedBy字段已设置为CreatedBy';
+
+-- 创建触发器自动更新WorkPlans表的UpdatedAt字段
+IF EXISTS (SELECT * FROM sys.triggers WHERE name = 'TR_WorkPlans_UpdateFields')
+BEGIN
+    DROP TRIGGER TR_WorkPlans_UpdateFields;
+END
+GO
+
+CREATE TRIGGER TR_WorkPlans_UpdateFields
+ON [dbo].[WorkPlans]
+FOR UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- 更新UpdatedAt字段为当前时间
+    UPDATE wp
+    SET UpdatedAt = GETDATE()
+    FROM [dbo].[WorkPlans] wp
+    INNER JOIN inserted i ON wp.ID = i.ID;
+    
+END
+GO
+
+PRINT '✅ WorkPlans表更新触发器创建成功';
+
 PRINT 'DMS-QA 数据库初始化脚本执行完成！';
+PRINT '====================================================='
+PRINT '✅ 工作计划管理系统数据库结构已完整初始化！'
+PRINT '包含字段：'
+PRINT '  - DepartmentID: 执行部门ID'
+PRINT '  - UpdatedBy: 更新人ID'
+PRINT '包含表：'
+PRINT '  - WorkPlanExecutors: 工作计划执行人关联表'
+PRINT '包含触发器：'
+PRINT '  - TR_WorkPlans_UpdateFields: 自动更新字段触发器'
+PRINT '=====================================================';}]}}
