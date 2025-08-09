@@ -160,8 +160,13 @@ const routes = [
       },
       {
         path: 'work-plan/statistics',
-        component: () => import('../views/admin/work-plan/WorkStatistics.vue'), // 统计分析页面
+        component: () => import('../views/admin/work-plan/WorkStatistics.vue'),
         meta: { title: '统计分析', requiresAuth: true }
+      },
+      {
+        path: 'work-plan/templates',
+        component: () => import('../views/admin/work-plan/PlanTemplates.vue'),
+        meta: { title: '计划模板', requiresAuth: true }
       },
 
       // 质量成本损失模块

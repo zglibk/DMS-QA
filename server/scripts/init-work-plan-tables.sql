@@ -139,6 +139,8 @@ BEGIN
         [EstimatedDays] INT,                            -- 预计天数
         [EstimatedHours] DECIMAL(8,2),                  -- 预计工时
         [DepartmentID] INT,                             -- 适用部门
+        [WorkTypeID] INT,                               -- 工作类型ID
+        [Priority] NVARCHAR(20) DEFAULT 'medium',       -- 优先级：low/medium/high/urgent
         [IsPublic] BIT DEFAULT 1,                       -- 是否公开
         [UsageCount] INT DEFAULT 0,                     -- 使用次数
         [CreatedBy] INT NOT NULL,                       -- 创建人
@@ -148,7 +150,9 @@ BEGIN
         CONSTRAINT FK_PlanTemplates_Creator 
             FOREIGN KEY (CreatedBy) REFERENCES [dbo].[User](ID),
         CONSTRAINT FK_PlanTemplates_Department 
-            FOREIGN KEY (DepartmentID) REFERENCES [dbo].[Department](ID)
+            FOREIGN KEY (DepartmentID) REFERENCES [dbo].[Department](ID),
+        CONSTRAINT FK_PlanTemplates_WorkType 
+            FOREIGN KEY (WorkTypeID) REFERENCES [dbo].[WorkTypes](ID)
     );
     PRINT '✅ PlanTemplates 表创建成功';
 END
@@ -156,6 +160,25 @@ ELSE
 BEGIN
     PRINT '⚠️ PlanTemplates 表已存在，跳过创建';
 END
+
+-- 创建 PlanTemplates 表索引
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanTemplates_WorkTypeID')
+    CREATE NONCLUSTERED INDEX [IX_PlanTemplates_WorkTypeID] ON [dbo].[PlanTemplates] ([WorkTypeID]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanTemplates_DepartmentID')
+    CREATE NONCLUSTERED INDEX [IX_PlanTemplates_DepartmentID] ON [dbo].[PlanTemplates] ([DepartmentID]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanTemplates_CreatedBy')
+    CREATE NONCLUSTERED INDEX [IX_PlanTemplates_CreatedBy] ON [dbo].[PlanTemplates] ([CreatedBy]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanTemplates_Category')
+    CREATE NONCLUSTERED INDEX [IX_PlanTemplates_Category] ON [dbo].[PlanTemplates] ([Category]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanTemplates_IsPublic')
+    CREATE NONCLUSTERED INDEX [IX_PlanTemplates_IsPublic] ON [dbo].[PlanTemplates] ([IsPublic]);
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_PlanTemplates_Priority')
+    CREATE NONCLUSTERED INDEX [IX_PlanTemplates_Priority] ON [dbo].[PlanTemplates] ([Priority]);
 
 -- =====================================================
 -- 5. 工作提醒表 (WorkReminders)

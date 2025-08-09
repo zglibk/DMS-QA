@@ -346,6 +346,64 @@ const getDefaultMenus = () => {
     },
     {
       ID: 6,
+      Name: '工作计划',
+      Code: 'work-plan',
+      Path: '/admin/work-plan',
+      Icon: 'Document',
+      Type: 'menu',
+      children: [
+        {
+          ID: 61,
+          Name: '工作台',
+          Code: 'work-dashboard',
+          Path: '/admin/work-plan/dashboard',
+          Icon: 'HomeFilled',
+          Type: 'menu'
+        },
+        {
+          ID: 62,
+          Name: '计划管理',
+          Code: 'plan-management',
+          Path: '/admin/work-plan/plans',
+          Icon: 'List',
+          Type: 'menu'
+        },
+        {
+          ID: 63,
+          Name: '工作日志',
+          Code: 'work-logs',
+          Path: '/admin/work-plan/logs',
+          Icon: 'Document',
+          Type: 'menu'
+        },
+        {
+          ID: 64,
+          Name: '进度跟踪',
+          Code: 'progress-tracking',
+          Path: '/admin/work-plan/progress',
+          Icon: 'Grid',
+          Type: 'menu'
+        },
+        {
+          ID: 65,
+          Name: '统计分析',
+          Code: 'statistics-analysis',
+          Path: '/admin/work-plan/statistics',
+          Icon: 'Grid',
+          Type: 'menu'
+        },
+        {
+          ID: 66,
+          Name: '计划模板',
+          Code: 'plan-templates',
+          Path: '/admin/work-plan/templates',
+          Icon: 'CopyDocument',
+          Type: 'menu'
+        }
+      ]
+    },
+    {
+      ID: 7,
       Name: '设置',
       Code: 'settings',
       Path: '/admin/settings',

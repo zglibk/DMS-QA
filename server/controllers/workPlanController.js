@@ -501,12 +501,7 @@ const getPlanList = async (req, res) => {
                     d1.Name as ExecuteDepartmentName,
                     u3.Username as UpdatedByName,
                     u3.RealName as UpdatedByRealName,
-                    (
-                        SELECT STRING_AGG(u4.RealName, ', ') 
-                        FROM WorkPlanExecutors wpe 
-                        LEFT JOIN [User] u4 ON wpe.ExecutorID = u4.ID 
-                        WHERE wpe.PlanID = wp.ID AND wpe.Status = 'active'
-                    ) as ExecutorNames,
+                    (                        SELECT STUFF((                            SELECT ', ' + u4.RealName                            FROM WorkPlanExecutors wpe                             LEFT JOIN [User] u4 ON wpe.ExecutorID = u4.ID                             WHERE wpe.PlanID = wp.ID AND wpe.Status = 'active'                            FOR XML PATH('')                        ), 1, 2, '')                    ) as ExecutorNames,
                     ROW_NUMBER() OVER (ORDER BY wp.CreatedAt DESC) as RowNum
                 FROM WorkPlans wp
                 LEFT JOIN WorkTypes wt ON wp.WorkTypeID = wt.ID
@@ -2243,25 +2238,619 @@ module.exports = {
         }
     },
     
-    // 模板（占位符）
+    // =====================================================
+    // 计划模板相关控制器
+    // =====================================================
+    
+    /**
+     * 获取计划模板列表（支持分页、筛选、搜索）
+     * @param {Object} req - 请求对象
+     * @param {Object} res - 响应对象
+     */
     getTemplateList: async (req, res) => {
-        res.status(501).json({ success: false, message: '功能开发中' });
+        try {
+            const pool = await poolPromise;
+            const {
+                page = 1,
+                pageSize = 20,
+                category,
+                keyword,
+                departmentId
+            } = req.query;
+            
+            const offset = (page - 1) * pageSize;
+            
+            // 构建查询条件
+            let whereConditions = [];
+            const params = {};
+            
+            if (category) {
+                whereConditions.push('pt.Category = @category');
+                params.category = category;
+            }
+            
+            if (departmentId) {
+                whereConditions.push('pt.DepartmentID = @departmentId');
+                params.departmentId = parseInt(departmentId);
+            }
+            
+            if (keyword) {
+                whereConditions.push('(pt.TemplateName LIKE @keyword OR pt.Description LIKE @keyword)');
+                params.keyword = `%${keyword}%`;
+            }
+            
+            const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+            
+            // 查询总数
+            const countQuery = `
+                SELECT COUNT(*) as total
+                FROM PlanTemplates pt
+                LEFT JOIN [User] u ON pt.CreatedBy = u.ID
+                LEFT JOIN Department d ON pt.DepartmentID = d.ID
+                LEFT JOIN WorkTypes wt ON pt.WorkTypeID = wt.ID
+                ${whereClause}
+            `;
+            
+            // 查询数据（使用ROW_NUMBER兼容旧版本SQL Server）
+            const dataQuery = `
+                SELECT * FROM (
+                    SELECT 
+                        pt.*,
+                        u.RealName as CreatorName,
+                        d.Name as DepartmentName,
+                        wt.TypeName as WorkTypeName,
+                        ROW_NUMBER() OVER (ORDER BY pt.CreatedAt DESC) as RowNum
+                    FROM PlanTemplates pt
+                    LEFT JOIN [User] u ON pt.CreatedBy = u.ID
+                    LEFT JOIN Department d ON pt.DepartmentID = d.ID
+                    LEFT JOIN WorkTypes wt ON pt.WorkTypeID = wt.ID
+                    ${whereClause}
+                ) AS NumberedResults
+                WHERE RowNum BETWEEN @startRow AND @endRow
+            `;
+            
+            let countRequest = pool.request();
+            let dataRequest = pool.request();
+            
+            // 添加参数
+            Object.keys(params).forEach(key => {
+                const value = params[key];
+                const sqlType = typeof value === 'number' ? sql.Int : sql.NVarChar;
+                countRequest.input(key, sqlType, value);
+                dataRequest.input(key, sqlType, value);
+            });
+            
+            const startRow = offset + 1;
+            const endRow = offset + parseInt(pageSize);
+            dataRequest.input('startRow', sql.Int, startRow);
+            dataRequest.input('endRow', sql.Int, endRow);
+            
+            const [countResult, dataResult] = await Promise.all([
+                countRequest.query(countQuery),
+                dataRequest.query(dataQuery)
+            ]);
+            
+            const total = countResult.recordset[0].total;
+            const templates = dataResult.recordset.map(template => ({
+                id: template.ID,
+                templateName: template.TemplateName,
+                category: template.Category,
+                description: template.Description,
+                templateData: template.TemplateData ? JSON.parse(template.TemplateData) : null,
+                estimatedDays: template.EstimatedDays,
+                estimatedHours: template.EstimatedHours,
+                departmentId: template.DepartmentID,
+                workTypeId: template.WorkTypeID,
+                priority: template.Priority,
+                isPublic: template.IsPublic,
+                usageCount: template.UsageCount,
+                createdBy: template.CreatorName || template.CreatedBy,
+                createdAt: template.CreatedAt,
+                updatedAt: template.UpdatedAt,
+                departmentName: template.DepartmentName,
+                workTypeName: template.WorkTypeName,
+                phases: template.TemplateData ? JSON.parse(template.TemplateData).phases || [] : []
+            }));
+            
+            res.json({
+                success: true,
+                data: {
+                    templates,
+                    pagination: {
+                        current: parseInt(page),
+                        pageSize: parseInt(pageSize),
+                        total,
+                        pages: Math.ceil(total / pageSize)
+                    }
+                }
+            });
+            
+        } catch (error) {
+            console.error('获取模板列表失败:', error);
+            res.status(500).json({
+                success: false,
+                message: '获取模板列表失败',
+                error: error.message
+            });
+        }
     },
+    
+    /**
+     * 获取单个计划模板详情
+     * @param {Object} req - 请求对象
+     * @param {Object} res - 响应对象
+     */
     getTemplateById: async (req, res) => {
-        res.status(501).json({ success: false, message: '功能开发中' });
+        try {
+            const pool = await poolPromise;
+            const { id } = req.params;
+            
+            const query = `
+                SELECT 
+                    pt.*,
+                    u.RealName as CreatorName,
+                    d.Name as DepartmentName,
+                    wt.TypeName as WorkTypeName
+                FROM PlanTemplates pt
+                LEFT JOIN [User] u ON pt.CreatedBy = u.ID
+                LEFT JOIN Department d ON pt.DepartmentID = d.ID
+                LEFT JOIN WorkTypes wt ON pt.WorkTypeID = wt.ID
+                WHERE pt.ID = @id
+            `;
+            
+            const result = await pool.request()
+                .input('id', sql.Int, id)
+                .query(query);
+            
+            if (result.recordset.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: '模板不存在'
+                });
+            }
+            
+            const template = result.recordset[0];
+            template.TemplateData = template.TemplateData ? JSON.parse(template.TemplateData) : null;
+            
+            res.json({
+                success: true,
+                data: template
+            });
+            
+        } catch (error) {
+            console.error('获取模板详情失败:', error);
+            res.status(500).json({
+                success: false,
+                message: '获取模板详情失败',
+                error: error.message
+            });
+        }
     },
+    
+    /**
+     * 创建计划模板
+     * @param {Object} req - 请求对象
+     * @param {Object} res - 响应对象
+     */
     createTemplate: async (req, res) => {
-        res.status(501).json({ success: false, message: '功能开发中' });
+        try {
+            console.log('创建模板请求数据:', req.body);
+            const pool = await poolPromise;
+            const {
+                TemplateName,
+                Description,
+                Category,
+                WorkTypeID,
+                Priority,
+                EstimatedHours,
+                // 支持两种字段名格式
+                departmentID,
+                departmentId,
+                templateName,
+                category,
+                description,
+                estimatedHours,
+                isPublic
+            } = req.body;
+            
+            // 兼容不同的字段名格式
+            const finalTemplateName = TemplateName || templateName;
+            const finalCategory = Category || category;
+            const finalDescription = Description || description;
+            const finalEstimatedHours = EstimatedHours || estimatedHours || 8;
+            const finalDepartmentId = departmentID || departmentId;
+            const finalIsPublic = isPublic !== undefined ? isPublic : true;
+            
+            const userId = req.user?.id || 1; // 获取当前用户ID
+            
+            // 验证必填字段
+            if (!TemplateName) {
+                return res.status(400).json({
+                    success: false,
+                    message: '模板名称不能为空'
+                });
+            }
+            
+            // 构建优化的模板数据结构
+            const templateData = {
+                workType: {
+                    id: WorkTypeID,
+                    priority: Priority
+                },
+                estimation: {
+                    hours: EstimatedHours || 8
+                },
+                metadata: {
+                    version: '1.0',
+                    createdAt: new Date().toISOString()
+                }
+            };
+            
+            const query = `
+                INSERT INTO PlanTemplates (
+                    TemplateName, Category, Description, TemplateData, 
+                    EstimatedHours, DepartmentID, WorkTypeID, Priority, IsPublic, CreatedBy, 
+                    CreatedAt, UpdatedAt
+                )
+                VALUES (
+                    @templateName, @category, @description, @templateData,
+                    @estimatedHours, @departmentId, @workTypeId, @priority, @isPublic, @createdBy,
+                    GETDATE(), GETDATE()
+                );
+                SELECT SCOPE_IDENTITY() as templateId;
+            `;
+            
+            const result = await pool.request()
+                .input('templateName', sql.NVarChar, finalTemplateName)
+                .input('category', sql.NVarChar, finalCategory || '')
+                .input('description', sql.NVarChar, finalDescription || '')
+                .input('templateData', sql.NVarChar, JSON.stringify(templateData))
+                .input('estimatedHours', sql.Decimal, finalEstimatedHours)
+                .input('departmentId', sql.Int, finalDepartmentId || null)
+                .input('workTypeId', sql.Int, WorkTypeID || null)
+                .input('priority', sql.NVarChar, Priority || 'medium')
+                .input('isPublic', sql.Bit, finalIsPublic)
+                .input('createdBy', sql.Int, userId)
+                .query(query);
+            
+            const templateId = result.recordset[0].templateId;
+            
+            res.json({
+                success: true,
+                message: '模板创建成功',
+                data: { templateId }
+            });
+            
+        } catch (error) {
+            console.error('创建模板失败:', error);
+            res.status(500).json({
+                success: false,
+                message: '创建模板失败',
+                error: error.message
+            });
+        }
     },
+    
+    /**
+     * 更新计划模板
+     * @param {Object} req - 请求对象
+     * @param {Object} res - 响应对象
+     */
     updateTemplate: async (req, res) => {
-        res.status(501).json({ success: false, message: '功能开发中' });
+        try {
+            const pool = await poolPromise;
+            const { id } = req.params;
+            
+            // 首先检查并添加缺失的字段
+            await ensureTemplateFields(pool);
+            
+            const {
+                TemplateName,
+                Category,
+                Description,
+                WorkTypeID,
+                Priority,
+                EstimatedHours,
+                // 兼容旧的字段名
+                templateName,
+                category,
+                description,
+                templateData,
+                estimatedDays,
+                estimatedHours,
+                departmentId
+            } = req.body;
+            
+            console.log('更新模板请求数据:', req.body);
+            
+            // 检查模板是否存在
+            const checkQuery = `
+                SELECT ID FROM PlanTemplates 
+                WHERE ID = @id
+            `;
+            
+            const checkResult = await pool.request()
+                .input('id', sql.Int, id)
+                .query(checkQuery);
+            
+            if (checkResult.recordset.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: '模板不存在'
+                });
+            }
+            
+            // 构建更新字段
+            const updateFields = [];
+            const params = { id: parseInt(id) };
+            
+            // 使用前端发送的字段名（大写开头）或兼容旧的字段名（小写开头）
+            const finalTemplateName = TemplateName !== undefined ? TemplateName : templateName;
+            const finalCategory = Category !== undefined ? Category : category;
+            const finalDescription = Description !== undefined ? Description : description;
+            const finalEstimatedHours = EstimatedHours !== undefined ? EstimatedHours : estimatedHours;
+            
+            if (finalTemplateName !== undefined) {
+                updateFields.push('TemplateName = @templateName');
+                params.templateName = finalTemplateName;
+            }
+            
+            if (finalCategory !== undefined) {
+                updateFields.push('Category = @category');
+                params.category = finalCategory;
+            }
+            
+            if (finalDescription !== undefined) {
+                updateFields.push('Description = @description');
+                params.description = finalDescription;
+            }
+            
+            if (WorkTypeID !== undefined) {
+                updateFields.push('WorkTypeID = @workTypeId');
+                params.workTypeId = WorkTypeID;
+            }
+            
+            // 处理优先级字段（前端发送的是priority，数据库字段是Priority）
+            if (Priority !== undefined || req.body.priority !== undefined) {
+                updateFields.push('Priority = @priority');
+                params.priority = Priority !== undefined ? Priority : req.body.priority;
+            }
+            
+            // 处理公开设置字段（前端发送的是isPublic，数据库字段是IsPublic）
+            if (req.body.isPublic !== undefined) {
+                updateFields.push('IsPublic = @isPublic');
+                params.isPublic = req.body.isPublic;
+            }
+            
+            if (finalEstimatedHours !== undefined) {
+                updateFields.push('EstimatedHours = @estimatedHours');
+                params.estimatedHours = finalEstimatedHours;
+            }
+            
+            // 处理模板数据和阶段信息
+            if (templateData !== undefined) {
+                updateFields.push('TemplateData = @templateData');
+                // 确保templateData是对象格式，如果是字符串则解析
+                let parsedTemplateData;
+                if (typeof templateData === 'string') {
+                    try {
+                        parsedTemplateData = JSON.parse(templateData);
+                    } catch (e) {
+                        parsedTemplateData = { phases: [] };
+                    }
+                } else {
+                    parsedTemplateData = templateData;
+                }
+                params.templateData = JSON.stringify(parsedTemplateData);
+            }
+            
+            if (estimatedDays !== undefined) {
+                updateFields.push('EstimatedDays = @estimatedDays');
+                params.estimatedDays = estimatedDays;
+            }
+            
+            // 处理部门ID字段（支持两种字段名格式：departmentId 和 departmentID）
+            const finalDepartmentId = req.body.departmentID !== undefined ? req.body.departmentID : departmentId;
+            if (finalDepartmentId !== undefined) {
+                updateFields.push('DepartmentID = @departmentId');
+                params.departmentId = finalDepartmentId;
+            }
+            
+            if (updateFields.length === 0) {
+                return res.status(400).json({
+                    success: false,
+                    message: '没有提供要更新的字段'
+                });
+            }
+            
+            updateFields.push('UpdatedAt = GETDATE()');
+            
+            const updateQuery = `
+                UPDATE PlanTemplates 
+                SET ${updateFields.join(', ')}
+                WHERE ID = @id
+            `;
+            
+            let request = pool.request();
+            Object.keys(params).forEach(key => {
+                const value = params[key];
+                let sqlType;
+                
+                if (typeof value === 'number') {
+                    sqlType = Number.isInteger(value) ? sql.Int : sql.Decimal;
+                } else if (typeof value === 'boolean' || key === 'isPublic') {
+                    // 处理布尔值，特别是isPublic字段
+                    sqlType = sql.Bit;
+                } else {
+                    sqlType = sql.NVarChar;
+                }
+                
+                request.input(key, sqlType, value);
+            });
+            
+            await request.query(updateQuery);
+            
+            res.json({
+                success: true,
+                message: '模板更新成功'
+            });
+            
+        } catch (error) {
+            console.error('更新模板失败:', error);
+            res.status(500).json({
+                success: false,
+                message: '更新模板失败',
+                error: error.message
+            });
+        }
     },
+    
+    /**
+     * 删除计划模板
+     * @param {Object} req - 请求对象
+     * @param {Object} res - 响应对象
+     */
     deleteTemplate: async (req, res) => {
-        res.status(501).json({ success: false, message: '功能开发中' });
+        try {
+            const pool = await poolPromise;
+            const { id } = req.params;
+            
+            // 检查模板是否存在
+            const checkQuery = `
+                SELECT ID FROM PlanTemplates 
+                WHERE ID = @id
+            `;
+            
+            const checkResult = await pool.request()
+                .input('id', sql.Int, id)
+                .query(checkQuery);
+            
+            if (checkResult.recordset.length === 0) {
+                return res.status(404).json({
+                    success: false,
+                    message: '模板不存在'
+                });
+            }
+            
+            const deleteQuery = `
+                DELETE FROM PlanTemplates 
+                WHERE ID = @id
+            `;
+            
+            await pool.request()
+                .input('id', sql.Int, id)
+                .query(deleteQuery);
+            
+            res.json({
+                success: true,
+                message: '模板删除成功'
+            });
+            
+        } catch (error) {
+            console.error('删除模板失败:', error);
+            res.status(500).json({
+                success: false,
+                message: '删除模板失败',
+                error: error.message
+            });
+        }
     },
-    createPlanFromTemplate: async (req, res) => {
-        res.status(501).json({ success: false, message: '功能开发中' });
+    
+    /**
+     * 批量删除模板
+     * @param {Object} req - 请求对象
+     * @param {Object} res - 响应对象
+     */
+    batchDeleteTemplates: async (req, res) => {
+        console.log('=== 批量删除模板请求开始 ===');
+        console.log('请求体:', req.body);
+        
+        try {
+            const { templateIds } = req.body;
+            
+            // 参数验证
+            if (!templateIds || !Array.isArray(templateIds) || templateIds.length === 0) {
+                console.log('参数验证失败: templateIds无效');
+                return res.status(400).json({
+                    success: false,
+                    message: '请提供要删除的模板ID列表'
+                });
+            }
+            
+            console.log('要删除的模板ID:', templateIds);
+            
+            // 验证所有ID都是有效的数字
+            const validIds = templateIds.filter(id => Number.isInteger(Number(id)) && Number(id) > 0);
+            if (validIds.length !== templateIds.length) {
+                console.log('ID验证失败: 包含无效的ID');
+                return res.status(400).json({
+                    success: false,
+                    message: '模板ID必须是有效的正整数'
+                });
+            }
+            
+            console.log('获取数据库连接...');
+            const pool = await poolPromise;
+            console.log('数据库连接成功');
+            
+            // 构建删除查询
+            const placeholders = templateIds.map((_, index) => `@templateId${index}`).join(',');
+            const deleteQuery = `
+                DELETE FROM PlanTemplates 
+                WHERE ID IN (${placeholders})
+            `;
+            
+            console.log('执行删除查询:', deleteQuery);
+            console.log('参数:', templateIds);
+            
+            const request = pool.request();
+            templateIds.forEach((id, index) => {
+                request.input(`templateId${index}`, sql.Int, parseInt(id));
+            });
+            
+            const result = await request.query(deleteQuery);
+            console.log('删除结果:', result);
+            
+            const deletedCount = result.rowsAffected && result.rowsAffected[0] ? result.rowsAffected[0] : 0;
+            console.log('实际删除数量:', deletedCount);
+            
+            if (deletedCount === 0) {
+                console.log('警告: 没有删除任何记录');
+                return res.json({
+                    success: false,
+                    message: '没有找到要删除的模板，可能已被删除'
+                });
+            }
+            
+            console.log('=== 批量删除模板成功 ===');
+            res.json({
+                success: true,
+                message: `成功删除 ${deletedCount} 个模板`,
+                deletedCount: deletedCount
+            });
+            
+        } catch (error) {
+            console.error('=== 批量删除模板失败 ===');
+            console.error('错误详情:', error);
+            console.error('错误堆栈:', error.stack);
+            
+            let errorMessage = '批量删除模板失败';
+            if (error.code === 'ETIMEOUT') {
+                errorMessage = '数据库连接超时，请稍后重试';
+            } else if (error.code === 'ECONNRESET') {
+                errorMessage = '数据库连接中断，请稍后重试';
+            } else if (error.message) {
+                errorMessage = `删除失败: ${error.message}`;
+            }
+            
+            res.status(500).json({
+                success: false,
+                message: errorMessage,
+                error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
     },
+
     
     // 提醒（占位符）
     getReminderList: async (req, res) => {
@@ -3174,7 +3763,10 @@ module.exports = {
                 error: error.message
             });
         }
-    }
+    },
+
+    // 辅助函数
+    ensureTemplateFields
 };
 
 /**
@@ -3199,4 +3791,43 @@ function buildDepartmentTree(departments, parentId = null) {
     }
     
     return tree;
+}
+
+/**
+ * 确保PlanTemplates表包含所需的字段
+ * @param {Object} pool - 数据库连接池
+ */
+async function ensureTemplateFields(pool) {
+    try {
+        // 检查WorkTypeID字段是否存在
+        const checkWorkTypeID = await pool.request().query(`
+            SELECT COUNT(*) as count 
+            FROM sys.columns 
+            WHERE object_id = OBJECT_ID(N'[dbo].[PlanTemplates]') 
+            AND name = 'WorkTypeID'
+        `);
+
+        if (checkWorkTypeID.recordset[0].count === 0) {
+            console.log('添加WorkTypeID字段...');
+            await pool.request().query('ALTER TABLE [dbo].[PlanTemplates] ADD [WorkTypeID] INT NULL');
+            console.log('✅ WorkTypeID字段添加成功');
+        }
+
+        // 检查Priority字段是否存在
+        const checkPriority = await pool.request().query(`
+            SELECT COUNT(*) as count 
+            FROM sys.columns 
+            WHERE object_id = OBJECT_ID(N'[dbo].[PlanTemplates]') 
+            AND name = 'Priority'
+        `);
+
+        if (checkPriority.recordset[0].count === 0) {
+            console.log('添加Priority字段...');
+            await pool.request().query("ALTER TABLE [dbo].[PlanTemplates] ADD [Priority] NVARCHAR(20) NOT NULL DEFAULT 'medium'");
+            console.log('✅ Priority字段添加成功');
+        }
+    } catch (error) {
+        console.error('检查/添加字段失败:', error);
+        // 不抛出错误，让主流程继续
+    }
 }

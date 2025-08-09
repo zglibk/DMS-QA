@@ -313,6 +313,16 @@ router.put('/templates/:id',
 );
 
 /**
+ * 批量删除计划模板
+ * DELETE /api/work-plan/templates/batch
+ */
+router.delete('/templates/batch', 
+    authenticateToken, 
+    checkPermission('work-plan:template:delete'),
+    workPlanController.batchDeleteTemplates
+);
+
+/**
  * 删除计划模板
  * DELETE /api/work-plan/templates/:id
  */
@@ -322,15 +332,7 @@ router.delete('/templates/:id',
     workPlanController.deleteTemplate
 );
 
-/**
- * 基于模板创建计划
- * POST /api/work-plan/templates/:id/create-plan
- */
-router.post('/templates/:id/create-plan', 
-    authenticateToken, 
-    checkPermission('work-plan:plan:add'),
-    workPlanController.createPlanFromTemplate
-);
+
 
 // =====================================================
 // 工作提醒相关路由
