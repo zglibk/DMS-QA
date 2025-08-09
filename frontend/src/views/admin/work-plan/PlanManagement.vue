@@ -103,7 +103,7 @@
             <template #default="{ row }">
               <div class="plan-title-cell">
                 <div class="plan-title" @click="viewPlanDetail(row.ID)">{{ row.Title }}</div>
-                <div class="plan-type">{{ getWorkTypeName(row.WorkTypeID) }}</div>
+                <!-- <div class="plan-type">{{ getWorkTypeName(row.WorkTypeID) }}</div> -->
               </div>
             </template>
           </el-table-column>
