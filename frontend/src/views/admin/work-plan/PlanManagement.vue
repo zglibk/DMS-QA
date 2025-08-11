@@ -309,28 +309,7 @@
           />
         </el-form-item>
         
-        <!-- 阶段信息展示（仅在从模板创建时显示） -->
-        <el-form-item v-if="planForm.phases && planForm.phases.length > 0" label="阶段信息">
-          <div class="phases-display">
-            <div v-for="(phase, index) in planForm.phases" :key="index" class="phase-item">
-              <div class="phase-header">
-                <span class="phase-name">{{ phase.name }}</span>
-                <el-tag size="small" type="info">{{ phase.estimatedDays || phase.days || 1 }}天</el-tag>
-              </div>
-              <div v-if="phase.description" class="phase-description">
-                {{ phase.description }}
-              </div>
-            </div>
-          </div>
-          <el-alert
-            title="提示"
-            description="这些阶段信息将在创建计划后自动转换为里程碑进行管理。"
-            type="info"
-            show-icon
-            :closable="false"
-            style="margin-top: 10px;"
-          />
-        </el-form-item>
+        <!-- 阶段信息展示已隐藏，只保留数据加载到阶段配置中 -->
         
         <!-- 阶段配置 -->
         <el-form-item label="阶段配置">
@@ -872,36 +851,61 @@ const loadTemplateData = async (templateId) => {
     const response = await api.get(`/work-plan/templates/${templateId}`)
     const template = response.data.data
     
+    console.log('原始模板数据:', template)
+    
     // 解析模板数据中的阶段信息
     let phases = []
-    if (template.TemplateData && template.TemplateData.phases) {
+    let milestones = []
+    
+    // 优先使用直接的phases字段，如果没有则尝试从TemplateData中获取
+    if (template.phases && template.phases.length > 0) {
+      phases = template.phases
+    } else if (template.TemplateData && template.TemplateData.phases) {
       phases = template.TemplateData.phases
+    } else if (template.templateData && template.templateData.phases) {
+      phases = template.templateData.phases
     }
     
+    // 将phases数据转换为milestones格式，供阶段配置表单使用
+    if (phases.length > 0) {
+      milestones = phases.map(phase => ({
+        name: phase.name || '',
+        description: phase.description || '',
+        estimatedDays: phase.estimatedDays || phase.days || 1
+      }))
+    }
+    
+    console.log('解析的phases:', phases)
+    console.log('转换的milestones:', milestones)
+    
     // 根据模板的分类（category）找到对应的工作类型ID
-    let workTypeID = template.WorkTypeID || ''
-    if (!workTypeID && template.Category) {
+    let workTypeID = template.WorkTypeID || template.workTypeID || ''
+    if (!workTypeID && (template.Category || template.category)) {
       // 如果没有WorkTypeID但有Category，则根据Category名称查找对应的工作类型ID
-      const matchedWorkType = workTypes.value.find(type => type.TypeName === template.Category)
+      const categoryName = template.Category || template.category
+      const matchedWorkType = workTypes.value.find(type => type.TypeName === categoryName)
       if (matchedWorkType) {
         workTypeID = matchedWorkType.ID
       }
     }
     
-    // 填充表单数据
+    // 填充表单数据，支持多种字段名格式
     Object.assign(planForm, {
       ID: null, // 新建计划，ID为null
-      Title: template.TemplateName || '',
-      Description: template.Description || '',
+      Title: template.TemplateName || template.templateName || template.name || '',
+      Description: template.Description || template.description || '',
       WorkTypeID: workTypeID,
-      Priority: template.Priority || 'medium',
+      Priority: template.Priority || template.priority || 'medium',
       AssigneeID: '', // 需要用户选择
-      DepartmentID: template.DepartmentID || '',
+      DepartmentID: template.DepartmentID || template.departmentID || template.departmentId || '',
       ExecutorIDs: [], // 需要用户选择
       StartDate: '', // 需要用户选择
       EndDate: '', // 需要用户选择
-      phases: phases // 加载模板的阶段信息
+      phases: phases, // 加载模板的阶段信息（已隐藏展示）
+      milestones: milestones // 加载模板的阶段信息（用于编辑）
     })
+    
+    console.log('填充后的表单数据:', planForm)
     
     // 显示新建对话框
     isEdit.value = false

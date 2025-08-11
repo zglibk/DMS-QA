@@ -28,143 +28,182 @@
       </div>
     </div>
 
-    <!-- 计划基本信息 -->
-    <el-card class="plan-info-card" v-loading="loading">
+    <!-- 计划详情管理 -->
+    <el-card class="plan-detail-card" v-loading="loading">
       <template #header>
         <div class="card-header">
-          <span>基本信息</span>
+          <span>计划详情管理</span>
           <el-tag :type="getStatusType(planDetail.Status)">{{ getStatusText(planDetail.Status) }}</el-tag>
         </div>
       </template>
       
-      <el-descriptions :column="2" border>
-        <el-descriptions-item label="计划标题">{{ planDetail.Title }}</el-descriptions-item>
-        <el-descriptions-item label="工作类型">{{ planDetail.WorkTypeName }}</el-descriptions-item>
-        <el-descriptions-item label="优先级">
-          <el-tag :type="getPriorityType(planDetail.Priority)">{{ getPriorityText(planDetail.Priority) }}</el-tag>
-        </el-descriptions-item>
-        <el-descriptions-item label="负责人">{{ planDetail.AssigneeName }}</el-descriptions-item>
-        <el-descriptions-item label="所属部门">{{ planDetail.DepartmentName }}</el-descriptions-item>
-        <el-descriptions-item label="进度">{{ planDetail.Progress }}%</el-descriptions-item>
-        <el-descriptions-item label="开始日期">{{ formatDate(planDetail.StartDate) }}</el-descriptions-item>
-        <el-descriptions-item label="结束日期">{{ formatDate(planDetail.EndDate) }}</el-descriptions-item>
-        <el-descriptions-item label="创建时间">{{ formatDateTime(planDetail.CreatedAt) }}</el-descriptions-item>
-        <el-descriptions-item label="更新时间">{{ formatDateTime(planDetail.UpdatedAt) }}</el-descriptions-item>
-        <el-descriptions-item label="描述" :span="2">
-          <div class="description-content">{{ planDetail.Description || '暂无描述' }}</div>
-        </el-descriptions-item>
-      </el-descriptions>
-    </el-card>
-
-    <!-- 里程碑信息 -->
-    <el-card class="milestones-card">
-      <template #header>
-        <div class="card-header">
-          <span>里程碑 ({{ milestones.length }})</span>
-          <el-button 
-            v-if="canAddMilestone" 
-            type="primary" 
-            size="small"
-            @click="showAddMilestoneDialog"
-          >
-            <el-icon><Plus /></el-icon>
-            添加里程碑
-          </el-button>
-        </div>
-      </template>
-      
-      <div v-if="milestones.length === 0" class="empty-milestones">
-        <el-empty description="暂无里程碑" />
-      </div>
-      <div v-else class="milestone-timeline">
-        <div
-          v-for="(milestone, index) in milestones"
-          :key="milestone.ID"
-          class="milestone-item"
-          :class="{ completed: milestone.IsCompleted }"
-        >
-          <div class="milestone-marker">
-            <div class="marker-dot" :class="{ completed: milestone.IsCompleted }">
-              <el-icon v-if="milestone.IsCompleted"><Check /></el-icon>
-            </div>
-            <div v-if="index < milestones.length - 1" class="marker-line"></div>
-          </div>
-          <div class="milestone-content">
-            <div class="milestone-title">{{ milestone.Title }}</div>
-            <div class="milestone-date">{{ formatDate(milestone.TargetDate) }}</div>
-            <div v-if="milestone.Description" class="milestone-desc">{{ milestone.Description }}</div>
-            <div class="milestone-actions">
-              <el-button
-                v-if="!milestone.IsCompleted"
-                type="success"
+      <!-- 标签页切换 -->
+      <el-tabs v-model="activeTab" class="plan-detail-tabs">
+        <!-- 基本信息标签页 -->
+        <el-tab-pane label="基本信息" name="basic">
+          <template #label>
+            <span class="tab-label">
+              <el-icon><Document /></el-icon>
+              基本信息
+            </span>
+          </template>
+          
+          <div class="tab-content">
+            <div class="tab-header">
+              <el-button 
+                v-if="canEditPlan" 
+                type="primary" 
                 size="small"
-                :disabled="!canEditProgress"
-                @click="completeMilestone(milestone)"
+                @click="editPlan"
               >
-                完成
+                <el-icon><Edit /></el-icon>
+                编辑计划
               </el-button>
+            </div>
+            
+            <el-descriptions :column="2" border>
+              <el-descriptions-item label="计划标题">{{ planDetail.Title }}</el-descriptions-item>
+              <el-descriptions-item label="工作类型">{{ planDetail.WorkTypeName }}</el-descriptions-item>
+              <el-descriptions-item label="优先级">
+                <el-tag :type="getPriorityType(planDetail.Priority)">{{ getPriorityText(planDetail.Priority) }}</el-tag>
+              </el-descriptions-item>
+              <el-descriptions-item label="负责人">{{ planDetail.AssigneeName }}</el-descriptions-item>
+              <el-descriptions-item label="所属部门">{{ planDetail.DepartmentName }}</el-descriptions-item>
+              <el-descriptions-item label="进度">{{ planDetail.Progress }}%</el-descriptions-item>
+              <el-descriptions-item label="开始日期">{{ formatDate(planDetail.StartDate) }}</el-descriptions-item>
+              <el-descriptions-item label="结束日期">{{ formatDate(planDetail.EndDate) }}</el-descriptions-item>
+              <el-descriptions-item label="创建时间">{{ formatDateTime(planDetail.CreatedAt) }}</el-descriptions-item>
+              <el-descriptions-item label="更新时间">{{ formatDateTime(planDetail.UpdatedAt) }}</el-descriptions-item>
+              <el-descriptions-item label="描述" :span="2">
+                <div class="description-content">{{ planDetail.Description || '暂无描述' }}</div>
+              </el-descriptions-item>
+            </el-descriptions>
+          </div>
+        </el-tab-pane>
+        
+        <!-- 里程碑标签页 -->
+        <el-tab-pane label="里程碑" name="milestones">
+          <template #label>
+            <span class="tab-label">
+              <el-icon><Flag /></el-icon>
+              里程碑 ({{ milestones.length }})
+            </span>
+          </template>
+          
+          <div class="tab-content">
+            <div class="tab-header">
               <el-button 
-                type="warning" 
-                size="small" 
-                :disabled="!canEditMilestone"
-                @click="editMilestone(milestone)"
+                v-if="canAddMilestone" 
+                type="primary" 
+                size="small"
+                @click="showAddMilestoneDialog"
               >
-                编辑
+                <el-icon><Plus /></el-icon>
+                添加里程碑
               </el-button>
-              <el-button 
-                type="danger" 
-                size="small" 
-                :disabled="!canDeleteMilestone"
-                @click="deleteMilestone(milestone)"
+            </div>
+            
+            <div v-if="milestones.length === 0" class="empty-milestones">
+              <el-empty description="暂无里程碑" />
+            </div>
+            <div v-else class="milestone-timeline">
+              <div
+                v-for="(milestone, index) in milestones"
+                :key="milestone.ID"
+                class="milestone-item"
+                :class="{ completed: milestone.IsCompleted }"
               >
-                删除
-              </el-button>
+                <div class="milestone-marker">
+                  <div class="marker-dot" :class="{ completed: milestone.IsCompleted }">
+                    <el-icon v-if="milestone.IsCompleted"><Check /></el-icon>
+                  </div>
+                  <div v-if="index < milestones.length - 1" class="marker-line"></div>
+                </div>
+                <div class="milestone-content">
+                  <div class="milestone-title">{{ milestone.Title }}</div>
+                  <div class="milestone-date">{{ formatDate(milestone.TargetDate) }}</div>
+                  <div v-if="milestone.Description" class="milestone-desc">{{ milestone.Description }}</div>
+                  <div class="milestone-actions">
+                    <el-button
+                      v-if="!milestone.IsCompleted"
+                      type="success"
+                      size="small"
+                      :disabled="!canEditProgress"
+                      @click="completeMilestone(milestone)"
+                    >
+                      完成
+                    </el-button>
+                    <el-button 
+                      type="warning" 
+                      size="small" 
+                      :disabled="!canEditMilestone"
+                      @click="editMilestone(milestone)"
+                    >
+                      编辑
+                    </el-button>
+                    <el-button 
+                      type="danger" 
+                      size="small" 
+                      :disabled="!canDeleteMilestone"
+                      @click="deleteMilestone(milestone)"
+                    >
+                      删除
+                    </el-button>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-        </div>
-      </div>
-    </el-card>
-
-    <!-- 进度历史 -->
-    <el-card class="history-card">
-      <template #header>
-        <div class="card-header">
-          <span>进度历史</span>
-          <el-button 
-            v-if="canEditProgress" 
-            type="primary" 
-            size="small"
-            @click="showUpdateProgressDialog"
-          >
-            <el-icon><Edit /></el-icon>
-            更新进度
-          </el-button>
-        </div>
-      </template>
-      
-      <div v-if="progressHistory.length === 0" class="empty-history">
-        <el-empty description="暂无进度记录" />
-      </div>
-      <el-timeline v-else>
-        <el-timeline-item
-          v-for="history in progressHistory"
-          :key="history.ID"
-          :timestamp="formatDateTime(history.UpdatedAt)"
-          placement="top"
-        >
-          <div class="history-item">
-            <div class="history-progress">
-              进度更新至 <strong>{{ history.Progress }}%</strong>
+        </el-tab-pane>
+        
+        <!-- 进度历史标签页 -->
+        <el-tab-pane label="进度历史" name="progress">
+          <template #label>
+            <span class="tab-label">
+              <el-icon><TrendCharts /></el-icon>
+              进度历史
+            </span>
+          </template>
+          
+          <div class="tab-content">
+            <div class="tab-header">
+              <el-button 
+                v-if="canEditProgress" 
+                type="primary" 
+                size="small"
+                @click="showUpdateProgressDialog"
+              >
+                <el-icon><Edit /></el-icon>
+                更新进度
+              </el-button>
             </div>
-            <div v-if="history.Description" class="history-description">
-              {{ history.Description }}
+            
+            <div v-if="progressHistory.length === 0" class="empty-history">
+              <el-empty description="暂无进度记录" />
             </div>
-            <div class="history-operator">
-              操作人：{{ history.OperatorName }}
-            </div>
+            <el-timeline v-else>
+              <el-timeline-item
+                v-for="history in progressHistory"
+                :key="history.ID"
+                :timestamp="formatDateTime(history.UpdatedAt)"
+                placement="top"
+              >
+                <div class="history-item">
+                  <div class="history-progress">
+                    进度更新至 <strong>{{ history.Progress }}%</strong>
+                  </div>
+                  <div v-if="history.Description" class="history-description">
+                    {{ history.Description }}
+                  </div>
+                  <div class="history-operator">
+                    操作人：{{ history.OperatorName }}
+                  </div>
+                </div>
+              </el-timeline-item>
+            </el-timeline>
           </div>
-        </el-timeline-item>
-      </el-timeline>
+        </el-tab-pane>
+      </el-tabs>
     </el-card>
 
     <!-- 添加/编辑里程碑对话框 -->
@@ -283,7 +322,9 @@ import {
   Document, 
   Edit, 
   Plus, 
-  Check 
+  Check,
+  Flag,
+  TrendCharts
 } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import { useUserStore } from '@/store/user'
@@ -297,6 +338,7 @@ const loading = ref(false)
 const planDetail = ref({})
 const milestones = ref([])
 const progressHistory = ref([])
+const activeTab = ref('basic') // 默认显示基本信息标签页
 
 // 对话框状态
 const milestoneFormDialogVisible = ref(false)
@@ -780,10 +822,32 @@ onMounted(() => {
 }
 
 /* 卡片样式 */
-.plan-info-card,
-.milestones-card,
-.history-card {
+.plan-detail-card {
   margin-bottom: 20px;
+}
+
+/* 标签页样式 */
+.plan-detail-tabs {
+  margin-top: 16px;
+}
+
+.tab-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.tab-content {
+  padding: 20px 0;
+}
+
+.tab-header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
 }
 
 .card-header {

@@ -503,7 +503,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Document,
@@ -574,7 +574,19 @@ const templateForm = reactive({
 
 // 表单验证规则
 const templateFormRules = {
-  templateName: [{ required: true, message: '请输入模板名称', trigger: 'blur' }],
+  templateName: [
+    { required: true, message: '请输入模板名称', trigger: ['blur', 'change'] },
+    { 
+      validator: (rule, value, callback) => {
+        if (!value || value.trim() === '') {
+          callback(new Error('模板名称不能为空'))
+        } else {
+          callback()
+        }
+      }, 
+      trigger: ['blur', 'change'] 
+    }
+  ],
   category: [{ required: true, message: '请选择分类', trigger: 'change' }],
   estimatedDays: [{ required: true, message: '请输入预计工期', trigger: 'blur' }],
   estimatedHours: [{ required: true, message: '请输入预计工时', trigger: 'blur' }]
@@ -686,10 +698,14 @@ const resetSearch = () => {
 const showCreateDialog = async () => {
   isEdit.value = false
   resetTemplateForm()
+  
   // 确保部门数据已加载
   if (departments.value.length === 0) {
     await getDepartments()
   }
+  
+  // 使用nextTick确保表单重置完成后再显示对话框
+  await nextTick()
   dialogVisible.value = true
 }
 
@@ -703,24 +719,43 @@ const editTemplate = async (template) => {
     return
   }
   
-  isEdit.value = true
-  Object.assign(templateForm, {
-    ...template,
-    // 修复部门ID字段映射问题：后端返回 departmentId，前端使用 departmentID
-    departmentID: template.departmentId || template.departmentID,
-    phases: template.phases ? JSON.parse(JSON.stringify(template.phases)) : [
-      {
-        name: '需求分析',
-        description: '分析和确认项目需求',
-        estimatedDays: 2
-      }
-    ]
-  })
-  // 确保部门数据已加载
-  if (departments.value.length === 0) {
-    await getDepartments()
+  try {
+    // 获取模板的完整详情数据
+    const response = await api.get(`/work-plan/templates/${template.id}`)
+    if (!response.data.success) {
+      ElMessage.error(response.data.message || '获取模板详情失败')
+      return
+    }
+    
+    const templateDetail = response.data.data
+    
+    isEdit.value = true
+    Object.assign(templateForm, {
+      ...templateDetail,
+      // 修复部门ID字段映射问题：后端返回 departmentId，前端使用 departmentID
+      departmentID: templateDetail.departmentId || templateDetail.departmentID,
+      // 确保phases数据正确赋值
+      phases: templateDetail.phases && templateDetail.phases.length > 0 ? 
+        JSON.parse(JSON.stringify(templateDetail.phases)) : [
+          {
+            name: '需求分析',
+            description: '分析和确认项目需求',
+            estimatedDays: 2
+          }
+        ]
+    })
+    
+    // 确保部门数据已加载
+    if (departments.value.length === 0) {
+      await getDepartments()
+    }
+    
+    dialogVisible.value = true
+    
+  } catch (error) {
+    console.error('获取模板详情失败:', error)
+    ElMessage.error('获取模板详情失败，请重试')
   }
-  dialogVisible.value = true
 }
 
 /**
@@ -728,7 +763,29 @@ const editTemplate = async (template) => {
  */
 const saveTemplate = async () => {
   try {
-    await templateFormRef.value.validate()
+    // 检查表单引用是否存在
+    if (!templateFormRef.value) {
+      ElMessage.error('表单引用未找到，请重新打开对话框')
+      return
+    }
+    
+    // 调试信息：输出当前表单数据
+    console.log('当前表单数据:', templateForm)
+    console.log('模板名称值:', templateForm.templateName)
+    
+    // 执行表单验证
+    try {
+      const isValid = await templateFormRef.value.validate()
+      if (!isValid) {
+        ElMessage.warning('请检查表单填写是否完整')
+        return
+      }
+    } catch (error) {
+      console.error('表单验证失败:', error)
+      ElMessage.warning('请检查表单填写是否完整')
+      return
+    }
+    
     saving.value = true
     
     const filteredPhases = templateForm.phases.filter(phase => phase.name && phase.description)
@@ -942,7 +999,11 @@ const resetTemplateForm = () => {
       }
     ]
   })
-  templateFormRef.value?.clearValidate()
+  
+  // 使用nextTick确保DOM更新后再清空验证
+  nextTick(() => {
+    templateFormRef.value?.clearValidate()
+  })
 }
 
 /**

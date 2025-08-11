@@ -2494,11 +2494,36 @@ module.exports = {
             }
             
             const template = result.recordset[0];
-            template.TemplateData = template.TemplateData ? JSON.parse(template.TemplateData) : null;
+            
+            // 格式化返回数据，保持与getTemplateList一致的字段映射
+            const formattedTemplate = {
+                id: template.ID,
+                templateName: template.TemplateName,
+                category: template.Category,
+                description: template.Description,
+                templateData: template.TemplateData ? JSON.parse(template.TemplateData) : null,
+                estimatedDays: template.EstimatedDays,
+                estimatedHours: template.EstimatedHours,
+                departmentId: template.DepartmentID,
+                workTypeId: template.WorkTypeID,
+                priority: template.Priority,
+                status: template.Status,
+                isPublic: template.IsPublic,
+                usageCount: template.UsageCount,
+                createdBy: template.CreatedBy,
+                createdAt: template.CreatedAt,
+                updatedAt: template.UpdatedAt,
+                creatorName: template.CreatorName,
+                departmentName: template.DepartmentName,
+                workTypeName: template.WorkTypeName,
+                // 处理phases数据
+                phases: template.TemplateData ? 
+                    (JSON.parse(template.TemplateData).phases || []) : []
+            };
             
             res.json({
                 success: true,
-                data: template
+                data: formattedTemplate
             });
             
         } catch (error) {
@@ -2551,7 +2576,7 @@ module.exports = {
             const userId = req.user?.id || 1; // 获取当前用户ID
             
             // 验证必填字段
-            if (!TemplateName) {
+            if (!finalTemplateName) {
                 return res.status(400).json({
                     success: false,
                     message: '模板名称不能为空'
