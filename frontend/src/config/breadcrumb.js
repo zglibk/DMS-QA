@@ -366,10 +366,70 @@ export const breadcrumbConfig = {
     icon: 'Tools'
   },
 
-  // 结构组件
+  // 二次开发 - 结构组件
   '/admin/development/structure-components': {
     title: '结构组件',
     icon: 'Grid'
+  },
+
+  // 工作计划管理
+  '/admin/work-plan': {
+    title: '工作计划',
+    icon: 'Calendar'
+  },
+
+  // 工作台
+  '/admin/work-plan/dashboard': {
+    title: '工作台',
+    icon: 'Monitor'
+  },
+
+  // 计划管理
+  '/admin/work-plan/plans': {
+    title: '计划管理',
+    icon: 'FileText'
+  },
+
+  // 计划详情
+  '/admin/work-plan/plans/detail': {
+    title: '计划详情',
+    icon: 'Document'
+  },
+
+  // 工作日志
+  '/admin/work-plan/logs': {
+    title: '工作日志',
+    icon: 'BookOpen'
+  },
+
+  // 日志详情
+  '/admin/work-plan/logs/detail': {
+    title: '日志详情',
+    icon: 'Document'
+  },
+
+  // 进度跟踪
+  '/admin/work-plan/progress': {
+    title: '进度跟踪',
+    icon: 'TrendingUp'
+  },
+
+  // 计划模板
+  '/admin/work-plan/templates': {
+    title: '计划模板',
+    icon: 'Files'
+  },
+
+  // 工作提醒
+  '/admin/work-plan/reminders': {
+    title: '工作提醒',
+    icon: 'Bell'
+  },
+
+  // 统计分析
+  '/admin/work-plan/statistics': {
+    title: '统计分析',
+    icon: 'DataAnalysis'
   }
 }
 
@@ -423,7 +483,13 @@ export function getBreadcrumbConfig(path) {
     }
     
     // 查找当前路径的配置
-    const config = findConfigByPath(currentPath)
+    let config = findConfigByPath(currentPath)
+    
+    // 如果没有找到精确匹配，尝试匹配模式路径（处理动态参数）
+    if (!config) {
+      config = findPatternConfig(currentPath, pathSegments, i)
+    }
+    
     if (config) {
       breadcrumbs.push({
         title: config.title,
@@ -480,7 +546,24 @@ function generateDefaultTitle(segment) {
     'department': '部门',
     'position': '岗位',
     'rework': '返工管理',
-    'dept': '部门管理'
+    'dept': '部门管理',
+    // 工作计划相关映射
+    'work-plan': '工作计划',
+    'work': '工作',
+    'plan': '计划',
+    'plans': '计划管理',
+    'logs': '工作日志',
+    'log': '日志',
+    'progress': '进度跟踪',
+    'templates': '计划模板',
+    'template': '模板',
+    'reminders': '工作提醒',
+    'reminder': '提醒',
+    'statistics': '统计分析',
+    'detail': '详情',
+    'create': '创建',
+    'edit': '编辑',
+    'view': '查看'
   }
   
   return titleMap[segment] || segment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
@@ -504,6 +587,57 @@ function findConfigByPath(path) {
     }
   }
 
+  return null
+}
+
+/**
+ * 查找模式匹配的配置（处理动态路由参数）
+ * @param {string} currentPath - 当前路径
+ * @param {Array} pathSegments - 路径段数组
+ * @param {number} currentIndex - 当前索引
+ * @returns {Object|null} 配置对象
+ */
+function findPatternConfig(currentPath, pathSegments, currentIndex) {
+  // 检查是否是数字ID（动态参数）
+  const currentSegment = pathSegments[currentIndex]
+  const isNumericId = /^\d+$/.test(currentSegment)
+  
+  if (isNumericId && currentIndex > 0) {
+    // 构建模式路径，将数字ID替换为通用标识
+    const patternSegments = [...pathSegments]
+    patternSegments[currentIndex] = 'detail'
+    const patternPath = '/' + patternSegments.slice(0, currentIndex + 1).join('/')
+    
+    // 查找模式匹配
+    if (breadcrumbConfig[patternPath]) {
+      return breadcrumbConfig[patternPath]
+    }
+    
+    // 特殊处理工作计划模块的动态路由
+    if (currentPath.includes('/work-plan/')) {
+      const baseSegments = pathSegments.slice(0, currentIndex)
+      const basePath = '/' + baseSegments.join('/')
+      
+      // 根据父路径确定详情页类型
+      if (basePath.includes('/plans')) {
+        return {
+          title: '计划详情',
+          icon: 'Document'
+        }
+      } else if (basePath.includes('/logs')) {
+        return {
+          title: '日志详情',
+          icon: 'Document'
+        }
+      } else if (basePath.includes('/templates')) {
+        return {
+          title: '模板详情',
+          icon: 'Document'
+        }
+      }
+    }
+  }
+  
   return null
 }
 

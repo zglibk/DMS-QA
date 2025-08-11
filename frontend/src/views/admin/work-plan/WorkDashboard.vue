@@ -104,7 +104,7 @@
                 </el-col>
 
                 <!-- 第二列：计划统计和柱形图 -->
-                <el-col :span="8">
+                <el-col :span="6">
                   <div class="chart-item bar-chart-item">
                     <div class="middle-content">
                       <!-- 上部：统计标签 -->
@@ -128,7 +128,7 @@
                 </el-col>
 
                 <!-- 第三列：圆环图 -->
-                <el-col :span="8">
+                <el-col :span="10">
                   <div class="chart-item pie-chart-item">
                     <div class="pie-charts">
                       <div class="pie-item">
@@ -923,8 +923,8 @@ const updateBarChart = () => {
   
   const option = {
     grid: {
-      left: '10%',
-      right: '10%',
+      left: '0%',
+      right: '0%',
       top: '20%',
       bottom: '25%'
     },
@@ -1777,7 +1777,7 @@ onUnmounted(() => {
 
 .chart-item {
   height: 100%;
-  padding: 12px;
+  /*padding: 12px;*/
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1786,7 +1786,6 @@ onUnmounted(() => {
 
 .bar-chart-item {
   height: 100%;
-  padding: 12px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -1799,14 +1798,14 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: space-around;
-  gap: 6px;
+  gap: 2px;
   width: 100%;
   padding: 0;
 }
 
 .pie-chart-item {
   height: 100%;
-  padding: 12px;
+  padding: 0;
   display: flex !important;
   flex-direction: row !important;
   justify-content: center;
@@ -2007,14 +2006,16 @@ onUnmounted(() => {
 .right-card .pie-charts {
   flex: 1;
   width: 100%;
-  padding: 0 0 12px 0;
+  padding: 0;
   text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
 }
 
 .pie-item {
   display: inline-block;
   vertical-align: top;
-  margin: 0 12px;
+  margin: 0 8px;
   text-align: center;
 }
 
@@ -2257,9 +2258,47 @@ onUnmounted(() => {
 
 /* 响应式设计 */
 @media (max-width: 1200px) {
-  .pie-charts {
-    flex-direction: column;
-    align-items: center;
+  .pie-item {
+    margin: 0 8px;
+  }
+  
+  .pie-item :deep(.el-progress-circle) {
+    width: 65px !important;
+    height: 65px !important;
+  }
+  
+  .pie-label {
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 1000px) {
+  .pie-item {
+    margin: 0 6px;
+  }
+  
+  .pie-item :deep(.el-progress-circle) {
+    width: 55px !important;
+    height: 55px !important;
+  }
+  
+  .pie-label {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 800px) {
+  .pie-item {
+    margin: 0 4px;
+  }
+  
+  .pie-item :deep(.el-progress-circle) {
+    width: 45px !important;
+    height: 45px !important;
+  }
+  
+  .pie-label {
+    font-size: 9px;
   }
 }
 

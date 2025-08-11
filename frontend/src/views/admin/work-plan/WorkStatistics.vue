@@ -54,7 +54,7 @@
               <el-icon><CircleCheck /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-number">{{ overviewStats.completionRate || 0 }}%</div>
+              <div class="stat-number">{{ (overviewStats.completionRate || 0).toFixed(1) }}%</div>
               <div class="stat-label">完成率</div>
               <div class="stat-change" :class="getChangeClass(overviewStats.completionChange)">
                 {{ formatChange(overviewStats.completionChange) }}
@@ -68,7 +68,7 @@
               <el-icon><TrendCharts /></el-icon>
             </div>
             <div class="stat-content">
-              <div class="stat-number">{{ overviewStats.avgProgress || 0 }}%</div>
+              <div class="stat-number">{{ (overviewStats.avgProgress || 0).toFixed(1) }}%</div>
               <div class="stat-label">平均进度</div>
               <div class="stat-change" :class="getChangeClass(overviewStats.progressChange)">
                 {{ formatChange(overviewStats.progressChange) }}
@@ -182,7 +182,7 @@
               <el-table-column prop="CompletionRate" label="完成率" width="80" align="center">
                 <template #default="{ row }">
                   <span :class="getCompletionRateClass(row.CompletionRate)">
-                    {{ row.CompletionRate }}%
+                    {{ (row.CompletionRate || 0).toFixed(1) }}%
                   </span>
                 </template>
               </el-table-column>
@@ -194,7 +194,7 @@
                     :show-text="false"
                     :color="getProgressColor(row.AvgProgress || 0)"
                   />
-                  <span class="progress-text">{{ row.AvgProgress || 0 }}%</span>
+                  <span class="progress-text">{{ (row.AvgProgress || 0).toFixed(1) }}%</span>
                 </template>
               </el-table-column>
               <el-table-column prop="OverduePlans" label="逾期" width="60" align="center">
@@ -303,11 +303,11 @@
               </div>
               <div class="summary-item">
                 <span class="summary-label">完成率:</span>
-                <span class="summary-value">{{ monthlyReport.completionRate }}%</span>
+                <span class="summary-value">{{ (monthlyReport.completionRate || 0).toFixed(1) }}%</span>
               </div>
               <div class="summary-item">
                 <span class="summary-label">平均进度:</span>
-                <span class="summary-value">{{ monthlyReport.avgProgress }}%</span>
+                <span class="summary-value">{{ (monthlyReport.avgProgress || 0).toFixed(1) }}%</span>
               </div>
             </div>
           </div>
