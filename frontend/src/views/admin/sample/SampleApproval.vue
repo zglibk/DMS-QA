@@ -982,7 +982,7 @@ async function handleExportList() {
       }
       
       // 动态导入XLSX库和样式库
-       const XLSX = await import('xlsx-style-vite')
+       const XLSX = await import('xlsx-js-style')
        const { saveAs } = await import('file-saver')
       
       // 准备导出数据，在首列添加序号字段
@@ -1303,9 +1303,13 @@ async function handleSubmit() {
     
     const submitData = { ...formData }
     
-    // 处理分发部门数据
+    // 处理分发部门数据 - 确保数据格式正确
     if (Array.isArray(submitData.distributionDepartment)) {
+      // 保持数组格式，后端会进行JSON.stringify处理
       submitData.distributionDepartment = submitData.distributionDepartment
+    } else if (!submitData.distributionDepartment) {
+      // 如果为空，设置为空数组
+      submitData.distributionDepartment = []
     }
     
     let response

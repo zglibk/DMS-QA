@@ -141,6 +141,7 @@ BEGIN
         [DepartmentID] INT,                             -- 适用部门
         [WorkTypeID] INT,                               -- 工作类型ID
         [Priority] NVARCHAR(20) DEFAULT 'medium',       -- 优先级：low/medium/high/urgent
+        [Status] NVARCHAR(20) DEFAULT 'active',         -- 状态：active/inactive（启用/禁用）
         [IsPublic] BIT DEFAULT 1,                       -- 是否公开
         [UsageCount] INT DEFAULT 0,                     -- 使用次数
         [CreatedBy] INT NOT NULL,                       -- 创建人

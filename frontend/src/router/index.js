@@ -168,6 +168,11 @@ const routes = [
         component: () => import('../views/admin/work-plan/PlanTemplates.vue'),
         meta: { title: '计划模板', requiresAuth: true }
       },
+      {
+        path: 'work-plan/plans/:id',
+        component: () => import('../views/admin/work-plan/PlanDetail.vue'),
+        meta: { title: '计划详情', requiresAuth: true }
+      },
 
       // 质量成本损失模块
       {

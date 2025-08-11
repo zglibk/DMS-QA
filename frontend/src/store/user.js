@@ -103,7 +103,9 @@ export const useUserStore = defineStore('user', {
 
     // 检查用户是否有特定操作权限
     hasActionPermission: (state) => (action) => {
-      return (state.user?.permissions?.actions || []).includes(action)
+      // 从菜单权限中提取Permission字段进行匹配
+      const menus = state.user?.permissions?.menus || []
+      return menus.some(menu => menu.Permission === action)
     },
 
     // 获取用户可访问的菜单树

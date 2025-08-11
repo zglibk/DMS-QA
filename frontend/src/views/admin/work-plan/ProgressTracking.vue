@@ -395,7 +395,7 @@
             type="primary" 
             size="small" 
             :disabled="!canAddMilestone"
-            @click="addMilestone"
+            @click="showAddMilestoneDialog"
           >
             <el-icon><Plus /></el-icon>
             添加里程碑
@@ -455,6 +455,63 @@
           </div>
         </div>
       </div>
+    </el-dialog>
+
+    <!-- 添加/编辑里程碑对话框 -->
+    <el-dialog
+      v-model="milestoneFormDialogVisible"
+      :title="milestoneFormMode === 'add' ? '添加里程碑' : '编辑里程碑'"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="milestoneFormRef"
+        :model="milestoneForm"
+        :rules="milestoneFormRules"
+        label-width="100px"
+      >
+        <el-form-item label="里程碑标题" prop="title">
+          <el-input
+            v-model="milestoneForm.title"
+            placeholder="请输入里程碑标题"
+            maxlength="100"
+            show-word-limit
+          />
+        </el-form-item>
+        <el-form-item label="目标日期" prop="targetDate">
+          <el-date-picker
+            v-model="milestoneForm.targetDate"
+            type="date"
+            placeholder="选择目标日期"
+            style="width: 100%"
+            format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD"
+          />
+        </el-form-item>
+        <el-form-item label="描述" prop="description">
+          <el-input
+            v-model="milestoneForm.description"
+            type="textarea"
+            :rows="3"
+            placeholder="请输入里程碑描述"
+            maxlength="500"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="milestoneFormDialogVisible = false">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="saveMilestone" 
+            :loading="milestoneFormSaving"
+          >
+            {{ milestoneFormMode === 'add' ? '添加' : '保存' }}
+          </el-button>
+        </span>
+      </template>
     </el-dialog>
 
     <!-- 进度历史对话框 -->
@@ -520,10 +577,69 @@ const userStore = useUserStore()
 const loading = ref(false)
 const saving = ref(false)
 const viewMode = ref('list')
-const isAdmin = ref(false)
-const canAddMilestone = ref(false)
-const canEditProgress = ref(false)
-const canDeleteMilestone = ref(false)
+/**
+ * 权限检查 - 基于数据库菜单权限系统进行权限验证
+ * 不再依赖用户名硬编码，而是通过用户角色和菜单权限来判断
+ */
+
+// 检查进度编辑权限
+const canEditProgress = computed(() => {
+  // 检查用户是否有系统管理员角色
+  const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+  
+  // 检查用户是否有进度编辑的操作权限
+  const hasProgressEditPermission = userStore.hasActionPermission('work-plan:progress:edit')
+  
+  // 检查用户是否有工作计划编辑权限（兼容性）
+  const hasPlanEditPermission = userStore.hasActionPermission('work-plan:plan:edit')
+  
+  return hasAdminRole || hasProgressEditPermission || hasPlanEditPermission
+})
+
+// 检查里程碑添加权限
+const canAddMilestone = computed(() => {
+  // 检查用户是否有系统管理员角色
+  const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+  
+  // 检查用户是否有里程碑添加的操作权限
+  const hasMilestoneAddPermission = userStore.hasActionPermission('work-plan:milestone:add')
+  
+  return hasAdminRole || hasMilestoneAddPermission
+})
+
+// 检查里程碑删除权限
+const canDeleteMilestone = computed(() => {
+  // 检查用户是否有系统管理员角色
+  const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+  
+  // 检查用户是否有里程碑删除的操作权限
+  const hasMilestoneDeletePermission = userStore.hasActionPermission('work-plan:milestone:delete')
+  
+  return hasAdminRole || hasMilestoneDeletePermission
+})
+
+// 检查里程碑编辑权限
+const canEditMilestone = computed(() => {
+  // 检查用户是否有系统管理员角色
+  const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+  
+  // 检查用户是否有里程碑编辑的操作权限
+  const hasMilestoneEditPermission = userStore.hasActionPermission('work-plan:milestone:edit')
+  
+  return hasAdminRole || hasMilestoneEditPermission
+})
+
+// 检查是否为管理员（基于角色权限，不再依赖用户名）
+const isAdmin = computed(() => {
+  // 检查用户是否有系统管理员角色
+  const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+  
+  // 检查用户是否有工作计划管理相关的菜单权限
+  const hasWorkPlanMenuPermission = userStore.hasMenuPermission('/admin/work-plan') ||
+                                   userStore.hasMenuPermission('/admin/work-plan/progress')
+  
+  return hasAdminRole || hasWorkPlanMenuPermission
+})
 const ganttScale = ref('week')
 const planList = ref([])
 const overviewData = ref({})
@@ -560,6 +676,7 @@ const background = ref(true)
 const progressDialogVisible = ref(false)
 const milestoneDialogVisible = ref(false)
 const historyDialogVisible = ref(false)
+const milestoneFormDialogVisible = ref(false)
 
 // 进度更新表单
 const progressForm = reactive({
@@ -567,76 +684,29 @@ const progressForm = reactive({
   description: ''
 })
 
-/**
- * 检查用户权限
- * @param {boolean} showMessage - 是否显示权限不足提示
- * @returns {Promise<boolean>} 是否有权限
- */
-const checkUserPermission = async (showMessage = false) => {
-  try {
-    // 确保获取最新的用户信息和权限
-    await userStore.fetchProfile()
-    
-    const userInfo = userStore.user
-    // console.log('用户信息:', userInfo)
-    
-    // 基于角色权限系统检查权限
-    // 1. 检查是否为系统管理员角色
-    const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
-    
-    // 2. 检查是否有进度管理相关的菜单权限
-    const hasProgressViewPermission = userStore.hasMenuPermission('/admin/work-plan/progress') || 
-                                      userStore.hasMenuPermission('/admin/work-plan') ||
-                                      userStore.hasActionPermission('work-plan:progress:view')
-    
-    // 3. 检查是否有进度编辑权限
-    const hasProgressEditPermission = userStore.hasActionPermission('work-plan:progress:edit') ||
-                                      userStore.hasActionPermission('work-plan:plan:edit')
-    
-    // 4. 兼容性检查：如果角色信息为空，回退到用户名检查（向后兼容）
-    const fallbackAdminCheck = (!userInfo.roles || userInfo.roles.length === 0) && 
-                              userInfo.Username && userInfo.Username.toLowerCase() === 'admin'
-    
-    // 用户有编辑权限的条件：有管理员角色 或 有进度编辑权限 或 通过兼容性检查
-    isAdmin.value = hasAdminRole || hasProgressEditPermission || fallbackAdminCheck
-    
-    // 设置细粒度权限
-    canEditProgress.value = hasAdminRole || userStore.hasActionPermission('work-plan:progress:edit') || fallbackAdminCheck
-    canAddMilestone.value = hasAdminRole || userStore.hasActionPermission('work-plan:milestone:add') || fallbackAdminCheck
-    canDeleteMilestone.value = hasAdminRole || userStore.hasActionPermission('work-plan:milestone:delete') || fallbackAdminCheck
-    
-    // 用户至少需要有查看权限才能访问页面
-    const hasViewAccess = hasAdminRole || hasProgressViewPermission || hasProgressEditPermission || fallbackAdminCheck
-    
-    // console.log('权限检查结果:', {
-    //   hasAdminRole,
-    //   hasProgressViewPermission,
-    //   hasProgressEditPermission,
-    //   fallbackAdminCheck,
-    //   hasViewAccess,
-    //   hasEditPermission: isAdmin.value,
-    //   userRoles: userInfo.roles?.map(r => r.name || r.RoleName)
-    // })
-    
-    // 如果连查看权限都没有，则阻止访问
-    if (!hasViewAccess && showMessage) {
-      ElMessage.error('您没有访问进度跟踪页面的权限，请联系管理员')
-      return false
-    }
-    
-    if (!isAdmin.value && showMessage) {
-      ElMessage.warning('您没有进度管理的操作权限，请联系管理员')
-    }
-    
-    return isAdmin.value
-  } catch (error) {
-    console.error('获取用户权限信息失败:', error)
-    if (showMessage) {
-      ElMessage.error('获取用户权限信息失败')
-    }
-    return false
-  }
+// 里程碑表单相关
+const milestoneFormMode = ref('add') // 'add' 或 'edit'
+const milestoneFormSaving = ref(false)
+const milestoneFormRef = ref(null)
+const currentMilestone = ref(null)
+const milestoneForm = reactive({
+  title: '',
+  description: '',
+  targetDate: ''
+})
+
+// 里程碑表单验证规则
+const milestoneFormRules = {
+  title: [
+    { required: true, message: '请输入里程碑标题', trigger: 'blur' },
+    { min: 2, max: 100, message: '标题长度在 2 到 100 个字符', trigger: 'blur' }
+  ],
+  targetDate: [
+    { required: true, message: '请选择目标日期', trigger: 'change' }
+  ]
 }
+
+// 权限检查函数已移除，现在使用computed属性实现实时权限检查
 
 /**
  * 获取进度概览数据
@@ -811,6 +881,15 @@ const saveProgress = async () => {
 const viewMilestones = async (plan) => {
   try {
     currentPlan.value = plan
+    
+    // 调试信息：输出权限状态
+    console.log('里程碑对话框权限状态:', {
+      canEditProgress: canEditProgress.value,
+      canAddMilestone: canAddMilestone.value,
+      canDeleteMilestone: canDeleteMilestone.value,
+      isAdmin: isAdmin.value
+    })
+    
     const response = await api.get(`/work-plan/plans/${plan.ID}/milestones`)
     if (response.data.success) {
       milestones.value = response.data.data
@@ -840,16 +919,19 @@ const viewHistory = async (plan) => {
 }
 
 /**
- * 添加里程碑
+ * 显示添加里程碑对话框
  */
-const addMilestone = async () => {
+const showAddMilestoneDialog = () => {
   // 检查权限
   if (!canAddMilestone.value) {
     ElMessage.warning('您没有添加里程碑的权限')
     return
   }
   
-  ElMessage.info('添加里程碑功能开发中')
+  milestoneFormMode.value = 'add'
+  currentMilestone.value = null
+  resetMilestoneForm()
+  milestoneFormDialogVisible.value = true
 }
 
 /**
@@ -862,7 +944,81 @@ const editMilestone = async (milestone) => {
     return
   }
   
-  ElMessage.info('编辑里程碑功能开发中')
+  milestoneFormMode.value = 'edit'
+  currentMilestone.value = milestone
+  
+  // 填充表单数据
+  milestoneForm.title = milestone.Title
+  milestoneForm.description = milestone.Description || ''
+  milestoneForm.targetDate = milestone.TargetDate ? milestone.TargetDate.split('T')[0] : ''
+  
+  milestoneFormDialogVisible.value = true
+}
+
+/**
+ * 重置里程碑表单
+ */
+const resetMilestoneForm = () => {
+  Object.assign(milestoneForm, {
+    title: '',
+    description: '',
+    targetDate: ''
+  })
+  
+  if (milestoneFormRef.value) {
+    milestoneFormRef.value.resetFields()
+  }
+}
+
+/**
+ * 保存里程碑
+ */
+const saveMilestone = async () => {
+  try {
+    // 表单验证
+    const valid = await milestoneFormRef.value.validate()
+    if (!valid) {
+      return
+    }
+    
+    milestoneFormSaving.value = true
+    
+    if (milestoneFormMode.value === 'add') {
+      // 添加里程碑
+      const response = await api.post(`/work-plan/plans/${currentPlan.value.ID}/milestones`, {
+        title: milestoneForm.title,
+        description: milestoneForm.description,
+        targetDate: milestoneForm.targetDate
+      })
+      
+      if (response.data.success) {
+        ElMessage.success('里程碑添加成功')
+        milestoneFormDialogVisible.value = false
+        viewMilestones(currentPlan.value) // 刷新里程碑列表
+        getPlanList() // 刷新计划列表以更新里程碑数量
+      }
+    } else {
+      // 编辑里程碑
+      const response = await api.put(`/work-plan/milestones/${currentMilestone.value.ID}`, {
+        title: milestoneForm.title,
+        description: milestoneForm.description,
+        targetDate: milestoneForm.targetDate
+      })
+      
+      if (response.data.success) {
+        ElMessage.success('里程碑更新成功')
+        milestoneFormDialogVisible.value = false
+        viewMilestones(currentPlan.value) // 刷新里程碑列表
+        getPlanList() // 刷新计划列表以更新里程碑数量
+      }
+    }
+    
+  } catch (error) {
+    console.error('保存里程碑失败:', error)
+    ElMessage.error('保存里程碑失败')
+  } finally {
+    milestoneFormSaving.value = false
+  }
 }
 
 /**
@@ -1276,9 +1432,6 @@ watch(ganttScale, () => {
 
 // 组件挂载时获取数据
 onMounted(async () => {
-  // 静默检查权限，不显示提示
-  await checkUserPermission(false)
-  
   // 初始化分页变量
   currentPage4.value = pagination.page
   pageSize4.value = pagination.pageSize

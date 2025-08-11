@@ -9,12 +9,6 @@
         </h2>
         <p class="page-subtitle">工作计划模板的创建、编辑、删除和管理</p>
       </div>
-      <div class="header-right">
-        <el-button type="primary" @click="showCreateDialog">
-          <el-icon><Plus /></el-icon>
-          新建模板
-        </el-button>
-      </div>
     </div>
 
     <!-- 搜索和筛选 -->
@@ -64,8 +58,11 @@
     <div class="template-list">
       <el-card>
         <div class="table-header">
-          <div class="table-title">模板列表</div>
           <div class="table-actions">
+            <el-button type="primary" @click="showCreateDialog">
+              <el-icon><Plus /></el-icon>
+              新建模板
+            </el-button>
             <el-button
               type="danger"
               :disabled="selectedTemplates.length === 0"
@@ -122,6 +119,15 @@
               <div class="cell-content-center">
                 <el-tag :type="getPriorityType(row.priority)">
                   {{ getPriorityName(row.priority) }}
+                </el-tag>
+              </div>
+            </template>
+          </el-table-column>
+          <el-table-column prop="status" label="状态" width="100" align="center" resizable>
+            <template #default="{ row }">
+              <div class="cell-content-center">
+                <el-tag :type="row.status === 'active' ? 'success' : 'danger'">
+                  {{ row.status === 'active' ? '启用' : '禁用' }}
                 </el-tag>
               </div>
             </template>
@@ -256,7 +262,7 @@
           </el-col>
         </el-row>
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :span="8">
             <el-form-item label="适用部门">
               <el-cascader
                 v-model="templateForm.departmentID"
@@ -275,7 +281,15 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="8">
+            <el-form-item label="状态">
+              <el-select v-model="templateForm.status" placeholder="选择状态" style="width: 100%">
+                <el-option label="启用" value="active" />
+                <el-option label="禁用" value="inactive" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
             <el-form-item label="公开设置">
               <el-switch
                 v-model="templateForm.isPublic"
@@ -401,6 +415,12 @@
               <div class="info-item">
                 <label>适用部门：</label>
                 <span>{{ getDepartmentName(selectedTemplate.departmentId) }}</span>
+              </div>
+              <div class="info-item">
+                <label>状态：</label>
+                <el-tag :type="selectedTemplate.status === 'active' ? 'success' : 'danger'">
+                  {{ selectedTemplate.status === 'active' ? '启用' : '禁用' }}
+                </el-tag>
               </div>
               <div class="info-item">
                 <label>公开设置：</label>
@@ -542,6 +562,7 @@ const templateForm = reactive({
   departmentID: null,
   workTypeID: null,
   priority: 'medium',
+  status: 'active',
   phases: [
     {
       name: '需求分析',
@@ -676,6 +697,12 @@ const showCreateDialog = async () => {
  * 编辑模板
  */
 const editTemplate = async (template) => {
+  // 检查模板ID的有效性
+  if (!template || !template.id) {
+    ElMessage.error('模板数据无效，无法编辑')
+    return
+  }
+  
   isEdit.value = true
   Object.assign(templateForm, {
     ...template,
@@ -714,6 +741,7 @@ const saveTemplate = async () => {
       estimatedDays: templateForm.estimatedDays,
       estimatedHours: templateForm.estimatedHours,
       priority: templateForm.priority,
+      status: templateForm.status,
       isPublic: templateForm.isPublic,
       departmentID: templateForm.departmentID,
       workTypeID: templateForm.workTypeID,
@@ -752,6 +780,12 @@ const saveTemplate = async () => {
  * 删除模板
  */
 const deleteTemplate = async (template) => {
+  // 检查模板ID的有效性
+  if (!template || !template.id) {
+    ElMessage.error('模板数据无效，无法删除')
+    return
+  }
+  
   try {
     await ElMessageBox.confirm(
       `确定要删除模板 "${template.name}" 吗？`,
@@ -851,6 +885,12 @@ const viewTemplateDetail = async (templateId) => {
  * 使用模板创建计划
  */
 const useTemplate = (template) => {
+  // 检查模板ID的有效性
+  if (!template || !template.id) {
+    ElMessage.error('模板数据无效，无法使用')
+    return
+  }
+  
   router.push({
     path: '/admin/work-plan/plans',
     query: { templateId: template.id }
@@ -886,6 +926,7 @@ const resetTemplateForm = () => {
     templateName: '',
     description: '',
     category: '',
+    status: 'active',
     templateData: '',
     estimatedDays: 7,
     estimatedHours: 0,

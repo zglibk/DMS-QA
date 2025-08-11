@@ -541,10 +541,11 @@ const getPlanOptions = async () => {
     const response = await api.get('/work-plan/plans', {
       params: {
         page: 1,
-        pageSize: 1000, // 获取所有计划用于选择
-        status: 'pending,in_progress' // 只获取活跃的计划（待处理和进行中）
+        pageSize: 1000 // 获取所有计划用于选择，不限制状态
+        // 移除状态筛选，允许选择所有状态的计划
       }
     })
+    console.log('API响应数据:', response.data)
     if (response.data.success) {
       // 使用真正的工作计划数据
       planOptions.value = response.data.data.list.map(plan => ({
@@ -552,7 +553,9 @@ const getPlanOptions = async () => {
         Title: plan.PlanName || plan.Title,
         Description: plan.Description
       })) || []
-      // console.log('获取到的计划选项:', planOptions.value)
+      console.log('获取到的计划选项:', planOptions.value)
+    } else {
+      console.error('API返回失败:', response.data.message)
     }
   } catch (error) {
     console.error('获取工作计划选项失败:', error)
@@ -582,16 +585,18 @@ const resetSearch = () => {
 /**
  * 显示创建对话框
  */
-const showCreateDialog = () => {
+const showCreateDialog = async () => {
   isEdit.value = false
   resetLogForm()
+  // 刷新计划选项以获取最新的计划数据
+  await getPlanOptions()
   dialogVisible.value = true
 }
 
 /**
  * 编辑日志
  */
-const editLog = (log) => {
+const editLog = async (log) => {
   isEdit.value = true
   Object.assign(logForm, {
     ID: log.ID,
@@ -603,6 +608,8 @@ const editLog = (log) => {
     WorkHours: log.WorkHours || 8,
     Progress: log.Progress
   })
+  // 刷新计划选项以获取最新的计划数据
+  await getPlanOptions()
   dialogVisible.value = true
 }
 

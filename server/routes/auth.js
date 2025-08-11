@@ -740,6 +740,7 @@ router.get('/user/:userId/roles-permissions', authenticateToken, async (req, res
           m.Path as path,
           m.MenuType as type,
           m.ParentID as parentId,
+          m.Permission,
           m.SortOrder
         FROM [UserRoles] ur
         INNER JOIN [RoleMenus] rm ON ur.RoleID = rm.RoleID

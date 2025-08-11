@@ -263,8 +263,25 @@ router.post('/create', authenticateToken, async (req, res) => {
       remark
     } = req.body;
 
+    // 验证必填字段
+    if (!customerNo || !workOrderNo || !productName || !productSpec) {
+      return res.status(400).json({
+        code: 400,
+        message: '客户编号、工单号、品名和产品规格为必填字段'
+      });
+    }
+
+    if (!createDate || !creator || !follower) {
+      return res.status(400).json({
+        code: 400,
+        message: '制作日期、制作人和跟单员为必填字段'
+      });
+    }
+
     // 自动生成样版编号
     const certificateNo = await generateCertificateNo();
+    console.log('生成的样版编号:', certificateNo);
+    console.log('接收到的数据:', JSON.stringify(req.body, null, 2));
 
     const query = `
       INSERT INTO SampleApproval (
@@ -297,13 +314,13 @@ router.post('/create', authenticateToken, async (req, res) => {
       request.input('receiver', sql.NVarChar, receiver);
       request.input('returnQuantity', sql.Int, returnQuantity);
       request.input('signer', sql.NVarChar, signer);
-      request.input('signDate', sql.Date, signDate);
-      request.input('receiveDate', sql.Date, receiveDate);
+      request.input('signDate', sql.Date, signDate || null);
+      request.input('receiveDate', sql.Date, receiveDate || null);
       request.input('judgment', sql.NVarChar, judgment);
       request.input('distributionDepartment', sql.NVarChar, JSON.stringify(distributionDepartment));
       request.input('distributionQuantity', sql.Int, distributionQuantity);
       request.input('sampleStatus', sql.NVarChar, sampleStatus);
-      request.input('expiryDate', sql.Date, expiryDate);
+      request.input('expiryDate', sql.Date, expiryDate || null);
       request.input('remark', sql.NVarChar, remark);
       return await request.query(query);
     });

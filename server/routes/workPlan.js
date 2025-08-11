@@ -268,6 +268,16 @@ router.delete('/milestones/:id',
     workPlanController.deleteMilestone
 );
 
+/**
+ * 更新里程碑信息
+ * PUT /api/work-plan/milestones/:id
+ */
+router.put('/milestones/:id', 
+    // authenticateToken, 
+    // checkPermission('work-plan:milestone:edit'),
+    workPlanController.updateMilestone
+);
+
 // =====================================================
 // 计划模板相关路由
 // =====================================================
@@ -324,12 +334,24 @@ router.delete('/templates/batch',
 
 /**
  * 删除计划模板
+/**
+ * 删除单个计划模板
  * DELETE /api/work-plan/templates/:id
  */
 router.delete('/templates/:id', 
     authenticateToken, 
     checkPermission('work-plan:template:delete'),
     workPlanController.deleteTemplate
+);
+
+/**
+ * 导出计划模板
+ * GET /api/work-plan/templates/export
+ */
+router.get('/templates/export', 
+    authenticateToken, 
+    checkPermission('work-plan:template:export'),
+    workPlanController.exportTemplates
 );
 
 

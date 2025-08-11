@@ -501,7 +501,20 @@ const getPlanList = async (req, res) => {
                     d1.Name as ExecuteDepartmentName,
                     u3.Username as UpdatedByName,
                     u3.RealName as UpdatedByRealName,
-                    (                        SELECT STUFF((                            SELECT ', ' + u4.RealName                            FROM WorkPlanExecutors wpe                             LEFT JOIN [User] u4 ON wpe.ExecutorID = u4.ID                             WHERE wpe.PlanID = wp.ID AND wpe.Status = 'active'                            FOR XML PATH('')                        ), 1, 2, '')                    ) as ExecutorNames,
+                    (
+                        SELECT STUFF((
+                            SELECT ', ' + u4.RealName
+                            FROM WorkPlanExecutors wpe 
+                            LEFT JOIN [User] u4 ON wpe.ExecutorID = u4.ID 
+                            WHERE wpe.PlanID = wp.ID AND wpe.Status = 'active'
+                            FOR XML PATH('')
+                        ), 1, 2, '')
+                    ) as ExecutorNames,
+                    (
+                        SELECT COUNT(*)
+                        FROM PlanMilestones pm
+                        WHERE pm.PlanID = wp.ID
+                    ) as MilestoneCount,
                     ROW_NUMBER() OVER (ORDER BY wp.CreatedAt DESC) as RowNum
                 FROM WorkPlans wp
                 LEFT JOIN WorkTypes wt ON wp.WorkTypeID = wt.ID
@@ -575,6 +588,7 @@ const getPlanById = async (req, res) => {
         const query = `
             SELECT 
                 wp.*,
+                wp.PlanName as Title,
                 wt.TypeName as WorkTypeName,
                 u1.Username as CreatorName,
                 u1.RealName as CreatorRealName,
@@ -582,7 +596,12 @@ const getPlanById = async (req, res) => {
                 u2.RealName as AssigneeRealName,
                 d1.Name as ExecuteDepartmentName,
                 u3.Username as UpdatedByName,
-                u3.RealName as UpdatedByRealName
+                u3.RealName as UpdatedByRealName,
+                (
+                    SELECT COUNT(*)
+                    FROM PlanMilestones pm
+                    WHERE pm.PlanID = wp.ID
+                ) as MilestoneCount
             FROM WorkPlans wp
             LEFT JOIN WorkTypes wt ON wp.WorkTypeID = wt.ID
             LEFT JOIN [User] u1 ON wp.CreatedBy = u1.ID
@@ -667,6 +686,7 @@ const createPlan = async (req, res) => {
             description,
             workTypeId,
             priority = 'medium',
+            status = 'pending', // 添加状态参数，默认为待开始
             assigneeId,
             departmentId,
             executorIds = [],
@@ -699,7 +719,7 @@ const createPlan = async (req, res) => {
                     DepartmentID, UpdatedBy, StartDate, EndDate, EstimatedHours, Status, Progress, CreatedAt, UpdatedAt
                 ) VALUES (
                     @planCode, @title, @description, @workTypeId, @priority, @creatorId, @assigneeId,
-                    @departmentId, @creatorId, @startDate, @endDate, @estimatedHours, 'pending', 0, GETDATE(), GETDATE()
+                    @departmentId, @creatorId, @startDate, @endDate, @estimatedHours, @status, 0, GETDATE(), GETDATE()
                 );
                 SELECT SCOPE_IDENTITY() as planId;
             `;
@@ -710,6 +730,7 @@ const createPlan = async (req, res) => {
                 .input('description', sql.NVarChar, description || '')
                 .input('workTypeId', sql.Int, workTypeId)
                 .input('priority', sql.NVarChar, priority)
+                .input('status', sql.NVarChar, status) // 添加状态参数绑定
                 .input('creatorId', sql.Int, userId)
                 .input('assigneeId', sql.Int, assigneeId)
                 .input('departmentId', sql.Int, departmentId)
@@ -2238,6 +2259,62 @@ module.exports = {
         }
     },
     
+    /**
+     * 更新里程碑信息
+     * @param {Object} req - 请求对象
+     * @param {Object} res - 响应对象
+     */
+    updateMilestone: async (req, res) => {
+        try {
+            const pool = await poolPromise;
+            const { id } = req.params;
+            const { title, description, targetDate } = req.body;
+            
+            if (!id) {
+                return res.status(400).json({
+                    success: false,
+                    message: '里程碑ID不能为空'
+                });
+            }
+            
+            if (!title || !targetDate) {
+                return res.status(400).json({
+                    success: false,
+                    message: '里程碑标题和目标日期不能为空'
+                });
+            }
+            
+            const query = `
+                UPDATE PlanMilestones 
+                SET MilestoneName = @title,
+                    Description = @description,
+                    TargetDate = @targetDate,
+                    UpdatedAt = GETDATE()
+                WHERE ID = @id
+            `;
+            
+            await pool.request()
+                .input('id', sql.Int, parseInt(id))
+                .input('title', sql.NVarChar, title)
+                .input('description', sql.NVarChar, description || '')
+                .input('targetDate', sql.Date, targetDate)
+                .query(query);
+            
+            res.json({
+                success: true,
+                message: '里程碑更新成功'
+            });
+            
+        } catch (error) {
+            console.error('更新里程碑失败:', error);
+            res.status(500).json({
+                success: false,
+                message: '更新里程碑失败',
+                error: error.message
+            });
+        }
+    },
+    
     // =====================================================
     // 计划模板相关控制器
     // =====================================================
@@ -2255,7 +2332,8 @@ module.exports = {
                 pageSize = 20,
                 category,
                 keyword,
-                departmentId
+                departmentId,
+                status
             } = req.query;
             
             const offset = (page - 1) * pageSize;
@@ -2277,6 +2355,11 @@ module.exports = {
             if (keyword) {
                 whereConditions.push('(pt.TemplateName LIKE @keyword OR pt.Description LIKE @keyword)');
                 params.keyword = `%${keyword}%`;
+            }
+            
+            if (status) {
+                whereConditions.push('pt.Status = @status');
+                params.status = status;
             }
             
             const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
@@ -2342,6 +2425,7 @@ module.exports = {
                 departmentId: template.DepartmentID,
                 workTypeId: template.WorkTypeID,
                 priority: template.Priority,
+                status: template.Status,
                 isPublic: template.IsPublic,
                 usageCount: template.UsageCount,
                 createdBy: template.CreatorName || template.CreatedBy,
@@ -2443,6 +2527,7 @@ module.exports = {
                 WorkTypeID,
                 Priority,
                 EstimatedHours,
+                Status,
                 // 支持两种字段名格式
                 departmentID,
                 departmentId,
@@ -2450,7 +2535,8 @@ module.exports = {
                 category,
                 description,
                 estimatedHours,
-                isPublic
+                isPublic,
+                status
             } = req.body;
             
             // 兼容不同的字段名格式
@@ -2460,6 +2546,7 @@ module.exports = {
             const finalEstimatedHours = EstimatedHours || estimatedHours || 8;
             const finalDepartmentId = departmentID || departmentId;
             const finalIsPublic = isPublic !== undefined ? isPublic : true;
+            const finalStatus = Status || status || 'active';
             
             const userId = req.user?.id || 1; // 获取当前用户ID
             
@@ -2489,12 +2576,12 @@ module.exports = {
             const query = `
                 INSERT INTO PlanTemplates (
                     TemplateName, Category, Description, TemplateData, 
-                    EstimatedHours, DepartmentID, WorkTypeID, Priority, IsPublic, CreatedBy, 
+                    EstimatedHours, DepartmentID, WorkTypeID, Priority, Status, IsPublic, CreatedBy, 
                     CreatedAt, UpdatedAt
                 )
                 VALUES (
                     @templateName, @category, @description, @templateData,
-                    @estimatedHours, @departmentId, @workTypeId, @priority, @isPublic, @createdBy,
+                    @estimatedHours, @departmentId, @workTypeId, @priority, @status, @isPublic, @createdBy,
                     GETDATE(), GETDATE()
                 );
                 SELECT SCOPE_IDENTITY() as templateId;
@@ -2509,6 +2596,7 @@ module.exports = {
                 .input('departmentId', sql.Int, finalDepartmentId || null)
                 .input('workTypeId', sql.Int, WorkTypeID || null)
                 .input('priority', sql.NVarChar, Priority || 'medium')
+                .input('status', sql.NVarChar, finalStatus)
                 .input('isPublic', sql.Bit, finalIsPublic)
                 .input('createdBy', sql.Int, userId)
                 .query(query);
@@ -2551,6 +2639,7 @@ module.exports = {
                 WorkTypeID,
                 Priority,
                 EstimatedHours,
+                Status,
                 // 兼容旧的字段名
                 templateName,
                 category,
@@ -2558,7 +2647,8 @@ module.exports = {
                 templateData,
                 estimatedDays,
                 estimatedHours,
-                departmentId
+                departmentId,
+                status
             } = req.body;
             
             console.log('更新模板请求数据:', req.body);
@@ -2589,6 +2679,7 @@ module.exports = {
             const finalCategory = Category !== undefined ? Category : category;
             const finalDescription = Description !== undefined ? Description : description;
             const finalEstimatedHours = EstimatedHours !== undefined ? EstimatedHours : estimatedHours;
+            const finalStatus = Status !== undefined ? Status : status;
             
             if (finalTemplateName !== undefined) {
                 updateFields.push('TemplateName = @templateName');
@@ -2654,6 +2745,12 @@ module.exports = {
             if (finalDepartmentId !== undefined) {
                 updateFields.push('DepartmentID = @departmentId');
                 params.departmentId = finalDepartmentId;
+            }
+            
+            // 处理状态字段
+            if (finalStatus !== undefined) {
+                updateFields.push('Status = @status');
+                params.status = finalStatus;
             }
             
             if (updateFields.length === 0) {
@@ -2847,6 +2944,129 @@ module.exports = {
                 success: false,
                 message: errorMessage,
                 error: process.env.NODE_ENV === 'development' ? error.message : undefined
+            });
+        }
+    },
+
+    /**
+     * 导出计划模板
+     * @param {Object} req - 请求对象
+     * @param {Object} res - 响应对象
+     */
+    exportTemplates: async (req, res) => {
+        try {
+            const pool = await poolPromise;
+            const {
+                keyword = '',
+                category = '',
+                status = ''
+            } = req.query;
+            
+            let whereConditions = ['1=1'];
+            const request = pool.request();
+            
+            // 关键词搜索
+            if (keyword) {
+                whereConditions.push('(pt.TemplateName LIKE @keyword OR pt.Description LIKE @keyword)');
+                request.input('keyword', sql.NVarChar, `%${keyword}%`);
+            }
+            
+            // 分类筛选
+            if (category) {
+                whereConditions.push('pt.Category = @category');
+                request.input('category', sql.NVarChar, category);
+            }
+            
+            // 状态筛选
+            if (status) {
+                whereConditions.push('pt.Status = @status');
+                request.input('status', sql.NVarChar, status);
+            }
+            
+            const whereClause = whereConditions.join(' AND ');
+            
+            const query = `
+                SELECT 
+                    pt.TemplateName as '模板名称',
+                    pt.Category as '分类',
+                    pt.Description as '描述',
+                    pt.Status as '状态',
+                    pt.Priority as '优先级',
+                    pt.EstimatedDays as '预计天数',
+                    pt.EstimatedHours as '预计工时',
+                    CASE WHEN pt.IsPublic = 1 THEN '是' ELSE '否' END as '是否公开',
+                    d.Name as '适用部门',
+                    wt.TypeName as '工作类型',
+                    creator.RealName as '创建人',
+                    pt.CreatedAt as '创建时间',
+                    pt.UpdatedAt as '更新时间',
+                    pt.UsageCount as '使用次数'
+                FROM PlanTemplates pt
+                LEFT JOIN [User] creator ON pt.CreatedBy = creator.ID
+                LEFT JOIN Department d ON pt.DepartmentID = d.ID
+                LEFT JOIN WorkTypes wt ON pt.WorkTypeID = wt.ID
+                WHERE ${whereClause}
+                ORDER BY pt.CreatedAt DESC
+            `;
+            
+            const result = await request.query(query);
+            
+            // 检查是否有数据
+            if (!result.recordset || result.recordset.length === 0) {
+                return res.status(200).json({
+                    success: false,
+                    message: '没有找到符合条件的模板数据'
+                });
+            }
+            
+            // 创建Excel工作簿
+            const workbook = new ExcelJS.Workbook();
+            const worksheet = workbook.addWorksheet('计划模板');
+            
+            // 设置列标题
+            const columns = Object.keys(result.recordset[0]);
+            worksheet.columns = columns.map(col => ({
+                header: col,
+                key: col,
+                width: 20
+            }));
+            
+            // 添加数据
+            result.recordset.forEach(row => {
+                // 处理状态显示
+                if (row['状态']) {
+                    row['状态'] = row['状态'] === 'active' ? '启用' : '禁用';
+                }
+                
+                // 处理优先级显示
+                if (row['优先级']) {
+                    const priorityMap = {
+                        'low': '低',
+                        'medium': '中',
+                        'high': '高',
+                        'urgent': '紧急'
+                    };
+                    row['优先级'] = priorityMap[row['优先级']] || row['优先级'];
+                }
+                
+                worksheet.addRow(row);
+            });
+            
+            // 设置响应头
+            const fileName = `计划模板_${moment().format('YYYY-MM-DD')}.xlsx`;
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+            
+            // 输出Excel文件
+            await workbook.xlsx.write(res);
+            res.end();
+            
+        } catch (error) {
+            console.error('导出模板列表失败:', error);
+            res.status(500).json({
+                success: false,
+                message: '导出模板列表失败',
+                error: error.message
             });
         }
     },
