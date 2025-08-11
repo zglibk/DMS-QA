@@ -30,9 +30,11 @@
     <el-card class="table-card" shadow="never">
       <el-table
         ref="tableRef"
-        :data="departmentTree"
+        :data="topLevelDepartments"
         style="width: 100%"
         row-key="ID"
+        lazy
+        :load="loadChildren"
         :tree-props="{ children: 'children', hasChildren: 'hasChildren' }"
         v-loading="loading"
         stripe
@@ -42,8 +44,9 @@
       >
       <el-table-column prop="Name" label="部门名称" min-width="200" resizable show-overflow-tooltip>
         <template #default="{ row }">
-          <el-icon v-if="row.DeptType === 'company'" class="dept-icon"><OfficeBuilding /></el-icon>
-          <el-icon v-else class="dept-icon"><Grid /></el-icon>
+          <el-icon class="dept-icon" :class="getDeptIconClass(row, getDeptLevel(row.ID))">
+            <component :is="getDeptIcon(row, getDeptLevel(row.ID))" />
+          </el-icon>
           {{ row.Name }}
         </template>
       </el-table-column>
@@ -201,9 +204,13 @@ import {
   Expand,
   Fold,
   OfficeBuilding,
-  Grid
+  Grid,
+  House,
+  Files,
+  Folder,
+  Document
 } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/services/api.js'
 
 // 响应式数据
 const loading = ref(false)
@@ -260,13 +267,34 @@ const departmentTree = computed(() => {
   return buildTree(departmentList.value)
 })
 
+// 顶级部门（用于懒加载表格显示）
+const topLevelDepartments = computed(() => {
+  if (!Array.isArray(departmentList.value)) {
+    return []
+  }
+  return departmentList.value
+    .filter(dept => dept.ParentID === null || dept.ParentID === 0)
+    .map(dept => ({
+      ...dept,
+      hasChildren: departmentList.value.some(child => child.ParentID === dept.ID)
+    }))
+})
+
 // 部门选项（用于上级部门选择）
 const departmentOptions = computed(() => {
   return buildTree(departmentList.value.filter(dept => dept.ID !== currentEditId.value))
 })
 
 // 构建树形结构的函数
+// 参数: list - 部门列表数组, parentId - 父级部门ID
+// 返回: 树形结构的部门数组
 function buildTree(list, parentId = null) {
+  // 确保list是数组类型，避免"list is not iterable"错误
+  if (!Array.isArray(list)) {
+    console.warn('buildTree: list参数不是数组类型:', list)
+    return []
+  }
+  
   const tree = []
   for (const item of list) {
     if (item.ParentID === parentId) {
@@ -281,17 +309,94 @@ function buildTree(list, parentId = null) {
 }
 
 // 获取部门列表
+// 从后端API获取部门数据并更新本地状态
 const fetchDepartments = async () => {
   try {
     loading.value = true
-    const response = await axios.get('/departments')
-    departmentList.value = response.data.data || []
+    const response = await api.get('/departments')
+    // 后端返回格式: {success: true, data: [...]}
+    const data = response.data?.data || response.data || []
+    // 确保数据是数组格式
+    departmentList.value = Array.isArray(data) ? data : []
   } catch (error) {
     console.error('获取部门列表失败:', error)
     ElMessage.error('获取部门列表失败')
   } finally {
     loading.value = false
   }
+}
+
+// 懒加载子部门数据
+// 参数: row - 当前行数据, treeNode - 树节点, resolve - 回调函数
+const loadChildren = (row, treeNode, resolve) => {
+  // 从已加载的部门列表中筛选出当前部门的子部门
+  const children = departmentList.value
+    .filter(dept => dept.ParentID === row.ID)
+    .map(dept => ({
+      ...dept,
+      hasChildren: departmentList.value.some(child => child.ParentID === dept.ID)
+    }))
+  
+  // 模拟异步加载效果（可选）
+  setTimeout(() => {
+    resolve(children)
+  }, 200)
+}
+
+// 根据部门层级获取对应图标
+// 参数: row - 部门数据, level - 当前层级（从0开始）
+const getDeptIcon = (row, level = 0) => {
+  // 如果是公司类型，始终使用办公楼图标
+  if (row.DeptType === 'company') {
+    return OfficeBuilding
+  }
+  
+  // 根据层级返回不同图标
+  switch (level) {
+    case 0:
+      return House // 一级部门使用房屋图标
+    case 1:
+      return Files // 二级部门使用文件夹图标
+    case 2:
+      return Folder // 三级部门使用文件夹图标
+    default:
+      return Document // 四级及以下使用文档图标
+  }
+}
+
+// 根据部门层级获取图标CSS类名
+// 参数: row - 部门数据, level - 当前层级（从0开始）
+const getDeptIconClass = (row, level = 0) => {
+  // 如果是公司类型
+  if (row.DeptType === 'company') {
+    return 'company-icon'
+  }
+  
+  // 根据层级返回不同类名
+  switch (level) {
+    case 0:
+      return 'level-0-icon'
+    case 1:
+      return 'level-1-icon'
+    case 2:
+      return 'level-2-icon'
+    default:
+      return 'level-3-icon'
+  }
+}
+
+// 计算部门层级
+// 参数: deptId - 部门ID
+const getDeptLevel = (deptId) => {
+  let level = 0
+  let currentDept = departmentList.value.find(dept => dept.ID === deptId)
+  
+  while (currentDept && currentDept.ParentID) {
+    level++
+    currentDept = departmentList.value.find(dept => dept.ID === currentDept.ParentID)
+  }
+  
+  return level
 }
 
 // 显示新增对话框
@@ -354,7 +459,7 @@ const submitForm = async () => {
     const url = isEdit.value ? `/departments/${currentEditId.value}` : '/departments'
     const method = isEdit.value ? 'put' : 'post'
     
-    await axios[method](url, formData)
+    await api[method](url, formData)
     
     ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
@@ -412,7 +517,7 @@ const deleteDepartment = async (dept) => {
       ? `/departments/${dept.ID}?cascade=true`
       : `/departments/${dept.ID}`
     
-    const response = await axios.delete(deleteUrl)
+    const response = await api.delete(deleteUrl)
     
     // 显示成功消息
     ElMessage.success(response.data.message || '删除成功')
@@ -510,7 +615,32 @@ onMounted(() => {
 
 .dept-icon {
   margin-right: 8px;
+  font-size: 16px;
+}
+
+/* 公司级别图标样式 */
+.dept-icon.company-icon {
+  color: #E6A23C;
+}
+
+/* 一级部门图标样式 */
+.dept-icon.level-0-icon {
   color: #409EFF;
+}
+
+/* 二级部门图标样式 */
+.dept-icon.level-1-icon {
+  color: #67C23A;
+}
+
+/* 三级部门图标样式 */
+.dept-icon.level-2-icon {
+  color: #909399;
+}
+
+/* 四级及以下部门图标样式 */
+.dept-icon.level-3-icon {
+  color: #F56C6C;
 }
 
 .dialog-footer {

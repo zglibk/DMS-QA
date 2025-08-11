@@ -152,13 +152,12 @@ router.get('/', async (req, res) => {
         ORDER BY SortOrder ASC, CreatedAt DESC
       `)
     
-    // 构建适合el-cascader的树形结构数据
+    // 返回原始部门数据，供前端懒加载使用
     const departments = result.recordset
-    const tree = buildDepartmentTreeForCascader(departments)
     
     res.json({
       success: true,
-      data: tree,
+      data: departments,
       message: '部门列表获取成功'
     })
   } catch (error) {
