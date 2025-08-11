@@ -94,6 +94,12 @@ export const breadcrumbConfig = {
     icon: 'Files'
   },
 
+  // 供应商投诉管理
+  '/admin/supplier/complaints': {
+    title: '供应商投诉管理',
+    icon: 'Warning'
+  },
+
   // 样版管理
   '/admin/sample': {
     title: '样版管理',

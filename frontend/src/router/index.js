@@ -86,6 +86,7 @@ const routes = [
       { path: 'supplier/inspection', component: () => import('../views/admin/supplier/InspectionReports.vue'), meta: { requiresAuth: true } },
       { path: 'supplier/annual-audit-plan', component: () => import('../views/admin/supplier/AnnualAuditPlan.vue'), meta: { requiresAuth: true } },
       { path: 'supplier/audit-reports', component: () => import('../views/admin/supplier/AuditReports.vue'), meta: { requiresAuth: true } },
+      { path: 'supplier/complaints', component: () => import('../views/admin/supplier/SupplierComplaints.vue'), meta: { requiresAuth: true } },
 
       // 样版管理
       { path: 'sample', redirect: '/admin/sample/approval' }, // 重定向到样品承认书
