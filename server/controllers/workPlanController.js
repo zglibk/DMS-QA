@@ -852,7 +852,7 @@ const updatePlan = async (req, res) => {
         const params = { id: parseInt(id) };
         
         if (title !== undefined) {
-            updateFields.push('Title = @title');
+            updateFields.push('PlanName = @title');
             params.title = title;
         }
         
@@ -1002,27 +1002,44 @@ const deletePlan = async (req, res) => {
         const pool = await poolPromise;
         const { id } = req.params;
         
-        // 删除工作计划
-        const query = `
-            DELETE FROM WorkPlans 
-            WHERE ID = @id
-        `;
+        // 开始事务处理
+        const transaction = new sql.Transaction(pool);
+        await transaction.begin();
         
-        const result = await pool.request()
-            .input('id', sql.Int, id)
-            .query(query);
-        
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({
-                success: false,
-                message: '工作计划不存在'
+        try {
+            // 第一步：删除相关的工作日志
+            const deleteLogsQuery = `DELETE FROM WorkLogs WHERE PlanID = @id`;
+            const logRequest = new sql.Request(transaction);
+            logRequest.input('id', sql.Int, id);
+            const logResult = await logRequest.query(deleteLogsQuery);
+            const deletedLogsCount = logResult.rowsAffected && logResult.rowsAffected[0] ? logResult.rowsAffected[0] : 0;
+            
+            // 第二步：删除工作计划
+            const deletePlanQuery = `DELETE FROM WorkPlans WHERE ID = @id`;
+            const planRequest = new sql.Request(transaction);
+            planRequest.input('id', sql.Int, id);
+            const planResult = await planRequest.query(deletePlanQuery);
+            
+            if (planResult.rowsAffected[0] === 0) {
+                await transaction.rollback();
+                return res.status(404).json({
+                    success: false,
+                    message: '工作计划不存在'
+                });
+            }
+            
+            // 提交事务
+            await transaction.commit();
+            
+            res.json({
+                success: true,
+                message: `工作计划删除成功，同时删除了 ${deletedLogsCount} 条相关工作日志`
             });
+            
+        } catch (transactionError) {
+            await transaction.rollback();
+            throw transactionError;
         }
-        
-        res.json({
-            success: true,
-            message: '工作计划删除成功'
-        });
         
     } catch (error) {
         console.error('删除工作计划失败:', error);
@@ -1059,34 +1076,102 @@ module.exports = {
      * @param {Object} res - 响应对象
      */
     batchDeletePlans: async (req, res) => {
+        console.log('=== 批量删除计划请求开始 ===');
+        console.log('请求体:', req.body);
+        
         try {
-            const pool = await poolPromise;
-            const { ids } = req.body;
+            const { planIds } = req.body;
             
-            if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            // 参数验证
+            if (!planIds || !Array.isArray(planIds) || planIds.length === 0) {
+                console.log('参数验证失败: planIds无效');
                 return res.status(400).json({
                     success: false,
-                    message: '请选择要删除的计划'
+                    message: '请提供要删除的计划ID列表'
                 });
             }
             
-            const placeholders = ids.map((_, index) => `@id${index}`).join(',');
-            const query = `DELETE FROM WorkPlans WHERE ID IN (${placeholders})`;
+            console.log('要删除的计划ID:', planIds);
             
-            const request = pool.request();
-            ids.forEach((id, index) => {
-                request.input(`id${index}`, sql.Int, parseInt(id));
-            });
+            // 验证所有ID都是有效的数字
+            const validIds = planIds.filter(id => Number.isInteger(Number(id)) && Number(id) > 0);
+            if (validIds.length !== planIds.length) {
+                console.log('ID验证失败: 包含无效的ID');
+                return res.status(400).json({
+                    success: false,
+                    message: '计划ID必须是有效的正整数'
+                });
+            }
             
-            await request.query(query);
+            console.log('获取数据库连接...');
+            const pool = await poolPromise;
+            console.log('数据库连接成功');
             
-            res.json({
-                success: true,
-                message: `成功删除 ${ids.length} 个计划`
-            });
+            // 开始事务处理
+            const transaction = new sql.Transaction(pool);
+            await transaction.begin();
+            console.log('事务开始');
+            
+            try {
+                // 第一步：删除相关的工作日志
+                const logPlaceholders = validIds.map((_, index) => `@planId${index}`).join(',');
+                const deleteLogsQuery = `DELETE FROM WorkLogs WHERE PlanID IN (${logPlaceholders})`;
+                
+                console.log('删除相关工作日志:', deleteLogsQuery);
+                const logRequest = new sql.Request(transaction);
+                validIds.forEach((id, index) => {
+                    logRequest.input(`planId${index}`, sql.Int, parseInt(id));
+                });
+                
+                const logResult = await logRequest.query(deleteLogsQuery);
+                const deletedLogsCount = logResult.rowsAffected && logResult.rowsAffected[0] ? logResult.rowsAffected[0] : 0;
+                console.log('删除的工作日志数量:', deletedLogsCount);
+                
+                // 第二步：删除计划
+                const planPlaceholders = validIds.map((_, index) => `@planId${index}`).join(',');
+                const deletePlansQuery = `DELETE FROM WorkPlans WHERE ID IN (${planPlaceholders})`;
+                
+                console.log('删除计划:', deletePlansQuery);
+                const planRequest = new sql.Request(transaction);
+                validIds.forEach((id, index) => {
+                    planRequest.input(`planId${index}`, sql.Int, parseInt(id));
+                });
+                
+                const planResult = await planRequest.query(deletePlansQuery);
+                const deletedPlansCount = planResult.rowsAffected && planResult.rowsAffected[0] ? planResult.rowsAffected[0] : 0;
+                console.log('删除的计划数量:', deletedPlansCount);
+                
+                if (deletedPlansCount === 0) {
+                    await transaction.rollback();
+                    console.log('警告: 没有删除任何计划记录');
+                    return res.json({
+                        success: false,
+                        message: '没有找到要删除的计划，可能已被删除'
+                    });
+                }
+                
+                // 提交事务
+                await transaction.commit();
+                console.log('事务提交成功');
+                
+                console.log('=== 批量删除计划成功 ===');
+                res.json({
+                    success: true,
+                    message: `成功删除 ${deletedPlansCount} 个计划和 ${deletedLogsCount} 条相关工作日志`,
+                    deletedPlansCount: deletedPlansCount,
+                    deletedLogsCount: deletedLogsCount
+                });
+                
+            } catch (transactionError) {
+                console.error('事务执行失败，回滚:', transactionError);
+                await transaction.rollback();
+                throw transactionError;
+            }
             
         } catch (error) {
-            console.error('批量删除计划失败:', error);
+            console.error('=== 批量删除计划失败 ===');
+            console.error('错误详情:', error);
+            console.error('错误堆栈:', error.stack);
             res.status(500).json({
                 success: false,
                 message: '批量删除计划失败',

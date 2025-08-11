@@ -90,6 +90,16 @@ router.put('/plans/:id',
 );
 
 /**
+ * 批量删除计划
+ * DELETE /api/work-plan/plans/batch
+ */
+router.delete('/plans/batch', 
+    authenticateToken, 
+    checkPermission('work-plan:plan:delete'),
+    workPlanController.batchDeletePlans
+);
+
+/**
  * 删除工作计划
  * DELETE /api/work-plan/plans/:id
  */
@@ -97,16 +107,6 @@ router.delete('/plans/:id',
     authenticateToken, 
     checkPermission('work-plan:plan:delete'),
     workPlanController.deletePlan
-);
-
-/**
- * 批量删除工作计划
- * DELETE /api/work-plan/plans
- */
-router.delete('/plans', 
-    authenticateToken, 
-    checkPermission('work-plan:plan:delete'),
-    workPlanController.batchDeletePlans
 );
 
 /**

@@ -17,14 +17,7 @@
         </h2>
       </div>
       <div class="header-right">
-        <el-button 
-          v-if="canEditPlan" 
-          type="primary" 
-          @click="editPlan"
-        >
-          <el-icon><Edit /></el-icon>
-          编辑计划
-        </el-button>
+        <!-- 移除顶部标题栏中的编辑计划按钮 -->
       </div>
     </div>
 
@@ -310,6 +303,172 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 编辑计划对话框 -->
+    <el-dialog
+      v-model="editPlanDialogVisible"
+      title="编辑计划"
+      width="800px"
+      :close-on-click-modal="false"
+    >
+      <el-form
+        ref="editPlanFormRef"
+        :model="editPlanForm"
+        :rules="editPlanFormRules"
+        label-width="120px"
+      >
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="计划标题" prop="title">
+              <el-input
+                v-model="editPlanForm.title"
+                placeholder="请输入计划标题"
+                maxlength="100"
+                show-word-limit
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="工作类型" prop="workTypeId">
+              <el-select
+                v-model="editPlanForm.workTypeId"
+                placeholder="请选择工作类型"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="type in workTypes"
+                  :key="type.ID"
+                  :label="type.TypeName"
+                  :value="type.ID"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="优先级" prop="priority">
+              <el-select
+                v-model="editPlanForm.priority"
+                placeholder="请选择优先级"
+                style="width: 100%"
+              >
+                <el-option label="低" value="low" />
+                <el-option label="中" value="medium" />
+                <el-option label="高" value="high" />
+                <el-option label="紧急" value="urgent" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="负责人" prop="assigneeId">
+              <el-select
+                v-model="editPlanForm.assigneeId"
+                placeholder="请选择负责人"
+                style="width: 100%"
+                filterable
+              >
+                <el-option
+                  v-for="user in assignableUsers"
+                  :key="user.ID"
+                  :label="user.RealName"
+                  :value="user.ID"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="所属部门" prop="departmentId">
+              <el-select
+                v-model="editPlanForm.departmentId"
+                placeholder="请选择部门"
+                style="width: 100%"
+              >
+                <el-option
+                  v-for="dept in departments"
+                  :key="dept.value || dept.ID"
+                  :label="dept.label || dept.DepartmentName || dept.Name"
+                  :value="dept.value || dept.ID"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="执行人" prop="executorIds">
+              <el-select
+                v-model="editPlanForm.executorIds"
+                placeholder="请选择执行人"
+                style="width: 100%"
+                multiple
+                filterable
+              >
+                <el-option
+                  v-for="user in assignableUsers"
+                  :key="user.ID"
+                  :label="user.RealName"
+                  :value="user.ID"
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="开始日期" prop="startDate">
+              <el-date-picker
+                v-model="editPlanForm.startDate"
+                type="date"
+                placeholder="选择开始日期"
+                style="width: 100%"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="结束日期" prop="endDate">
+              <el-date-picker
+                v-model="editPlanForm.endDate"
+                type="date"
+                placeholder="选择结束日期"
+                style="width: 100%"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-form-item label="计划描述" prop="description">
+          <el-input
+            v-model="editPlanForm.description"
+            type="textarea"
+            :rows="4"
+            placeholder="请输入计划描述"
+            maxlength="1000"
+            show-word-limit
+          />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="editPlanDialogVisible = false">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="saveEditPlan" 
+            :loading="editPlanSaving"
+          >
+            保存
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -343,7 +502,9 @@ const activeTab = ref('basic') // 默认显示基本信息标签页
 // 对话框状态
 const milestoneFormDialogVisible = ref(false)
 const progressDialogVisible = ref(false)
+const editPlanDialogVisible = ref(false)
 const saving = ref(false)
+const editPlanSaving = ref(false)
 
 // 里程碑表单相关
 const milestoneFormMode = ref('add')
@@ -372,6 +533,36 @@ const progressForm = reactive({
 const progressFormRules = {
   progress: [{ required: true, message: '请设置进度', trigger: 'change' }]
 }
+
+// 编辑计划表单相关
+const editPlanFormRef = ref()
+const editPlanForm = reactive({
+  title: '',
+  description: '',
+  workTypeId: '',
+  priority: '',
+  assigneeId: '',
+  departmentId: '',
+  executorIds: [],
+  startDate: '',
+  endDate: ''
+})
+
+const editPlanFormRules = {
+  title: [{ required: true, message: '请输入计划标题', trigger: 'blur' }],
+  workTypeId: [{ required: true, message: '请选择工作类型', trigger: 'change' }],
+  priority: [{ required: true, message: '请选择优先级', trigger: 'change' }],
+  assigneeId: [{ required: true, message: '请选择负责人', trigger: 'change' }],
+  departmentId: [{ required: true, message: '请选择部门', trigger: 'change' }],
+  executorIds: [{ required: true, message: '请选择执行人', trigger: 'change' }],
+  startDate: [{ required: true, message: '请选择开始日期', trigger: 'change' }],
+  endDate: [{ required: true, message: '请选择结束日期', trigger: 'change' }]
+}
+
+// 基础数据
+const workTypes = ref([])
+const departments = ref([])
+const assignableUsers = ref([])
 
 // 权限检查 - 基于角色权限管理系统
 const canEditPlan = computed(() => {
@@ -484,10 +675,169 @@ const goBack = () => {
 }
 
 /**
- * 编辑计划
+ * 编辑计划 - 显示编辑对话框
  */
-const editPlan = () => {
-  router.push(`/admin/work-plan/management?edit=${planDetail.value.ID}`)
+const editPlan = async () => {
+  try {
+    // 加载基础数据
+    await loadBasicData()
+    
+    // 填充表单数据
+    Object.assign(editPlanForm, {
+      title: planDetail.value.Title || '',
+      description: planDetail.value.Description || '',
+      workTypeId: planDetail.value.WorkTypeID || '',
+      priority: planDetail.value.Priority || '',
+      assigneeId: planDetail.value.AssignedTo || '',
+      departmentId: planDetail.value.DepartmentID || '',
+      executorIds: planDetail.value.executors ? planDetail.value.executors.map(executor => executor.ExecutorID) : [],
+      startDate: planDetail.value.StartDate ? planDetail.value.StartDate.split('T')[0] : '',
+      endDate: planDetail.value.EndDate ? planDetail.value.EndDate.split('T')[0] : ''
+    })
+    
+    editPlanDialogVisible.value = true
+  } catch (error) {
+    console.error('加载编辑数据失败:', error)
+    ElMessage.error('加载编辑数据失败')
+  }
+}
+
+/**
+ * 将树形结构的部门数据扁平化为适合下拉选择的格式
+ * @param {Array} tree - 树形结构的部门数据
+ * @param {string} prefix - 层级前缀
+ * @returns {Array} 扁平化的部门数据
+ */
+const flattenDepartmentTree = (tree, prefix = '') => {
+  const result = []
+  
+  for (const node of tree) {
+    // 添加当前节点
+    result.push({
+      value: node.value || node.ID,
+      label: prefix + (node.label || node.DepartmentName || node.Name),
+      ID: node.value || node.ID,
+      Name: node.label || node.DepartmentName || node.Name,
+      DepartmentName: node.label || node.DepartmentName || node.Name
+    })
+    
+    // 递归处理子节点
+    if (node.children && node.children.length > 0) {
+      const childNodes = flattenDepartmentTree(node.children, prefix + (node.label || node.DepartmentName || node.Name) + ' / ')
+      result.push(...childNodes)
+    }
+  }
+  
+  return result
+}
+
+/**
+ * 加载基础数据（工作类型、部门、用户等）
+ */
+const loadBasicData = async () => {
+  try {
+    console.log('开始加载基础数据...')
+    
+    // 检查token是否存在
+    const token = localStorage.getItem('token')
+    console.log('Token存在:', !!token)
+    
+    // 分别加载基础数据，便于调试
+    console.log('正在加载可分配用户...')
+    const assignableUsersRes = await api.get('/work-plan/assignable-users')
+    console.log('可分配用户响应:', assignableUsersRes.data)
+    
+    console.log('正在加载部门列表...')
+    const departmentsRes = await api.get('/departments')
+    console.log('部门列表响应:', departmentsRes.data)
+    
+    // 处理可分配用户数据
+    if (assignableUsersRes.data.success) {
+      assignableUsers.value = assignableUsersRes.data.data || []
+      console.log('可分配用户数据:', assignableUsers.value)
+    } else {
+      console.error('获取可分配用户失败:', assignableUsersRes.data.message)
+    }
+    
+    // 处理部门数据
+     if (departmentsRes.data.success) {
+       const departmentTree = departmentsRes.data.data || []
+       // 将树形结构扁平化为适合下拉选择的格式
+       departments.value = flattenDepartmentTree(departmentTree)
+       console.log('部门数据:', departments.value)
+     } else {
+       console.error('获取部门列表失败:', departmentsRes.data.message)
+     }
+    
+    // 尝试获取工作类型
+    try {
+      console.log('正在加载工作类型...')
+      const workTypeResponse = await api.get('/work-plan/work-types')
+      console.log('工作类型响应:', workTypeResponse.data)
+      if (workTypeResponse.data.success) {
+        workTypes.value = workTypeResponse.data.data || []
+        console.log('工作类型数据:', workTypes.value)
+      } else {
+        console.error('获取工作类型失败:', workTypeResponse.data.message)
+        workTypes.value = []
+      }
+    } catch (workTypeError) {
+      console.error('获取工作类型异常:', workTypeError)
+      // 如果工作类型获取失败，使用默认值
+      workTypes.value = [
+        { ID: 1, Name: '日常工作' },
+        { ID: 2, Name: '项目任务' },
+        { ID: 3, Name: '临时任务' }
+      ]
+    }
+    
+    console.log('基础数据加载完成')
+  } catch (error) {
+    console.error('加载基础数据失败:', error)
+    console.error('错误详情:', error.response?.data || error.message)
+    throw error
+  }
+}
+
+/**
+ * 保存编辑的计划
+ */
+const saveEditPlan = async () => {
+  try {
+    const valid = await editPlanFormRef.value.validate()
+    if (!valid) {
+      return
+    }
+    
+    editPlanSaving.value = true
+    
+    // 准备更新数据
+    const updateData = {
+      title: editPlanForm.title,
+      description: editPlanForm.description,
+      workTypeId: editPlanForm.workTypeId,
+      priority: editPlanForm.priority,
+      assigneeId: editPlanForm.assigneeId,
+      departmentId: editPlanForm.departmentId,
+      executorIds: editPlanForm.executorIds,
+      startDate: editPlanForm.startDate,
+      endDate: editPlanForm.endDate
+    }
+    
+    const response = await api.put(`/work-plan/plans/${planDetail.value.ID}`, updateData)
+    
+    if (response.data.success) {
+      ElMessage.success('计划更新成功')
+      editPlanDialogVisible.value = false
+      // 重新加载计划详情
+      await getPlanDetail()
+    }
+  } catch (error) {
+    console.error('保存计划失败:', error)
+    ElMessage.error('保存计划失败')
+  } finally {
+    editPlanSaving.value = false
+  }
 }
 
 /**
