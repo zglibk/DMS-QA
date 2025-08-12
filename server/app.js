@@ -52,6 +52,7 @@ const menuRouter = require('./routes/menus');                 // 菜单管理路
 const sampleRouter = require('./routes/sample');              // 样品管理路由
 const workPlanRouter = require('./routes/workPlan');          // 工作计划管理路由
 const noticeRouter = require('./routes/notice');              // 通知公告管理路由
+const supplierComplaintsRouter = require('./routes/supplierComplaints'); // 供应商投诉管理路由
 
 /**
  * 创建Express应用实例
@@ -157,6 +158,7 @@ app.use('/api/menus', menuRouter);
 app.use('/api/sample', sampleRouter);
 app.use('/api/work-plan', workPlanRouter);
 app.use('/api/notice', noticeRouter);
+app.use('/api/supplier-complaints', supplierComplaintsRouter);
 
 /**
  * 静态文件服务配置

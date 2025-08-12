@@ -4,7 +4,7 @@
     <div class="page-header">
       <h2 class="page-title">
         <el-icon><Warning /></el-icon>
-        供应商投诉管理
+        供应商投诉
       </h2>
       <p class="page-description">管理供应商材料投诉、处理流程、改善验证、索赔等相关业务</p>
     </div>
@@ -69,17 +69,11 @@
               style="width: 240px"
             />
           </el-form-item>
-          <el-form-item>
+          <el-form-item class="search-btn">
             <el-button type="primary" @click="handleSearch" :icon="Search">搜索</el-button>
             <el-button @click="handleReset" :icon="Refresh">重置</el-button>
           </el-form-item>
         </el-form>
-        
-        <div class="action-buttons">
-          <el-button type="primary" @click="handleAdd" :icon="Plus">新增投诉</el-button>
-          <el-button type="success" @click="handleExport" :icon="Download">导出数据</el-button>
-          <el-button type="info" @click="handleStatistics" :icon="DataAnalysis">统计分析</el-button>
-        </div>
       </el-card>
     </div>
 
@@ -143,60 +137,71 @@
 
     <!-- 数据表格 -->
     <div class="table-section">
-      <el-card shadow="never">
-        <el-table 
+      <div class="table-header">
+        <div class="action-buttons">
+          <el-button type="primary" @click="handleAdd" :icon="Plus">新增投诉</el-button>
+          <el-button type="success" @click="handleExport" :icon="Download">导出数据</el-button>
+          <el-button type="danger" @click="handleBatchDelete" :icon="Delete" :disabled="selectedRows.length === 0">批量删除</el-button>
+        </div>
+      </div>
+      <el-table 
+          :key="tableKey"
           :data="tableData" 
           v-loading="loading" 
           stripe 
           border
           style="width: 100%"
+          :header-cell-style="{ textAlign: 'center', whiteSpace: 'nowrap' }"
+          :cell-style="getCellStyle"
           @selection-change="handleSelectionChange"
         >
           <el-table-column type="selection" width="55" />
-          <el-table-column prop="complaintNo" label="投诉编号" width="140" fixed="left">
+          <el-table-column prop="ComplaintNo" label="投诉编号" width="140" fixed="left">
             <template #default="{ row }">
-              <el-link type="primary" @click="handleView(row)">{{ row.complaintNo }}</el-link>
+              <el-link type="primary" @click="handleView(row)">{{ row.ComplaintNo }}</el-link>
             </template>
           </el-table-column>
-          <el-table-column prop="complaintDate" label="投诉日期" width="120">
+          <el-table-column prop="ComplaintDate" label="投诉日期" width="120">
             <template #default="{ row }">
-              {{ formatDate(row.complaintDate) }}
+              {{ formatDate(row.ComplaintDate) }}
             </template>
           </el-table-column>
-          <el-table-column prop="supplierName" label="供应商名称" width="180" show-overflow-tooltip />
-          <el-table-column prop="materialName" label="材料名称" width="150" show-overflow-tooltip />
-          <el-table-column prop="complaintType" label="投诉类型" width="120">
+          <el-table-column prop="SupplierName" label="供应商名称" width="180" show-overflow-tooltip />
+          <el-table-column prop="MaterialName" label="材料名称" width="150" show-overflow-tooltip />
+          <el-table-column prop="ComplaintType" label="投诉类型" width="120">
             <template #default="{ row }">
-              <el-tag :type="getComplaintTypeColor(row.complaintType)">{{ row.complaintType }}</el-tag>
+              <el-tag :type="getComplaintTypeColor(row.ComplaintType)">{{ row.ComplaintType }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="urgencyLevel" label="紧急程度" width="100">
+          <el-table-column prop="UrgencyLevel" label="紧急程度" width="100">
             <template #default="{ row }">
-              <el-tag :type="getUrgencyColor(row.urgencyLevel)">{{ getUrgencyText(row.urgencyLevel) }}</el-tag>
+              <el-tag :type="getUrgencyColor(row.UrgencyLevel)">{{ getUrgencyText(row.UrgencyLevel) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="quantity" label="数量" width="100" align="right">
+          <el-table-column prop="Quantity" label="数量" width="100" align="right">
             <template #default="{ row }">
-              {{ formatNumber(row.quantity) }}
+              {{ formatNumber(row.Quantity) }}
             </template>
           </el-table-column>
-          <el-table-column prop="totalAmount" label="涉及金额" width="120" align="right">
+          <el-table-column prop="TotalAmount" label="涉及金额" width="120" align="right">
             <template #default="{ row }">
-              <span class="amount-text">¥{{ formatNumber(row.totalAmount) }}</span>
+              <span class="amount-text">¥{{ formatNumber(row.TotalAmount) }}</span>
             </template>
           </el-table-column>
-          <el-table-column prop="processStatus" label="处理状态" width="100">
+          <el-table-column prop="ProcessStatus" label="处理状态" width="100">
             <template #default="{ row }">
-              <el-tag :type="getStatusColor(row.processStatus)">{{ getStatusText(row.processStatus) }}</el-tag>
+              <el-tag :type="getStatusColor(row.ProcessStatus)">{{ getStatusText(row.ProcessStatus) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="responsiblePerson" label="负责人" width="100" />
-          <el-table-column prop="description" label="问题描述" width="200" show-overflow-tooltip />
-          <el-table-column label="操作" width="200" fixed="right">
+          <el-table-column prop="InitiatedBy" label="发起人" width="100" />
+          <el-table-column prop="Description" label="问题描述" width="200" show-overflow-tooltip />
+          <el-table-column label="操作" width="220" fixed="right">
             <template #default="{ row }">
-              <el-button type="primary" size="small" @click="handleView(row)" :icon="View">查看</el-button>
-              <el-button type="warning" size="small" @click="handleEdit(row)" :icon="Edit">编辑</el-button>
-              <el-button type="danger" size="small" @click="handleDelete(row)" :icon="Delete">删除</el-button>
+              <div class="action-buttons">
+                <el-button type="primary" size="small" @click="handleView(row)" :icon="View">查看</el-button>
+                <el-button type="warning" size="small" @click="handleEdit(row)" :icon="Edit">编辑</el-button>
+                <el-button type="danger" size="small" @click="handleDelete(row)" :icon="Delete">删除</el-button>
+              </div>
             </template>
           </el-table-column>
         </el-table>
@@ -206,21 +211,20 @@
           <el-pagination
             v-model:current-page="pagination.currentPage"
             v-model:page-size="pagination.pageSize"
-            :page-sizes="[10, 20, 50, 100]"
+            :page-sizes="[5, 10, 20, 50, 100]"
             :total="pagination.total"
             layout="total, sizes, prev, pager, next, jumper"
             @size-change="handleSizeChange"
             @current-change="handleCurrentChange"
           />
         </div>
-      </el-card>
     </div>
 
     <!-- 新增/编辑对话框 -->
     <el-dialog 
       v-model="dialogVisible" 
       :title="dialogTitle" 
-      width="80%"
+      width="50%"
       :close-on-click-modal="false"
       @close="handleDialogClose"
     >
@@ -232,15 +236,15 @@
         class="complaint-form"
       >
         <el-row :gutter="20">
-          <el-col :span="12">
+          <el-col :span="8">
             <el-form-item label="投诉编号" prop="complaintNo">
-              <el-input v-model="formData.complaintNo" :disabled="isEdit" placeholder="系统自动生成" />
+              <el-input v-model="formData.complaintNo" :disabled="true" placeholder="系统自动生成" />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="投诉日期" prop="complaintDate">
+          <el-col :span="8">
+            <el-form-item label="投诉日期" prop="ComplaintDate">
               <el-date-picker 
-                v-model="formData.complaintDate" 
+                v-model="formData.ComplaintDate" 
                 type="date" 
                 placeholder="选择投诉日期"
                 format="YYYY-MM-DD"
@@ -249,49 +253,9 @@
               />
             </el-form-item>
           </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="供应商名称" prop="supplierName">
-              <el-select 
-                v-model="formData.supplierName" 
-                placeholder="请选择供应商" 
-                filterable 
-                style="width: 100%"
-              >
-                <el-option 
-                  v-for="supplier in supplierList" 
-                  :key="supplier.value" 
-                  :label="supplier.label" 
-                  :value="supplier.value" 
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="材料名称" prop="materialName">
-              <el-input v-model="formData.materialName" placeholder="请输入材料名称" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="投诉类型" prop="complaintType">
-              <el-select v-model="formData.complaintType" placeholder="请选择投诉类型" style="width: 100%">
-                <el-option label="质量问题" value="质量问题" />
-                <el-option label="交货延迟" value="交货延迟" />
-                <el-option label="规格不符" value="规格不符" />
-                <el-option label="包装破损" value="包装破损" />
-                <el-option label="服务问题" value="服务问题" />
-                <el-option label="其他" value="其他" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="紧急程度" prop="urgencyLevel">
-              <el-select v-model="formData.urgencyLevel" placeholder="请选择紧急程度" style="width: 100%">
+          <el-col :span="8">
+            <el-form-item label="紧急程度" prop="UrgencyLevel">
+              <el-select v-model="formData.UrgencyLevel" placeholder="请选择紧急程度" style="width: 100%">
                 <el-option label="低" value="low" />
                 <el-option label="中" value="medium" />
                 <el-option label="高" value="high" />
@@ -301,68 +265,143 @@
         </el-row>
         
         <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="问题数量" prop="quantity">
-              <el-input-number 
-                v-model="formData.quantity" 
-                :min="0" 
-                :precision="2" 
+          <el-col :span="10">
+            <el-form-item label="供应商名称" prop="SupplierName">
+              <el-select
+                v-model="formData.SupplierName"
+                placeholder="请选择或输入供应商名称"
+                filterable
+                allow-create
+                default-first-option
                 style="width: 100%"
-                @change="calculateTotalAmount"
-              />
+              >
+                <el-option
+                  v-for="supplier in supplierList"
+                  :key="supplier.value"
+                  :label="supplier.label"
+                  :value="supplier.value"
+                />
+              </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
-            <el-form-item label="单价" prop="unitPrice">
-              <el-input-number 
-                v-model="formData.unitPrice" 
-                :min="0" 
-                :precision="2" 
-                style="width: 100%"
-                @change="calculateTotalAmount"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="总金额" prop="totalAmount">
-              <el-input-number 
-                v-model="formData.totalAmount" 
-                :min="0" 
-                :precision="2" 
-                style="width: 100%"
-                disabled
-              />
+          <el-col :span="14">
+            <el-form-item label="材料名称" prop="MaterialName">
+              <el-input v-model="formData.MaterialName" placeholder="请输入材料名称" />
             </el-form-item>
           </el-col>
         </el-row>
         
-        <el-form-item label="问题描述" prop="description">
-          <el-input 
-            v-model="formData.description" 
-            type="textarea" 
-            :rows="4" 
-            placeholder="请详细描述投诉问题"
-          />
-        </el-form-item>
-        
-        <el-form-item label="期望解决方案">
-          <el-input 
-            v-model="formData.expectedSolution" 
-            type="textarea" 
-            :rows="3" 
-            placeholder="请描述期望的解决方案"
-          />
-        </el-form-item>
-        
-        <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="负责人" prop="responsiblePerson">
-              <el-input v-model="formData.responsiblePerson" placeholder="请输入负责人姓名" />
+        <el-row :gutter="15">
+          <el-col :span="8">
+            <el-form-item label="来料日期">
+              <el-date-picker 
+                v-model="formData.IncomingDate" 
+                type="date" 
+                placeholder="选择来料日期"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+              />
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="处理状态" prop="processStatus">
-              <el-select v-model="formData.processStatus" placeholder="请选择处理状态" style="width: 100%">
+          <el-col :span="8">
+            <el-form-item label="批量数量">
+              <el-input-number 
+                v-model="formData.BatchQuantity" 
+                :min="0" 
+                :precision="2" 
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item label="抽检数量">
+              <el-input-number 
+                v-model="formData.SampleQuantity" 
+                :min="0" 
+                :precision="2" 
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="6">
+            <el-form-item label="IQC判定">
+              <el-select v-model="formData.IQCResult" placeholder="请选择IQC判定" style="width: 100%">
+                <el-option label="合格" value="合格" />
+                <el-option label="不合格" value="不合格" />
+                <el-option label="特采" value="特采" />
+                <el-option label="让步接收" value="让步接收" />
+                <el-option label="待定" value="待定" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="采购单号">
+              <el-input 
+                v-model="formData.PurchaseOrderNo" 
+                placeholder="请输入采购单号，多个用逗号分隔" 
+                type="textarea"
+                :rows="2"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="使用工单">
+              <el-input 
+                v-model="formData.WorkOrderNo" 
+                placeholder="请输入使用工单，多个用逗号分隔" 
+                type="textarea"
+                :rows="2"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="附图">
+              <el-input v-model="formData.AttachedImages" placeholder="请输入附图说明或路径" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="检验日期">
+              <el-date-picker 
+                v-model="formData.InspectionDate" 
+                type="date" 
+                placeholder="选择检验日期"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+ 
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="发起人" prop="InitiatedBy">
+            <el-select 
+              v-model="formData.InitiatedBy" 
+              placeholder="请选择发起人" 
+              filterable
+              clearable
+              style="width: 100%"
+            >
+              <el-option
+                v-for="person in personList"
+                :key="person.value"
+                :label="person.label"
+                :value="person.value"
+              />
+            </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="处理状态" prop="ProcessStatus">
+              <el-select v-model="formData.ProcessStatus" placeholder="请选择处理状态" style="width: 100%">
                 <el-option label="待处理" value="pending" />
                 <el-option label="处理中" value="processing" />
                 <el-option label="已完成" value="completed" />
@@ -372,14 +411,70 @@
           </el-col>
         </el-row>
         
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="问题数量" prop="Quantity">
+              <el-input-number 
+                v-model="formData.Quantity" 
+                :min="0" 
+                :precision="2" 
+                style="width: 100%"
+                @change="calculateTotalAmount"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="单价" prop="UnitPrice">
+              <el-input-number 
+                v-model="formData.UnitPrice" 
+                :min="0" 
+                :precision="2" 
+                style="width: 100%"
+                @change="calculateTotalAmount"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="总金额" prop="TotalAmount">
+              <el-input-number 
+                v-model="formData.TotalAmount" 
+                :min="0" 
+                :precision="2" 
+                style="width: 100%"
+                disabled
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-form-item label="问题描述" prop="Description">
+          <el-input 
+            v-model="formData.Description" 
+            type="textarea" 
+            :rows="4" 
+            placeholder="请详细描述投诉问题"
+          />
+        </el-form-item>
+        
+        <el-form-item label="期望解决方案">
+          <el-input 
+            v-model="formData.ExpectedSolution" 
+            type="textarea" 
+            :rows="3" 
+            placeholder="请描述期望的解决方案"
+          />
+        </el-form-item>
+        
+
+        
         <!-- 处理结果相关字段 -->
-        <div v-if="formData.processStatus !== 'pending'" class="process-section">
+        <div v-if="formData.ProcessStatus !== 'pending'" class="process-section">
           <el-divider content-position="left">处理结果</el-divider>
           
           <el-row :gutter="20">
-            <el-col :span="12">
+            <el-col :span="8">
               <el-form-item label="处理结果">
-                <el-select v-model="formData.processResult" placeholder="请选择处理结果" style="width: 100%">
+                <el-select v-model="formData.ProcessResult" placeholder="请选择处理结果" style="width: 100%">
                   <el-option label="供应商整改" value="supplier_improvement" />
                   <el-option label="退货处理" value="return_goods" />
                   <el-option label="换货处理" value="exchange_goods" />
@@ -389,10 +484,20 @@
                 </el-select>
               </el-form-item>
             </el-col>
-            <el-col :span="12">
+            <el-col :span="8">
               <el-form-item label="索赔金额">
                 <el-input-number 
-                  v-model="formData.claimAmount" 
+                  v-model="formData.ClaimAmount" 
+                  :min="0" 
+                  :precision="2" 
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="实际损失">
+                <el-input-number 
+                  v-model="formData.ActualLoss" 
                   :min="0" 
                   :precision="2" 
                   style="width: 100%"
@@ -403,19 +508,9 @@
           
           <el-row :gutter="20">
             <el-col :span="8">
-              <el-form-item label="实际损失">
-                <el-input-number 
-                  v-model="formData.actualLoss" 
-                  :min="0" 
-                  :precision="2" 
-                  style="width: 100%"
-                />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
               <el-form-item label="赔偿金额">
                 <el-input-number 
-                  v-model="formData.compensationAmount" 
+                  v-model="formData.CompensationAmount" 
                   :min="0" 
                   :precision="2" 
                   style="width: 100%"
@@ -425,7 +520,17 @@
             <el-col :span="8">
               <el-form-item label="返工成本">
                 <el-input-number 
-                  v-model="formData.reworkCost" 
+                  v-model="formData.ReworkCost" 
+                  :min="0" 
+                  :precision="2" 
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item label="更换成本">
+                <el-input-number 
+                  v-model="formData.ReplacementCost" 
                   :min="0" 
                   :precision="2" 
                   style="width: 100%"
@@ -436,19 +541,9 @@
           
           <el-row :gutter="20">
             <el-col :span="8">
-              <el-form-item label="更换成本">
-                <el-input-number 
-                  v-model="formData.replacementCost" 
-                  :min="0" 
-                  :precision="2" 
-                  style="width: 100%"
-                />
-              </el-form-item>
-            </el-col>
-            <el-col :span="8">
               <el-form-item label="退货数量">
                 <el-input-number 
-                  v-model="formData.returnQuantity" 
+                  v-model="formData.ReturnQuantity" 
                   :min="0" 
                   :precision="2" 
                   style="width: 100%"
@@ -458,7 +553,7 @@
             <el-col :span="8">
               <el-form-item label="退货金额">
                 <el-input-number 
-                  v-model="formData.returnAmount" 
+                  v-model="formData.ReturnAmount" 
                   :min="0" 
                   :precision="2" 
                   style="width: 100%"
@@ -469,7 +564,7 @@
           
           <el-form-item label="解决方案描述">
             <el-input 
-              v-model="formData.solutionDescription" 
+              v-model="formData.SolutionDescription" 
               type="textarea" 
               :rows="3" 
               placeholder="请描述具体的解决方案"
@@ -478,7 +573,7 @@
           
           <el-form-item label="验证结果">
             <el-input 
-              v-model="formData.verificationResult" 
+              v-model="formData.VerificationResult" 
               type="textarea" 
               :rows="3" 
               placeholder="请描述验证结果"
@@ -487,7 +582,7 @@
           
           <el-form-item label="后续行动">
             <el-input 
-              v-model="formData.followUpActions" 
+              v-model="formData.FollowUpActions" 
               type="textarea" 
               :rows="2" 
               placeholder="请描述后续需要采取的行动"
@@ -496,7 +591,7 @@
           
           <el-form-item label="预防措施">
             <el-input 
-              v-model="formData.preventiveMeasures" 
+              v-model="formData.PreventiveMeasures" 
               type="textarea" 
               :rows="2" 
               placeholder="请描述预防类似问题的措施"
@@ -505,7 +600,7 @@
           
           <el-form-item label="供应商回复">
             <el-input 
-              v-model="formData.supplierResponse" 
+              v-model="formData.SupplierResponse" 
               type="textarea" 
               :rows="3" 
               placeholder="供应商的回复内容"
@@ -515,7 +610,7 @@
         
         <el-form-item label="内部备注">
           <el-input 
-            v-model="formData.internalNotes" 
+            v-model="formData.InternalNotes" 
             type="textarea" 
             :rows="2" 
             placeholder="内部备注信息"
@@ -535,68 +630,80 @@
     <el-dialog 
       v-model="viewDialogVisible" 
       title="投诉详情" 
-      width="70%"
+      width="43%"
       :close-on-click-modal="false"
     >
       <div class="complaint-detail" v-if="viewData">
-        <el-descriptions :column="2" border>
-          <el-descriptions-item label="投诉编号">{{ viewData.complaintNo }}</el-descriptions-item>
-          <el-descriptions-item label="投诉日期">{{ formatDate(viewData.complaintDate) }}</el-descriptions-item>
-          <el-descriptions-item label="供应商名称">{{ viewData.supplierName }}</el-descriptions-item>
-          <el-descriptions-item label="材料名称">{{ viewData.materialName }}</el-descriptions-item>
+        <el-descriptions :column="3" border>
+          <el-descriptions-item label="投诉编号">{{ viewData.ComplaintNo }}</el-descriptions-item>
+          <el-descriptions-item label="投诉日期">{{ formatDate(viewData.ComplaintDate) }}</el-descriptions-item>
+          <el-descriptions-item label="供应商名称">{{ viewData.SupplierName }}</el-descriptions-item>
+          <el-descriptions-item label="材料名称">{{ viewData.MaterialName }}</el-descriptions-item>
+          <el-descriptions-item label="材料编号">{{ viewData.MaterialCode || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="采购单号">{{ viewData.PurchaseOrderNo || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="来料日期">{{ formatDate(viewData.IncomingDate) || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="批量数量">{{ formatNumber(viewData.BatchQuantity) || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="检验日期">{{ formatDate(viewData.InspectionDate) || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="使用工单">{{ viewData.WorkOrderNo || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="抽检数量">{{ formatNumber(viewData.SampleQuantity) || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="附图">{{ viewData.AttachedImages || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="IQC判定">
+            <el-tag v-if="viewData.IQCResult" :type="getIQCResultColor(viewData.IQCResult)">{{ viewData.IQCResult }}</el-tag>
+            <span v-else>-</span>
+          </el-descriptions-item>
           <el-descriptions-item label="投诉类型">
-            <el-tag :type="getComplaintTypeColor(viewData.complaintType)">{{ viewData.complaintType }}</el-tag>
+            <el-tag :type="getComplaintTypeColor(viewData.ComplaintType)">{{ viewData.ComplaintType }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="紧急程度">
-            <el-tag :type="getUrgencyColor(viewData.urgencyLevel)">{{ getUrgencyText(viewData.urgencyLevel) }}</el-tag>
+            <el-tag :type="getUrgencyColor(viewData.UrgencyLevel)">{{ getUrgencyText(viewData.UrgencyLevel) }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="问题数量">{{ formatNumber(viewData.quantity) }}</el-descriptions-item>
-          <el-descriptions-item label="单价">¥{{ formatNumber(viewData.unitPrice) }}</el-descriptions-item>
-          <el-descriptions-item label="总金额">¥{{ formatNumber(viewData.totalAmount) }}</el-descriptions-item>
+          <el-descriptions-item label="问题数量">{{ formatNumber(viewData.Quantity) }}</el-descriptions-item>
+          <el-descriptions-item label="单价">¥{{ formatNumber(viewData.UnitPrice) }}</el-descriptions-item>
+          <el-descriptions-item label="总金额">¥{{ formatNumber(viewData.TotalAmount) }}</el-descriptions-item>
           <el-descriptions-item label="处理状态">
-            <el-tag :type="getStatusColor(viewData.processStatus)">{{ getStatusText(viewData.processStatus) }}</el-tag>
+            <el-tag :type="getStatusColor(viewData.ProcessStatus)">{{ getStatusText(viewData.ProcessStatus) }}</el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="负责人">{{ viewData.responsiblePerson }}</el-descriptions-item>
-          <el-descriptions-item label="创建时间">{{ formatDateTime(viewData.createdAt) }}</el-descriptions-item>
+          <el-descriptions-item label="发起人">{{ viewData.InitiatedBy }}</el-descriptions-item>
+          <el-descriptions-item label="创建时间">{{ formatDateTime(viewData.CreatedAt) }}</el-descriptions-item>
         </el-descriptions>
         
         <el-divider content-position="left">问题描述</el-divider>
-        <p class="description-text">{{ viewData.description }}</p>
+        <p class="description-text">{{ viewData.Description }}</p>
         
-        <el-divider content-position="left" v-if="viewData.expectedSolution">期望解决方案</el-divider>
-        <p class="description-text" v-if="viewData.expectedSolution">{{ viewData.expectedSolution }}</p>
+        <el-divider content-position="left" v-if="viewData.ExpectedSolution">期望解决方案</el-divider>
+        <p class="description-text" v-if="viewData.ExpectedSolution">{{ viewData.ExpectedSolution }}</p>
         
-        <div v-if="viewData.processStatus !== 'pending'">
+        <div v-if="viewData.ProcessStatus !== 'pending'">
           <el-divider content-position="left">处理结果</el-divider>
-          <el-descriptions :column="2" border>
-            <el-descriptions-item label="处理结果">{{ viewData.processResult }}</el-descriptions-item>
-            <el-descriptions-item label="索赔金额">¥{{ formatNumber(viewData.claimAmount) }}</el-descriptions-item>
-            <el-descriptions-item label="实际损失">¥{{ formatNumber(viewData.actualLoss) }}</el-descriptions-item>
-            <el-descriptions-item label="赔偿金额">¥{{ formatNumber(viewData.compensationAmount) }}</el-descriptions-item>
-            <el-descriptions-item label="返工成本">¥{{ formatNumber(viewData.reworkCost) }}</el-descriptions-item>
-            <el-descriptions-item label="更换成本">¥{{ formatNumber(viewData.replacementCost) }}</el-descriptions-item>
-            <el-descriptions-item label="退货数量">{{ formatNumber(viewData.returnQuantity) }}</el-descriptions-item>
-            <el-descriptions-item label="退货金额">¥{{ formatNumber(viewData.returnAmount) }}</el-descriptions-item>
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="处理结果">{{ viewData.ProcessResult }}</el-descriptions-item>
+            <el-descriptions-item label="索赔金额">¥{{ formatNumber(viewData.ClaimAmount) }}</el-descriptions-item>
+            <el-descriptions-item label="实际损失">¥{{ formatNumber(viewData.ActualLoss) }}</el-descriptions-item>
+            <el-descriptions-item label="赔偿金额">¥{{ formatNumber(viewData.CompensationAmount) }}</el-descriptions-item>
+            <el-descriptions-item label="返工成本">¥{{ formatNumber(viewData.ReworkCost) }}</el-descriptions-item>
+            <el-descriptions-item label="更换成本">¥{{ formatNumber(viewData.ReplacementCost) }}</el-descriptions-item>
+            <el-descriptions-item label="退货数量">{{ formatNumber(viewData.ReturnQuantity) }}</el-descriptions-item>
+            <el-descriptions-item label="退货金额">¥{{ formatNumber(viewData.ReturnAmount) }}</el-descriptions-item>
           </el-descriptions>
           
-          <el-divider content-position="left" v-if="viewData.solutionDescription">解决方案描述</el-divider>
-          <p class="description-text" v-if="viewData.solutionDescription">{{ viewData.solutionDescription }}</p>
+          <el-divider content-position="left" v-if="viewData.SolutionDescription">解决方案描述</el-divider>
+          <p class="description-text" v-if="viewData.SolutionDescription">{{ viewData.SolutionDescription }}</p>
           
-          <el-divider content-position="left" v-if="viewData.verificationResult">验证结果</el-divider>
-          <p class="description-text" v-if="viewData.verificationResult">{{ viewData.verificationResult }}</p>
+          <el-divider content-position="left" v-if="viewData.VerificationResult">验证结果</el-divider>
+          <p class="description-text" v-if="viewData.VerificationResult">{{ viewData.VerificationResult }}</p>
           
-          <el-divider content-position="left" v-if="viewData.followUpActions">后续行动</el-divider>
-          <p class="description-text" v-if="viewData.followUpActions">{{ viewData.followUpActions }}</p>
+          <el-divider content-position="left" v-if="viewData.FollowUpActions">后续行动</el-divider>
+          <p class="description-text" v-if="viewData.FollowUpActions">{{ viewData.FollowUpActions }}</p>
           
-          <el-divider content-position="left" v-if="viewData.preventiveMeasures">预防措施</el-divider>
-          <p class="description-text" v-if="viewData.preventiveMeasures">{{ viewData.preventiveMeasures }}</p>
+          <el-divider content-position="left" v-if="viewData.PreventiveMeasures">预防措施</el-divider>
+          <p class="description-text" v-if="viewData.PreventiveMeasures">{{ viewData.PreventiveMeasures }}</p>
           
-          <el-divider content-position="left" v-if="viewData.supplierResponse">供应商回复</el-divider>
-          <p class="description-text" v-if="viewData.supplierResponse">{{ viewData.supplierResponse }}</p>
+          <el-divider content-position="left" v-if="viewData.SupplierResponse">供应商回复</el-divider>
+          <p class="description-text" v-if="viewData.SupplierResponse">{{ viewData.SupplierResponse }}</p>
         </div>
         
-        <el-divider content-position="left" v-if="viewData.internalNotes">内部备注</el-divider>
-        <p class="description-text" v-if="viewData.internalNotes">{{ viewData.internalNotes }}</p>
+        <el-divider content-position="left" v-if="viewData.InternalNotes">内部备注</el-divider>
+        <p class="description-text" v-if="viewData.InternalNotes">{{ viewData.InternalNotes }}</p>
       </div>
       
       <template #footer>
@@ -610,23 +717,25 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Search, Refresh, Plus, Download, DataAnalysis,
   View, Edit, Delete, Warning, Clock, Loading,
   CircleCheck, Histogram
 } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/services/api'
 
 // 响应式数据
 const loading = ref(false)
 const submitLoading = ref(false)
 const tableData = ref([])
+const tableKey = ref(0)
 const selectedRows = ref([])
-const showStatistics = ref(false)
+const showStatistics = ref(true)
 const statistics = ref({})
 const supplierList = ref([])
+const personList = ref([]) // 人员列表
 
 // 搜索表单
 const searchForm = reactive({
@@ -640,7 +749,7 @@ const searchForm = reactive({
 // 分页数据
 const pagination = reactive({
   currentPage: 1,
-  pageSize: 20,
+  pageSize: 5,
   total: 0
 })
 
@@ -652,34 +761,43 @@ const viewData = ref(null)
 
 // 表单数据
 const formData = reactive({
-  id: null,
-  complaintNo: '',
-  complaintDate: '',
-  supplierName: '',
-  materialName: '',
-  complaintType: '',
-  description: '',
-  quantity: 0,
-  unitPrice: 0,
-  totalAmount: 0,
-  urgencyLevel: 'medium',
-  expectedSolution: '',
-  responsiblePerson: '',
-  processStatus: 'pending',
-  processResult: '',
-  solutionDescription: '',
-  verificationResult: '',
-  claimAmount: 0,
-  actualLoss: 0,
-  compensationAmount: 0,
-  reworkCost: 0,
-  replacementCost: 0,
-  returnQuantity: 0,
-  returnAmount: 0,
-  followUpActions: '',
-  preventiveMeasures: '',
-  supplierResponse: '',
-  internalNotes: ''
+  ID: null,
+  ComplaintNo: '',
+  ComplaintDate: '',
+  SupplierName: '',
+  MaterialName: '',
+  MaterialCode: '', // 材料编号
+  PurchaseOrderNo: '', // 采购单号
+  IncomingDate: '', // 来料日期
+  BatchQuantity: 0, // 批量数量
+  InspectionDate: '', // 检验日期
+  WorkOrderNo: '', // 使用工单
+  SampleQuantity: 0, // 抽检数量
+  AttachedImages: '', // 附图
+  IQCResult: '', // IQC判定
+  ComplaintType: '',
+  Description: '',
+  Quantity: 0,
+  UnitPrice: 0,
+  TotalAmount: 0,
+  UrgencyLevel: 'medium',
+  ExpectedSolution: '',
+  InitiatedBy: '',
+  ProcessStatus: 'pending',
+  ProcessResult: '',
+  SolutionDescription: '',
+  VerificationResult: '',
+  ClaimAmount: 0,
+  ActualLoss: 0,
+  CompensationAmount: 0,
+  ReworkCost: 0,
+  ReplacementCost: 0,
+  ReturnQuantity: 0,
+  ReturnAmount: 0,
+  FollowUpActions: '',
+  PreventiveMeasures: '',
+  SupplierResponse: '',
+  InternalNotes: ''
 })
 
 // 表单引用
@@ -687,16 +805,16 @@ const formRef = ref(null)
 
 // 表单验证规则
 const formRules = {
-  complaintDate: [{ required: true, message: '请选择投诉日期', trigger: 'change' }],
-  supplierName: [{ required: true, message: '请选择供应商', trigger: 'change' }],
-  materialName: [{ required: true, message: '请输入材料名称', trigger: 'blur' }],
-  complaintType: [{ required: true, message: '请选择投诉类型', trigger: 'change' }],
-  description: [{ required: true, message: '请输入问题描述', trigger: 'blur' }],
-  quantity: [{ required: true, message: '请输入问题数量', trigger: 'blur' }],
-  unitPrice: [{ required: true, message: '请输入单价', trigger: 'blur' }],
-  urgencyLevel: [{ required: true, message: '请选择紧急程度', trigger: 'change' }],
-  responsiblePerson: [{ required: true, message: '请输入负责人', trigger: 'blur' }],
-  processStatus: [{ required: true, message: '请选择处理状态', trigger: 'change' }]
+  ComplaintDate: [{ required: true, message: '请选择投诉日期', trigger: 'change' }],
+  SupplierName: [{ required: true, message: '请选择供应商', trigger: 'change' }],
+  MaterialName: [{ required: true, message: '请输入材料名称', trigger: 'blur' }],
+  ComplaintType: [{ required: true, message: '请选择投诉类型', trigger: 'change' }],
+  Description: [{ required: true, message: '请输入问题描述', trigger: 'blur' }],
+  Quantity: [{ required: true, message: '请输入问题数量', trigger: 'blur' }],
+  UnitPrice: [{ required: true, message: '请输入单价', trigger: 'blur' }],
+  UrgencyLevel: [{ required: true, message: '请选择紧急程度', trigger: 'change' }],
+  InitiatedBy: [{ required: true, message: '请选择发起人', trigger: 'change' }],
+  ProcessStatus: [{ required: true, message: '请选择处理状态', trigger: 'change' }]
 }
 
 // 计算属性
@@ -708,6 +826,8 @@ const dialogTitle = computed(() => {
 onMounted(() => {
   loadData()
   loadSuppliers()
+  loadPersonList() // 加载人员列表
+  loadStatistics()
 })
 
 // 方法定义
@@ -720,7 +840,7 @@ const loadData = async () => {
     loading.value = true
     const params = {
       page: pagination.currentPage,
-      pageSize: pagination.pageSize,
+      size: pagination.pageSize,
       ...searchForm
     }
     
@@ -730,11 +850,22 @@ const loadData = async () => {
       params.endDate = searchForm.dateRange[1]
     }
     
-    const response = await axios.get('/api/supplier-complaints', { params })
+    const response = await api.get('/supplier-complaints', { params })
+    
+    // 添加调试日志
+    console.log('API响应:', response.data)
+    console.log('数据列表:', response.data.data?.list)
     
     if (response.data.success) {
-      tableData.value = response.data.data.list
+      // 强制触发响应式更新
+      tableData.value = []
+      tableKey.value++
+      await nextTick()
+      tableData.value = response.data.data.list || []
       pagination.total = response.data.data.total
+      console.log('设置tableData:', tableData.value)
+      console.log('tableData长度:', tableData.value.length)
+      console.log('tableKey:', tableKey.value)
     } else {
       ElMessage.error(response.data.message || '加载数据失败')
     }
@@ -751,12 +882,44 @@ const loadData = async () => {
  */
 const loadSuppliers = async () => {
   try {
-    const response = await axios.get('/api/supplier-complaints/suppliers')
+    const response = await api.get('/supplier-complaints/suppliers')
     if (response.data.success) {
-      supplierList.value = response.data.data
+      // 将字符串数组转换为对象数组，供el-select使用
+      supplierList.value = response.data.data.map(supplier => ({
+        value: supplier,
+        label: supplier
+      }))
     }
   } catch (error) {
     console.error('加载供应商列表失败:', error)
+    ElMessage.error('加载供应商列表失败')
+  }
+}
+
+/**
+ * 加载人员列表
+ */
+const loadPersonList = async () => {
+  try {
+    const response = await api.get('/person/list', {
+      params: {
+        page: 1,
+        pageSize: 1000, // 获取所有人员
+        includeInactive: false // 只获取在职人员
+      }
+    })
+    if (response.data.success) {
+      // 格式化人员数据为 "姓名（部门）" 格式
+      personList.value = response.data.data.map(person => ({
+        value: person.Name,
+        label: `${person.Name}（${person.DepartmentName}）`,
+        name: person.Name,
+        department: person.DepartmentName
+      }))
+    }
+  } catch (error) {
+    console.error('加载人员列表失败:', error)
+    ElMessage.error('加载人员列表失败')
   }
 }
 
@@ -765,7 +928,7 @@ const loadSuppliers = async () => {
  */
 const loadStatistics = async () => {
   try {
-    const response = await axios.get('/api/supplier-complaints/statistics')
+    const response = await api.get('/supplier-complaints/statistics/overview')
     if (response.data.success) {
       statistics.value = response.data.data
     }
@@ -799,10 +962,25 @@ const handleReset = () => {
 /**
  * 新增投诉
  */
-const handleAdd = () => {
-  isEdit.value = false
-  resetFormData()
-  dialogVisible.value = true
+const handleAdd = async () => {
+  try {
+    isEdit.value = false
+    resetFormData()
+    
+    // 预生成投诉编号
+    const response = await api.get('/supplier-complaints/generate-complaint-no')
+    if (response.data.success) {
+      formData.complaintNo = response.data.data.complaintNo
+    } else {
+      ElMessage.error(response.data.message || '生成投诉编号失败')
+      return
+    }
+    
+    dialogVisible.value = true
+  } catch (error) {
+    console.error('生成投诉编号失败:', error)
+    ElMessage.error('生成投诉编号失败')
+  }
 }
 
 /**
@@ -811,6 +989,8 @@ const handleAdd = () => {
 const handleEdit = (row) => {
   isEdit.value = true
   Object.assign(formData, row)
+  // 确保投诉编号正确设置
+  formData.complaintNo = row.ComplaintNo
   dialogVisible.value = true
 }
 
@@ -836,7 +1016,7 @@ const handleEditFromView = () => {
 const handleDelete = async (row) => {
   try {
     await ElMessageBox.confirm(
-      `确定要删除投诉编号为 "${row.complaintNo}" 的记录吗？`,
+      `确定要删除投诉编号为 "${row.ComplaintNo}" 的记录吗？`,
       '确认删除',
       {
         confirmButtonText: '确定',
@@ -845,7 +1025,7 @@ const handleDelete = async (row) => {
       }
     )
     
-    const response = await axios.delete(`/api/supplier-complaints/${row.id}`)
+    const response = await api.delete(`/supplier-complaints/${row.ID}`)
     
     if (response.data.success) {
       ElMessage.success('删除成功')
@@ -869,12 +1049,44 @@ const handleExport = () => {
 }
 
 /**
- * 统计分析
+ * 批量删除
  */
-const handleStatistics = () => {
-  showStatistics.value = !showStatistics.value
-  if (showStatistics.value) {
-    loadStatistics()
+const handleBatchDelete = async () => {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请选择要删除的记录')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedRows.value.length} 条记录吗？此操作不可恢复！`,
+      '批量删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+
+    const ids = selectedRows.value.map(row => row.ID)
+    const response = await api.delete('/supplier-complaints/batch', {
+      data: { ids }
+    })
+
+    if (response.data.success) {
+      ElMessage.success(`成功删除 ${selectedRows.value.length} 条记录`)
+      selectedRows.value = []
+      loadData()
+      loadStatistics() // 重新加载统计数据
+    } else {
+      ElMessage.error(response.data.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量删除失败:', error)
+      ElMessage.error('删除失败')
+    }
   }
 }
 
@@ -906,7 +1118,7 @@ const handleCurrentChange = (page) => {
  * 计算总金额
  */
 const calculateTotalAmount = () => {
-  formData.totalAmount = (formData.quantity || 0) * (formData.unitPrice || 0)
+  formData.TotalAmount = (formData.Quantity || 0) * (formData.UnitPrice || 0)
 }
 
 /**
@@ -919,12 +1131,12 @@ const handleSubmit = async () => {
     submitLoading.value = true
     
     const url = isEdit.value 
-      ? `/api/supplier-complaints/${formData.id}`
-      : '/api/supplier-complaints'
+      ? `/supplier-complaints/${formData.ID}`
+      : '/supplier-complaints'
     
     const method = isEdit.value ? 'put' : 'post'
     
-    const response = await axios[method](url, formData)
+    const response = await api[method](url, formData)
     
     if (response.data.success) {
       ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
@@ -953,35 +1165,45 @@ const handleDialogClose = () => {
  * 重置表单数据
  */
 const resetFormData = () => {
+  const currentComplaintNo = formData.ComplaintNo // 保存当前的投诉编号
   Object.assign(formData, {
-    id: null,
-    complaintNo: '',
-    complaintDate: new Date().toISOString().split('T')[0],
-    supplierName: '',
-    materialName: '',
-    complaintType: '',
-    description: '',
-    quantity: 0,
-    unitPrice: 0,
-    totalAmount: 0,
-    urgencyLevel: 'medium',
-    expectedSolution: '',
-    responsiblePerson: '',
-    processStatus: 'pending',
-    processResult: '',
-    solutionDescription: '',
-    verificationResult: '',
-    claimAmount: 0,
-    actualLoss: 0,
-    compensationAmount: 0,
-    reworkCost: 0,
-    replacementCost: 0,
-    returnQuantity: 0,
-    returnAmount: 0,
-    followUpActions: '',
-    preventiveMeasures: '',
-    supplierResponse: '',
-    internalNotes: ''
+    ID: null,
+    ComplaintNo: isEdit.value ? '' : currentComplaintNo, // 新增时保留预生成的编号，编辑时清空
+    ComplaintDate: new Date().toISOString().split('T')[0],
+    SupplierName: '',
+    MaterialName: '',
+    MaterialCode: '', // 材料编号
+    PurchaseOrderNo: '', // 采购单号
+    IncomingDate: '', // 来料日期
+    BatchQuantity: 0, // 批量数量
+    InspectionDate: '', // 检验日期
+    WorkOrderNo: '', // 使用工单
+    SampleQuantity: 0, // 抽检数量
+    AttachedImages: '', // 附图
+    IQCResult: '', // IQC判定
+    ComplaintType: '',
+    Description: '',
+    Quantity: 0,
+    UnitPrice: 0,
+    TotalAmount: 0,
+    UrgencyLevel: 'medium',
+    ExpectedSolution: '',
+    ResponsiblePerson: '',
+    ProcessStatus: 'pending',
+    ProcessResult: '',
+    SolutionDescription: '',
+    VerificationResult: '',
+    ClaimAmount: 0,
+    ActualLoss: 0,
+    CompensationAmount: 0,
+    ReworkCost: 0,
+    ReplacementCost: 0,
+    ReturnQuantity: 0,
+    ReturnAmount: 0,
+    FollowUpActions: '',
+    PreventiveMeasures: '',
+    SupplierResponse: '',
+    InternalNotes: ''
   })
 }
 
@@ -1075,18 +1297,73 @@ const getStatusText = (status) => {
   }
   return textMap[status] || '未知状态'
 }
+
+/**
+ * 获取IQC判定结果颜色
+ */
+const getIQCResultColor = (result) => {
+  const colorMap = {
+    '合格': 'success',
+    '不合格': 'danger',
+    '特采': 'warning',
+    '让步接收': 'info',
+    '待定': 'warning'
+  }
+  return colorMap[result] || 'info'
+}
+
+/**
+ * 获取表格单元格样式
+ */
+const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
+  const baseStyle = {
+    textAlign: 'center',
+    verticalAlign: 'middle',
+    whiteSpace: 'nowrap',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis'
+  }
+  
+  // 供应商名称列（第4列，索引3）左对齐
+  if (columnIndex === 3) {
+    return { ...baseStyle, textAlign: 'left' }
+  }
+  
+  // 材料名称列（第5列，索引4）左对齐
+  if (columnIndex === 4) {
+    return { ...baseStyle, textAlign: 'left' }
+  }
+  
+  // 问题描述列（第11列，索引10）左对齐
+  if (columnIndex === 10) {
+    return { ...baseStyle, textAlign: 'left' }
+  }
+  
+  // 数量列（第8列，索引7）右对齐
+  if (columnIndex === 7) {
+    return { ...baseStyle, textAlign: 'right' }
+  }
+  
+  // 涉及金额列（第9列，索引8）右对齐
+  if (columnIndex === 8) {
+    return { ...baseStyle, textAlign: 'right' }
+  }
+  
+  return baseStyle
+}
 </script>
 
 <style scoped>
 .supplier-complaints-container {
-  padding: 20px;
+  padding: 8px;
   background-color: #f5f5f5;
-  min-height: 100vh;
+  height: auto; /* 改为自动高度，  */
+  box-sizing: border-box;
 }
 
 .page-header {
-  margin-bottom: 20px;
-  padding: 20px;
+  margin-bottom: 10px;
+  padding: 20px 8px;
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
@@ -1108,16 +1385,31 @@ const getStatusText = (status) => {
   font-size: 14px;
 }
 
-.search-section {
-  margin-bottom: 20px;
+.supplier-complaints-container .search-section {
+  margin-bottom: 10px !important;
 }
 
 .search-card {
   border-radius: 8px;
 }
 
-.search-form {
+.search-btn {
+  margin: 0px !important;
+}
+
+.table-header {
+  display: flex;
+  align-items: center;
   margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.table-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
 }
 
 .action-buttons {
@@ -1126,12 +1418,15 @@ const getStatusText = (status) => {
 }
 
 .statistics-section {
-  margin-bottom: 20px;
+  margin-bottom: 8px;
+  flex-shrink: 0;
 }
 
 .stat-card {
   border-radius: 8px;
   transition: all 0.3s ease;
+  height: auto;
+  min-height: 80px;
 }
 
 .stat-card:hover {
@@ -1142,7 +1437,7 @@ const getStatusText = (status) => {
 .stat-content {
   display: flex;
   align-items: center;
-  padding: 10px;
+  padding: 8px 10px;
 }
 
 .stat-icon {
@@ -1208,22 +1503,40 @@ const getStatusText = (status) => {
   color: #303133;
 }
 
+/* 表格区域样式 - 参考岗位管理页面的处理方式 */
 .table-section {
   background: white;
   border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   overflow: hidden;
 }
 
+/* 表格内容区域 - 参考岗位管理页面的处理方式 */
+.table-content {
+  /* 移除flex属性，让内容自然适应高度 */
+}
+
+/* 表格头部操作区域 */
+.table-header {
+  padding: 20px;
+  border-bottom: 1px solid #EBEEF5;
+}
+
+.table-header .action-buttons {
+  display: flex;
+  gap: 12px;
+}
+
+/* 分页样式 - 参考物料价格页面 */
 .pagination-container {
+  padding: 20px;
   display: flex;
   justify-content: center;
-  padding: 20px;
-  background: #fafafa;
-  border-top: 1px solid #ebeef5;
+  border-top: 1px solid #EBEEF5;
 }
 
 .complaint-form {
-  max-height: 60vh;
+  max-height: 65vh;
   overflow-y: auto;
   padding-right: 10px;
 }
@@ -1236,7 +1549,7 @@ const getStatusText = (status) => {
 }
 
 .complaint-detail {
-  max-height: 70vh;
+  max-height: 75vh;
   overflow-y: auto;
 }
 
@@ -1256,6 +1569,82 @@ const getStatusText = (status) => {
 
 .dialog-footer {
   text-align: right;
+}
+
+/* 表格样式优化已通过Element Plus内置属性实现 */
+
+/* 操作列按钮样式 - 禁止换行 */
+.supplier-complaints-container .el-table .action-buttons {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  min-width: 200px;
+  width: 100%;
+}
+
+.supplier-complaints-container .el-table .action-buttons .el-button {
+  margin: 0;
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-size: 12px;
+  padding: 4px 6px;
+}
+
+/* 确保操作列单元格不换行 */
+.supplier-complaints-container .el-table td:last-child {
+  white-space: nowrap !important;
+  overflow: visible !important;
+}
+
+/* 防止对话框导致页面元素被挤压的样式 - 参考物料价格页面 */
+/* 编辑对话框样式 - 修复居中问题 */
+:deep(.el-dialog) {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  margin: 0 !important;
+  max-height: 90vh !important;
+  overflow-y: auto !important;
+}
+
+/* 确保删除确认对话框不影响页面布局 */
+:deep(.delete-confirm-dialog.el-message-box) {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 2001 !important;
+  margin: 0 !important;
+}
+
+/* 防止删除确认对话框导致页面滚动条变化 */
+:deep(.el-popup-parent--hidden) {
+  padding-right: 0 !important;
+  overflow: visible !important;
+}
+
+/* 通用消息框样式 */
+:deep(.el-message-box) {
+  position: fixed !important;
+  margin: 0 !important;
+}
+
+/* 消息框遮罩层样式 */
+:deep(.el-overlay) {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  z-index: 2000 !important;
+}
+
+.supplier-complaints-container .el-table td:last-child .cell {
+  white-space: nowrap !important;
+  overflow: visible !important;
 }
 
 /* 响应式设计 */

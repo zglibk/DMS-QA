@@ -90,28 +90,39 @@ router.get('/', async (req, res) => {
     dataRequest.input('size', sql.Int, parseInt(size))
     
     const dataResult = await dataRequest.query(`
-      SELECT 
-        sc.ID,
-        sc.ComplaintNo,
-        sc.ComplaintDate,
-        sc.SupplierName,
-        sc.MaterialName,
-        sc.ComplaintType,
-        sc.Description,
-        sc.Quantity,
-        sc.UnitPrice,
-        sc.TotalAmount,
-        sc.ProcessStatus,
-        sc.ProcessResult,
-        sc.ResponsiblePerson,
-        sc.CreatedBy,
-        sc.CreatedAt,
-        sc.UpdatedAt
-      FROM SupplierComplaints sc
-      WHERE ${whereClause}
-      ORDER BY sc.ComplaintDate DESC, sc.CreatedAt DESC
-      OFFSET @offset ROWS
-      FETCH NEXT @size ROWS ONLY
+      SELECT * FROM (
+        SELECT 
+          sc.ID,
+          sc.ComplaintNo,
+          sc.ComplaintDate,
+          sc.SupplierName,
+          sc.MaterialName,
+          sc.MaterialCode,
+          sc.PurchaseOrderNo,
+          sc.IncomingDate,
+          sc.BatchQuantity,
+          sc.InspectionDate,
+          sc.WorkOrderNo,
+          sc.SampleQuantity,
+          sc.AttachedImages,
+          sc.IQCResult,
+          sc.ComplaintType,
+          sc.UrgencyLevel,
+          sc.Description,
+          sc.Quantity,
+          sc.UnitPrice,
+          sc.TotalAmount,
+          sc.ProcessStatus,
+          sc.ProcessResult,
+          sc.InitiatedBy,
+          sc.CreatedBy,
+          sc.CreatedAt,
+          sc.UpdatedAt,
+          ROW_NUMBER() OVER (ORDER BY sc.ComplaintDate DESC, sc.CreatedAt DESC) as RowNum
+        FROM SupplierComplaints sc
+        WHERE ${whereClause}
+      ) AS PagedResults
+      WHERE RowNum > @offset AND RowNum <= (@offset + @size)
     `)
     
     res.json({
@@ -135,6 +146,97 @@ router.get('/', async (req, res) => {
 })
 
 /**
+ * 预生成投诉编号
+ * GET /api/supplier-complaints/generate-complaint-no
+ */
+router.get('/generate-complaint-no', async (req, res) => {
+  try {
+    const pool = await getConnection()
+    
+    // 生成投诉编号：MC-TJ + yymm + 000（流水号每月重置）
+    const today = new Date()
+    const year = today.getFullYear().toString().slice(-2) // 获取年份后两位
+    const month = (today.getMonth() + 1).toString().padStart(2, '0') // 获取月份，补零
+    const yearMonth = year + month // yymm格式
+    
+    // 获取当月的投诉序号（每月重置），确保流水号唯一性
+    let sequence = 1
+    let complaintNo = ''
+    let isUnique = false
+    
+    // 循环查找可用的流水号，确保不重复
+    while (!isUnique && sequence <= 999) {
+      const seqStr = sequence.toString().padStart(3, '0')
+      complaintNo = `MC-TJ${yearMonth}${seqStr}`
+      
+      // 检查该编号是否已存在
+      const checkResult = await pool.request()
+        .input('complaintNo', sql.NVarChar(50), complaintNo)
+        .query(`
+          SELECT COUNT(*) as count
+          FROM SupplierComplaints
+          WHERE ComplaintNo = @complaintNo
+        `)
+      
+      if (checkResult.recordset[0].count === 0) {
+        isUnique = true
+      } else {
+        sequence++
+      }
+    }
+    
+    // 如果所有流水号都被占用，返回错误
+    if (!isUnique) {
+      return res.status(500).json({
+        success: false,
+        message: '当月投诉编号已达上限（999），请联系管理员'
+      })
+    }
+    
+    res.json({
+      success: true,
+      data: { complaintNo }
+    })
+  } catch (error) {
+    console.error('生成投诉编号失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '生成投诉编号失败',
+      error: error.message
+    })
+  }
+})
+
+/**
+ * 获取供应商列表（用于下拉选择）
+ * GET /api/supplier-complaints/suppliers
+ */
+router.get('/suppliers', async (req, res) => {
+  try {
+    const pool = await getConnection()
+    
+    const result = await pool.request().query(`
+      SELECT DISTINCT SupplierName
+      FROM SupplierComplaints
+      WHERE Status != 0 AND SupplierName IS NOT NULL AND SupplierName != ''
+      ORDER BY SupplierName
+    `)
+    
+    res.json({
+      success: true,
+      data: result.recordset.map(item => item.SupplierName)
+    })
+  } catch (error) {
+    console.error('获取供应商列表失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取供应商列表失败',
+      error: error.message
+    })
+  }
+})
+
+/**
  * 获取单个供应商投诉详情
  * GET /api/supplier-complaints/:id
  */
@@ -144,15 +246,15 @@ router.get('/:id', async (req, res) => {
     const pool = await getConnection()
     
     const result = await pool.request()
-      .input('id', sql.Int, id)
+      .input('id', sql.Int, parseInt(id))
       .query(`
         SELECT 
           sc.*,
           u1.Username as CreatedByName,
           u2.Username as UpdatedByName
         FROM SupplierComplaints sc
-        LEFT JOIN Users u1 ON sc.CreatedBy = u1.ID
-        LEFT JOIN Users u2 ON sc.UpdatedBy = u2.ID
+        LEFT JOIN [User] u1 ON sc.CreatedBy = u1.ID
+        LEFT JOIN [User] u2 ON sc.UpdatedBy = u2.ID
         WHERE sc.ID = @id AND sc.Status != 0
       `)
     
@@ -186,11 +288,20 @@ router.post('/', async (req, res) => {
     const {
       supplierName,
       materialName,
+      materialCode,
+      purchaseOrderNo,
+      incomingDate,
+      batchQuantity,
+      inspectionDate,
+      workOrderNo,
+      sampleQuantity,
+      attachedImages,
+      iqcResult,
       complaintType,
       description,
       quantity,
       unitPrice,
-      responsiblePerson,
+      initiatedBy,
       urgencyLevel = 'medium',
       expectedSolution
     } = req.body
@@ -205,21 +316,45 @@ router.post('/', async (req, res) => {
     
     const pool = await getConnection()
     
-    // 生成投诉编号
+    // 生成投诉编号：MC-TJ + yymm + 000（流水号每月重置）
     const today = new Date()
-    const dateStr = today.toISOString().slice(0, 10).replace(/-/g, '')
+    const year = today.getFullYear().toString().slice(-2) // 获取年份后两位
+    const month = (today.getMonth() + 1).toString().padStart(2, '0') // 获取月份，补零
+    const yearMonth = year + month // yymm格式
     
-    // 获取当天的投诉序号
-    const seqResult = await pool.request()
-      .input('datePrefix', sql.NVarChar(20), `SC${dateStr}`)
-      .query(`
-        SELECT COUNT(*) as count
-        FROM SupplierComplaints
-        WHERE ComplaintNo LIKE @datePrefix + '%'
-      `)
+    // 获取当月的投诉序号（每月重置），确保流水号唯一性
+    let sequence = 1
+    let complaintNo = ''
+    let isUnique = false
     
-    const sequence = (seqResult.recordset[0].count + 1).toString().padStart(3, '0')
-    const complaintNo = `SC${dateStr}${sequence}`
+    // 循环查找可用的流水号，确保不重复
+    while (!isUnique && sequence <= 999) {
+      const seqStr = sequence.toString().padStart(3, '0')
+      complaintNo = `MC-TJ${yearMonth}${seqStr}`
+      
+      // 检查该编号是否已存在
+      const checkResult = await pool.request()
+        .input('complaintNo', sql.NVarChar(50), complaintNo)
+        .query(`
+          SELECT COUNT(*) as count
+          FROM SupplierComplaints
+          WHERE ComplaintNo = @complaintNo
+        `)
+      
+      if (checkResult.recordset[0].count === 0) {
+        isUnique = true
+      } else {
+        sequence++
+      }
+    }
+    
+    // 如果所有流水号都被占用，抛出错误
+    if (!isUnique) {
+      return res.status(500).json({
+        success: false,
+        message: '当月投诉编号已达上限（999），请联系管理员'
+      })
+    }
     
     // 计算总金额
     const totalAmount = quantity && unitPrice ? quantity * unitPrice : 0
@@ -230,6 +365,15 @@ router.post('/', async (req, res) => {
       .input('complaintDate', sql.DateTime, today)
       .input('supplierName', sql.NVarChar(200), supplierName)
       .input('materialName', sql.NVarChar(200), materialName)
+      .input('materialCode', sql.NVarChar(100), materialCode || '')
+      .input('purchaseOrderNo', sql.NVarChar(100), purchaseOrderNo || '')
+      .input('incomingDate', sql.DateTime, incomingDate || null)
+      .input('batchQuantity', sql.Decimal(18, 2), batchQuantity || 0)
+      .input('inspectionDate', sql.DateTime, inspectionDate || null)
+      .input('workOrderNo', sql.NVarChar(100), workOrderNo || '')
+      .input('sampleQuantity', sql.Decimal(18, 2), sampleQuantity || 0)
+      .input('attachedImages', sql.NText, attachedImages || '')
+      .input('iqcResult', sql.NVarChar(50), iqcResult || '')
       .input('complaintType', sql.NVarChar(50), complaintType)
       .input('description', sql.NText, description)
       .input('quantity', sql.Decimal(18, 2), quantity || 0)
@@ -237,18 +381,22 @@ router.post('/', async (req, res) => {
       .input('totalAmount', sql.Decimal(18, 2), totalAmount)
       .input('urgencyLevel', sql.NVarChar(20), urgencyLevel)
       .input('expectedSolution', sql.NText, expectedSolution || '')
-      .input('responsiblePerson', sql.NVarChar(100), responsiblePerson || '')
+      .input('initiatedBy', sql.NVarChar(100), initiatedBy || '')
       .input('processStatus', sql.NVarChar(50), 'pending')
       .input('createdBy', sql.Int, req.user?.id || 1)
       .query(`
         INSERT INTO SupplierComplaints (
-          ComplaintNo, ComplaintDate, SupplierName, MaterialName, ComplaintType,
+          ComplaintNo, ComplaintDate, SupplierName, MaterialName, MaterialCode,
+          PurchaseOrderNo, IncomingDate, BatchQuantity, InspectionDate, WorkOrderNo,
+          SampleQuantity, AttachedImages, IQCResult, ComplaintType,
           Description, Quantity, UnitPrice, TotalAmount, UrgencyLevel,
-          ExpectedSolution, ResponsiblePerson, ProcessStatus, CreatedBy, CreatedAt
+          ExpectedSolution, InitiatedBy, ProcessStatus, CreatedBy, CreatedAt
         ) VALUES (
-          @complaintNo, @complaintDate, @supplierName, @materialName, @complaintType,
+          @complaintNo, @complaintDate, @supplierName, @materialName, @materialCode,
+          @purchaseOrderNo, @incomingDate, @batchQuantity, @inspectionDate, @workOrderNo,
+          @sampleQuantity, @attachedImages, @iqcResult, @complaintType,
           @description, @quantity, @unitPrice, @totalAmount, @urgencyLevel,
-          @expectedSolution, @responsiblePerson, @processStatus, @createdBy, GETDATE()
+          @expectedSolution, @initiatedBy, @processStatus, @createdBy, GETDATE()
         );
         SELECT SCOPE_IDENTITY() as ID;
       `)
@@ -280,11 +428,20 @@ router.put('/:id', async (req, res) => {
     const {
       supplierName,
       materialName,
+      materialCode,
+      purchaseOrderNo,
+      incomingDate,
+      batchQuantity,
+      inspectionDate,
+      workOrderNo,
+      sampleQuantity,
+      attachedImages,
+      iqcResult,
       complaintType,
       description,
       quantity,
       unitPrice,
-      responsiblePerson,
+      initiatedBy,
       urgencyLevel,
       expectedSolution,
       processStatus,
@@ -297,7 +454,7 @@ router.put('/:id', async (req, res) => {
     
     // 检查记录是否存在
     const checkResult = await pool.request()
-      .input('id', sql.Int, id)
+      .input('id', sql.Int, parseInt(id))
       .query('SELECT ID FROM SupplierComplaints WHERE ID = @id AND Status != 0')
     
     if (checkResult.recordset.length === 0) {
@@ -312,9 +469,18 @@ router.put('/:id', async (req, res) => {
     
     // 更新记录
     await pool.request()
-      .input('id', sql.Int, id)
+      .input('id', sql.Int, parseInt(id))
       .input('supplierName', sql.NVarChar(200), supplierName)
       .input('materialName', sql.NVarChar(200), materialName)
+      .input('materialCode', sql.NVarChar(100), materialCode || '')
+      .input('purchaseOrderNo', sql.NVarChar(100), purchaseOrderNo || '')
+      .input('incomingDate', sql.DateTime, incomingDate || null)
+      .input('batchQuantity', sql.Decimal(18, 2), batchQuantity || 0)
+      .input('inspectionDate', sql.DateTime, inspectionDate || null)
+      .input('workOrderNo', sql.NVarChar(100), workOrderNo || '')
+      .input('sampleQuantity', sql.Decimal(18, 2), sampleQuantity || 0)
+      .input('attachedImages', sql.NText, attachedImages || '')
+      .input('iqcResult', sql.NVarChar(50), iqcResult || '')
       .input('complaintType', sql.NVarChar(50), complaintType)
       .input('description', sql.NText, description)
       .input('quantity', sql.Decimal(18, 2), quantity || 0)
@@ -322,7 +488,7 @@ router.put('/:id', async (req, res) => {
       .input('totalAmount', sql.Decimal(18, 2), totalAmount)
       .input('urgencyLevel', sql.NVarChar(20), urgencyLevel)
       .input('expectedSolution', sql.NText, expectedSolution || '')
-      .input('responsiblePerson', sql.NVarChar(100), responsiblePerson || '')
+      .input('initiatedBy', sql.NVarChar(100), initiatedBy || '')
       .input('processStatus', sql.NVarChar(50), processStatus)
       .input('processResult', sql.NVarChar(50), processResult || '')
       .input('solutionDescription', sql.NText, solutionDescription || '')
@@ -332,6 +498,15 @@ router.put('/:id', async (req, res) => {
         UPDATE SupplierComplaints SET
           SupplierName = @supplierName,
           MaterialName = @materialName,
+          MaterialCode = @materialCode,
+          PurchaseOrderNo = @purchaseOrderNo,
+          IncomingDate = @incomingDate,
+          BatchQuantity = @batchQuantity,
+          InspectionDate = @inspectionDate,
+          WorkOrderNo = @workOrderNo,
+          SampleQuantity = @sampleQuantity,
+          AttachedImages = @attachedImages,
+          IQCResult = @iqcResult,
           ComplaintType = @complaintType,
           Description = @description,
           Quantity = @quantity,
@@ -339,7 +514,7 @@ router.put('/:id', async (req, res) => {
           TotalAmount = @totalAmount,
           UrgencyLevel = @urgencyLevel,
           ExpectedSolution = @expectedSolution,
-          ResponsiblePerson = @responsiblePerson,
+          InitiatedBy = @initiatedBy,
           ProcessStatus = @processStatus,
           ProcessResult = @processResult,
           SolutionDescription = @solutionDescription,
@@ -364,6 +539,56 @@ router.put('/:id', async (req, res) => {
 })
 
 /**
+ * 批量删除供应商投诉记录
+ * DELETE /api/supplier-complaints/batch
+ */
+router.delete('/batch', async (req, res) => {
+  try {
+    const { ids } = req.body
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '请提供要删除的记录ID列表'
+      })
+    }
+    
+    const pool = await getConnection()
+    
+    // 构建批量删除的SQL语句
+    const placeholders = ids.map((_, index) => `@id${index}`).join(',')
+    let request = pool.request()
+    
+    // 添加参数
+    ids.forEach((id, index) => {
+      request.input(`id${index}`, sql.Int, id)
+    })
+    
+    // 执行批量删除（软删除）
+    const result = await request.query(`
+      UPDATE SupplierComplaints 
+      SET Status = 0, UpdatedAt = GETDATE()
+      WHERE ID IN (${placeholders}) AND Status != 0
+    `)
+    
+    res.json({
+      success: true,
+      message: `成功删除 ${result.rowsAffected[0]} 条记录`,
+      data: {
+        deletedCount: result.rowsAffected[0]
+      }
+    })
+  } catch (error) {
+    console.error('批量删除供应商投诉记录失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '批量删除供应商投诉记录失败',
+      error: error.message
+    })
+  }
+})
+
+/**
  * 删除供应商投诉记录（软删除）
  * DELETE /api/supplier-complaints/:id
  */
@@ -374,7 +599,7 @@ router.delete('/:id', async (req, res) => {
     
     // 检查记录是否存在
     const checkResult = await pool.request()
-      .input('id', sql.Int, id)
+      .input('id', sql.Int, parseInt(id))
       .query('SELECT ID FROM SupplierComplaints WHERE ID = @id AND Status != 0')
     
     if (checkResult.recordset.length === 0) {
@@ -386,7 +611,7 @@ router.delete('/:id', async (req, res) => {
     
     // 软删除记录
     await pool.request()
-      .input('id', sql.Int, id)
+      .input('id', sql.Int, parseInt(id))
       .input('updatedBy', sql.Int, req.user?.id || 1)
       .query(`
         UPDATE SupplierComplaints SET
@@ -457,35 +682,6 @@ router.get('/statistics/overview', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '获取投诉统计数据失败',
-      error: error.message
-    })
-  }
-})
-
-/**
- * 获取供应商列表（用于下拉选择）
- * GET /api/supplier-complaints/suppliers
- */
-router.get('/options/suppliers', async (req, res) => {
-  try {
-    const pool = await getConnection()
-    
-    const result = await pool.request().query(`
-      SELECT DISTINCT SupplierName
-      FROM SupplierComplaints
-      WHERE Status != 0 AND SupplierName IS NOT NULL AND SupplierName != ''
-      ORDER BY SupplierName
-    `)
-    
-    res.json({
-      success: true,
-      data: result.recordset.map(item => item.SupplierName)
-    })
-  } catch (error) {
-    console.error('获取供应商列表失败:', error)
-    res.status(500).json({
-      success: false,
-      message: '获取供应商列表失败',
       error: error.message
     })
   }

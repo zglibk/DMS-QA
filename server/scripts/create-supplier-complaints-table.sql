@@ -4,52 +4,52 @@
  * 执行方式：在SQL Server Management Studio中执行此脚本
  */
 
--- =====================================================
--- 创建供应商投诉表
--- =====================================================
+/* ===================================================== */
+/* 创建供应商投诉表 */
+/* ===================================================== */
 IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='SupplierComplaints' AND xtype='U')
 BEGIN
     CREATE TABLE [dbo].[SupplierComplaints] (
         [ID] INT IDENTITY(1,1) PRIMARY KEY,
-        [ComplaintNo] NVARCHAR(50) NOT NULL UNIQUE,                    -- 投诉编号
-        [ComplaintDate] DATETIME NOT NULL DEFAULT GETDATE(),           -- 投诉日期
-        [SupplierName] NVARCHAR(200) NOT NULL,                         -- 供应商名称
-        [MaterialName] NVARCHAR(200) NOT NULL,                         -- 材料名称
-        [ComplaintType] NVARCHAR(50) NOT NULL,                         -- 投诉类型
-        [Description] NTEXT NOT NULL,                                  -- 问题描述
-        [Quantity] DECIMAL(18,2) DEFAULT 0,                           -- 问题数量
-        [UnitPrice] DECIMAL(18,2) DEFAULT 0,                          -- 单价
-        [TotalAmount] DECIMAL(18,2) DEFAULT 0,                        -- 总金额
-        [UrgencyLevel] NVARCHAR(20) DEFAULT 'medium',                 -- 紧急程度
-        [ExpectedSolution] NTEXT,                                      -- 期望解决方案
-        [ResponsiblePerson] NVARCHAR(100),                            -- 负责人
-        [ProcessStatus] NVARCHAR(50) DEFAULT 'pending',               -- 处理状态
-        [ProcessResult] NVARCHAR(50),                                  -- 处理结果
-        [SolutionDescription] NTEXT,                                   -- 解决方案描述
-        [VerificationResult] NTEXT,                                    -- 验证结果
-        [ClaimAmount] DECIMAL(18,2) DEFAULT 0,                        -- 索赔金额
-        [ActualLoss] DECIMAL(18,2) DEFAULT 0,                         -- 实际损失
-        [CompensationAmount] DECIMAL(18,2) DEFAULT 0,                 -- 赔偿金额
-        [ReworkCost] DECIMAL(18,2) DEFAULT 0,                         -- 返工成本
-        [ReplacementCost] DECIMAL(18,2) DEFAULT 0,                    -- 更换成本
-        [ReturnQuantity] DECIMAL(18,2) DEFAULT 0,                     -- 退货数量
-        [ReturnAmount] DECIMAL(18,2) DEFAULT 0,                       -- 退货金额
-        [FollowUpActions] NTEXT,                                       -- 后续行动
-        [PreventiveMeasures] NTEXT,                                    -- 预防措施
-        [SupplierResponse] NTEXT,                                      -- 供应商回复
-        [InternalNotes] NTEXT,                                         -- 内部备注
-        [AttachmentPaths] NTEXT,                                       -- 附件路径
-        [CompletedDate] DATETIME,                                      -- 完成日期
-        [ClosedDate] DATETIME,                                         -- 关闭日期
-        [Status] INT DEFAULT 1,                                       -- 状态(1:正常, 0:删除)
-        [CreatedBy] INT,                                               -- 创建人ID
-        [CreatedAt] DATETIME DEFAULT GETDATE(),                       -- 创建时间
-        [UpdatedBy] INT,                                               -- 更新人ID
-        [UpdatedAt] DATETIME DEFAULT GETDATE(),                       -- 更新时间
+        [ComplaintNo] NVARCHAR(50) NOT NULL UNIQUE,                    /* 投诉编号 */
+        [ComplaintDate] DATETIME NOT NULL DEFAULT GETDATE(),           /* 投诉日期 */
+        [SupplierName] NVARCHAR(200) NOT NULL,                         /* 供应商名称 */
+        [MaterialName] NVARCHAR(200) NOT NULL,                         /* 材料名称 */
+        [ComplaintType] NVARCHAR(50) NOT NULL,                         /* 投诉类型 */
+        [Description] NTEXT NOT NULL,                                  /* 问题描述 */
+        [Quantity] DECIMAL(18,2) DEFAULT 0,                           /* 问题数量 */
+        [UnitPrice] DECIMAL(18,2) DEFAULT 0,                          /* 单价 */
+        [TotalAmount] DECIMAL(18,2) DEFAULT 0,                        /* 总金额 */
+        [UrgencyLevel] NVARCHAR(20) DEFAULT 'medium',                 /* 紧急程度 */
+        [ExpectedSolution] NTEXT,                                      /* 期望解决方案 */
+        [ResponsiblePerson] NVARCHAR(100),                            /* 负责人 */
+        [ProcessStatus] NVARCHAR(50) DEFAULT 'pending',               /* 处理状态 */
+        [ProcessResult] NVARCHAR(50),                                  /* 处理结果 */
+        [SolutionDescription] NTEXT,                                   /* 解决方案描述 */
+        [VerificationResult] NTEXT,                                    /* 验证结果 */
+        [ClaimAmount] DECIMAL(18,2) DEFAULT 0,                        /* 索赔金额 */
+        [ActualLoss] DECIMAL(18,2) DEFAULT 0,                         /* 实际损失 */
+        [CompensationAmount] DECIMAL(18,2) DEFAULT 0,                 /* 赔偿金额 */
+        [ReworkCost] DECIMAL(18,2) DEFAULT 0,                         /* 返工成本 */
+        [ReplacementCost] DECIMAL(18,2) DEFAULT 0,                    /* 更换成本 */
+        [ReturnQuantity] DECIMAL(18,2) DEFAULT 0,                     /* 退货数量 */
+        [ReturnAmount] DECIMAL(18,2) DEFAULT 0,                       /* 退货金额 */
+        [FollowUpActions] NTEXT,                                       /* 后续行动 */
+        [PreventiveMeasures] NTEXT,                                    /* 预防措施 */
+        [SupplierResponse] NTEXT,                                      /* 供应商回复 */
+        [InternalNotes] NTEXT,                                         /* 内部备注 */
+        [AttachmentPaths] NTEXT,                                       /* 附件路径 */
+        [CompletedDate] DATETIME,                                      /* 完成日期 */
+        [ClosedDate] DATETIME,                                         /* 关闭日期 */
+        [Status] INT DEFAULT 1,                                       /* 状态(1:正常, 0:删除) */
+        [CreatedBy] INT,                                               /* 创建人ID */
+        [CreatedAt] DATETIME DEFAULT GETDATE(),                       /* 创建时间 */
+        [UpdatedBy] INT,                                               /* 更新人ID */
+        [UpdatedAt] DATETIME DEFAULT GETDATE(),                       /* 更新时间 */
         
-        -- 外键约束
-        CONSTRAINT [FK_SupplierComplaints_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [Users]([ID]),
-        CONSTRAINT [FK_SupplierComplaints_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [Users]([ID])
+        /* 外键约束 */
+        CONSTRAINT [FK_SupplierComplaints_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [User]([ID]),
+        CONSTRAINT [FK_SupplierComplaints_UpdatedBy] FOREIGN KEY ([UpdatedBy]) REFERENCES [User]([ID])
     )
     
     PRINT '供应商投诉表 SupplierComplaints 创建成功'
@@ -60,39 +60,39 @@ BEGIN
 END
 GO
 
--- =====================================================
--- 创建索引
--- =====================================================
+/* ===================================================== */
+/* 创建索引 */
+/* ===================================================== */
 
--- 投诉编号索引
+/* 投诉编号索引 */
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_ComplaintNo')
 BEGIN
     CREATE UNIQUE INDEX [IX_SupplierComplaints_ComplaintNo] ON [SupplierComplaints] ([ComplaintNo])
     PRINT '投诉编号索引创建成功'
 END
 
--- 供应商名称索引
+/* 供应商名称索引 */
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_SupplierName')
 BEGIN
     CREATE INDEX [IX_SupplierComplaints_SupplierName] ON [SupplierComplaints] ([SupplierName])
     PRINT '供应商名称索引创建成功'
 END
 
--- 投诉日期索引
+/* 投诉日期索引 */
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_ComplaintDate')
 BEGIN
     CREATE INDEX [IX_SupplierComplaints_ComplaintDate] ON [SupplierComplaints] ([ComplaintDate])
     PRINT '投诉日期索引创建成功'
 END
 
--- 处理状态索引
+/* 处理状态索引 */
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_ProcessStatus')
 BEGIN
     CREATE INDEX [IX_SupplierComplaints_ProcessStatus] ON [SupplierComplaints] ([ProcessStatus])
     PRINT '处理状态索引创建成功'
 END
 
--- 状态索引
+/* 状态索引 */
 IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_Status')
 BEGIN
     CREATE INDEX [IX_SupplierComplaints_Status] ON [SupplierComplaints] ([Status])
@@ -100,11 +100,11 @@ BEGIN
 END
 GO
 
--- =====================================================
--- 插入测试数据
--- =====================================================
+/* ===================================================== */
+/* 插入测试数据 */
+/* ===================================================== */
 
--- 检查是否已有数据
+/* 检查是否已有数据 */
 IF NOT EXISTS (SELECT * FROM SupplierComplaints)
 BEGIN
     INSERT INTO [SupplierComplaints] (
@@ -146,11 +146,11 @@ BEGIN
 END
 GO
 
--- =====================================================
--- 创建视图（可选）
--- =====================================================
+/* ===================================================== */
+/* 创建视图（可选） */
+/* ===================================================== */
 
--- 供应商投诉概览视图
+/* 供应商投诉概览视图 */
 IF EXISTS (SELECT * FROM sys.views WHERE name = 'V_SupplierComplaintsOverview')
 BEGIN
     DROP VIEW [V_SupplierComplaintsOverview]
@@ -191,19 +191,19 @@ SELECT
         ELSE '未知'
     END as UrgencyLevelText
 FROM SupplierComplaints sc
-LEFT JOIN Users u1 ON sc.CreatedBy = u1.ID
-LEFT JOIN Users u2 ON sc.UpdatedBy = u2.ID
+LEFT JOIN [User] u1 ON sc.CreatedBy = u1.ID
+LEFT JOIN [User] u2 ON sc.UpdatedBy = u2.ID
 WHERE sc.Status = 1
 GO
 
 PRINT '供应商投诉概览视图创建成功'
 GO
 
--- =====================================================
--- 创建存储过程（可选）
--- =====================================================
+/* ===================================================== */
+/* 创建存储过程（可选） */
+/* ===================================================== */
 
--- 获取投诉统计信息的存储过程
+/* 获取投诉统计信息的存储过程 */
 IF EXISTS (SELECT * FROM sys.procedures WHERE name = 'SP_GetSupplierComplaintStatistics')
 BEGIN
     DROP PROCEDURE [SP_GetSupplierComplaintStatistics]
@@ -217,7 +217,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- 如果没有提供日期范围，默认查询最近30天
+    /* 如果没有提供日期范围，默认查询最近30天 */
     IF @StartDate IS NULL
         SET @StartDate = DATEADD(DAY, -30, GETDATE())
     
