@@ -30,6 +30,7 @@
 - Node.js 18
 - Git
 - GitHub CLI
+- MS SQL CLI (mssql-cli)
 - 常用开发工具
 
 ### VS Code 扩展
@@ -38,7 +39,7 @@
 - ESLint 代码检查
 - Tailwind CSS 智能提示
 - 路径智能提示
-- MySQL 支持
+- MS SQL Server 支持
 
 ### 端口配置
 - `5173` - 前端开发服务器 (Vue + Vite)
@@ -89,13 +90,38 @@ node app.js
 2. 或在 `devcontainer.json` 的 `containerEnv` 中添加
 
 ### 数据库配置
-如果需要MySQL数据库，可以在 `devcontainer.json` 中添加：
+如果需要MS SQL Server数据库，可以在 `devcontainer.json` 中添加：
 ```json
 "features": {
-  "ghcr.io/devcontainers/features/mysql:1": {
-    "version": "8.0"
+  "ghcr.io/devcontainers/features/mssql:1": {
+    "version": "2022"
   }
 }
+```
+
+#### MS SQL Server 连接配置
+在 `server/.env` 文件中配置：
+```env
+DB_HOST=localhost
+DB_USER=your_username
+DB_PASSWORD=your_password
+DB_NAME=dms_qa
+PORT=3001
+DB_TYPE=mssql
+```
+
+#### 连接字符串示例：
+```javascript
+const config = {
+  server: 'localhost',
+  database: 'dms_qa',
+  user: 'your_username',
+  password: 'your_password',
+  options: {
+    encrypt: true,
+    trustServerCertificate: true
+  }
+};
 ```
 
 ## 📊 性能优化
@@ -129,6 +155,21 @@ npm cache clean --force
 rm -rf node_modules package-lock.json
 npm install
 ```
+
+**问题4：MS SQL Server连接问题**
+```bash
+# 检查SQL Server服务状态
+sudo systemctl status mssql-server
+
+# 重启SQL Server服务
+sudo systemctl restart mssql-server
+
+# 测试连接
+sqlcmd -S localhost -U your_username -P your_password
+```
+- 确保SQL Server Browser服务正在运行
+- 检查防火墙设置
+- 验证用户权限和密码
 
 **问题3：权限问题**
 ```bash

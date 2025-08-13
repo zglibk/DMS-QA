@@ -5,6 +5,10 @@
 
 echo "🚀 启动 DMS-QA 质量管理系统开发环境..."
 echo "================================================"
+echo "前端端口: 5173"
+echo "后端端口: 3001"
+echo "数据库: MS SQL Server"
+echo "================================================"
 
 # 检查是否在正确的目录
 if [ ! -f "package.json" ]; then
@@ -76,6 +80,8 @@ case "$1" in
         echo "🎉 DMS-QA 开发环境已完全启动！"
         echo "📱 前端: http://localhost:5173"
         echo "🔧 后端: http://localhost:3001"
+        echo "💾 数据库: MS SQL Server"
+        echo "📝 请确保MS SQL Server连接配置正确"
         echo "📋 按 Ctrl+C 停止所有服务"
         echo ""
         

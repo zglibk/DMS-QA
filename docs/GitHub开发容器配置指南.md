@@ -196,6 +196,20 @@ node app.js
 
 ### 4.3 数据库配置
 如果需要数据库，可以在devcontainer.json中添加：
+
+#### MS SQL Server 配置
+```json
+{
+  "features": {
+    "ghcr.io/devcontainers-contrib/features/mssql-cli:1": {},
+    "ghcr.io/devcontainers/features/mssql:1": {
+      "version": "2022"
+    }
+  }
+}
+```
+
+#### MySQL 配置（可选）
 ```json
 {
   "features": {
@@ -209,18 +223,59 @@ node app.js
 ## 5. 环境变量配置
 
 ### 5.1 创建环境变量文件
+
+#### MS SQL Server 环境变量
 ```bash
-# 在Codespace中创建环境变量
+# 在Codespace中创建MS SQL Server环境变量
+echo "DATABASE_URL=mssql://sa:YourPassword123!@localhost:1433/dms_qa" >> .env
+echo "DB_HOST=localhost" >> .env
+echo "DB_USER=sa" >> .env
+echo "DB_PASSWORD=YourPassword123!" >> .env
+echo "DB_NAME=dms_qa" >> .env
+echo "DB_TYPE=mssql" >> .env
+echo "JWT_SECRET=your-secret-key" >> .env
+```
+
+#### MySQL 环境变量（可选）
+```bash
+# 在Codespace中创建MySQL环境变量
 echo "DATABASE_URL=mysql://user:password@localhost:3306/dms_qa" >> .env
+echo "DB_HOST=localhost" >> .env
+echo "DB_USER=root" >> .env
+echo "DB_PASSWORD=password" >> .env
+echo "DB_NAME=dms_qa" >> .env
+echo "DB_TYPE=mysql" >> .env
 echo "JWT_SECRET=your-secret-key" >> .env
 ```
 
 ### 5.2 在devcontainer.json中设置
+
+#### MS SQL Server 环境变量配置
 ```json
 {
   "containerEnv": {
     "NODE_ENV": "development",
-    "DATABASE_URL": "mysql://user:password@localhost:3306/dms_qa"
+    "DATABASE_URL": "mssql://sa:YourPassword123!@localhost:1433/dms_qa",
+    "DB_HOST": "localhost",
+    "DB_USER": "sa",
+    "DB_PASSWORD": "YourPassword123!",
+    "DB_NAME": "dms_qa",
+    "DB_TYPE": "mssql"
+  }
+}
+```
+
+#### MySQL 环境变量配置（可选）
+```json
+{
+  "containerEnv": {
+    "NODE_ENV": "development",
+    "DATABASE_URL": "mysql://user:password@localhost:3306/dms_qa",
+    "DB_HOST": "localhost",
+    "DB_USER": "root",
+    "DB_PASSWORD": "password",
+    "DB_NAME": "dms_qa",
+    "DB_TYPE": "mysql"
   }
 }
 ```

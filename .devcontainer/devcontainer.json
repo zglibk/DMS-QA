@@ -9,7 +9,8 @@
       "nodeGypDependencies": true
     },
     "ghcr.io/devcontainers/features/git:1": {},
-    "ghcr.io/devcontainers/features/github-cli:1": {}
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers-contrib/features/mssql-cli:1": {}
   },
   
   // 端口转发配置
@@ -26,7 +27,7 @@
   },
   
   // 容器创建后执行的命令
-  "postCreateCommand": "npm install && cd frontend && npm install && cd ../server && npm install && echo '\n🎉 DMS-QA开发环境配置完成！\n前端服务: npm run dev (在frontend目录)\n后端服务: node app.js (在server目录)\n'",
+  "postCreateCommand": "npm install && cd frontend && npm install && cd ../server && npm install && npm install -g mssql-cli && echo '\n🎉 DMS-QA开发环境配置完成！\n前端服务: npm run dev (在frontend目录)\n后端服务: node app.js (在server目录)\n'",
   
   // VS Code 自定义配置
   "customizations": {
@@ -40,7 +41,7 @@
         "formulahendry.auto-rename-tag",
         "christian-kohler.path-intellisense",
         "ms-vscode.vscode-typescript-next",
-        "ms-vscode.vscode-mysql",
+        "ms-mssql.mssql",
         "humao.rest-client"
       ],
       "settings": {
@@ -77,7 +78,7 @@
   },
   
   // 生命周期脚本
-  "postStartCommand": "echo '\n📋 DMS-QA 质量管理系统开发环境\n🌐 前端: http://localhost:5173\n🔧 后端: http://localhost:3001\n📁 工作目录: /workspaces/DMS-QA\n\n快速启动命令:\n  前端: cd frontend && npm run dev\n  后端: cd server && node app.js\n'",
+  "postStartCommand": "echo '\n📋 DMS-QA 质量管理系统开发环境\n🌐 前端: http://localhost:5173\n🔧 后端: http://localhost:3001\n📁 工作目录: /workspaces/DMS-QA\n💾 MS SQL Server 数据库连接已配置\n\n快速启动命令:\n  前端: cd frontend && npm run dev\n  后端: cd server && node app.js\n'",
   
   // 自动停止配置（节省资源）
   "shutdownAction": "stopCodespace"
