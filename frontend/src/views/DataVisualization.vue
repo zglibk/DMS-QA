@@ -436,7 +436,11 @@ onMounted(() => {
 
 <style scoped>
 .data-visualization-content {
-  /* 数据可视化页面特有样式 */
+  width: 100% !important;
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  box-sizing: border-box !important;
 }
 
 /* 页面标题 */

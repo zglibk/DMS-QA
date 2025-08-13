@@ -184,6 +184,8 @@ router.get('/list', async (req, res) => {
       customerCode,
       orderNo,
       responsiblePerson,
+      department,
+      workshop,
       reworkStatus,
       approvalStatus,
       keyword
@@ -218,6 +220,16 @@ router.get('/list', async (req, res) => {
     if (responsiblePerson) {
       whereConditions.push('ResponsiblePerson LIKE @responsiblePerson');
       parameters.push({ name: 'responsiblePerson', type: sql.NVarChar, value: `%${responsiblePerson}%` });
+    }
+    
+    if (department) {
+      whereConditions.push('ResponsibleDept = @department');
+      parameters.push({ name: 'department', type: sql.NVarChar, value: department });
+    }
+    
+    if (workshop) {
+      whereConditions.push('Workshop = @workshop');
+      parameters.push({ name: 'workshop', type: sql.NVarChar, value: workshop });
     }
     
     if (reworkStatus) {
@@ -1134,33 +1146,56 @@ router.get('/statistics/summary', async (req, res) => {
       year = new Date().getFullYear(),
       startDate,
       endDate,
-      timeType = 'year'
+      timeType = 'year',
+      department,
+      workshop,
+      responsiblePerson
     } = req.query;
     
     const pool = await getConnection();
     const request = pool.request();
     
-    // 根据是否有具体时间范围来构建查询条件
-    let whereClause = '';
+    // 构建查询条件
+    let whereConditions = [];
+    let parameters = [];
     
+    // 时间条件
     if (startDate && endDate) {
-      whereClause = 'WHERE ReworkDate >= @startDate AND ReworkDate <= @endDate';
+      whereConditions.push('ReworkDate >= @startDate AND ReworkDate <= @endDate');
+      parameters.push({ name: 'startDate', type: sql.Date, value: startDate });
+      parameters.push({ name: 'endDate', type: sql.Date, value: endDate });
       console.log(`查询时间范围: ${startDate} 到 ${endDate}`);
     } else {
-      whereClause = 'WHERE YEAR(ReworkDate) = @year';
+      whereConditions.push('YEAR(ReworkDate) = @year');
+      parameters.push({ name: 'year', type: sql.Int, value: year });
       console.log(`查询年份: ${year}`);
     }
     
+    // 筛选条件
+    if (department) {
+      whereConditions.push('ResponsibleDept = @department');
+      parameters.push({ name: 'department', type: sql.NVarChar, value: department });
+    }
+    
+    if (workshop) {
+      whereConditions.push('Workshop = @workshop');
+      parameters.push({ name: 'workshop', type: sql.NVarChar, value: workshop });
+    }
+    
+    if (responsiblePerson) {
+      whereConditions.push('ResponsiblePerson = @responsiblePerson');
+      parameters.push({ name: 'responsiblePerson', type: sql.NVarChar, value: responsiblePerson });
+    }
+    
+    const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
     console.log(`WHERE子句: ${whereClause}`);
     
     // 获取时间范围内的汇总数据
     const summaryRequest = pool.request();
-    if (startDate && endDate) {
-      summaryRequest.input('startDate', sql.Date, startDate);
-      summaryRequest.input('endDate', sql.Date, endDate);
-    } else {
-      summaryRequest.input('year', sql.Int, year);
-    }
+    parameters.forEach(param => {
+      summaryRequest.input(param.name, param.type, param.value);
+    });
+    
     const summaryResult = await summaryRequest.query(`
       SELECT 
         COUNT(*) as TotalReworkCount,
@@ -1173,12 +1208,11 @@ router.get('/statistics/summary', async (req, res) => {
     
     // 获取责任部门统计
     const deptRequest = pool.request();
-    if (startDate && endDate) {
-      deptRequest.input('startDate', sql.Date, startDate);
-      deptRequest.input('endDate', sql.Date, endDate);
-    } else {
-      deptRequest.input('year', sql.Int, year);
-    }
+    parameters.forEach(param => {
+      deptRequest.input(param.name, param.type, param.value);
+    });
+    
+    const deptWhereClause = whereClause ? `${whereClause} AND ResponsibleDept IS NOT NULL` : 'WHERE ResponsibleDept IS NOT NULL';
     const deptResult = await deptRequest.query(`
       SELECT 
         ResponsibleDept,
@@ -1186,19 +1220,16 @@ router.get('/statistics/summary', async (req, res) => {
         SUM(DefectiveQty) as TotalDefectiveQty,
         SUM(TotalCost) as TotalCost
       FROM ProductionReworkRegister 
-      ${whereClause} AND ResponsibleDept IS NOT NULL
+      ${deptWhereClause}
       GROUP BY ResponsibleDept
       ORDER BY ReworkCount DESC
     `);
     
     // 获取返工类别统计
     const categoryRequest = pool.request();
-    if (startDate && endDate) {
-      categoryRequest.input('startDate', sql.Date, startDate);
-      categoryRequest.input('endDate', sql.Date, endDate);
-    } else {
-      categoryRequest.input('year', sql.Int, year);
-    }
+    parameters.forEach(param => {
+      categoryRequest.input(param.name, param.type, param.value);
+    });
     const categoryResult = await categoryRequest.query(`
       SELECT 
         DefectiveCategory,
@@ -1248,13 +1279,44 @@ router.get('/statistics/trend', async (req, res) => {
     const { 
       startDate = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
       endDate = new Date().toISOString().split('T')[0],
-      groupBy = 'month' // month, week, day
+      groupBy = 'month', // month, week, day
+      department,
+      workshop,
+      responsiblePerson
     } = req.query;
     
     const pool = await getConnection();
     const request = pool.request();
-    request.input('startDate', sql.Date, startDate);
-    request.input('endDate', sql.Date, endDate);
+    
+    // 构建查询条件
+    let whereConditions = ['ReworkDate >= @startDate AND ReworkDate <= @endDate'];
+    let parameters = [
+      { name: 'startDate', type: sql.Date, value: startDate },
+      { name: 'endDate', type: sql.Date, value: endDate }
+    ];
+    
+    // 筛选条件
+    if (department) {
+      whereConditions.push('ResponsibleDept = @department');
+      parameters.push({ name: 'department', type: sql.NVarChar, value: department });
+    }
+    
+    if (workshop) {
+      whereConditions.push('Workshop = @workshop');
+      parameters.push({ name: 'workshop', type: sql.NVarChar, value: workshop });
+    }
+    
+    if (responsiblePerson) {
+      whereConditions.push('ResponsiblePerson = @responsiblePerson');
+      parameters.push({ name: 'responsiblePerson', type: sql.NVarChar, value: responsiblePerson });
+    }
+    
+    const whereClause = 'WHERE ' + whereConditions.join(' AND ');
+    
+    // 绑定参数
+    parameters.forEach(param => {
+      request.input(param.name, param.type, param.value);
+    });
     
     let groupByClause, dateFormat;
     switch (groupBy) {
@@ -1281,7 +1343,7 @@ router.get('/statistics/trend', async (req, res) => {
         AVG(CAST(DefectiveQty AS DECIMAL(10,2)) / NULLIF(TotalQty, 0) * 100) as AvgDefectiveRate,
         SUM(ReworkHours) as TotalReworkHours
       FROM ProductionReworkRegister 
-      WHERE ReworkDate >= @startDate AND ReworkDate <= @endDate
+      ${whereClause}
       GROUP BY ${groupByClause}
       ORDER BY MIN(ReworkDate)
     `);
@@ -1296,6 +1358,164 @@ router.get('/statistics/trend', async (req, res) => {
     res.status(500).json({
       success: false,
       message: '获取返工趋势数据失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * @route GET /api/rework/statistics/hours
+ * @desc 获取工时损耗统计数据
+ * @access Private
+ */
+router.get('/statistics/hours', async (req, res) => {
+  try {
+    const { 
+      startDate = new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
+      endDate = new Date().toISOString().split('T')[0],
+      department,
+      workshop,
+      responsiblePerson
+    } = req.query;
+    
+    console.log('获取工时损耗统计数据请求参数:', { startDate, endDate, department, workshop, responsiblePerson });
+    
+    const pool = await getConnection();
+    
+    // 构建WHERE条件
+    let whereConditions = ['ReworkDate >= @startDate AND ReworkDate <= @endDate'];
+    let parameters = [
+      { name: 'startDate', type: sql.Date, value: startDate },
+      { name: 'endDate', type: sql.Date, value: endDate }
+    ];
+    
+    if (department) {
+      whereConditions.push('ResponsibleDept = @department');
+      parameters.push({ name: 'department', type: sql.NVarChar, value: department });
+    }
+    
+    if (workshop) {
+      whereConditions.push('Workshop = @workshop');
+      parameters.push({ name: 'workshop', type: sql.NVarChar, value: workshop });
+    }
+    
+    if (responsiblePerson) {
+      whereConditions.push('ResponsiblePerson = @responsiblePerson');
+      parameters.push({ name: 'responsiblePerson', type: sql.NVarChar, value: responsiblePerson });
+    }
+    
+    const whereClause = 'WHERE ' + whereConditions.join(' AND ');
+    
+    // 获取部门统计
+    const deptRequest = pool.request();
+    parameters.forEach(param => {
+      deptRequest.input(param.name, param.type, param.value);
+    });
+    
+    const deptQuery = `
+      SELECT 
+        ResponsibleDept as name,
+        '部门' as type,
+        SUM(CAST(ReworkHours as FLOAT)) as totalHours,
+        SUM(CAST(TotalCost as FLOAT)) as totalCost,
+        AVG(CAST(TotalCost as FLOAT) / NULLIF(CAST(ReworkHours as FLOAT), 0)) as avgHourlyRate
+      FROM ProductionReworkRegister 
+      ${whereClause}
+      AND ResponsibleDept IS NOT NULL AND ResponsibleDept != ''
+      GROUP BY ResponsibleDept
+    `;
+    
+    // 获取车间统计
+    const workshopRequest = pool.request();
+    parameters.forEach(param => {
+      workshopRequest.input(param.name, param.type, param.value);
+    });
+    
+    const workshopQuery = `
+      SELECT 
+        Workshop as name,
+        '车间' as type,
+        SUM(CAST(ReworkHours as FLOAT)) as totalHours,
+        SUM(CAST(TotalCost as FLOAT)) as totalCost,
+        AVG(CAST(TotalCost as FLOAT) / NULLIF(CAST(ReworkHours as FLOAT), 0)) as avgHourlyRate
+      FROM ProductionReworkRegister 
+      ${whereClause}
+      AND Workshop IS NOT NULL AND Workshop != ''
+      GROUP BY Workshop
+    `;
+    
+    // 获取人员统计
+    const personRequest = pool.request();
+    parameters.forEach(param => {
+      personRequest.input(param.name, param.type, param.value);
+    });
+    
+    const personQuery = `
+      SELECT 
+        ResponsiblePerson as name,
+        '人员' as type,
+        SUM(CAST(ReworkHours as FLOAT)) as totalHours,
+        SUM(CAST(TotalCost as FLOAT)) as totalCost,
+        AVG(CAST(TotalCost as FLOAT) / NULLIF(CAST(ReworkHours as FLOAT), 0)) as avgHourlyRate
+      FROM ProductionReworkRegister 
+      ${whereClause}
+      AND ResponsiblePerson IS NOT NULL AND ResponsiblePerson != ''
+      GROUP BY ResponsiblePerson
+    `;
+    
+    // 获取总计用于计算占比
+    const totalRequest = pool.request();
+    parameters.forEach(param => {
+      totalRequest.input(param.name, param.type, param.value);
+    });
+    
+    const totalQuery = `
+      SELECT 
+        SUM(CAST(ReworkHours as FLOAT)) as totalHours,
+        SUM(CAST(TotalCost as FLOAT)) as totalCost
+      FROM ProductionReworkRegister 
+      ${whereClause}
+    `;
+    
+    // 执行查询
+    const [deptResult, workshopResult, personResult, totalResult] = await Promise.all([
+      deptRequest.query(deptQuery),
+      workshopRequest.query(workshopQuery),
+      personRequest.query(personQuery),
+      totalRequest.query(totalQuery)
+    ]);
+    
+    const totalHours = totalResult.recordset[0]?.totalHours || 0;
+    const totalCost = totalResult.recordset[0]?.totalCost || 0;
+    
+    // 合并所有结果并计算占比
+    const allData = [
+      ...deptResult.recordset,
+      ...workshopResult.recordset,
+      ...personResult.recordset
+    ].map(item => ({
+      ...item,
+      totalHours: item.totalHours || 0,
+      totalCost: item.totalCost || 0,
+      avgHourlyRate: item.avgHourlyRate || 0,
+      percentage: totalHours > 0 ? (item.totalHours / totalHours) * 100 : 0
+    }));
+    
+    // 按工时降序排序
+    allData.sort((a, b) => b.totalHours - a.totalHours);
+    
+    console.log('工时损耗统计查询结果:', allData);
+    
+    res.json({
+      success: true,
+      data: allData
+    });
+    
+  } catch (error) {
+    console.error('获取工时损耗统计数据失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取工时损耗统计数据失败',
       error: error.message
     });
   }
