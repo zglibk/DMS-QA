@@ -34,7 +34,7 @@ start_backend() {
         echo "📦 安装后端依赖..."
         npm install
     fi
-    echo "🔗 后端API将在 http://localhost:3000 启动"
+    echo "🔗 后端API将在 http://localhost:3001 启动"
     node app.js &
     BACKEND_PID=$!
     cd ..
@@ -75,7 +75,7 @@ case "$1" in
         echo ""
         echo "🎉 DMS-QA 开发环境已完全启动！"
         echo "📱 前端: http://localhost:5173"
-        echo "🔧 后端: http://localhost:3000"
+        echo "🔧 后端: http://localhost:3001"
         echo "📋 按 Ctrl+C 停止所有服务"
         echo ""
         
