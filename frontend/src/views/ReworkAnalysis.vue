@@ -1,15 +1,6 @@
 <template>
   <AppLayout>
     <div class="rework-analysis">
-      <!-- 页面标题 -->
-      <div class="page-header">
-        <h1>
-          <el-icon><Tools /></el-icon>
-          生产不良返工分析
-        </h1>
-        <p class="page-subtitle">实时监控生产返工情况，分析不良原因，提升产品质量</p>
-      </div>
-
       <!-- 时间筛选汇总信息 -->
       <el-card class="yearly-summary" shadow="never">
         <template #header>
@@ -20,7 +11,7 @@
             </span>
             <div class="time-filter-group">
               <!-- 时间类型选择 -->
-              <el-select v-model="timeType" @change="onTimeTypeChange" style="width: 100px; margin-right: 10px">
+              <el-select v-model="timeType" @change="onTimeTypeChange" size="small" style="width: 100px; margin-right: 10px">
                 <el-option label="年度" value="year" />
                 <el-option label="季度" value="quarter" />
                 <el-option label="月份" value="month" />
@@ -28,7 +19,7 @@
               </el-select>
               
               <!-- 年份选择 -->
-              <el-select v-model="selectedYear" @change="onYearChange" style="width: 100px; margin-right: 10px">
+              <el-select v-model="selectedYear" @change="onYearChange" size="small" style="width: 100px; margin-right: 10px">
                 <el-option
                   v-for="year in availableYears"
                   :key="year"
@@ -42,6 +33,7 @@
                 v-if="timeType === 'quarter'" 
                 v-model="selectedQuarter" 
                 @change="loadTimeRangeData" 
+                size="small"
                 style="width: 100px; margin-right: 10px"
               >
                 <el-option label="第一季度" :value="1" />
@@ -55,6 +47,7 @@
                 v-if="timeType === 'month'" 
                 v-model="selectedMonth" 
                 @change="loadTimeRangeData" 
+                size="small"
                 style="width: 100px; margin-right: 10px"
               >
                 <el-option
@@ -70,6 +63,7 @@
                 v-if="timeType === 'week'" 
                 v-model="selectedWeek" 
                 @change="loadTimeRangeData" 
+                size="small"
                 style="width: 120px; margin-right: 10px"
               >
                 <el-option
@@ -79,22 +73,13 @@
                   :value="week.value"
                 />
               </el-select>
-              
-              <!-- 重置条件按钮 -->
-              <el-button type="primary" size="small" @click="resetToCurrentMonth">
-                <el-icon><Refresh /></el-icon>
-                重置
-              </el-button>
-            </div>
-            
-            <!-- 筛选条件组 -->
-            <div class="filter-group" style="margin-top: 10px;">
               <!-- 责任部门筛选 -->
               <el-select 
                 v-model="selectedDepartment" 
                 placeholder="请选择责任部门" 
                 clearable
                 @change="loadTimeRangeData"
+                size="small"
                 style="width: 120px; margin-right: 10px"
               >
                 <el-option
@@ -111,6 +96,7 @@
                 placeholder="请选择车间" 
                 clearable
                 @change="loadTimeRangeData"
+                size="small"
                 style="width: 120px; margin-right: 10px"
               >
                 <el-option
@@ -128,6 +114,7 @@
                 clearable
                 filterable
                 @change="loadTimeRangeData"
+                size="small"
                 style="width: 120px; margin-right: 10px"
               >
                 <el-option
@@ -137,33 +124,59 @@
                   :value="person.Name"
                 />
               </el-select>
+
+              <!-- 重置条件按钮 -->
+              <el-button type="primary" size="small" @click="resetToCurrentMonth">
+                <el-icon><Refresh /></el-icon>
+                重置
+              </el-button>
             </div>
           </div>
         </template>
         
-        <el-row :gutter="20">
-          <el-col :span="6">
-            <div class="summary-item">
-              <div class="summary-label">返工总次数</div>
-              <div class="summary-value primary">{{ yearlyStats.totalCount || 0 }}</div>
+        <el-row :gutter="20" class="summary-cards-row">
+          <el-col :xs="24" :sm="6" :md="6" :lg="6" :xl="6">
+            <div class="summary-item summary-item-primary">
+              <div class="summary-icon">
+                <el-icon><Tools /></el-icon>
+              </div>
+              <div class="summary-content">
+                <div class="summary-label">返工总次数</div>
+                <div class="summary-value primary">{{ yearlyStats.totalCount || 0 }}</div>
+              </div>
             </div>
           </el-col>
-          <el-col :span="6">
-            <div class="summary-item">
-              <div class="summary-label">不良总数</div>
-              <div class="summary-value warning">{{ yearlyStats.totalDefectiveQty || 0 }}</div>
+          <el-col :xs="24" :sm="6" :md="6" :lg="6" :xl="6">
+            <div class="summary-item summary-item-warning">
+              <div class="summary-icon">
+                <el-icon><Warning /></el-icon>
+              </div>
+              <div class="summary-content">
+                <div class="summary-label">不良总数</div>
+                <div class="summary-value warning">{{ yearlyStats.totalDefectiveQty || 0 }}</div>
+              </div>
             </div>
           </el-col>
-          <el-col :span="6">
-            <div class="summary-item">
-              <div class="summary-label">返工总成本</div>
-              <div class="summary-value danger">¥{{ (yearlyStats.totalCost || 0).toFixed(2) }}</div>
+          <el-col :xs="24" :sm="6" :md="6" :lg="6" :xl="6">
+            <div class="summary-item summary-item-danger">
+              <div class="summary-icon">
+                <el-icon><Money /></el-icon>
+              </div>
+              <div class="summary-content">
+                <div class="summary-label">返工总成本</div>
+                <div class="summary-value danger">¥{{ (yearlyStats.totalCost || 0).toFixed(2) }}</div>
+              </div>
             </div>
           </el-col>
-          <el-col :span="6">
-            <div class="summary-item">
-              <div class="summary-label">平均不良率</div>
-              <div class="summary-value info">{{ (yearlyStats.avgDefectiveRate || 0).toFixed(2) }}%</div>
+          <el-col :xs="24" :sm="6" :md="6" :lg="6" :xl="6">
+            <div class="summary-item summary-item-info">
+              <div class="summary-icon">
+                <el-icon><TrendCharts /></el-icon>
+              </div>
+              <div class="summary-content">
+                <div class="summary-label">平均不良率</div>
+                <div class="summary-value info">{{ (yearlyStats.avgDefectiveRate || 0).toFixed(2) }}%</div>
+              </div>
             </div>
           </el-col>
         </el-row>
@@ -304,7 +317,8 @@
                         </span>
                       </template>
                     </el-table-column>
-                    <el-table-column prop="avgHourlyRate" label="平均时薪" max-width="60" align="center">
+                    <el-table-column prop="avgHourlyRate" label="工时单价" max-width="60" align="center">
+
                       <template #default="{ row }">
                         {{ row.avgHourlyRate ? '¥' + row.avgHourlyRate.toFixed(2) + '/h' : '-' }}
                       </template>
@@ -531,7 +545,8 @@ import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
   Tools, TrendCharts, PieChart,
-  DataBoard, List, Search, Download, View, Refresh
+  DataBoard, List, Search, Download, View, Refresh,
+  Warning, Money
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import api from '@/services/api.js'
@@ -1103,28 +1118,33 @@ const updateTrendChart = (data) => {
     },
     legend: {
       data: ['返工次数', '不良数量', '不良率'],
-      bottom: 0
+      bottom: 10,
+      itemGap: 15
     },
     xAxis: {
       type: 'category',
-      data: data.map(item => item.DateLabel)
+      data: data.map(item => item.DateLabel),
+      splitLine: { show: false }
     },
     yAxis: [
       {
         type: 'value',
         name: '数量',
-        position: 'left'
+        position: 'left',
+        splitLine: { show: false }
       },
       {
         type: 'value',
         name: '不良率(%)',
-        position: 'right'
+        position: 'right',
+        splitLine: { show: false }
       }
     ],
     series: [
       {
         name: '返工次数',
         type: 'bar',
+        barMaxWidth: 60,
         data: data.map(item => {
           const count = item.ReworkCount
           return (count !== null && count !== undefined && !isNaN(count)) ? Number(count) : 0
@@ -1134,6 +1154,7 @@ const updateTrendChart = (data) => {
       {
         name: '不良数量',
         type: 'bar',
+        barMaxWidth: 50,
         data: data.map(item => {
           const qty = item.TotalDefectiveQty
           return (qty !== null && qty !== undefined && !isNaN(qty)) ? Number(qty) : 0
@@ -1184,7 +1205,9 @@ const updateDeptChart = (data) => {
     },
     legend: {
       orient: 'vertical',
-      left: 'left'
+      left: 'left',
+      top: 'middle',
+      itemGap: 8
     },
     series: [
       {
@@ -1238,16 +1261,19 @@ const updateCategoryChart = (data) => {
       data: data.map(item => item.DefectiveCategory),
       axisLabel: {
         rotate: 45
-      }
+      },
+      splitLine: { show: false }
     },
     yAxis: {
       type: 'value',
-      name: '返工次数'
+      name: '返工次数',
+      splitLine: { show: false }
     },
     series: [
       {
         name: '返工次数',
         type: 'bar',
+        barMaxWidth: 50,
         data: data.map(item => item.ReworkCount),
         itemStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -1288,20 +1314,24 @@ const updateCostChart = (data) => {
     },
     legend: {
       data: ['总成本', '平均成本'],
-      bottom: 0
+      bottom: 10,
+      itemGap: 15
     },
     xAxis: {
       type: 'category',
-      data: data.map(item => item.DateLabel)
+      data: data.map(item => item.DateLabel),
+      splitLine: { show: false }
     },
     yAxis: {
       type: 'value',
-      name: '成本(元)'
+      name: '成本(元)',
+      splitLine: { show: false }
     },
     series: [
       {
         name: '总成本',
         type: 'bar',
+        barMaxWidth: 50,
         data: data.map(item => {
           const cost = item.TotalCost
           return (cost !== null && cost !== undefined && !isNaN(cost)) ? Number(cost.toFixed(2)) : 0
@@ -1550,27 +1580,36 @@ const updateGanttChart = () => {
   width: 80%;
 }
 
-.page-header {
-  margin-bottom: 20px;
-}
-
-.page-header h1 {
-  margin: 0;
-  font-size: 24px;
-  color: #303133;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.page-subtitle {
-  margin: 8px 0 0 0;
-  color: #909399;
-  font-size: 14px;
-}
-
+/* 年度统计卡片整体样式 */
 .yearly-summary {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 20px;
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e1f5fe;
+  overflow: hidden;
+  position: relative;
+}
+
+.yearly-summary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  background: linear-gradient(90deg, #409eff 0%, #67c23a 50%, #e6a23c 75%, #f56c6c 100%);
+}
+
+.yearly-summary .el-card__header {
+  background: linear-gradient(135deg, #f8fafc 0%, #e3f2fd 100%);
+  border-bottom: 2px solid #e1f5fe;
+  padding: 20px 24px;
+}
+
+.yearly-summary .el-card__body {
+  padding: 32px 24px;
+  background: transparent;
 }
 
 .card-header {
@@ -1580,42 +1619,175 @@ const updateGanttChart = () => {
   font-weight: 600;
 }
 
-.time-filter-group {
-  display: flex;
-  align-items: center;
+/* 选择器组件字体样式重置 */
+.card-header .time-filter-group .el-select {
+  font-weight: normal;
 }
 
+.card-header .time-filter-group .el-select .el-input__inner {
+  font-weight: normal;
+}
+
+.card-header .time-filter-group .el-select .el-input__wrapper {
+  font-weight: normal;
+}
+
+/* 统计卡片美化样式 */
 .summary-item {
-  text-align: center;
-  padding: 20px;
+  display: flex;
+  align-items: center;
+  padding: 24px 20px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e1f5fe;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+
+.summary-item::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #409eff 0%, #67c23a 100%);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.summary-item:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
+}
+
+.summary-item:hover::before {
+  transform: scaleX(1);
+}
+
+/* 不同类型卡片的特定样式 */
+.summary-item-primary {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+  border-color: #409eff;
+}
+
+.summary-item-warning {
+  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+  border-color: #e6a23c;
+}
+
+.summary-item-danger {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+  border-color: #f56c6c;
+}
+
+.summary-item-info {
+  background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+  border-color: #909399;
+}
+
+.summary-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  margin-right: 16px;
+  font-size: 24px;
+  transition: all 0.3s ease;
+}
+
+.summary-item-primary .summary-icon {
+  background: linear-gradient(135deg, #409eff 0%, #66b3ff 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+.summary-item-warning .summary-icon {
+  background: linear-gradient(135deg, #e6a23c 0%, #f0b90b 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(230, 162, 60, 0.3);
+}
+
+.summary-item-danger .summary-icon {
+  background: linear-gradient(135deg, #f56c6c 0%, #ff8a95 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(245, 108, 108, 0.3);
+}
+
+.summary-item-info .summary-icon {
+  background: linear-gradient(135deg, #909399 0%, #a6a9ad 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(144, 147, 153, 0.3);
+}
+
+.summary-item:hover .summary-icon {
+  transform: scale(1.1) rotate(5deg);
+}
+
+.summary-content {
+  flex: 1;
+  text-align: left;
 }
 
 .summary-label {
   font-size: 14px;
-  color: #909399;
+  color: #606266;
   margin-bottom: 8px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
 }
 
 .summary-value {
-  font-size: 28px;
-  font-weight: bold;
+  font-size: 32px;
+  font-weight: 700;
   margin-bottom: 4px;
+  line-height: 1.2;
+  background: linear-gradient(135deg, #303133 0%, #606266 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
-.summary-value.primary {
-  color: #409EFF;
+/* 不同类型卡片的数字渐变效果 */
+.summary-item-primary .summary-value {
+  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 50%, #1e40af 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 3s ease-in-out infinite !important;
 }
 
-.summary-value.warning {
-  color: #E6A23C;
+.summary-item-warning .summary-value {
+  background: linear-gradient(135deg, #92400e 0%, #f59e0b 50%, #b45309 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 3s ease-in-out infinite !important;
 }
 
-.summary-value.danger {
-  color: #F56C6C;
+.summary-item-danger .summary-value {
+  background: linear-gradient(135deg, #991b1b 0%, #ef4444 50%, #b91c1c 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 3s ease-in-out infinite !important;
 }
 
-.summary-value.info {
-  color: #909399;
+.summary-item-info .summary-value {
+  background: linear-gradient(135deg, #374151 0%, #6b7280 50%, #4b5563 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 3s ease-in-out infinite !important;
 }
 
 .charts-section {
@@ -1727,10 +1899,271 @@ const updateGanttChart = () => {
 /* 图表分析卡片样式 */
 .charts-analysis-card {
   margin-bottom: 20px;
+  max-height: 500px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.08);
+  overflow: hidden;
+  border: 1px solid #e1f5fe;
+}
+
+/* 响应式设计 - 修复图标挤扁和字体大小问题 */
+/* 加强图标等比缩放保护 */
+.summary-icon {
+  min-width: 56px !important;
+  min-height: 56px !important;
+  max-width: 56px !important;
+  max-height: 56px !important;
+  flex-shrink: 0 !important;
+  flex-grow: 0 !important;
+  aspect-ratio: 1 / 1 !important;
+  object-fit: contain !important;
+}
+
+/* 统计数字响应式字体 - 增强响应式版本 */
+.summary-value {
+  font-size: clamp(16px, 5vw, 36px) !important;
+  font-weight: 800 !important;
+  white-space: nowrap !important;
+  letter-spacing: -0.5px !important;
+  line-height: 1.1 !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+  /* 增强渐变文字效果 */
+  background: linear-gradient(135deg, #2c3e50 0%, #3498db 50%, #2c3e50 100%) !important;
+  -webkit-background-clip: text !important;
+  -webkit-text-fill-color: transparent !important;
+  background-clip: text !important;
+  background-size: 200% 100% !important;
+  animation: shimmer 3s ease-in-out infinite !important;
+}
+
+/* 数字闪烁动画 */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  50% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+.summary-label {
+  font-size: clamp(9px, 2.8vw, 15px) !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.3px !important;
+}
+
+/* 额外的响应式断点确保字体缩放 */
+@media (max-width: 480px) {
+  .summary-value {
+    font-size: clamp(14px, 6vw, 20px) !important;
+  }
+  
+  .summary-label {
+    font-size: clamp(8px, 3vw, 12px) !important;
+  }
+}
+
+@media (max-width: 320px) {
+  .summary-value {
+    font-size: clamp(12px, 7vw, 16px) !important;
+  }
+  
+  .summary-label {
+    font-size: clamp(7px, 3.5vw, 10px) !important;
+  }
+}
+
+@media (max-width: 1200px) {
+  .summary-item {
+    padding: 20px 16px;
+  }
+  
+  .summary-icon {
+    min-width: 48px !important;
+    min-height: 48px !important;
+    max-width: 48px !important;
+    max-height: 48px !important;
+    font-size: 20px !important;
+    margin-right: 12px;
+  }
+}
+
+@media (max-width: 992px) {
+  .summary-item {
+    padding: 16px 12px;
+  }
+  
+  .summary-icon {
+    min-width: 40px !important;
+    min-height: 40px !important;
+    max-width: 40px !important;
+    max-height: 40px !important;
+    font-size: 18px !important;
+    margin-right: 10px;
+  }
+}
+
+@media (max-width: 768px) {
+  .summary-item {
+    padding: 12px 8px;
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .summary-icon {
+    min-width: 36px !important;
+    min-height: 36px !important;
+    max-width: 36px !important;
+    max-height: 36px !important;
+    font-size: 16px !important;
+    margin-right: 0;
+    margin-bottom: 8px;
+  }
+  
+  .summary-content {
+    text-align: center;
+  }
+}
+
+@media (max-width: 576px) {
+  .summary-item {
+    padding: 10px 6px;
+  }
+  
+  .summary-icon {
+    min-width: 32px !important;
+    min-height: 32px !important;
+    max-width: 32px !important;
+    max-height: 32px !important;
+    font-size: 14px !important;
+  }
+}
+
+/* 容器级别的响应式保护 */
+.yearly-summary .el-row {
+  flex-wrap: wrap !important;
+}
+
+.yearly-summary .el-col {
+  min-width: 0 !important;
+  flex-basis: auto !important;
+}
+
+/* 统计卡片行布局优化 */
+.summary-cards-row {
+  display: flex !important;
+  justify-content: center !important;
+  align-items: stretch !important;
+  flex-wrap: wrap !important;
+  margin: 0 auto !important;
+}
+
+/* 小屏幕下4个卡片布局优化 */
+@media (min-width: 576px) {
+  .summary-cards-row {
+    justify-content: space-between !important;
+  }
+  
+  .summary-cards-row .el-col {
+    flex: 1 !important;
+    max-width: calc(25% - 15px) !important;
+    min-width: 200px !important;
+  }
+}
+
+/* 中等屏幕下的布局优化 */
+@media (min-width: 768px) {
+  .summary-cards-row .el-col {
+    min-width: 220px !important;
+  }
+}
+
+/* 大屏幕下的居中对齐和平均分布 */
+@media (min-width: 1200px) {
+  .summary-cards-row {
+    max-width: 1400px !important;
+    margin: 0 auto !important;
+    justify-content: space-between !important;
+    gap: 20px !important;
+  }
+  
+  .summary-cards-row .el-col {
+    flex: 1 !important;
+    max-width: calc(25% - 15px) !important;
+    min-width: 240px !important;
+  }
+}
+
+@media (min-width: 1400px) {
+  .summary-cards-row {
+    max-width: 1600px !important;
+    justify-content: space-between !important;
+    gap: 25px !important;
+  }
+  
+  .summary-cards-row .el-col {
+    flex: 1 !important;
+    max-width: calc(25% - 20px) !important;
+    min-width: 260px !important;
+  }
+}
+
+@media (min-width: 1600px) {
+  .summary-cards-row {
+    max-width: 1800px !important;
+    justify-content: space-between !important;
+    gap: 30px !important;
+  }
+  
+  .summary-cards-row .el-col {
+    flex: 1 !important;
+    max-width: calc(25% - 25px) !important;
+    min-width: 280px !important;
+  }
 }
 
 .chart-tabs {
   min-height: 500px;
+}
+
+/* Element Plus 标签页美化 */
+.charts-analysis-card .el-tabs__header {
+  background: linear-gradient(90deg, #f0f9ff 0%, #e0f2fe 100%);
+  margin: 0;
+  padding: 0 20px;
+  border-bottom: 2px solid #e1f5fe;
+}
+
+.charts-analysis-card .el-tabs__nav-wrap {
+  padding: 8px 0;
+}
+
+.charts-analysis-card .el-tabs__item {
+  color: #606266;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  border-radius: 6px 6px 0 0;
+  margin-right: 4px;
+}
+
+.charts-analysis-card .el-tabs__item:hover {
+  color: #409eff;
+  background: rgba(64, 158, 255, 0.1);
+}
+
+.charts-analysis-card .el-tabs__item.is-active {
+  color: #409eff;
+  background: rgba(64, 158, 255, 0.15);
+  font-weight: 600;
+}
+
+.charts-analysis-card .el-tabs__active-bar {
+  background: linear-gradient(90deg, #409eff 0%, #67c23a 100%);
+  height: 3px;
+  border-radius: 2px;
+}
+
+.charts-analysis-card .el-tabs__content {
+  padding: 20px;
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .chart-data-panel {
@@ -1738,7 +2171,6 @@ const updateGanttChart = () => {
   border: 1px solid #e9ecef;
   border-radius: 6px;
   padding: 16px;
-  height: 480px;
   overflow: hidden;
 }
 
@@ -1755,19 +2187,47 @@ const updateGanttChart = () => {
 }
 
 .chart-panel {
-  background: #fff;
-  border: 1px solid #e9ecef;
-  border-radius: 6px;
-  padding: 16px;
-  height: 480px;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 50%, #f8fafc 100%);
+  border: 1px solid #e1f5fe;
+  border-radius: 12px;
+  padding: 20px;
+  height: calc(100% - 32px);
+  box-sizing: border-box;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.chart-panel::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #409eff 0%, #67c23a 50%, #409eff 100%);
+  border-radius: 12px 12px 0 0;
+}
+
+.chart-panel:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(64, 158, 255, 0.15);
 }
 
 .chart-panel .chart-container {
-  height: 440px !important;
   width: 100% !important;
   min-width: 100% !important;
-  max-width: 100% !important;
+  height: 100% !important;
+  min-height: 300px !important;
+  max-height: 380px !important;
   box-sizing: border-box !important;
+  overflow: hidden !important;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  padding: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(64, 158, 255, 0.1);
 }
 
 /* 强制所有图表容器及其内部元素宽度 */
