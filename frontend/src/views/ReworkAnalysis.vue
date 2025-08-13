@@ -10,286 +10,275 @@
         <p class="page-subtitle">实时监控生产返工情况，分析不良原因，提升产品质量</p>
       </div>
 
-    <!-- 统计卡片区域 -->
-    <div class="stats-cards">
-      <el-row :gutter="20">
-        <el-col :xs="24" :sm="12" :md="6">
-          <div class="stat-card">
-            <div class="card-icon current-month">
-              <el-icon><Calendar /></el-icon>
-            </div>
-            <div class="card-content">
-              <div class="card-title">本月返工次数</div>
-              <div class="card-value">{{ currentMonthStats.count || 0 }}</div>
-              <div class="card-trend" :class="getTrendClass(currentMonthStats.countTrend)">
-                <el-icon><component :is="getTrendIcon(currentMonthStats.countTrend)" /></el-icon>
-                {{ Math.abs(currentMonthStats.countTrend || 0) }}%
-              </div>
+      <!-- 时间筛选汇总信息 -->
+      <el-card class="yearly-summary" shadow="never">
+        <template #header>
+          <div class="card-header">
+            <span>
+              <el-icon><TrendCharts /></el-icon>
+              {{ getTimeRangeTitle() }}返工汇总
+            </span>
+            <div class="time-filter-group">
+              <!-- 时间类型选择 -->
+              <el-select v-model="timeType" @change="onTimeTypeChange" style="width: 100px; margin-right: 10px">
+                <el-option label="年度" value="year" />
+                <el-option label="季度" value="quarter" />
+                <el-option label="月份" value="month" />
+                <el-option label="周次" value="week" />
+              </el-select>
+              
+              <!-- 年份选择 -->
+              <el-select v-model="selectedYear" @change="onYearChange" style="width: 100px; margin-right: 10px">
+                <el-option
+                  v-for="year in availableYears"
+                  :key="year"
+                  :label="year + '年'"
+                  :value="year"
+                />
+              </el-select>
+              
+              <!-- 季度选择 -->
+              <el-select 
+                v-if="timeType === 'quarter'" 
+                v-model="selectedQuarter" 
+                @change="loadTimeRangeData" 
+                style="width: 100px; margin-right: 10px"
+              >
+                <el-option label="第一季度" :value="1" />
+                <el-option label="第二季度" :value="2" />
+                <el-option label="第三季度" :value="3" />
+                <el-option label="第四季度" :value="4" />
+              </el-select>
+              
+              <!-- 月份选择 -->
+              <el-select 
+                v-if="timeType === 'month'" 
+                v-model="selectedMonth" 
+                @change="loadTimeRangeData" 
+                style="width: 100px; margin-right: 10px"
+              >
+                <el-option
+                  v-for="month in availableMonths"
+                  :key="month.value"
+                  :label="month.label"
+                  :value="month.value"
+                />
+              </el-select>
+              
+              <!-- 周次选择 -->
+              <el-select 
+                v-if="timeType === 'week'" 
+                v-model="selectedWeek" 
+                @change="loadTimeRangeData" 
+                style="width: 120px"
+              >
+                <el-option
+                  v-for="week in availableWeeks"
+                  :key="week.value"
+                  :label="week.label"
+                  :value="week.value"
+                />
+              </el-select>
             </div>
           </div>
-        </el-col>
+        </template>
         
-        <el-col :xs="24" :sm="12" :md="6">
-          <div class="stat-card">
-            <div class="card-icon defective-qty">
-              <el-icon><Warning /></el-icon>
+        <el-row :gutter="20">
+          <el-col :span="6">
+            <div class="summary-item">
+              <div class="summary-label">返工总次数</div>
+              <div class="summary-value primary">{{ yearlyStats.totalCount || 0 }}</div>
             </div>
-            <div class="card-content">
-              <div class="card-title">本月不良数量</div>
-              <div class="card-value">{{ currentMonthStats.defectiveQty || 0 }}</div>
-              <div class="card-trend" :class="getTrendClass(currentMonthStats.defectiveQtyTrend)">
-                <el-icon><component :is="getTrendIcon(currentMonthStats.defectiveQtyTrend)" /></el-icon>
-                {{ Math.abs(currentMonthStats.defectiveQtyTrend || 0) }}%
+          </el-col>
+          <el-col :span="6">
+            <div class="summary-item">
+              <div class="summary-label">不良总数</div>
+              <div class="summary-value warning">{{ yearlyStats.totalDefectiveQty || 0 }}</div>
+            </div>
+          </el-col>
+          <el-col :span="6">
+            <div class="summary-item">
+              <div class="summary-label">返工总成本</div>
+              <div class="summary-value danger">¥{{ (yearlyStats.totalCost || 0).toFixed(2) }}</div>
+            </div>
+          </el-col>
+          <el-col :span="6">
+            <div class="summary-item">
+              <div class="summary-label">平均不良率</div>
+              <div class="summary-value info">{{ (yearlyStats.avgDefectiveRate || 0).toFixed(2) }}%</div>
+            </div>
+          </el-col>
+        </el-row>
+      </el-card>
+
+      <!-- 图表分析区域 -->
+      <el-row :gutter="20" class="charts-section">
+        <!-- 返工趋势图 -->
+        <el-col :span="12">
+          <el-card class="chart-card" shadow="never">
+            <template #header>
+              <div class="card-header">
+                <span>
+                  <el-icon><TrendCharts /></el-icon>
+                  返工趋势分析
+                </span>
+                <el-radio-group v-model="trendPeriod" @change="loadTrendData" size="small">
+                  <el-radio-button label="day">日</el-radio-button>
+                  <el-radio-button label="week">周</el-radio-button>
+                  <el-radio-button label="month">月</el-radio-button>
+                </el-radio-group>
               </div>
-            </div>
-          </div>
+            </template>
+            <div ref="trendChartRef" class="chart-container"></div>
+          </el-card>
         </el-col>
-        
-        <el-col :xs="24" :sm="12" :md="6">
-          <div class="stat-card">
-            <div class="card-icon cost">
-              <el-icon><Money /></el-icon>
-            </div>
-            <div class="card-content">
-              <div class="card-title">本月返工成本</div>
-              <div class="card-value">¥{{ (currentMonthStats.cost || 0).toFixed(2) }}</div>
-              <div class="card-trend" :class="getTrendClass(currentMonthStats.costTrend)">
-                <el-icon><component :is="getTrendIcon(currentMonthStats.costTrend)" /></el-icon>
-                {{ Math.abs(currentMonthStats.costTrend || 0) }}%
+
+        <!-- 部门分布图 -->
+        <el-col :span="12">
+          <el-card class="chart-card" shadow="never">
+            <template #header>
+              <div class="card-header">
+                <span>
+                  <el-icon><PieChart /></el-icon>
+                  部门返工分布
+                </span>
               </div>
-            </div>
-          </div>
-        </el-col>
-        
-        <el-col :xs="24" :sm="12" :md="6">
-          <div class="stat-card">
-            <div class="card-icon rate">
-              <el-icon><DataAnalysis /></el-icon>
-            </div>
-            <div class="card-content">
-              <div class="card-title">本月不良率</div>
-              <div class="card-value">{{ (currentMonthStats.defectiveRate || 0).toFixed(2) }}%</div>
-              <div class="card-trend" :class="getTrendClass(currentMonthStats.defectiveRateTrend)">
-                <el-icon><component :is="getTrendIcon(currentMonthStats.defectiveRateTrend)" /></el-icon>
-                {{ Math.abs(currentMonthStats.defectiveRateTrend || 0) }}%
-              </div>
-            </div>
-          </div>
+            </template>
+            <div ref="deptChartRef" class="chart-container"></div>
+          </el-card>
         </el-col>
       </el-row>
+
+      <el-row :gutter="20" class="charts-section">
+        <!-- 类别分析图 -->
+        <el-col :span="12">
+          <el-card class="chart-card" shadow="never">
+            <template #header>
+              <div class="card-header">
+                <span>
+                  <el-icon><DataBoard /></el-icon>
+                  不良类别分析
+                </span>
+              </div>
+            </template>
+            <div ref="categoryChartRef" class="chart-container"></div>
+          </el-card>
+        </el-col>
+
+        <!-- 成本分析图 -->
+        <el-col :span="12">
+          <el-card class="chart-card" shadow="never">
+            <template #header>
+              <div class="card-header">
+                <span>
+                  <el-icon><TrendCharts /></el-icon>
+                  返工成本分析
+                </span>
+              </div>
+            </template>
+            <div ref="costChartRef" class="chart-container"></div>
+          </el-card>
+        </el-col>
+      </el-row>
+
+      <!-- 数据表格 -->
+      <el-card class="table-card" shadow="never">
+        <template #header>
+          <div class="card-header">
+            <span>
+              <el-icon><List /></el-icon>
+              返工记录明细
+            </span>
+            <div class="header-actions">
+              <el-input
+                v-model="searchKeyword"
+                placeholder="搜索工单号、产品名称"
+                style="width: 200px; margin-right: 10px"
+                @keyup.enter="loadTableData"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+              <el-button type="primary" @click="loadTableData">
+                <el-icon><Search /></el-icon>
+                搜索
+              </el-button>
+              <el-button type="success" @click="exportTableData" :loading="exportLoading">
+                <el-icon><Download /></el-icon>
+                导出
+              </el-button>
+            </div>
+          </div>
+        </template>
+
+        <el-table
+          :data="tableData"
+          v-loading="tableLoading"
+          stripe
+          border
+          style="width: 100%"
+        >
+          <el-table-column prop="ReworkDate" label="返工日期" width="120" :formatter="(row) => formatDate(row.ReworkDate)" />
+          <el-table-column prop="CustomerCode" label="客户编号" width="120" />
+          <el-table-column prop="OrderNo" label="工单号" width="150" />
+          <el-table-column prop="ProductName" label="产品名称" width="200" show-overflow-tooltip />
+          <el-table-column prop="TotalQty" label="总数量" width="100" align="right" />
+          <el-table-column prop="DefectiveQty" label="不良数量" width="100" align="right" />
+          <el-table-column prop="DefectiveRate" label="不良率" width="100" align="right">
+            <template #default="{ row }">
+              <span :class="getDefectiveRateClass(row.DefectiveRate)">
+                {{ row.DefectiveRate ? row.DefectiveRate.toFixed(2) + '%' : '-' }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="ResponsiblePerson" label="责任人" width="120" />
+          <el-table-column prop="ReworkPersonnel" label="返工人员" width="120" />
+          <el-table-column prop="ReworkHours" label="返工工时" width="100" align="right">
+            <template #default="{ row }">
+              {{ row.ReworkHours ? row.ReworkHours + 'h' : '-' }}
+            </template>
+          </el-table-column>
+          <el-table-column prop="TotalCost" label="总成本" width="120" align="right">
+            <template #default="{ row }">
+              <span class="cost-amount">
+                {{ row.TotalCost ? '¥' + row.TotalCost.toFixed(2) : '-' }}
+              </span>
+            </template>
+          </el-table-column>
+          <el-table-column prop="ReworkStatus" label="状态" width="100">
+            <template #default="{ row }">
+              <el-tag :type="getStatusType(row.ReworkStatus)" size="small">
+                {{ row.ReworkStatus }}
+              </el-tag>
+            </template>
+          </el-table-column>
+          <el-table-column label="操作" width="100" fixed="right">
+            <template #default="{ row }">
+              <el-button type="primary" size="small" @click="viewDetail(row)">
+                <el-icon><View /></el-icon>
+                详情
+              </el-button>
+            </template>
+          </el-table-column>
+        </el-table>
+
+        <div class="pagination-wrapper">
+          <el-pagination
+            v-model:current-page="tablePagination.current"
+            v-model:page-size="tablePagination.pageSize"
+            :page-sizes="[10, 20, 50, 100]"
+            :total="tablePagination.total"
+            layout="total, sizes, prev, pager, next, jumper"
+            @size-change="handleTableSizeChange"
+            @current-change="handleTableCurrentChange"
+          />
+        </div>
+      </el-card>
     </div>
 
-    <!-- 年度汇总信息 -->
-    <el-card class="yearly-summary" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>
-            <el-icon><TrendCharts /></el-icon>
-            {{ currentYear }}年度返工汇总
-          </span>
-          <el-select v-model="selectedYear" @change="loadYearlyData" style="width: 120px">
-            <el-option
-              v-for="year in availableYears"
-              :key="year"
-              :label="year + '年'"
-              :value="year"
-            />
-          </el-select>
-        </div>
-      </template>
-      
-      <el-row :gutter="20">
-        <el-col :span="6">
-          <div class="summary-item">
-            <div class="summary-label">年度返工总次数</div>
-            <div class="summary-value primary">{{ yearlyStats.totalCount || 0 }}</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="summary-item">
-            <div class="summary-label">年度不良总数</div>
-            <div class="summary-value warning">{{ yearlyStats.totalDefectiveQty || 0 }}</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="summary-item">
-            <div class="summary-label">年度返工总成本</div>
-            <div class="summary-value danger">¥{{ (yearlyStats.totalCost || 0).toFixed(2) }}</div>
-          </div>
-        </el-col>
-        <el-col :span="6">
-          <div class="summary-item">
-            <div class="summary-label">年度平均不良率</div>
-            <div class="summary-value info">{{ (yearlyStats.avgDefectiveRate || 0).toFixed(2) }}%</div>
-          </div>
-        </el-col>
-      </el-row>
-    </el-card>
-
-    <!-- 图表分析区域 -->
-    <el-row :gutter="20" class="charts-section">
-      <!-- 返工趋势图 -->
-      <el-col :span="12">
-        <el-card class="chart-card" shadow="never">
-          <template #header>
-            <div class="card-header">
-              <span>
-                <el-icon><TrendCharts /></el-icon>
-                返工趋势分析
-              </span>
-              <el-radio-group v-model="trendPeriod" @change="loadTrendData" size="small">
-                <el-radio-button label="month">按月</el-radio-button>
-                <el-radio-button label="week">按周</el-radio-button>
-                <el-radio-button label="day">按日</el-radio-button>
-              </el-radio-group>
-            </div>
-          </template>
-          <div ref="trendChartRef" class="chart-container"></div>
-        </el-card>
-      </el-col>
-      
-      <!-- 部门分布图 -->
-      <el-col :span="12">
-        <el-card class="chart-card" shadow="never">
-          <template #header>
-            <span>
-              <el-icon><PieChart /></el-icon>
-              部门返工分布
-            </span>
-          </template>
-          <div ref="deptChartRef" class="chart-container"></div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <el-row :gutter="20" class="charts-section">
-      <!-- 不良类别分析 -->
-      <el-col :span="12">
-        <el-card class="chart-card" shadow="never">
-          <template #header>
-            <span>
-              <el-icon><DataBoard /></el-icon>
-              不良类别分析
-            </span>
-          </template>
-          <div ref="categoryChartRef" class="chart-container"></div>
-        </el-card>
-      </el-col>
-      
-      <!-- 成本分析图 -->
-      <el-col :span="12">
-        <el-card class="chart-card" shadow="never">
-          <template #header>
-            <span>
-              <el-icon><Money /></el-icon>
-              返工成本分析
-            </span>
-          </template>
-          <div ref="costChartRef" class="chart-container"></div>
-        </el-card>
-      </el-col>
-    </el-row>
-
-    <!-- 详细数据表格 -->
-    <el-card class="data-table" shadow="never">
-      <template #header>
-        <div class="card-header">
-          <span>
-            <el-icon><List /></el-icon>
-            返工记录清单
-          </span>
-          <div class="header-actions">
-            <el-input
-              v-model="searchKeyword"
-              placeholder="搜索工单号、产品名称等"
-              style="width: 200px; margin-right: 10px"
-              clearable
-              @keyup.enter="loadTableData"
-            >
-              <template #prefix>
-                <el-icon><Search /></el-icon>
-              </template>
-            </el-input>
-            <el-button @click="loadTableData" :icon="Search">搜索</el-button>
-            <el-button @click="exportTableData" :icon="Download" :loading="exportLoading">
-              导出
-            </el-button>
-          </div>
-        </div>
-      </template>
-      
-      <el-table
-        :data="tableData"
-        v-loading="tableLoading"
-        stripe
-        border
-        height="400"
-      >
-        <el-table-column prop="ReworkDate" label="返工日期" width="120" sortable>
-          <template #default="{ row }">
-            {{ formatDate(row.ReworkDate) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="CustomerCode" label="客户编号" width="120" />
-        <el-table-column prop="OrderNo" label="工单号" width="140" />
-        <el-table-column prop="ProductName" label="产品名称" width="150" show-overflow-tooltip />
-        <el-table-column prop="DefectiveQty" label="不良数" width="100" align="right" />
-        <el-table-column prop="DefectiveRate" label="不良率" width="100" align="right">
-          <template #default="{ row }">
-            <span :class="getDefectiveRateClass(row.DefectiveRate)">
-              {{ row.DefectiveRate ? row.DefectiveRate.toFixed(2) + '%' : '-' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="DefectiveReason" label="不良原因" width="150" show-overflow-tooltip />
-        <el-table-column prop="ResponsiblePerson" label="责任人" width="100" />
-        <el-table-column prop="TotalCost" label="返工成本" width="120" align="right">
-          <template #default="{ row }">
-            <span class="cost-amount">
-              {{ row.TotalCost ? '¥' + row.TotalCost.toFixed(2) : '-' }}
-            </span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="ReworkStatus" label="状态" width="100">
-          <template #default="{ row }">
-            <el-tag :type="getStatusType(row.ReworkStatus)" size="small">
-              {{ row.ReworkStatus }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="120" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              size="small"
-              @click="viewDetail(row)"
-              :icon="View"
-            >
-              查看
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-      
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="tablePagination.current"
-          v-model:page-size="tablePagination.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="tablePagination.total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleTableSizeChange"
-          @current-change="handleTableCurrentChange"
-        />
-      </div>
-    </el-card>
-
-    <!-- 详情查看对话框 -->
-    <el-dialog
-      title="返工记录详情"
-      v-model="detailVisible"
-      width="70%"
-    >
+    <!-- 详情弹窗 -->
+    <el-dialog v-model="detailVisible" title="返工记录详情" width="800px">
       <div class="detail-content" v-if="currentRecord">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="返工日期">
@@ -340,7 +329,6 @@
         </el-descriptions>
       </div>
     </el-dialog>
-    </div>
   </AppLayout>
 </template>
 
@@ -348,11 +336,11 @@
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import {
-  Tools, Calendar, Warning, Money, DataAnalysis, TrendCharts, PieChart,
-  DataBoard, List, Search, Download, View, ArrowUp, ArrowDown
+  Tools, TrendCharts, PieChart,
+  DataBoard, List, Search, Download, View
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import axios from 'axios'
+import api from '@/services/api.js'
 import AppLayout from '../components/common/AppLayout.vue'
 
 // 响应式数据
@@ -365,6 +353,12 @@ const searchKeyword = ref('')
 const trendPeriod = ref('month')
 const selectedYear = ref(new Date().getFullYear())
 const currentYear = ref(new Date().getFullYear())
+
+// 时间筛选相关数据
+const timeType = ref('year') // year, quarter, month, week
+const selectedQuarter = ref(Math.ceil((new Date().getMonth() + 1) / 3)) // 当前季度
+const selectedMonth = ref(new Date().getMonth() + 1) // 当前月份
+const selectedWeek = ref(1) // 当前周次
 
 // 图表引用
 const trendChartRef = ref(null)
@@ -379,17 +373,6 @@ let categoryChart = null
 let costChart = null
 
 // 统计数据
-const currentMonthStats = reactive({
-  count: 0,
-  defectiveQty: 0,
-  cost: 0,
-  defectiveRate: 0,
-  countTrend: 0,
-  defectiveQtyTrend: 0,
-  costTrend: 0,
-  defectiveRateTrend: 0
-})
-
 const yearlyStats = reactive({
   totalCount: 0,
   totalDefectiveQty: 0,
@@ -407,12 +390,39 @@ const tablePagination = reactive({
 
 // 计算属性
 const availableYears = computed(() => {
-  const currentYear = new Date().getFullYear()
   const years = []
-  for (let i = currentYear; i >= currentYear - 5; i--) {
+  for (let i = currentYear.value; i >= currentYear.value - 5; i--) {
     years.push(i)
   }
   return years
+})
+
+// 可选月份列表
+const availableMonths = computed(() => {
+  const months = []
+  for (let i = 1; i <= 12; i++) {
+    months.push({
+      value: i,
+      label: `${i}月`
+    })
+  }
+  return months
+})
+
+// 可选周次列表（基于选择的年份）
+const availableWeeks = computed(() => {
+  const weeks = []
+  const year = selectedYear.value
+  // 计算该年的总周数
+  const totalWeeks = getWeeksInYear(year)
+  for (let i = 1; i <= totalWeeks; i++) {
+    const weekRange = getWeekRange(year, i)
+    weeks.push({
+      value: i,
+      label: `第${i}周 (${weekRange})`
+    })
+  }
+  return weeks
 })
 
 // 生命周期
@@ -425,35 +435,35 @@ onMounted(() => {
 const loadAllData = async () => {
   await Promise.all([
     loadSummaryData(),
-    loadYearlyData(),
     loadTrendData(),
     loadTableData()
   ])
 }
 
+/**
+ * 加载汇总数据
+ */
 const loadSummaryData = async () => {
   try {
-    const response = await axios.get('/rework/statistics/summary', {
-      params: { year: selectedYear.value }
+    const timeRange = getTimeRange()
+    const response = await api.get('/rework/statistics/summary', {
+      params: { 
+        year: selectedYear.value,
+        startDate: timeRange.startDate,
+        endDate: timeRange.endDate,
+        timeType: timeType.value
+      }
     })
     
     if (response.data.success) {
       const data = response.data.data
       
-      // 更新当月统计
-      Object.assign(currentMonthStats, {
-        count: data.currentMonth.CurrentMonthCount || 0,
-        defectiveQty: data.currentMonth.CurrentMonthDefectiveQty || 0,
-        cost: data.currentMonth.CurrentMonthCost || 0,
-        defectiveRate: data.currentMonth.CurrentMonthDefectiveRate || 0
-      })
-      
-      // 更新年度统计
+      // 更新时间范围统计
       Object.assign(yearlyStats, {
-        totalCount: data.yearly.TotalReworkCount || 0,
-        totalDefectiveQty: data.yearly.TotalDefectiveQty || 0,
-        totalCost: data.yearly.TotalCost || 0,
-        avgDefectiveRate: data.yearly.AvgDefectiveRate || 0
+        totalCount: data.yearly?.TotalReworkCount || 0,
+        totalDefectiveQty: data.yearly?.TotalDefectiveQty || 0,
+        totalCost: data.yearly?.TotalCost || 0,
+        avgDefectiveRate: data.yearly?.AvgDefectiveRate || 0
       })
       
       // 更新图表数据
@@ -466,20 +476,19 @@ const loadSummaryData = async () => {
   }
 }
 
-const loadYearlyData = async () => {
-  await loadSummaryData()
-}
-
+/**
+ * 加载趋势数据
+ */
 const loadTrendData = async () => {
   try {
-    const startDate = new Date(selectedYear.value, 0, 1).toISOString().split('T')[0]
-    const endDate = new Date(selectedYear.value, 11, 31).toISOString().split('T')[0]
+    const timeRange = getTimeRange()
     
-    const response = await axios.get('/rework/statistics/trend', {
+    const response = await api.get('/rework/statistics/trend', {
       params: {
-        startDate,
-        endDate,
-        groupBy: trendPeriod.value
+        startDate: timeRange.startDate,
+        endDate: timeRange.endDate,
+        groupBy: trendPeriod.value,
+        timeType: timeType.value
       }
     })
     
@@ -493,20 +502,28 @@ const loadTrendData = async () => {
   }
 }
 
+/**
+ * 加载表格数据
+ */
 const loadTableData = async () => {
   try {
     tableLoading.value = true
-    const response = await axios.get('/rework/list', {
+    const timeRange = getTimeRange()
+    const response = await api.get('/rework/list', {
       params: {
         page: tablePagination.current,
         pageSize: tablePagination.pageSize,
-        keyword: searchKeyword.value
+        keyword: searchKeyword.value,
+        year: selectedYear.value,
+        startDate: timeRange.startDate,
+        endDate: timeRange.endDate,
+        timeType: timeType.value
       }
     })
     
     if (response.data.success) {
-      tableData.value = response.data.data
-      tablePagination.total = response.data.pagination.total
+      tableData.value = response.data.data || []
+      tablePagination.total = response.data.pagination?.total || 0
     }
   } catch (error) {
     console.error('加载表格数据失败:', error)
@@ -514,6 +531,137 @@ const loadTableData = async () => {
   } finally {
     tableLoading.value = false
   }
+}
+
+/**
+ * 时间类型变更处理
+ */
+const onTimeTypeChange = () => {
+  // 重置时间选择为默认值
+  switch (timeType.value) {
+    case 'quarter':
+      selectedQuarter.value = Math.ceil((new Date().getMonth() + 1) / 3)
+      break
+    case 'month':
+      selectedMonth.value = new Date().getMonth() + 1
+      break
+    case 'week':
+      selectedWeek.value = 1
+      break
+  }
+  loadTimeRangeData()
+}
+
+/**
+ * 年份变更处理
+ */
+const onYearChange = () => {
+  // 如果是周次选择，需要重置周次为1（因为不同年份的周数可能不同）
+  if (timeType.value === 'week') {
+    selectedWeek.value = 1
+  }
+  loadTimeRangeData()
+}
+
+/**
+ * 加载时间范围数据
+ */
+const loadTimeRangeData = async () => {
+  await Promise.all([
+    loadSummaryData(),
+    loadTrendData(),
+    loadTableData()
+  ])
+}
+
+/**
+ * 获取时间范围标题
+ */
+const getTimeRangeTitle = () => {
+  switch (timeType.value) {
+    case 'year':
+      return `${selectedYear.value}年度`
+    case 'quarter':
+      return `${selectedYear.value}年第${selectedQuarter.value}季度`
+    case 'month':
+      return `${selectedYear.value}年${selectedMonth.value}月`
+    case 'week':
+      return `${selectedYear.value}年第${selectedWeek.value}周`
+    default:
+      return `${selectedYear.value}年度`
+  }
+}
+
+/**
+ * 计算指定年份的总周数
+ */
+const getWeeksInYear = (year) => {
+  const lastDayOfYear = new Date(year, 11, 31)
+  const firstDayOfYear = new Date(year, 0, 1)
+  const dayOfWeek = firstDayOfYear.getDay()
+  const daysInYear = Math.ceil((lastDayOfYear - firstDayOfYear) / (24 * 60 * 60 * 1000)) + 1
+  return Math.ceil((daysInYear + dayOfWeek) / 7)
+}
+
+/**
+ * 获取指定年份和周次的日期范围
+ */
+const getWeekRange = (year, week) => {
+  const firstDayOfYear = new Date(year, 0, 1)
+  const dayOfWeek = firstDayOfYear.getDay()
+  const startOfWeek = new Date(year, 0, 1 + (week - 1) * 7 - dayOfWeek + 1)
+  const endOfWeek = new Date(startOfWeek)
+  endOfWeek.setDate(startOfWeek.getDate() + 6)
+  
+  const formatDateShort = (date) => {
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${month}-${day}`
+  }
+  
+  return `${formatDateShort(startOfWeek)}-${formatDateShort(endOfWeek)}`
+}
+
+/**
+ * 获取时间范围
+ */
+const getTimeRange = () => {
+  const year = selectedYear.value
+  let startDate, endDate
+  
+  switch (timeType.value) {
+    case 'year':
+      startDate = `${year}-01-01`
+      endDate = `${year}-12-31`
+      break
+    case 'quarter':
+      const quarter = selectedQuarter.value
+      const startMonth = (quarter - 1) * 3 + 1
+      const endMonth = quarter * 3
+      startDate = `${year}-${String(startMonth).padStart(2, '0')}-01`
+      endDate = new Date(year, endMonth, 0).toISOString().split('T')[0]
+      break
+    case 'month':
+      const month = selectedMonth.value
+      startDate = `${year}-${String(month).padStart(2, '0')}-01`
+      endDate = new Date(year, month, 0).toISOString().split('T')[0]
+      break
+    case 'week':
+      const week = selectedWeek.value
+      const firstDayOfYear = new Date(year, 0, 1)
+      const dayOfWeek = firstDayOfYear.getDay()
+      const startOfWeek = new Date(year, 0, 1 + (week - 1) * 7 - dayOfWeek + 1)
+      const endOfWeek = new Date(startOfWeek)
+      endOfWeek.setDate(startOfWeek.getDate() + 6)
+      startDate = startOfWeek.toISOString().split('T')[0]
+      endDate = endOfWeek.toISOString().split('T')[0]
+      break
+    default:
+      startDate = `${year}-01-01`
+      endDate = `${year}-12-31`
+  }
+  
+  return { startDate, endDate }
 }
 
 // 图表初始化
@@ -685,9 +833,9 @@ const updateCategoryChart = (data) => {
         data: data.map(item => item.ReworkCount),
         itemStyle: {
           color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: '#83bff6' },
-            { offset: 0.5, color: '#188df0' },
-            { offset: 1, color: '#188df0' }
+            { offset: 0, color: '#409EFF' },
+            { offset: 0.5, color: '#337ecc' },
+            { offset: 1, color: '#337ecc' }
           ])
         }
       }
@@ -710,30 +858,39 @@ const updateCostChart = (data) => {
       trigger: 'axis',
       axisPointer: { type: 'cross' }
     },
+    legend: {
+      data: ['总成本', '平均成本'],
+      bottom: 0
+    },
     xAxis: {
       type: 'category',
       data: data.map(item => item.DateLabel)
     },
     yAxis: {
       type: 'value',
-      name: '成本(元)',
-      axisLabel: {
-        formatter: '¥{value}'
-      }
+      name: '成本(元)'
     },
     series: [
       {
-        name: '返工成本',
+        name: '总成本',
+        type: 'bar',
+        data: data.map(item => {
+          const cost = item.TotalCost
+          return (cost !== null && cost !== undefined && !isNaN(cost)) ? Number(cost.toFixed(2)) : 0
+        }),
+        itemStyle: { color: '#67C23A' }
+      },
+      {
+        name: '平均成本',
         type: 'line',
-        data: data.map(item => item.TotalCost),
-        smooth: true,
-        itemStyle: { color: '#E6A23C' },
-        areaStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-            { offset: 0, color: 'rgba(230, 162, 60, 0.3)' },
-            { offset: 1, color: 'rgba(230, 162, 60, 0.1)' }
-          ])
-        }
+        data: data.map(item => {
+          const avgCost = item.AvgCost
+          if (avgCost !== null && avgCost !== undefined && !isNaN(avgCost)) {
+            return Number(avgCost.toFixed(2))
+          }
+          return 0
+        }),
+        itemStyle: { color: '#E6A23C' }
       }
     ]
   }
@@ -788,137 +945,62 @@ const formatDate = (date) => {
   }
 }
 
+const getDefectiveRateClass = (rate) => {
+  if (!rate) return ''
+  if (rate < 1) return 'rate-low'
+  if (rate < 3) return 'rate-medium'
+  return 'rate-high'
+}
+
 const getStatusType = (status) => {
   const statusMap = {
     '进行中': 'warning',
     '已完成': 'success',
-    '已取消': 'danger'
+    '已取消': 'info',
+    '待审核': 'primary'
   }
   return statusMap[status] || 'info'
-}
-
-const getDefectiveRateClass = (rate) => {
-  if (!rate) return ''
-  if (rate < 1) return 'rate-low'
-  if (rate < 5) return 'rate-medium'
-  return 'rate-high'
-}
-
-const getTrendClass = (trend) => {
-  if (!trend) return ''
-  return trend > 0 ? 'trend-up' : 'trend-down'
-}
-
-const getTrendIcon = (trend) => {
-  if (!trend) return 'ArrowUp'
-  return trend > 0 ? 'ArrowUp' : 'ArrowDown'
 }
 </script>
 
 <style scoped>
 .rework-analysis {
   padding: 20px;
-  background-color: #f5f7fa;
-  min-height: 100vh;
 }
 
 .page-header {
-  text-align: center;
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .page-header h1 {
-  margin: 0 0 10px 0;
+  margin: 0;
+  font-size: 24px;
   color: #303133;
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 10px;
-  font-size: 28px;
+  gap: 8px;
 }
 
 .page-subtitle {
-  margin: 0;
+  margin: 8px 0 0 0;
   color: #909399;
-  font-size: 16px;
-}
-
-.stats-cards {
-  margin-bottom: 30px;
-}
-
-.stat-card {
-  background: white;
-  border-radius: 8px;
-  padding: 20px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  display: flex;
-  align-items: center;
-  gap: 15px;
-  height: 100px;
-}
-
-.card-icon {
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 24px;
-  color: white;
-}
-
-.card-icon.current-month {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-}
-
-.card-icon.defective-qty {
-  background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-}
-
-.card-icon.cost {
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-}
-
-.card-icon.rate {
-  background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-}
-
-.card-content {
-  flex: 1;
-}
-
-.card-title {
   font-size: 14px;
-  color: #909399;
-  margin-bottom: 8px;
-}
-
-.card-value {
-  font-size: 36px;
-  font-weight: bold;
-  color: #303133;
-  margin-bottom: 5px;
-}
-
-.card-trend {
-  font-size: 12px;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.trend-up {
-  color: #F56C6C;
-}
-
-.trend-down {
-  color: #67C23A;
 }
 
 .yearly-summary {
-  margin-bottom: 30px;
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+}
+
+.time-filter-group {
+  display: flex;
+  align-items: center;
 }
 
 .summary-item {
@@ -929,13 +1011,13 @@ const getTrendIcon = (trend) => {
 .summary-label {
   font-size: 14px;
   color: #909399;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .summary-value {
   font-size: 28px;
   font-weight: bold;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .summary-value.primary {
@@ -955,7 +1037,7 @@ const getTrendIcon = (trend) => {
 }
 
 .charts-section {
-  margin-bottom: 30px;
+  margin-bottom: 20px;
 }
 
 .chart-card {
@@ -967,19 +1049,14 @@ const getTrendIcon = (trend) => {
   width: 100%;
 }
 
-.data-table {
-  margin-bottom: 30px;
-}
-
-.card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.table-card {
+  margin-bottom: 20px;
 }
 
 .header-actions {
   display: flex;
   align-items: center;
+  gap: 10px;
 }
 
 .pagination-wrapper {
@@ -988,41 +1065,25 @@ const getTrendIcon = (trend) => {
   margin-top: 20px;
 }
 
-.detail-content {
-  max-height: 60vh;
-  overflow-y: auto;
-}
-
 .cost-amount {
-  font-weight: bold;
-  color: #E6A23C;
-}
-
-.rate-low {
   color: #67C23A;
   font-weight: bold;
 }
 
+.rate-low {
+  color: #67C23A;
+}
+
 .rate-medium {
   color: #E6A23C;
-  font-weight: bold;
 }
 
 .rate-high {
   color: #F56C6C;
-  font-weight: bold;
 }
 
-:deep(.el-card__header) {
-  padding: 15px 20px;
-  border-bottom: 1px solid #EBEEF5;
-}
-
-:deep(.el-card__body) {
-  padding: 20px;
-}
-
-:deep(.el-table .el-table__cell) {
-  padding: 8px 0;
+.detail-content {
+  max-height: 500px;
+  overflow-y: auto;
 }
 </style>

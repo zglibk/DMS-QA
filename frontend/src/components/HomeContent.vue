@@ -1243,6 +1243,9 @@
       </template>
       <ComplaintFormDialog @success="handleComplaintSuccess" @cancel="showComplaintDialog = false" />
     </el-dialog>
+    
+    <!-- 回到顶部按钮 -->
+    <el-backtop :right="40" :bottom="40" :visibility-height="200" />
   </div>
 </template>
 

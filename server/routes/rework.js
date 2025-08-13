@@ -1130,68 +1130,99 @@ router.delete('/:id', async (req, res) => {
  */
 router.get('/statistics/summary', async (req, res) => {
   try {
-    const { year = new Date().getFullYear() } = req.query;
+    const { 
+      year = new Date().getFullYear(),
+      startDate,
+      endDate,
+      timeType = 'year'
+    } = req.query;
     
     const pool = await getConnection();
     const request = pool.request();
-    request.input('year', sql.Int, year);
     
-    // 获取年度汇总数据
-    const yearlyResult = await request.query(`
-      SELECT * FROM YearlyReworkSummary WHERE StatYear = @year
-    `);
+    // 根据是否有具体时间范围来构建查询条件
+    let whereClause = '';
     
-    // 获取月度统计数据
-    const monthlyResult = await request.query(`
-      SELECT * FROM ReworkStatistics WHERE StatYear = @year ORDER BY StatMonth
-    `);
+    if (startDate && endDate) {
+      whereClause = 'WHERE ReworkDate >= @startDate AND ReworkDate <= @endDate';
+      console.log(`查询时间范围: ${startDate} 到 ${endDate}`);
+    } else {
+      whereClause = 'WHERE YEAR(ReworkDate) = @year';
+      console.log(`查询年份: ${year}`);
+    }
     
-    // 获取当前月份数据
-    const currentMonth = new Date().getMonth() + 1;
-    request.input('currentMonth', sql.Int, currentMonth);
+    console.log(`WHERE子句: ${whereClause}`);
     
-    const currentMonthResult = await request.query(`
+    // 获取时间范围内的汇总数据
+    const summaryRequest = pool.request();
+    if (startDate && endDate) {
+      summaryRequest.input('startDate', sql.Date, startDate);
+      summaryRequest.input('endDate', sql.Date, endDate);
+    } else {
+      summaryRequest.input('year', sql.Int, year);
+    }
+    const summaryResult = await summaryRequest.query(`
       SELECT 
-        COUNT(*) as CurrentMonthCount,
-        SUM(DefectiveQty) as CurrentMonthDefectiveQty,
-        SUM(TotalCost) as CurrentMonthCost,
-        AVG(CAST(DefectiveQty AS DECIMAL(10,2)) / NULLIF(TotalQty, 0) * 100) as CurrentMonthDefectiveRate
+        COUNT(*) as TotalReworkCount,
+        SUM(DefectiveQty) as TotalDefectiveQty,
+        SUM(TotalCost) as TotalCost,
+        AVG(CAST(DefectiveQty AS DECIMAL(10,2)) / NULLIF(TotalQty, 0) * 100) as AvgDefectiveRate
       FROM ProductionReworkRegister 
-      WHERE YEAR(ReworkDate) = @year AND MONTH(ReworkDate) = @currentMonth
+      ${whereClause}
     `);
     
     // 获取责任部门统计
-    const deptResult = await request.query(`
+    const deptRequest = pool.request();
+    if (startDate && endDate) {
+      deptRequest.input('startDate', sql.Date, startDate);
+      deptRequest.input('endDate', sql.Date, endDate);
+    } else {
+      deptRequest.input('year', sql.Int, year);
+    }
+    const deptResult = await deptRequest.query(`
       SELECT 
         ResponsibleDept,
         COUNT(*) as ReworkCount,
         SUM(DefectiveQty) as TotalDefectiveQty,
         SUM(TotalCost) as TotalCost
       FROM ProductionReworkRegister 
-      WHERE YEAR(ReworkDate) = @year AND ResponsibleDept IS NOT NULL
+      ${whereClause} AND ResponsibleDept IS NOT NULL
       GROUP BY ResponsibleDept
       ORDER BY ReworkCount DESC
     `);
     
     // 获取返工类别统计
-    const categoryResult = await request.query(`
+    const categoryRequest = pool.request();
+    if (startDate && endDate) {
+      categoryRequest.input('startDate', sql.Date, startDate);
+      categoryRequest.input('endDate', sql.Date, endDate);
+    } else {
+      categoryRequest.input('year', sql.Int, year);
+    }
+    const categoryResult = await categoryRequest.query(`
       SELECT 
         DefectiveCategory,
         COUNT(*) as ReworkCount,
         SUM(DefectiveQty) as TotalDefectiveQty,
         SUM(TotalCost) as TotalCost
       FROM ProductionReworkRegister 
-      WHERE YEAR(ReworkDate) = @year AND DefectiveCategory IS NOT NULL
+      ${whereClause} AND DefectiveCategory IS NOT NULL
       GROUP BY DefectiveCategory
       ORDER BY ReworkCount DESC
     `);
     
+    // 使用查询结果数据
+    const summaryData = summaryResult.recordset[0] || {};
+
     res.json({
       success: true,
       data: {
-        yearly: yearlyResult.recordset[0] || {},
-        monthly: monthlyResult.recordset,
-        currentMonth: currentMonthResult.recordset[0] || {},
+        yearly: {
+          TotalReworkCount: summaryData.TotalReworkCount || 0,
+          TotalDefectiveQty: summaryData.TotalDefectiveQty || 0,
+          TotalCost: summaryData.TotalCost || 0,
+          AvgDefectiveRate: summaryData.AvgDefectiveRate || 0
+        },
         byDepartment: deptResult.recordset,
         byCategory: categoryResult.recordset
       }
@@ -1252,7 +1283,7 @@ router.get('/statistics/trend', async (req, res) => {
       FROM ProductionReworkRegister 
       WHERE ReworkDate >= @startDate AND ReworkDate <= @endDate
       GROUP BY ${groupByClause}
-      ORDER BY ${groupByClause}
+      ORDER BY MIN(ReworkDate)
     `);
     
     res.json({
