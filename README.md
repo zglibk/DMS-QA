@@ -55,129 +55,129 @@ DMS-QA 是一个基于 Vue 3 + Node.js + SQL Server 的质量管理系统，主�
 ## 项目结构
 
 ```
-DMS-QA/
-├── .devcontainer/
-│   ├── README.md
-│   ├── devcontainer.json
-│   └── start-dev.sh
-├── .gitignore
-├── .nvmrc
-├── .trae/
-│   └── rules/
-│       └── project_rules.md
-├── LICENSE
-├── NOTICE
-├── README.md
-├── VERSION_HISTORY.md
-├── docs/
-├── frontend/
-│   ├── .env.example
-│   ├── App.vue
-│   ├── index.html
-│   ├── main.js
-│   ├── package-lock.json
-│   ├── package-scripts.json
-│   ├── package.json
-│   ├── scripts/
-│   │   └── deployment-check.js
-│   ├── src/
-│   │   ├── components/
-│   │   ├── composables/
-│   │   ├── config/
-│   │   ├── examples/
-│   │   ├── router/
-│   │   ├── services/
-│   │   ├── store/
-│   │   ├── utils/
-│   │   └── views/
-│   ├── vite.config.js
-│   └── vite.config.production.js
-├── package-lock.json
-├── package.json
-├── push-to-all.ps1
-├── scripts/
-│   ├── check-environment.js
-│   └── version-compatibility-test.js
-└── server/
-    ├── .env.example
-    ├── .gitignore
-    ├── app.js
-    ├── config/
-    │   ├── database.js
-    │   ├── nginx-dms-qa-centosstream.conf
-    │   ├── nginx-dms-qa-fixed.conf
-    │   └── path-mapping.js
-    ├── controllers/
-    │   ├── noticeController.js
-    │   └── workPlanController.js
-    ├── db.js
-    ├── init.sql
-    ├── init_MySQL80.sql
-    ├── insert_template_data.js
-    ├── menu-formatted.json
-    ├── menu-response.json
-    ├── middleware/
-    │   └── auth.js
-    ├── package-lock.json
-    ├── package.json
-    ├── routes/
-    │   ├── auth.js
-    │   ├── complaint.js
-    │   ├── config.js
-    │   ├── customerComplaints.js
-    │   ├── customerComplaintsBatch.js
-    │   ├── departments.js
-    │   ├── import.js
-    │   ├── material-price-backup.js
-    │   ├── material-price.js
-    │   ├── menus.js
-    │   ├── notice.js
-    │   ├── person.js
-    │   ├── positions.js
-    │   ├── quality-metrics.js
-    │   ├── rework.js
-    │   ├── roles.js
-    │   ├── sample.js
-    │   ├── shared-files.js
-    │   ├── supplierComplaints.js
-    │   ├── upload.js
-    │   └── workPlan.js
-    ├── scripts/
-    │   ├── DEPLOYMENT_SUMMARY.md
-    │   ├── README.md
-    │   ├── add-development-menus.js
-    │   ├── add-development-menus.sql
-    │   ├── add-supplier-complaints-menu.sql
-    │   ├── add-supplier-complaints-new-fields.sql
-    │   ├── add-work-plan-menus.sql
-    │   ├── check-environment.ps1
-    │   ├── create-supplier-complaints-table.sql
-    │   ├── execute-add-fields.js
-    │   ├── fix-attachment-paths-v2.js
-    │   ├── fix-attachment-paths.js
-    │   ├── fix_null_bit_fields.js
-    │   ├── fix_null_bit_fields.sql
-    │   ├── health-monitor.ps1
-    │   ├── init-work-plan-menus.js
-    │   ├── init-work-plan-tables.sql
-    │   ├── install-all-services.ps1
-    │   ├── install-nginx-service-fixed.ps1
-    │   ├── install-node-service-fixed.ps1
-    │   ├── install-nssm.ps1
-    │   ├── install-services-english.ps1
-    │   ├── run-init-tables.js
-    │   ├── service-manager.ps1
-    │   ├── update-responsible-person-field.js
-    │   └── update-responsible-person-to-initiator.sql
-    ├── services/
-    │   └── fileCopyService.js
-    ├── templates/
-    │   └── complaint_template.xlsx
-    ├── uploads/
-    │   ├── .gitkeep
-    │   ├── attachments/
-    │   └── site-images/
-    └── 质量等级数据库说明.md
+DMS-QA/                                    # 质量管理系统根目录
+├── .devcontainer/                         # 开发容器配置目录
+│   ├── README.md                          # 开发容器说明文档
+│   ├── devcontainer.json                  # VS Code开发容器配置文件
+│   └── start-dev.sh                       # 开发环境启动脚本
+├── .gitignore                             # Git忽略文件配置
+├── .nvmrc                                 # Node.js版本控制文件
+├── .trae/                                 # Trae AI配置目录
+│   └── rules/                             # AI规则配置目录
+│       └── project_rules.md               # 项目开发规则文档
+├── LICENSE                                # 开源许可证文件
+├── NOTICE                                 # 版权声明文件
+├── README.md                              # 项目说明文档
+├── VERSION_HISTORY.md                     # 版本更新历史记录
+├── docs/                                  # 项目文档目录
+├── frontend/                              # 前端应用目录
+│   ├── .env.example                       # 前端环境变量示例文件
+│   ├── App.vue                            # Vue应用主组件
+│   ├── index.html                         # HTML入口文件
+│   ├── main.js                            # JavaScript入口文件
+│   ├── package-lock.json                  # 前端依赖锁定文件
+│   ├── package-scripts.json               # 前端脚本配置文件
+│   ├── package.json                       # 前端项目配置文件
+│   ├── scripts/                           # 前端脚本目录
+│   │   └── deployment-check.js            # 部署检查脚本
+│   ├── src/                               # 前端源代码目录
+│   │   ├── components/                    # Vue组件目录
+│   │   ├── composables/                   # Vue组合式函数目录
+│   │   ├── config/                        # 前端配置文件目录
+│   │   ├── examples/                      # 示例代码目录
+│   │   ├── router/                        # 路由配置目录
+│   │   ├── services/                      # API服务目录
+│   │   ├── store/                         # 状态管理目录
+│   │   ├── utils/                         # 工具函数目录
+│   │   └── views/                         # 页面视图目录
+│   ├── vite.config.js                     # Vite开发环境配置
+│   └── vite.config.production.js          # Vite生产环境配置
+├── package-lock.json                      # 根目录依赖锁定文件
+├── package.json                           # 根目录项目配置文件
+├── push-to-all.ps1                        # Git多仓库推送脚本
+├── scripts/                               # 项目脚本目录
+│   ├── check-environment.js               # 环境检查脚本
+│   └── version-compatibility-test.js      # 版本兼容性测试脚本
+└── server/                                # 后端服务目录
+    ├── .env.example                       # 后端环境变量示例文件
+    ├── .gitignore                         # 后端Git忽略文件
+    ├── app.js                             # Express应用入口文件
+    ├── config/                            # 后端配置目录
+    │   ├── database.js                    # 数据库连接配置
+    │   ├── nginx-dms-qa-centosstream.conf # Nginx配置文件(CentOS Stream)
+    │   ├── nginx-dms-qa-fixed.conf        # Nginx配置文件(修复版)
+    │   └── path-mapping.js                # 路径映射配置
+    ├── controllers/                       # 控制器目录
+    │   ├── noticeController.js            # 通知控制器
+    │   └── workPlanController.js          # 工作计划控制器
+    ├── db.js                              # 数据库连接文件
+    ├── init.sql                           # 数据库初始化SQL脚本
+    ├── init_MySQL80.sql                   # MySQL 8.0初始化脚本
+    ├── insert_template_data.js            # 模板数据插入脚本
+    ├── menu-formatted.json                # 格式化菜单数据
+    ├── menu-response.json                 # 菜单响应数据
+    ├── middleware/                        # 中间件目录
+    │   └── auth.js                        # 身份验证中间件
+    ├── package-lock.json                  # 后端依赖锁定文件
+    ├── package.json                       # 后端项目配置文件
+    ├── routes/                            # 路由目录
+    │   ├── auth.js                        # 身份验证路由
+    │   ├── complaint.js                   # 投诉管理路由
+    │   ├── config.js                      # 配置管理路由
+    │   ├── customerComplaints.js          # 客户投诉路由
+    │   ├── customerComplaintsBatch.js     # 客户投诉批量处理路由
+    │   ├── departments.js                 # 部门管理路由
+    │   ├── import.js                      # 数据导入路由
+    │   ├── material-price-backup.js       # 材料价格备份路由
+    │   ├── material-price.js              # 材料价格管理路由
+    │   ├── menus.js                       # 菜单管理路由
+    │   ├── notice.js                      # 通知管理路由
+    │   ├── person.js                      # 人员管理路由
+    │   ├── positions.js                   # 职位管理路由
+    │   ├── quality-metrics.js             # 质量指标路由
+    │   ├── rework.js                      # 返工管理路由
+    │   ├── roles.js                       # 角色管理路由
+    │   ├── sample.js                      # 样品管理路由
+    │   ├── shared-files.js                # 共享文件路由
+    │   ├── supplierComplaints.js          # 供应商投诉路由
+    │   ├── upload.js                      # 文件上传路由
+    │   └── workPlan.js                    # 工作计划路由
+    ├── scripts/                           # 后端脚本目录
+    │   ├── DEPLOYMENT_SUMMARY.md          # 部署总结文档
+    │   ├── README.md                      # 脚本说明文档
+    │   ├── add-development-menus.js       # 添加开发菜单脚本
+    │   ├── add-development-menus.sql      # 添加开发菜单SQL
+    │   ├── add-supplier-complaints-menu.sql # 添加供应商投诉菜单SQL
+    │   ├── add-supplier-complaints-new-fields.sql # 供应商投诉新字段SQL
+    │   ├── add-work-plan-menus.sql        # 添加工作计划菜单SQL
+    │   ├── check-environment.ps1          # 环境检查PowerShell脚本
+    │   ├── create-supplier-complaints-table.sql # 创建供应商投诉表SQL
+    │   ├── execute-add-fields.js          # 执行添加字段脚本
+    │   ├── fix-attachment-paths-v2.js     # 修复附件路径脚本v2
+    │   ├── fix-attachment-paths.js        # 修复附件路径脚本
+    │   ├── fix_null_bit_fields.js         # 修复空位字段脚本
+    │   ├── fix_null_bit_fields.sql        # 修复空位字段SQL
+    │   ├── health-monitor.ps1             # 健康监控PowerShell脚本
+    │   ├── init-work-plan-menus.js        # 初始化工作计划菜单脚本
+    │   ├── init-work-plan-tables.sql      # 初始化工作计划表SQL
+    │   ├── install-all-services.ps1       # 安装所有服务PowerShell脚本
+    │   ├── install-nginx-service-fixed.ps1 # 安装Nginx服务脚本(修复版)
+    │   ├── install-node-service-fixed.ps1 # 安装Node服务脚本(修复版)
+    │   ├── install-nssm.ps1               # 安装NSSM服务管理器脚本
+    │   ├── install-services-english.ps1   # 安装服务脚本(英文版)
+    │   ├── run-init-tables.js             # 运行初始化表脚本
+    │   ├── service-manager.ps1            # 服务管理PowerShell脚本
+    │   ├── update-responsible-person-field.js # 更新责任人字段脚本
+    │   └── update-responsible-person-to-initiator.sql # 更新责任人为发起人SQL
+    ├── services/                          # 服务层目录
+    │   └── fileCopyService.js             # 文件复制服务
+    ├── templates/                         # 模板文件目录
+    │   └── complaint_template.xlsx        # 投诉模板Excel文件
+    ├── uploads/                           # 文件上传目录
+    │   ├── .gitkeep                       # Git保持目录文件
+    │   ├── attachments/                   # 附件存储目录
+    │   └── site-images/                   # 站点图片存储目录
+    └── 质量等级数据库说明.md               # 质量等级数据库说明文档
 ```
 
 ## 功能特性
