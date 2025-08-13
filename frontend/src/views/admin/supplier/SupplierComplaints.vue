@@ -141,6 +141,7 @@
         <div class="action-buttons">
           <el-button type="primary" @click="handleAdd" :icon="Plus">新增投诉</el-button>
           <el-button type="success" @click="handleExport" :icon="Download">导出数据</el-button>
+          <el-button type="warning" @click="handleGenerateComplaintReport" :icon="Document" :disabled="selectedRows.length === 0 || !canGenerateReport">生成投诉书</el-button>
           <el-button type="danger" @click="handleBatchDelete" :icon="Delete" :disabled="selectedRows.length === 0">批量删除</el-button>
         </div>
       </div>
@@ -314,7 +315,7 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="8">
             <el-form-item label="抽检数量">
               <el-input-number 
                 v-model="formData.SampleQuantity" 
@@ -324,7 +325,10 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="8">
             <el-form-item label="IQC判定">
               <el-select v-model="formData.IQCResult" placeholder="请选择IQC判定" style="width: 100%">
                 <el-option label="合格" value="合格" />
@@ -335,9 +339,6 @@
               </el-select>
             </el-form-item>
           </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="采购单号">
               <el-input 
@@ -358,14 +359,14 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="16">
             <el-form-item label="附图">
               <el-input v-model="formData.AttachedImages" placeholder="请输入附图说明或路径" />
             </el-form-item>
           </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="检验日期">
               <el-date-picker 
@@ -463,10 +464,8 @@
             :rows="3" 
             placeholder="请描述期望的解决方案"
           />
-        </el-form-item>
-        
-
-        
+        </el-form-item>       
+       
         <!-- 处理结果相关字段 -->
         <div v-if="formData.ProcessStatus !== 'pending'" class="process-section">
           <el-divider content-position="left">处理结果</el-divider>
@@ -713,18 +712,96 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 导出字段选择对话框 -->
+    <el-dialog 
+      v-model="exportDialogVisible" 
+      title="选择导出字段" 
+      width="750px"
+      :close-on-click-modal="false"
+    >
+      <div class="export-dialog-content">
+        <div class="export-header">
+          <span class="selected-count">已选择 {{ selectedExportFields.length }} 个字段</span>
+        </div>
+        
+        <el-divider />
+        
+        <div class="export-transfer">
+          <el-transfer
+            v-model="selectedExportFields"
+            :data="allExportFieldsForTransfer"
+            :titles="['可选字段', '已选字段']"
+            :button-texts="['移除', '添加']"
+            :format="{
+              noChecked: '${total}',
+              hasChecked: '${checked}/${total}'
+            }"
+            filterable
+            filter-placeholder="搜索字段"
+            target-order="original"
+            style="text-align: left; display: inline-block"
+          >
+            <template #default="{ option }">
+              <span>{{ option.label }}</span>
+            </template>
+          </el-transfer>
+        </div>
+        <el-divider />
+        <div class="export-tips">
+          <el-alert
+            title="导出说明"
+            type="info"
+            :closable="false"
+            show-icon
+          >
+            <template #default>
+              <ul>
+                <li>导出将包含当前搜索条件下的所有数据</li>
+                <li>左侧为可选字段，右侧为已选择的导出字段</li>
+                <li>可以使用搜索功能快速查找字段</li>
+              </ul>
+            </template>
+          </el-alert>
+        </div>
+      </div>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="cancelExport">取消</el-button>
+          <el-button @click="resetExportFields">重置</el-button>
+          <el-button type="primary" @click="confirmExport" :disabled="selectedExportFields.length === 0">
+            确认导出
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import {
   Search, Refresh, Plus, Download, DataAnalysis,
   View, Edit, Delete, Warning, Clock, Loading,
-  CircleCheck, Histogram
+  CircleCheck, Histogram, Document
 } from '@element-plus/icons-vue'
 import api from '@/services/api'
+import { useUserStore } from '@/store/user'
+
+// 用户store
+const userStore = useUserStore()
+
+// 权限检查
+const canGenerateReport = computed(() => {
+  // 检查用户是否有系统管理员角色
+  const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+  
+  // 检查用户是否有生成投诉书的操作权限
+  const hasReportPermission = userStore.hasActionPermission('supplier:materialcomplaint:export')  
+  return hasAdminRole || hasReportPermission
+})
 
 // 响应式数据
 const loading = ref(false)
@@ -823,7 +900,17 @@ const dialogTitle = computed(() => {
 })
 
 // 生命周期
-onMounted(() => {
+onMounted(async () => {
+  // 确保用户信息已加载
+  if (!userStore.user?.id) {
+    try {
+      await userStore.fetchProfile()
+      console.log('用户信息已加载:', userStore.user)
+    } catch (error) {
+      console.error('获取用户信息失败:', error)
+    }
+  }
+  
   loadData()
   loadSuppliers()
   loadPersonList() // 加载人员列表
@@ -1041,11 +1128,292 @@ const handleDelete = async (row) => {
   }
 }
 
+// 导出相关状态
+const exportDialogVisible = ref(false)
+const exportFields = ref([])
+const allExportFields = ref([])
+const selectedExportFields = ref([]) // el-transfer选中的字段key数组
+const allExportFieldsForTransfer = ref([]) // el-transfer数据源
+
+
 /**
- * 导出数据
+ * 获取表字段信息
+ * 功能：从API动态获取SupplierComplaints表的所有字段信息
  */
-const handleExport = () => {
-  ElMessage.info('导出功能开发中...')
+const loadTableFields = async () => {
+  try {
+    const response = await fetch('/api/supplier-complaints/table-fields')
+    const result = await response.json()
+    
+    if (result.success) {
+      // 设置默认选中的字段
+      const defaultSelectedFields = [
+        'ComplaintNo', 'ComplaintDate', 'SupplierName', 'MaterialName', 
+        'ComplaintType', 'UrgencyLevel', 'Quantity', 'TotalAmount', 
+        'ProcessStatus', 'InitiatedBy', 'Description'
+      ]
+      
+      // 为原有的exportFields保留兼容性
+      allExportFields.value = result.data.map(field => ({
+        key: field.key,
+        label: field.label,
+        checked: defaultSelectedFields.includes(field.key),
+        dataType: field.dataType
+      }))
+      
+      // 为el-transfer组件准备数据
+      allExportFieldsForTransfer.value = result.data.map(field => ({
+        key: field.key,
+        label: field.label,
+        dataType: field.dataType
+      }))
+      
+      // 设置默认选中的字段
+      selectedExportFields.value = defaultSelectedFields.filter(key => 
+        result.data.some(field => field.key === key)
+      )
+    } else {
+      ElMessage.error('获取字段信息失败')
+    }
+  } catch (error) {
+    console.error('获取字段信息失败:', error)
+    ElMessage.error('获取字段信息失败')
+  }
+}
+
+/**
+ * 打开导出字段选择对话框
+ * 功能：加载字段信息并显示导出对话框
+ */
+const handleExport = async () => {
+  try {
+    // 如果字段信息未加载，先加载字段信息
+    if (allExportFieldsForTransfer.value.length === 0) {
+      await loadTableFields()
+    }
+    
+    exportDialogVisible.value = true
+  } catch (error) {
+    console.error('打开导出对话框失败:', error)
+    ElMessage.error('打开导出对话框失败')
+  }
+}
+
+/**
+ * 确认导出数据
+ * 功能：根据用户选择的字段导出完整数据
+ */
+const confirmExport = async () => {
+  if (selectedExportFields.value.length === 0) {
+    ElMessage.warning('请至少选择一个字段进行导出')
+    return
+  }
+
+  try {
+    // 显示加载状态
+    const loadingInstance = ElLoading.service({
+      lock: true,
+      text: '正在导出数据，请稍候...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+
+    // 根据选中的字段key获取完整的字段信息，并按照用户调整的顺序排列
+    const selectedFields = selectedExportFields.value.map(fieldKey => 
+      allExportFieldsForTransfer.value.find(field => field.key === fieldKey)
+    ).filter(field => field) // 过滤掉可能的undefined值
+    
+    // 获取要导出的数据，传递选择的字段信息
+    const exportData = await getExportData(selectedFields)
+    
+    // 导出Excel
+    await exportToExcel(exportData, selectedFields)
+    
+    loadingInstance.close()
+    exportDialogVisible.value = false
+    ElMessage.success(`成功导出 ${exportData.length} 条记录`)
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败，请重试')
+  }
+}
+
+/**
+ * 获取导出数据
+ * 功能：根据用户选择的字段和当前筛选条件从后端获取完整数据
+ */
+const getExportData = async (selectedFields) => {
+  try {
+    // 构建筛选条件
+    const filters = {
+      ...searchForm
+    }
+    
+    // 处理日期范围
+    if (filters.dateRange && filters.dateRange.length === 2) {
+      filters.startDate = filters.dateRange[0]
+      filters.endDate = filters.dateRange[1]
+      delete filters.dateRange
+    }
+    
+    // 提取字段名称列表
+    const fieldKeys = selectedFields.map(field => field.key)
+    
+    // 调用专门的导出API
+    const response = await api.post('/supplier-complaints/export', {
+      fields: fieldKeys,
+      filters: filters
+    })
+    
+    if (response.data.success) {
+      return response.data.data || []
+    } else {
+      throw new Error(response.data.message || '获取导出数据失败')
+    }
+  } catch (error) {
+    console.error('获取导出数据失败:', error)
+    throw error
+  }
+}
+
+/**
+ * 导出到Excel
+ * 功能：将数据导出为Excel文件，包含优化的表格样式
+ */
+const exportToExcel = async (data, selectedFields) => {
+  const ExcelJS = await import('exceljs')
+  const { saveAs } = await import('file-saver')
+  
+  // 创建工作簿
+  const workbook = new ExcelJS.Workbook()
+  const worksheet = workbook.addWorksheet('供应商投诉数据')
+  
+  // 设置列标题
+  const headers = selectedFields.map(field => field.label)
+  worksheet.addRow(headers)
+  
+  // 设置标题行样式（浅灰色背景）
+  const headerRow = worksheet.getRow(1)
+  headerRow.font = { bold: true, color: { argb: '333333' } }
+  headerRow.fill = {
+    type: 'pattern',
+    pattern: 'solid',
+    fgColor: { argb: 'F5F5F5' } // 浅灰色背景
+  }
+  headerRow.alignment = { horizontal: 'center', vertical: 'middle' }
+  headerRow.height = 25
+  
+  // 添加数据行
+  data.forEach((item, index) => {
+    const rowData = selectedFields.map(field => {
+      let value = item[field.key]
+      
+      // 格式化特殊字段
+      switch (field.key) {
+        case 'ComplaintDate':
+        case 'IncomingDate':
+          return value ? formatDate(value) : ''
+        case 'UrgencyLevel':
+          return getUrgencyText(value)
+        case 'ProcessStatus':
+          return getStatusText(value)
+        case 'Quantity':
+        case 'UnitPrice':
+        case 'TotalAmount':
+        case 'ClaimAmount':
+        case 'ActualLoss':
+        case 'CompensationAmount':
+          return value ? formatNumber(value) : ''
+        default:
+          return value || ''
+      }
+    })
+    const row = worksheet.addRow(rowData)
+    
+    // 设置隔行变色（偶数行浅灰色背景）
+    if ((index + 1) % 2 === 0) {
+      row.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FAFAFA' } // 更浅的灰色用于隔行变色
+      }
+    }
+    
+    // 设置行高
+    row.height = 20
+  })
+  
+  // 自动调整列宽
+  selectedFields.forEach((field, index) => {
+    const column = worksheet.getColumn(index + 1)
+    column.width = Math.max(field.label.length * 2, 15)
+  })
+  
+  // 设置表格边框（浅灰色）
+  const maxCol = selectedFields.length
+  const maxRow = data.length + 1 // 包含标题行
+  
+  for (let row = 1; row <= maxRow; row++) {
+    for (let col = 1; col <= maxCol; col++) {
+      const cell = worksheet.getCell(row, col)
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'D3D3D3' } },    // 浅灰色边框
+        left: { style: 'thin', color: { argb: 'D3D3D3' } },
+        bottom: { style: 'thin', color: { argb: 'D3D3D3' } },
+        right: { style: 'thin', color: { argb: 'D3D3D3' } }
+      }
+      
+      // 设置数据行的对齐方式
+      if (row > 1) {
+        cell.alignment = { horizontal: 'left', vertical: 'middle' }
+      }
+    }
+  }
+  
+  // 生成文件名
+  const now = new Date()
+  const fileName = `供应商投诉数据_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}.xlsx`
+  
+  // 导出文件
+  const buffer = await workbook.xlsx.writeBuffer()
+  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  saveAs(blob, fileName)
+}
+
+// toggleAllFields函数已移除，el-transfer组件自带全选功能
+
+/**
+ * 取消导出
+ * 功能：关闭导出对话框并重置选择状态为默认值
+ */
+const cancelExport = () => {
+  exportDialogVisible.value = false
+  
+  // 重置为默认选中的字段
+  const defaultSelectedFields = [
+    'ComplaintNo', 'ComplaintDate', 'SupplierName', 'MaterialName', 
+    'ComplaintType', 'UrgencyLevel', 'Quantity', 'TotalAmount', 
+    'ProcessStatus', 'InitiatedBy', 'Description'
+  ]
+  
+  selectedExportFields.value = defaultSelectedFields.filter(key => 
+    allExportFieldsForTransfer.value.some(field => field.key === key)
+  )
+}
+
+/**
+ * 功能：重置导出字段选择为默认值
+ */
+const resetExportFields = () => {
+  // 重置为默认选中的字段
+  const defaultSelectedFields = [
+    'ComplaintNo', 'ComplaintDate', 'SupplierName', 'MaterialName', 
+    'ComplaintType', 'UrgencyLevel', 'Quantity', 'TotalAmount', 
+    'ProcessStatus', 'InitiatedBy', 'Description'
+  ]
+  
+  selectedExportFields.value = defaultSelectedFields.filter(key => 
+    allExportFieldsForTransfer.value.some(field => field.key === key)
+  )
 }
 
 /**
@@ -1086,6 +1454,77 @@ const handleBatchDelete = async () => {
     if (error !== 'cancel') {
       console.error('批量删除失败:', error)
       ElMessage.error('删除失败')
+    }
+  }
+}
+
+/**
+ * 生成投诉书
+ */
+const handleGenerateComplaintReport = async () => {
+  // 权限检查
+  if (!canGenerateReport.value) {
+    ElMessage.error('您没有生成投诉书的权限')
+    return
+  }
+  
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请选择要生成投诉书的记录')
+    return
+  }
+
+  try {
+    await ElMessageBox.confirm(
+      `确定要为选中的 ${selectedRows.value.length} 条记录生成投诉书吗？`,
+      '生成投诉书确认',
+      {
+        confirmButtonText: '确定生成',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+
+    const loadingInstance = ElLoading.service({
+      lock: true,
+      text: '正在生成投诉书，请稍候...',
+      background: 'rgba(0, 0, 0, 0.7)'
+    })
+
+    try {
+      const ids = selectedRows.value.map(row => row.ID)
+      const response = await api.post('/supplier-complaints/generate-report', {
+        ids: ids
+      }, {
+        responseType: 'blob'
+      })
+
+      // 创建下载链接
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      
+      // 生成文件名
+      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
+      link.download = `供应商投诉书_${timestamp}.xlsx`
+      
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+
+      ElMessage.success('投诉书生成成功')
+    } catch (error) {
+      console.error('生成投诉书失败:', error)
+      ElMessage.error('生成投诉书失败，请重试')
+    } finally {
+      loadingInstance.close()
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('生成投诉书失败:', error)
     }
   }
 }
@@ -1361,6 +1800,10 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
   box-sizing: border-box;
 }
 
+.el-divider {
+  margin: 0;
+}
+
 .page-header {
   margin-bottom: 10px;
   padding: 20px 8px;
@@ -1568,7 +2011,7 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
 }
 
 .dialog-footer {
-  text-align: right;
+  text-align: center;
 }
 
 /* 表格样式优化已通过Element Plus内置属性实现 */
@@ -1606,8 +2049,7 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
   margin: 0 !important;
-  max-height: 90vh !important;
-  overflow-y: auto !important;
+  max-height: 90% !important;
 }
 
 /* 确保删除确认对话框不影响页面布局 */
@@ -1645,6 +2087,179 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
 .supplier-complaints-container .el-table td:last-child .cell {
   white-space: nowrap !important;
   overflow: visible !important;
+}
+
+/* 导出对话框样式 */
+.export-dialog-content {
+  padding: 10px 0;
+  width: 100%;
+}
+
+.export-header {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.selected-count {
+  color: #409eff;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* el-transfer组件样式 */
+.export-transfer {
+  display: flex;
+  justify-content: center;
+  padding: 10px 0;
+  max-width: 800px; /* 增加最大宽度 */
+  flex-shrink: 0; /* 防止被压缩 */
+  overflow-x: auto; /* 允许水平滚动 */
+}
+
+:deep(.el-transfer) {
+  display: flex !important;
+  align-items: center !important; /* 改为 center 以支持按钮垂直居中 */
+  white-space: nowrap !important; /* 强制防止换行 */
+  margin: 0 auto !important;
+  flex-wrap: nowrap !important;
+  overflow: visible !important;
+}
+
+:deep(.el-transfer-panel) {
+  width: 280px !important;
+  height: 100% !important;
+  flex-shrink: 0 !important; /* 强制防止面板被压缩 */
+  flex-grow: 0 !important;
+  flex-basis: 280px !important;
+}
+
+:deep(.el-transfer-panel__header) {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+  padding: 12px 15px;
+  font-weight: 500;
+}
+
+:deep(.el-transfer-panel__body) {
+  height: 100%;
+}
+
+:deep(.el-transfer-panel__list) {
+  height: 220px;
+  overflow-y: auto;
+}
+
+:deep(.el-transfer-panel__item) {
+  padding: 8px 15px;
+  border-bottom: none !important;
+  transition: background-color 0.2s;
+  display: flex !important;
+  align-items: center !important; /* 确保复选框与文字水平对齐 */
+}
+
+:deep(.el-transfer-panel__item:hover) {
+  background-color: #f5f7fa;
+}
+
+/* 复选框与文字对齐优化 - 解决重叠问题 */
+:deep(.el-transfer-panel__item .el-checkbox) {
+  margin-right: 20px !important;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0; /* 防止复选框被压缩 */
+  min-width: 24px;
+}
+
+:deep(.el-transfer-panel__item .el-checkbox__input) {
+  line-height: 1;
+  margin-right: 12px !important;
+}
+
+:deep(.el-transfer-panel__item .el-checkbox__label) {
+  line-height: 1.5;
+  padding-left: 0 !important;
+  margin-left: 20px !important;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  flex: 1;
+}
+
+
+/* 调整整个item的padding来给复选框更多空间 */
+:deep(.el-transfer-panel__item) {
+  padding: 8px 15px 8px 20px !important;
+}
+
+
+
+:deep(.el-transfer__buttons) {
+  padding: 0 20px;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+  align-self: center !important; /* 确保按钮区域在父容器中垂直居中 */
+  gap: 10px;
+  height: 100% !important; /* 与面板高度一致 */
+  flex-shrink: 0 !important; /* 强制防止按钮区域被压缩 */
+  flex-grow: 0 !important;
+  flex-basis: 120px !important;
+  min-width: 120px !important; /* 确保按钮区域有足够宽度 */
+  width: 120px !important;
+}
+
+:deep(.el-transfer__button) {
+  border-radius: 4px;
+  padding: 8px 16px;
+  font-size: 12px;
+  margin: 0 !important; /* 移除所有margin */
+  width: 100% !important; /* 确保按钮宽度一致 */
+  text-align: center !important; /* 文字居中 */
+  box-sizing: border-box !important;
+}
+
+.export-tips {
+  margin-top: 15px;
+}
+
+.export-tips ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.export-tips li {
+  margin-bottom: 5px;
+  color: #606266;
+  font-size: 13px;
+}
+
+/* 导出对话框响应式设计 */
+@media (max-width: 900px) {
+  .export-transfer {
+    min-width: auto;
+    overflow-x: auto;
+  }
+  
+  :deep(.el-transfer) {
+    min-width: auto;
+    flex-wrap: nowrap;
+  }
+  
+  :deep(.el-transfer-panel) {
+    width: 250px;
+    height: 300px;
+  }
+  
+  :deep(.el-transfer-panel__body) {
+    height: 230px;
+  }
+  
+  :deep(.el-transfer-panel__list) {
+    height: 190px;
+  }
 }
 
 /* 响应式设计 */

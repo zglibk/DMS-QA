@@ -237,6 +237,95 @@ router.get('/suppliers', async (req, res) => {
 })
 
 /**
+ * 获取表字段信息
+ * GET /api/supplier-complaints/table-fields
+ */
+router.get('/table-fields', async (req, res) => {
+  try {
+    const pool = await getConnection()
+    
+    // 查询表字段信息
+    const result = await pool.request().query(`
+      SELECT 
+        COLUMN_NAME as fieldName,
+        DATA_TYPE as dataType,
+        IS_NULLABLE as isNullable,
+        COLUMN_DEFAULT as defaultValue,
+        CHARACTER_MAXIMUM_LENGTH as maxLength
+      FROM INFORMATION_SCHEMA.COLUMNS 
+      WHERE TABLE_NAME = 'SupplierComplaints'
+        AND COLUMN_NAME NOT IN ('CreatedBy', 'CreatedAt', 'UpdatedBy', 'UpdatedAt', 'Status', 'ID')
+      ORDER BY ORDINAL_POSITION
+    `)
+    
+    // 字段中文名称映射
+    const fieldLabels = {
+      'ComplaintNo': '投诉编号',
+      'ComplaintDate': '投诉日期',
+      'SupplierName': '供应商名称',
+      'MaterialName': '材料名称',
+      'MaterialCode': '材料编号',
+      'ComplaintType': '投诉类型',
+      'Description': '问题描述',
+      'Quantity': '问题数量',
+      'UnitPrice': '单价',
+      'TotalAmount': '总金额',
+      'UrgencyLevel': '紧急程度',
+      'ExpectedSolution': '期望解决方案',
+      'ResponsiblePerson': '负责人',
+      'ProcessStatus': '处理状态',
+      'ProcessResult': '处理结果',
+      'SolutionDescription': '解决方案描述',
+      'VerificationResult': '验证结果',
+      'ClaimAmount': '索赔金额',
+      'ActualLoss': '实际损失',
+      'CompensationAmount': '赔偿金额',
+      'ReworkCost': '返工成本',
+      'ReplacementCost': '更换成本',
+      'ReturnQuantity': '退货数量',
+      'ReturnAmount': '退货金额',
+      'FollowUpActions': '后续行动',
+      'PreventiveMeasures': '预防措施',
+      'SupplierResponse': '供应商回复',
+      'InternalNotes': '内部备注',
+      'AttachmentPaths': '附件路径',
+      'CompletedDate': '完成日期',
+      'ClosedDate': '关闭日期',
+      'PurchaseOrderNo': '采购单号',
+      'IncomingDate': '来料日期',
+      'BatchQuantity': '批量数量',
+      'InspectionDate': '检验日期',
+      'WorkOrderNo': '使用工单',
+      'SampleQuantity': '抽检数量',
+      'AttachedImages': '附图',
+      'IQCResult': 'IQC判定',
+      'InitiatedBy': '发起人'
+    }
+    
+    // 格式化字段信息
+    const fields = result.recordset.map(field => ({
+      key: field.fieldName,
+      label: fieldLabels[field.fieldName] || field.fieldName,
+      dataType: field.dataType,
+      isNullable: field.isNullable === 'YES',
+      maxLength: field.maxLength
+    }))
+    
+    res.json({
+      success: true,
+      data: fields
+    })
+  } catch (error) {
+    console.error('获取表字段信息失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取表字段信息失败',
+      error: error.message
+    })
+  }
+})
+
+/**
  * 获取单个供应商投诉详情
  * GET /api/supplier-complaints/:id
  */
@@ -636,6 +725,94 @@ router.delete('/:id', async (req, res) => {
 })
 
 /**
+ * 导出供应商投诉数据
+ * POST /api/supplier-complaints/export
+ * 功能：根据筛选条件和选择的字段导出完整数据
+ */
+router.post('/export', async (req, res) => {
+  try {
+    const {
+      fields = [], // 要导出的字段列表
+      filters = {} // 筛选条件
+    } = req.body
+    
+    if (fields.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '请选择要导出的字段'
+      })
+    }
+    
+    const pool = await getConnection()
+    
+    // 构建字段选择语句
+    const selectFields = fields.map(field => `sc.${field}`).join(', ')
+    
+    // 构建查询条件
+    let whereConditions = ['sc.Status != 0'] // 排除已删除的记录
+    let queryParams = []
+    
+    // 处理筛选条件
+    if (filters.keyword) {
+      whereConditions.push('(sc.ComplaintNo LIKE @keyword OR sc.MaterialName LIKE @keyword OR sc.Description LIKE @keyword)')
+      queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${filters.keyword}%` })
+    }
+    
+    if (filters.supplierName) {
+      whereConditions.push('sc.SupplierName LIKE @supplierName')
+      queryParams.push({ name: 'supplierName', type: sql.NVarChar(100), value: `%${filters.supplierName}%` })
+    }
+    
+    if (filters.complaintType) {
+      whereConditions.push('sc.ComplaintType = @complaintType')
+      queryParams.push({ name: 'complaintType', type: sql.NVarChar(50), value: filters.complaintType })
+    }
+    
+    if (filters.status) {
+      whereConditions.push('sc.ProcessStatus = @status')
+      queryParams.push({ name: 'status', type: sql.NVarChar(50), value: filters.status })
+    }
+    
+    if (filters.startDate) {
+      whereConditions.push('sc.ComplaintDate >= @startDate')
+      queryParams.push({ name: 'startDate', type: sql.DateTime, value: new Date(filters.startDate) })
+    }
+    
+    if (filters.endDate) {
+      whereConditions.push('sc.ComplaintDate <= @endDate')
+      queryParams.push({ name: 'endDate', type: sql.DateTime, value: new Date(filters.endDate) })
+    }
+    
+    const whereClause = whereConditions.join(' AND ')
+    
+    // 执行查询
+    let dataRequest = pool.request()
+    queryParams.forEach(param => {
+      dataRequest.input(param.name, param.type, param.value)
+    })
+    
+    const dataResult = await dataRequest.query(`
+      SELECT ${selectFields}
+      FROM SupplierComplaints sc
+      WHERE ${whereClause}
+      ORDER BY sc.ComplaintDate DESC, sc.CreatedAt DESC
+    `)
+    
+    res.json({
+      success: true,
+      data: dataResult.recordset
+    })
+  } catch (error) {
+    console.error('导出供应商投诉数据失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '导出供应商投诉数据失败',
+      error: error.message
+    })
+  }
+})
+
+/**
  * 获取投诉统计数据
  * GET /api/supplier-complaints/statistics
  */
@@ -683,6 +860,369 @@ router.get('/statistics/overview', async (req, res) => {
       success: false,
       message: '获取投诉统计数据失败',
       error: error.message
+    })
+  }
+})
+
+/**
+ * 生成投诉书
+ * POST /api/supplier-complaints/generate-report
+ * 根据选中的投诉记录生成Excel投诉书
+ */
+router.post('/generate-report', async (req, res) => {
+  try {
+    const { ids } = req.body
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: '请选择要生成投诉书的记录'
+      })
+    }
+    
+    const pool = await getConnection()
+    
+    // 查询选中的投诉记录
+    const placeholders = ids.map((_, index) => `@id${index}`).join(',')
+    const request = pool.request()
+    
+    ids.forEach((id, index) => {
+      request.input(`id${index}`, sql.Int, id)
+    })
+    
+    const result = await request.query(`
+      SELECT 
+        sc.ID,
+        sc.ComplaintNo,
+        sc.ComplaintDate,
+        sc.SupplierName,
+        sc.MaterialName,
+        sc.MaterialCode,
+        sc.PurchaseOrderNo,
+        sc.IncomingDate,
+        sc.BatchQuantity,
+        sc.InspectionDate,
+        sc.WorkOrderNo,
+        sc.SampleQuantity,
+        sc.ComplaintType,
+        sc.UrgencyLevel,
+        sc.Description,
+        sc.Quantity,
+        sc.UnitPrice,
+        sc.TotalAmount,
+        sc.ProcessStatus,
+        sc.ProcessResult,
+        sc.InitiatedBy,
+        sc.CreatedBy,
+        sc.CreatedAt
+      FROM SupplierComplaints sc
+      WHERE sc.ID IN (${placeholders}) AND sc.Status != 0
+      ORDER BY sc.ComplaintDate DESC
+    `)
+    
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '未找到有效的投诉记录'
+      })
+    }
+    
+    // 导入ExcelJS库
+    const ExcelJS = require('exceljs')
+    const path = require('path')
+    const fs = require('fs')
+    
+    // 模板文件路径
+    const templatePath = path.join(__dirname, '../templates/complaint_template.xlsx')
+    
+    // 检查模板文件是否存在
+    if (!fs.existsSync(templatePath)) {
+      return res.status(500).json({
+        success: false,
+        message: '投诉书模板文件不存在，请联系管理员'
+      })
+    }
+    
+    // 创建工作簿
+    const workbook = new ExcelJS.Workbook()
+    
+    // 生成时间戳：yymmddhhmm格式（提前生成，供工作表名称和文件名使用）
+    const now = new Date()
+    const year = now.getFullYear().toString().slice(-2) // 取年份后两位
+    const month = (now.getMonth() + 1).toString().padStart(2, '0')
+    const day = now.getDate().toString().padStart(2, '0')
+    const hour = now.getHours().toString().padStart(2, '0')
+    const minute = now.getMinutes().toString().padStart(2, '0')
+    const timestamp = `${year}${month}${day}${hour}${minute}`
+    
+    console.log('=== 文件名生成调试 ===')
+    console.log('时间戳生成:', timestamp)
+    
+    // 为每个投诉记录创建一个工作表
+    for (let i = 0; i < result.recordset.length; i++) {
+      const complaint = result.recordset[i]
+      
+      // 读取模板
+      const templateWorkbook = new ExcelJS.Workbook()
+      await templateWorkbook.xlsx.readFile(templatePath)
+      const templateWorksheet = templateWorkbook.getWorksheet(1)
+      
+      // 复制模板到新工作簿
+      // 生成工作表名称：使用与文件名相同的时间戳确保一致性
+      const worksheetSupplierShort = (complaint.SupplierName || '未知供应商').substring(0, 4)
+      const worksheetMaterialShort = (complaint.MaterialName || '未知材料').substring(0, 6)
+      
+      const worksheetName = `${worksheetSupplierShort}_${worksheetMaterialShort}_${timestamp}异常反馈单`
+      const worksheet = workbook.addWorksheet(worksheetName)
+      
+      // 关闭视图网格线，使生成的Excel文件看起来更专业
+      worksheet.views = [{
+        showGridLines: false
+      }]
+      
+      // 复制模板的完整内容和格式
+      templateWorksheet.eachRow((row, rowNumber) => {
+        const newRow = worksheet.getRow(rowNumber)
+        row.eachCell((cell, colNumber) => {
+          const newCell = newRow.getCell(colNumber)
+          
+          // 先复制值
+          newCell.value = cell.value
+          
+          // 复制完整样式（包括边框）
+          if (cell.style) {
+            // 使用JSON深拷贝确保完整复制
+            try {
+              const fullStyle = JSON.parse(JSON.stringify(cell.style))
+              newCell.style = fullStyle
+            } catch (e) {
+              // 如果JSON复制失败，使用手动深度复制
+              const borderCopy = {}
+              if (cell.style.border) {
+                if (cell.style.border.top) borderCopy.top = { ...cell.style.border.top }
+                if (cell.style.border.left) borderCopy.left = { ...cell.style.border.left }
+                if (cell.style.border.bottom) borderCopy.bottom = { ...cell.style.border.bottom }
+                if (cell.style.border.right) borderCopy.right = { ...cell.style.border.right }
+                if (cell.style.border.diagonal) borderCopy.diagonal = { ...cell.style.border.diagonal }
+              }
+              
+              newCell.style = {
+                border: borderCopy,
+                fill: cell.style.fill ? { ...cell.style.fill } : {},
+                font: cell.style.font ? { ...cell.style.font } : {},
+                alignment: cell.style.alignment ? { ...cell.style.alignment } : {},
+                numFmt: cell.style.numFmt || '',
+                protection: cell.style.protection ? { ...cell.style.protection } : {}
+              }
+            }
+          }
+        })
+        newRow.height = row.height
+      })
+      
+      // 复制合并单元格
+      if (templateWorksheet.model && templateWorksheet.model.merges) {
+        templateWorksheet.model.merges.forEach(merge => {
+          worksheet.mergeCells(merge)
+        })
+      }
+      
+      // 复制列宽
+      templateWorksheet.columns.forEach((column, index) => {
+        if (column.width) {
+          worksheet.getColumn(index + 1).width = column.width
+        }
+      })
+      
+      // 填充数据到指定单元格 - 按照用户要求的映射关系
+      // 定义一个保留样式的数据填充函数
+      const fillCellWithData = (cellAddress, value) => {
+        const cell = worksheet.getCell(cellAddress)
+        const originalStyle = cell.style
+        cell.value = value
+        
+        // 深度保留原有样式，特别是边框，同时设置字体大小和垂直居中
+        if (originalStyle) {
+          try {
+            // 使用JSON深拷贝确保完整保留样式
+            const fullStyle = JSON.parse(JSON.stringify(originalStyle))
+            
+            // 设置字体大小为10
+            if (!fullStyle.font) fullStyle.font = {}
+            fullStyle.font.size = 10
+            
+            // 设置垂直居中对齐
+            if (!fullStyle.alignment) fullStyle.alignment = {}
+            fullStyle.alignment.vertical = 'middle'
+            
+            cell.style = fullStyle
+          } catch (e) {
+            // 如果JSON复制失败，使用手动深度复制
+            const borderCopy = {}
+            if (originalStyle.border) {
+              if (originalStyle.border.top) borderCopy.top = { ...originalStyle.border.top }
+              if (originalStyle.border.left) borderCopy.left = { ...originalStyle.border.left }
+              if (originalStyle.border.bottom) borderCopy.bottom = { ...originalStyle.border.bottom }
+              if (originalStyle.border.right) borderCopy.right = { ...originalStyle.border.right }
+              if (originalStyle.border.diagonal) borderCopy.diagonal = { ...originalStyle.border.diagonal }
+            }
+            
+            // 保留原有字体样式，但设置字体大小为10
+            const fontCopy = originalStyle.font ? { ...originalStyle.font } : {}
+            fontCopy.size = 10
+            
+            // 保留原有对齐样式，但设置垂直居中
+            const alignmentCopy = originalStyle.alignment ? { ...originalStyle.alignment } : {}
+            alignmentCopy.vertical = 'middle'
+            
+            cell.style = {
+              border: borderCopy,
+              fill: originalStyle.fill ? { ...originalStyle.fill } : {},
+              font: fontCopy,
+              alignment: alignmentCopy,
+              numFmt: originalStyle.numFmt || '',
+              protection: originalStyle.protection ? { ...originalStyle.protection } : {}
+            }
+          }
+        } else {
+          // 如果没有原有样式，设置基本的字体和对齐样式
+          cell.style = {
+            font: { size: 10 },
+            alignment: { vertical: 'middle' }
+          }
+        }
+      }
+      
+      try {
+          // B4: 供应商名称
+          fillCellWithData('B4', complaint.SupplierName || '')
+          
+          // J4: 报告编号
+          fillCellWithData('J4', complaint.ComplaintNo || '')
+        
+        // C5: 物料名称
+        fillCellWithData('C5', complaint.MaterialName || '')
+        
+        // I5: 物料编号
+        fillCellWithData('I5', complaint.MaterialCode || '')
+        
+        // I6: 来料日期
+        fillCellWithData('I6', complaint.IncomingDate ? new Date(complaint.IncomingDate).toLocaleDateString('zh-CN') : '')
+        
+        // C7: 批量数量
+        fillCellWithData('C7', complaint.BatchQuantity || '')
+        
+        // I7: 检验日期
+        fillCellWithData('I7', complaint.InspectionDate ? new Date(complaint.InspectionDate).toLocaleDateString('zh-CN') : '')
+        
+        // C8: 使用工单
+        fillCellWithData('C8', complaint.WorkOrderNo || '')
+        
+        // F8: 抽检数量
+        fillCellWithData('F8', complaint.SampleQuantity || '')
+        
+        // I8: 不合格数（使用Quantity字段作为不合格数）
+        fillCellWithData('I8', complaint.Quantity || '')
+        
+        // I9: 问题描述
+        fillCellWithData('I9', complaint.Description || '')
+        
+        // C22: IQC判定 - 映射为中文
+        const processStatus = complaint.ProcessStatus || ''
+        let statusValue = ''
+        
+        // 根据ProcessStatus的值映射为中文
+        if (processStatus) {
+          const statusLower = processStatus.toLowerCase()
+          if (statusLower.includes('qualified') || statusLower.includes('pass') || statusLower.includes('合格') || statusLower === 'completed') {
+            statusValue = '合格'
+          } else if (statusLower.includes('unqualified') || statusLower.includes('fail') || statusLower.includes('不合格') || statusLower.includes('reject')) {
+            statusValue = '不合格'
+          } else if (statusLower.includes('pending') || statusLower.includes('待处理')) {
+            statusValue = '待处理'
+          } else {
+            // 如果无法识别，保持原值但尝试转换
+            statusValue = processStatus
+          }
+        }
+        
+        fillCellWithData('C22', statusValue)
+        
+        // G22: 发起人
+        fillCellWithData('G22', complaint.InitiatedBy || complaint.CreatedBy || '')
+        
+        // C23: 改善要求（使用ProcessResult字段作为改善要求）
+        fillCellWithData('C23', complaint.ProcessResult || '')
+        
+        // 为A5:K38区域添加全部表格线
+        const borderStyle = {
+          style: 'thin',
+          color: { argb: '000000' }
+        }
+        
+        // 遍历A5:K38区域的所有单元格
+        for (let row = 5; row <= 38; row++) {
+          for (let col = 1; col <= 11; col++) { // A=1, B=2, ..., K=11
+            const cell = worksheet.getCell(row, col)
+            
+            // 保留原有样式，只添加边框，确保字体和对齐样式不被覆盖
+            const currentStyle = cell.style || {}
+            
+            // 确保字体大小为10和垂直居中不被覆盖
+            const preservedFont = currentStyle.font || {}
+            preservedFont.size = 10
+            
+            const preservedAlignment = currentStyle.alignment || {}
+            preservedAlignment.vertical = 'middle'
+            
+            cell.style = {
+              ...currentStyle,
+              font: preservedFont,
+              alignment: preservedAlignment,
+              border: {
+                top: borderStyle,
+                left: borderStyle,
+                bottom: borderStyle,
+                right: borderStyle
+              }
+            }
+          }
+        }
+        
+      } catch (fillError) {
+        console.error(`填充第${i + 1}个投诉记录数据时出错:`, fillError)
+        // 继续处理其他记录
+      }
+    }
+    
+    // 生成Excel文件
+    const buffer = await workbook.xlsx.writeBuffer()
+    
+    // 设置响应头
+    
+    // 获取第一个投诉记录的信息用于文件名
+    const firstComplaint = result.recordset[0] || {}
+    const supplierName = firstComplaint.SupplierName || '未知供应商'
+    const materialName = firstComplaint.MaterialName || '未知材料'
+    
+    // 截取供应商简称和材料名称，避免文件名过长
+    const supplierShort = supplierName.substring(0, 4)
+    const materialShort = materialName.substring(0, 6)
+    
+    const filename = `${supplierShort}_${materialShort}_${timestamp}异常反馈单.xlsx`
+    
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`)
+    res.setHeader('Content-Length', buffer.length)
+    
+    // 发送文件
+    res.send(buffer)
+    
+  } catch (error) {
+    console.error('生成投诉书失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '生成投诉书失败: ' + error.message
     })
   }
 })

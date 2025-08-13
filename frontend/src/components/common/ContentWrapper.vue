@@ -22,17 +22,19 @@
 <style scoped>
 .content-wrapper {
   width: 100%;
-  min-height: 100%;
+  height: 100%;
   background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   padding: 0;
   margin: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 .content-container {
   max-width: 1600px;
   margin: 0 auto;
   padding: 24px 12px;
-  min-height: calc(100vh - 7rem);
+  min-height: calc(100vh - 8rem);
   background: rgba(255, 255, 255, 0.95);
   border-radius: 12px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);

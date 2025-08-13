@@ -21,18 +21,26 @@ import AppFooter from './AppFooter.vue'
 <style scoped>
 .app-layout {
   background: #f5f7fa;
-  min-height: 100vh;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .main-content {
   padding: 20px;
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .scrollable-content {
   margin-top: 5rem; /* 为固定头部留出空间 */
   margin-bottom: 3rem; /* 为固定底部留出空间 */
-  min-height: calc(100vh - 8rem); /* 确保内容区域至少占满剩余空间 */
+  flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* 全局样式重置 */
