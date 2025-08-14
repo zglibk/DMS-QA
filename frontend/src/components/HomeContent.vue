@@ -728,11 +728,9 @@
                 background
                 layout="total, sizes, prev, pager, next, jumper"
                 :total="total"
-                :page-size="pageSize"
-                :current-page="page"
+                v-model:page-size="pageSize"
+                v-model:current-page="page"
                 :page-sizes="pageSizes"
-                @size-change="handleSizeChange"
-                @current-change="handlePageChange"
               />
             </div>
           </el-card>
@@ -2052,17 +2050,19 @@ const fetchChartData = async () => {
   nextTick(() => renderCharts())
 }
 
-const handlePageChange = (val) => {
-  page.value = val
-  gotoPage.value = val
-  fetchTableData()
-}
-
-const handleSizeChange = (val) => {
-  pageSize.value = val
-  page.value = 1
-  fetchTableData()
-}
+// 监听分页变化
+watch(
+  () => [page.value, pageSize.value],
+  ([newPage, newSize], [oldPage, oldSize]) => {
+    // 如果页面大小改变，重置到第一页
+    if (newSize !== oldSize) {
+      page.value = 1
+    }
+    // 同步 gotoPage 值
+    gotoPage.value = newPage
+    fetchTableData()
+  }
+)
 
 const jumpToPage = (val) => {
   if (val >= 1 && val <= pageCount.value) {

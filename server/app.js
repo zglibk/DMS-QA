@@ -53,6 +53,7 @@ const sampleRouter = require('./routes/sample');              // 样品管理路
 const workPlanRouter = require('./routes/workPlan');          // 工作计划管理路由
 const noticeRouter = require('./routes/notice');              // 通知公告管理路由
 const supplierComplaintsRouter = require('./routes/supplierComplaints'); // 供应商投诉管理路由
+const qualityTargetsRouter = require('./routes/quality-targets'); // 质量目标管理路由
 
 /**
  * 创建Express应用实例
@@ -139,6 +140,7 @@ app.get('/api/test-connection', (req, res) => {
  * - /api/quality-metrics: 质量指标（统计分析、图表数据）
  * - /api/admin/material-prices: 材料价格管理（供应商价格）
  * - /api/rework: 生产不良返工登记管理（增删改查、统计分析）
+ * - /api/quality-targets: 质量目标管理（目标录入、统计分析、图表展示）
  */
 app.use('/api/complaint', complaintRouter);
 app.use('/api/customer-complaints', customerComplaintsRouter);
@@ -159,6 +161,7 @@ app.use('/api/sample', sampleRouter);
 app.use('/api/work-plan', workPlanRouter);
 app.use('/api/notice', noticeRouter);
 app.use('/api/supplier-complaints', supplierComplaintsRouter);
+app.use('/api/quality-targets', qualityTargetsRouter);
 
 /**
  * 静态文件服务配置

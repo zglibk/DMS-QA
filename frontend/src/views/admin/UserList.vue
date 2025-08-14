@@ -353,12 +353,10 @@
           background
           layout="total, sizes, prev, pager, next, jumper"
           :total="total"
-          :page-size="pageSize"
-          :current-page="page"
+          v-model:page-size="pageSize"
+          v-model:current-page="page"
           :page-sizes="[10, 20, 50, 100]"
           class="modern-pagination"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
         />
       </div>
     </el-card>
@@ -1520,17 +1518,17 @@ const fetchUsers = async () => {
   }
 }
 
-// 分页处理
-const handleSizeChange = (size) => {
-  pageSize.value = size
-  page.value = 1
-  fetchUsers()
-}
-
-const handleCurrentChange = (p) => {
-  page.value = p
-  fetchUsers()
-}
+// 监听分页变化
+watch(
+  () => [page.value, pageSize.value],
+  ([newPage, newSize], [oldPage, oldSize]) => {
+    // 如果页面大小改变，重置到第一页
+    if (newSize !== oldSize) {
+      page.value = 1
+    }
+    fetchUsers()
+  }
+)
 
 // 表格行样式
 const getRowClassName = ({ row, rowIndex }) => {

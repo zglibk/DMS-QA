@@ -74,6 +74,24 @@ export const breadcrumbConfig = {
     icon: 'CircleCheck'
   },
 
+  // 质量管理
+  '/admin/quality': {
+    title: '质量管理',
+    icon: 'Medal'
+  },
+
+  // 质量目标管理
+  '/admin/quality/targets': {
+    title: '目标管理',
+    icon: 'Target'
+  },
+
+  // 质量目标统计分析
+  '/admin/quality/targets/analysis': {
+    title: '目标统计分析',
+    icon: 'DataAnalysis'
+  },
+
   // 供应商审核
   '/admin/supplier/audit': {
     title: '供应商审核',

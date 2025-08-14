@@ -133,6 +133,16 @@ const routes = [
         component: () => import('../views/admin/DataManagement.vue'), // 质量异常数据导入页面
         meta: { requiresAuth: true }
       },
+      {
+        path: 'quality/targets',
+        component: () => import('../views/quality/targets/QualityTargets.vue'), // 质量目标管理页面
+        meta: { title: '目标管理', requiresAuth: true }
+      },
+      {
+        path: 'quality/targets/analysis',
+        component: () => import('../views/quality/targets/QualityTargetsAnalysis.vue'), // 质量目标统计分析页面
+        meta: { title: '目标统计分析', requiresAuth: true }
+      },
 
       // 工作计划管理模块
       {
