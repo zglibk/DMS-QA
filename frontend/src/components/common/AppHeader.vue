@@ -8,7 +8,7 @@
     <!-- 中间菜单栏 -->
     <div class="header-center">
       <div class="nav-menu-wrap">
-        <el-menu mode="horizontal" @select="handleMenuSelect" class="nav-menu" :ellipsis="false">
+        <el-menu mode="horizontal" @select="handleMenuSelect" class="nav-menu" :ellipsis="false" :default-active="activeMenu">
           <el-menu-item index="home">首页</el-menu-item>
           <el-menu-item index="stats">数据可视化</el-menu-item>
           <el-menu-item index="rework">返工分析</el-menu-item>
@@ -56,7 +56,22 @@ const userStore = useUserStore()
 const { user } = storeToRefs(userStore)
 const { siteConfig } = useSiteConfig()
 
-// 移除了 activeMenu 计算属性以避免与 el-menu 的循环依赖
+/**
+ * 根据当前路由计算激活的菜单项
+ */
+const activeMenu = computed(() => {
+  const path = route.path
+  if (path === '/' || path === '/home') {
+    return 'home'
+  } else if (path === '/data-visualization') {
+    return 'stats'
+  } else if (path === '/rework-analysis') {
+    return 'rework'
+  } else if (path === '/publishing-exceptions') {
+    return 'publishing-exceptions'
+  }
+  return ''
+})
 
 // 导航相关方法
 const handleMenuSelect = (index) => {
