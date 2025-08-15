@@ -141,7 +141,7 @@
                 <el-icon><Tools /></el-icon>
               </div>
               <div class="summary-content">
-                <div class="summary-label">返工总次数</div>
+                <div class="summary-label">返工总批次</div>
                 <div class="summary-value primary">{{ yearlyStats.totalCount || 0 }}</div>
               </div>
             </div>
@@ -152,7 +152,7 @@
                 <el-icon><Warning /></el-icon>
               </div>
               <div class="summary-content">
-                <div class="summary-label">不良总数</div>
+                <div class="summary-label">返工批量数</div>
                 <div class="summary-value warning">{{ yearlyStats.totalDefectiveQty || 0 }}</div>
               </div>
             </div>
@@ -163,8 +163,8 @@
                 <el-icon><Money /></el-icon>
               </div>
               <div class="summary-content">
-                <div class="summary-label">返工总成本</div>
-                <div class="summary-value danger">¥{{ (yearlyStats.totalCost || 0).toFixed(2) }}</div>
+                <div class="summary-label">返工工时费</div>
+                <div class="summary-value danger">¥{{ (yearlyStats.totalCost || 0).toFixed(1) }}</div>
               </div>
             </div>
           </el-col>
@@ -175,7 +175,7 @@
               </div>
               <div class="summary-content">
                 <div class="summary-label">平均不良率</div>
-                <div class="summary-value info">{{ (yearlyStats.avgDefectiveRate || 0).toFixed(2) }}%</div>
+                <div class="summary-value info">{{ (yearlyStats.avgDefectiveRate || 0).toFixed(1) }}%</div>
               </div>
             </div>
           </el-col>
@@ -1740,17 +1740,19 @@ const updateGanttChart = () => {
   margin-bottom: 8px;
   font-weight: 500;
   letter-spacing: 0.5px;
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
 
 .summary-value {
   font-size: 32px;
-  font-weight: 700;
+  font-weight: normal;
   margin-bottom: 4px;
   line-height: 1.2;
   background: linear-gradient(135deg, #303133 0%, #606266 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
+  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
 }
 
 /* 不同类型卡片的数字渐变效果 */

@@ -40,12 +40,13 @@ import AppFooter from './AppFooter.vue'
 
 .scrollable-content {
   margin-top: 5rem; /* 为固定头部留出空间 */
-  margin-bottom: 3rem; /* 为固定底部留出空间 */
+  margin-bottom: 2.5rem; /* 调整底部边距，减少多余空间 */
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
   padding: 0 2%; /* 减少左右padding，使用更小的百分比 */
   box-sizing: border-box;
+  height: calc(100vh - 7.5rem); /* 精确计算可用高度 */
 }
 
 /* 内容区域样式 */

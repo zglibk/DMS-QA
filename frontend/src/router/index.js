@@ -51,6 +51,9 @@ const routes = [
   // 返工分析页面
   { path: '/rework-analysis', component: () => import('../views/ReworkAnalysis.vue') },
 
+  // 出版异常页面
+  { path: '/publishing-exceptions', component: () => import('../views/PublishingExceptions.vue') },
+
   // 个人资料页面（懒加载）
   {
     path: '/profile',
@@ -138,10 +141,11 @@ const routes = [
         component: () => import('../views/quality/targets/QualityTargets.vue'), // 质量目标管理页面
         meta: { title: '目标管理', requiresAuth: true }
       },
+
       {
-        path: 'quality/targets/analysis',
-        component: () => import('../views/quality/targets/QualityTargetsAnalysis.vue'), // 质量目标统计分析页面
-        meta: { title: '目标统计分析', requiresAuth: true }
+        path: 'quality/targets/:targetId/statistics',
+        component: () => import('../views/quality/targets/QualityTargetStatistics.vue'),
+        meta: { title: '目标统计数据', requiresAuth: true }
       },
 
       // 工作计划管理模块

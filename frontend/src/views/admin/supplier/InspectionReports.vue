@@ -181,10 +181,22 @@
         </el-table-column>
         <el-table-column label="操作" width="220" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleView(row)">查看</el-button>
-            <el-button type="warning" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button type="info" size="small" @click="handleDownload(row)">下载</el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="primary" size="small" @click="handleView(row)">
+              <el-icon><View /></el-icon>
+              查看
+            </el-button>
+            <el-button type="warning" size="small" @click="handleEdit(row)">
+              <el-icon><Edit /></el-icon>
+              编辑
+            </el-button>
+            <el-button type="info" size="small" @click="handleDownload(row)">
+              <el-icon><Download /></el-icon>
+              下载
+            </el-button>
+            <el-button type="danger" size="small" @click="handleDelete(row)">
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -465,7 +477,7 @@
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Download, Upload, Document, CircleCheck, CircleCloseFilled, TrendCharts } from '@element-plus/icons-vue'
+import { Search, Plus, Download, Upload, Document, CircleCheck, CircleCloseFilled, TrendCharts, View, Edit, Delete } from '@element-plus/icons-vue'
 
 /**
  * 响应式数据定义

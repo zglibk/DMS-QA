@@ -39,6 +39,7 @@ const config = {
   user: process.env.DB_USER || 'sa',                    // 数据库用户名
   password: process.env.DB_PASSWORD || 'Qa369*',       // 数据库密码
   server: process.env.DB_SERVER || '192.168.1.57',     // 数据库服务器IP（默认连接远程）
+  port: parseInt(process.env.DB_PORT) || 1433,         // 数据库端口（SQL Server默认端口）
   database: process.env.DB_NAME || 'DMS-QA',           // 数据库名称
   options: {
     encrypt: false,              // 不使用SSL加密（内网环境）

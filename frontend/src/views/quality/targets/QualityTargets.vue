@@ -121,17 +121,22 @@
         </el-table-column>
         <el-table-column prop="StatisticsFrequency" label="统计频率" min-width="100" align="center" header-align="center" />
         <el-table-column prop="Description" label="描述" min-width="200" show-overflow-tooltip header-align="center" />
-        <el-table-column label="操作" width="200" fixed="right" align="center" header-align="center">
+        <el-table-column label="操作" min-width="180" fixed="right" align="center" header-align="center">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">
-              编辑
-            </el-button>
-            <el-button type="info" size="small" @click="handleViewStatistics(row)">
-              统计
-            </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">
-              删除
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleEdit(row)">
+                <el-icon><Edit /></el-icon>
+                编辑
+              </el-button>
+              <el-button type="info" size="small" @click="handleViewStatistics(row)">
+                <el-icon><DataAnalysis /></el-icon>
+                统计
+              </el-button>
+              <el-button type="danger" size="small" @click="handleDelete(row)">
+                <el-icon><Delete /></el-icon>
+                删除
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -302,6 +307,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Search,
@@ -310,9 +316,13 @@ import {
   Delete,
   Download,
   DataAnalysis,
-  ArrowDown
+  ArrowDown,
+  Edit
 } from '@element-plus/icons-vue'
 import * as qualityTargetsApi from '@/services/qualityTargetsApi'
+
+// 路由实例
+const router = useRouter()
 
 // 响应式数据
 const loading = ref(false)
@@ -730,7 +740,7 @@ const handleExport = async () => {
  * 跳转到统计分析页面
  */
 const goToAnalysis = () => {
-  router.push('/admin/quality/targets/analysis')
+  router.push('/admin/quality/targets/1/statistics')
 }
 
 /**
@@ -738,8 +748,7 @@ const goToAnalysis = () => {
  */
 const handleViewStatistics = (row) => {
   // 跳转到具体目标的统计页面
-  // router.push(`/admin/quality/targets/${row.id}/statistics`)
-  ElMessage.info('目标统计功能开发中')
+  router.push(`/admin/quality/targets/${row.ID}/statistics`)
 }
 
 /**
@@ -979,5 +988,19 @@ onMounted(() => {
   outline: none !important;
 }
 
+/* 操作按钮样式 */
+.action-buttons {
+  display: flex;
+  gap: 4px;
+  justify-content: center;
+  align-items: center;
+  white-space: nowrap;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  padding: 4px 8px;
+  font-size: 12px;
+}
 
 </style>

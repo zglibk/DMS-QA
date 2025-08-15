@@ -160,15 +160,19 @@
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="handleView(row)">
+              <el-icon><View /></el-icon>
               查看
             </el-button>
             <el-button type="warning" size="small" @click="handleEdit(row)">
+              <el-icon><Edit /></el-icon>
               编辑
             </el-button>
             <el-button type="success" size="small" @click="handleExecute(row)" v-if="row.status === 'pending'">
+              <el-icon><VideoPlay /></el-icon>
               执行
             </el-button>
             <el-button type="danger" size="small" @click="handleDelete(row)">
+              <el-icon><Delete /></el-icon>
               删除
             </el-button>
           </template>
@@ -372,7 +376,11 @@ import {
   Calendar,
   Clock,
   Check,
-  Warning
+  Warning,
+  View,
+  Edit,
+  Delete,
+  VideoPlay
 } from '@element-plus/icons-vue'
 
 // 响应式数据

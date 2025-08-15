@@ -12,6 +12,7 @@
           <el-menu-item index="home">首页</el-menu-item>
           <el-menu-item index="stats">数据可视化</el-menu-item>
           <el-menu-item index="rework">返工分析</el-menu-item>
+          <el-menu-item index="publishing-exceptions">出版异常</el-menu-item>
         </el-menu>
       </div>
     </div>
@@ -65,6 +66,8 @@ const handleMenuSelect = (index) => {
     router.push('/data-visualization')
   } else if (index === 'rework') {
     router.push('/rework-analysis')
+  } else if (index === 'publishing-exceptions') {
+    router.push('/publishing-exceptions')
   }
 }
 

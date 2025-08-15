@@ -54,6 +54,7 @@ const workPlanRouter = require('./routes/workPlan');          // 工作计划管
 const noticeRouter = require('./routes/notice');              // 通知公告管理路由
 const supplierComplaintsRouter = require('./routes/supplierComplaints'); // 供应商投诉管理路由
 const qualityTargetsRouter = require('./routes/quality-targets'); // 质量目标管理路由
+const publishingExceptionsRouter = require('./routes/publishingExceptions'); // 出版异常管理路由
 
 /**
  * 创建Express应用实例
@@ -162,6 +163,7 @@ app.use('/api/work-plan', workPlanRouter);
 app.use('/api/notice', noticeRouter);
 app.use('/api/supplier-complaints', supplierComplaintsRouter);
 app.use('/api/quality-targets', qualityTargetsRouter);
+app.use('/api/publishing-exceptions', publishingExceptionsRouter);
 
 /**
  * 静态文件服务配置

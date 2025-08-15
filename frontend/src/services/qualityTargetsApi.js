@@ -178,3 +178,46 @@ export const updateQualityTargetStatistics = (id, data) => {
 export const getQualityTargetStatistics = (params) => {
   return api.get('/quality-targets/statistics', { params })
 }
+
+/**
+ * 获取特定目标的统计数据列表
+ * @param {number} targetId - 目标ID
+ * @param {Object} params - 查询参数
+ * @param {number} params.year - 年度
+ * @param {number} params.page - 页码
+ * @param {number} params.pageSize - 每页大小
+ * @returns {Promise} API响应
+ */
+export const getTargetStatistics = (targetId, params) => {
+  return api.get(`/quality-targets/${targetId}/statistics`, { params })
+}
+
+/**
+ * 删除质量目标统计数据
+ * @param {number} id - 统计数据ID
+ * @returns {Promise} API响应
+ */
+export const deleteQualityTargetStatistics = (id) => {
+  return api.delete(`/quality-targets/statistics/${id}`)
+}
+
+/**
+ * 获取图表选项数据（目标名称和部门列表）
+ * @param {Object} params - 查询参数
+ * @param {number} params.year - 年份
+ * @returns {Promise} API响应
+ */
+export const getQualityTargetChartOptions = (params) => {
+  return api.get('/quality-targets/statistics/chart-options', { params })
+}
+
+/**
+ * 获取按目标名称分组的分类统计数据
+ * @param {Object} params - 查询参数
+ * @param {number} params.year - 年份
+ * @param {string} params.selectedUnits - 选中的部门（逗号分隔）
+ * @returns {Promise} API响应
+ */
+export const getQualityTargetCategoryByTargets = (params) => {
+  return api.get('/quality-targets/statistics/category-by-targets', { params })
+}

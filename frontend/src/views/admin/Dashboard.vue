@@ -336,6 +336,7 @@ function getArrowColor(trend, trendType) {
 // 获取仪表盘数据
 async function fetchDashboardData() {
   try {
+    console.log('=== 开始获取仪表盘数据 ===')
     loading.value = true
     const token = localStorage.getItem('token')
 
@@ -343,6 +344,8 @@ async function fetchDashboardData() {
       ElMessage.error('请先登录')
       return
     }
+    
+    console.log('Token验证通过，开始获取数据...')
 
     // 并行获取当前月份和上月数据，以及批次统计数据
     const [currentRes, lastMonthRes, currentBatchRes, lastBatchRes] = await Promise.all([
@@ -399,8 +402,11 @@ async function fetchDashboardData() {
     ])
 
     // 初始化图表
+    console.log('=== 数据获取完成，准备初始化图表 ===')
+    console.log('trendData.value:', trendData.value)
     await nextTick()
     initCharts()
+    console.log('=== 图表初始化完成 ===')
 
   } catch (error) {
     ElMessage.error('获取仪表盘数据失败')
@@ -551,17 +557,59 @@ async function fetchLastQualityStats(token) {
   }
 }
 
+// 获取质量目标数据
+/**
+ * 根据年份和目标名称获取质量目标值
+ * @param {string} token - 认证令牌
+ * @param {number} year - 年份
+ * @param {string} targetName - 目标名称
+ * @returns {Promise<number>} 目标值
+ */
+async function fetchQualityTarget(token, year, targetName) {
+  try {
+    const response = await axios.get('/quality-targets', {
+      headers: { Authorization: `Bearer ${token}` },
+      params: {
+        year: year,
+        keyword: targetName,
+        page: 1,
+        pageSize: 1
+      }
+    })
+    
+    if (response.data.success && response.data.data && response.data.data.records && response.data.data.records.length > 0) {
+      const target = response.data.data.records[0]
+      if (target.TargetValue) {
+        // 解析目标值，处理特殊符号（如≥、%等）
+        const targetValue = target.TargetValue.replace(/[≥%]/g, '').trim()
+        const parsedValue = parseFloat(targetValue) || 98.5
+        return parsedValue
+      }
+    }
+    return 98.5
+  } catch (error) {
+    console.warn('获取质量目标失败:', error)
+    return 0
+  }
+}
+
 // 获取趋势数据
 async function fetchTrendData(token) {
   try {
-    const currentYear = new Date().getFullYear()
-    const response = await axios.get('/quality-metrics/trends', {
-      headers: { Authorization: `Bearer ${token}` },
-      params: { year: currentYear }
-    })
+    // 从selectedMonth中提取年份
+    const selectedYear = selectedMonth.value ? parseInt(selectedMonth.value.split('-')[0]) : new Date().getFullYear()
+    
+    // 并行获取趋势数据和质量目标数据
+    const [trendResponse, qualityTargetValue] = await Promise.all([
+      axios.get('/quality-metrics/trends', {
+        headers: { Authorization: `Bearer ${token}` },
+        params: { year: selectedYear }
+      }),
+      fetchQualityTarget(token, selectedYear, '一次交检合格率')
+    ])
 
-    if (response.data.success && response.data.data && Array.isArray(response.data.data)) {
-      const data = response.data.data
+    if (trendResponse.data.success && trendResponse.data.data && Array.isArray(trendResponse.data.data)) {
+      const data = trendResponse.data.data
       trendData.value = {
         months: data.map(item => item && item.StatMonth ? `${item.StatMonth}月` : ''),
         passRates: data.map(item => item && item.FirstPassRate ? parseFloat(item.FirstPassRate) : 0),
@@ -572,7 +620,9 @@ async function fetchTrendData(token) {
           const customerComplaints = parseInt(item.CustomerComplaints || 0)
           return deliveryBatches > 0 ? parseFloat((customerComplaints / deliveryBatches * 100).toFixed(2)) : 0
         }),
-        complaintCounts: data.map(item => item && item.CustomerComplaints ? parseInt(item.CustomerComplaints) : 0)
+        complaintCounts: data.map(item => item && item.CustomerComplaints ? parseInt(item.CustomerComplaints) : 0),
+        // 添加质量目标值
+        qualityTarget: qualityTargetValue
       }
     } else {
       // 如果没有数据，使用默认空数据
@@ -580,7 +630,8 @@ async function fetchTrendData(token) {
         months: [],
         passRates: [],
         complaintRates: [],
-        complaintCounts: []
+        complaintCounts: [],
+        qualityTarget: qualityTargetValue
       }
     }
   } catch (error) {
@@ -593,7 +644,8 @@ async function fetchTrendData(token) {
       months,
       passRates: new Array(12).fill(0),
       complaintRates: new Array(12).fill(0),
-      complaintCounts: new Array(12).fill(0)
+      complaintCounts: new Array(12).fill(0),
+      qualityTarget: 98.5
     }
   }
 }
@@ -606,7 +658,8 @@ function initCharts() {
       months: [],
       passRates: [],
       complaintRates: [],
-      complaintCounts: []
+      complaintCounts: [],
+      qualityTarget: 98.5
     }
   }
 
@@ -628,7 +681,17 @@ function initQualityTrendChart() {
     const months = trendData.value.months || []
     const passRates = trendData.value.passRates || []
     const complaintRates = trendData.value.complaintRates || []
-
+    const qualityTarget = trendData.value.qualityTarget || 98.5
+    const targetLineData = new Array(months.length).fill(qualityTarget)
+    
+    // 调试输出：图表加载时的关键信息
+    console.log('=== 图表加载调试信息 ===')
+    console.log('目标值 (qualityTarget):', qualityTarget)
+    console.log('目标线数据 (targetLineData):', targetLineData)
+    console.log('月份数据 (months):', months)
+    console.log('合格率数据 (passRates):', passRates)
+    console.log('客诉率数据 (complaintRates):', complaintRates)
+    
     const option = {
       title: {
         text: '质量指标月度趋势',
@@ -667,7 +730,7 @@ function initQualityTrendChart() {
         }
       },
       legend: {
-        data: ['一次交检合格率', '客诉率'],
+        data: ['一次交检合格率', '客诉率', '目标线'],
         bottom: 10
       },
       grid: {
@@ -695,8 +758,8 @@ function initQualityTrendChart() {
         {
           type: 'value',
           name: '合格率(%)',
-          min: 97,
-          max: 100,
+          min: Math.min(95, qualityTarget - 2),
+          max: Math.max(100, qualityTarget + 2),
           axisLine: {
             show: false
           },
@@ -819,11 +882,46 @@ function initQualityTrendChart() {
               ]
             }
           }
+        },
+        {
+          name: '目标线',
+          type: 'line',
+          yAxisIndex: 0,
+          data: targetLineData,
+          lineStyle: {
+            color: '#409eff',
+            width: 2,
+            type: 'dashed'
+          },
+          itemStyle: {
+            color: '#409eff',
+            borderColor: '#409eff',
+            borderWidth: 2
+          },
+          symbol: 'circle',
+          symbolSize: 4,
+          smooth: false,
+          showSymbol: true
         }
       ]
     }
 
-    qualityChartInstance.setOption(option)
+    // 调试输出：系列配置信息
+    console.log('=== 图表系列配置调试信息 ===')
+    option.series.forEach((series, index) => {
+      console.log(`系列 ${index + 1}:`)
+      console.log('  - 系列名称:', series.name)
+      console.log('  - 系列类型:', series.type)
+      console.log('  - Y轴索引:', series.yAxisIndex)
+      console.log('  - 系列数据:', series.data)
+      console.log('  - 数据长度:', series.data ? series.data.length : 0)
+    })
+    console.log('=========================')
+    
+    // 强制重新渲染图表
+    qualityChartInstance.clear()
+    qualityChartInstance.setOption(option, true)
+    qualityChartInstance.resize()
   }
 }
 
@@ -1083,7 +1181,13 @@ function handleBottomMonthChange(value) {
 
 // 组件挂载时获取数据
 onMounted(() => {
+  console.log('=== Dashboard页面开始加载 ===')
+  console.log('当前时间:', new Date().toLocaleString())
+  console.log('当前选择月份:', selectedMonth.value)
+  
   fetchDashboardData()
+  
+  console.log('=== Dashboard页面加载完成 ===')
 })
 
 // 组件卸载时销毁图表

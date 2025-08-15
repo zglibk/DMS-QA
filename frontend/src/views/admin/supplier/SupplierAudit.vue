@@ -187,17 +187,27 @@
         </el-table-column>
         <el-table-column label="操作" width="250" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleView(row)">查看</el-button>
+            <el-button type="primary" size="small" @click="handleView(row)">
+              <el-icon><View /></el-icon>
+              查看
+            </el-button>
             <el-button 
               type="warning" 
               size="small" 
               @click="handleAudit(row)" 
               v-if="row.auditStatus === 'pending' || row.auditStatus === 'reviewing'"
             >
+              <el-icon><Check /></el-icon>
               审核
             </el-button>
-            <el-button type="success" size="small" @click="handleEdit(row)">编辑</el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">删除</el-button>
+            <el-button type="success" size="small" @click="handleEdit(row)">
+              <el-icon><Edit /></el-icon>
+              编辑
+            </el-button>
+            <el-button type="danger" size="small" @click="handleDelete(row)">
+              <el-icon><Delete /></el-icon>
+              删除
+            </el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -442,7 +452,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Clock, View, CircleCheck, CircleCloseFilled } from '@element-plus/icons-vue'
+import { Search, Plus, Clock, View, CircleCheck, CircleCloseFilled, Edit, Delete, Check } from '@element-plus/icons-vue'
 
 /**
  * 响应式数据定义

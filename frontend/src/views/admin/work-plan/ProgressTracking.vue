@@ -431,6 +431,7 @@
                     :disabled="!canEditProgress"
                     @click="completeMilestone(milestone)"
                   >
+                    <el-icon><Check /></el-icon>
                     完成
                   </el-button>
                   <el-button 
@@ -439,6 +440,7 @@
                     :disabled="!canEditProgress"
                     @click="editMilestone(milestone)"
                   >
+                    <el-icon><Edit /></el-icon>
                     编辑
                   </el-button>
                   <el-button 
@@ -447,6 +449,7 @@
                     :disabled="!canDeleteMilestone"
                     @click="deleteMilestone(milestone)"
                   >
+                    <el-icon><Delete /></el-icon>
                     删除
                   </el-button>
                 </div>
@@ -564,7 +567,9 @@ import {
   CircleCheck,
   Plus,
   Check,
-  Flag
+  Flag,
+  Edit,
+  Delete
 } from '@element-plus/icons-vue'
 import api from '@/services/api'
 import { useRouter } from 'vue-router'
