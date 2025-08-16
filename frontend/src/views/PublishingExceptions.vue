@@ -3,63 +3,113 @@
     <AppHeader />
     <el-container>
       <el-aside width="200px">
+        <!-- 左侧边栏占位 -->
+        <el-card class="sidebar-placeholder" shadow="never">
+          <div class="placeholder-content">
+            <el-icon><Filter /></el-icon>
+            <span>筛选区域</span>
+          </div>
+        </el-card>
+      </el-aside>
+      
+      <el-main>
         <!-- 筛选卡片 -->
         <el-card class="filter-card" shadow="hover">
           <template #header>
             <div class="card-header">
               <span>筛选条件</span>
-              <el-button type="primary" size="small" @click="resetFilters">重置</el-button>
             </div>
           </template>
           
-          <el-form :model="filters" label-width="80px" size="small">
-            <el-form-item label="客户代码">
-              <el-input v-model="filters.customerCode" placeholder="请输入" clearable />
-            </el-form-item>
-            
-            <el-form-item label="工单号">
-              <el-input v-model="filters.workOrderNumber" placeholder="请输入" clearable />
-            </el-form-item>
-            
-            <el-form-item label="产品名称">
-              <el-input v-model="filters.productName" placeholder="请输入" clearable />
-            </el-form-item>
-            
-            <el-form-item label="责任单位">
-              <el-select v-model="filters.responsibleUnit" placeholder="请选择" clearable>
-                <el-option 
-                  v-for="dept in departmentList" 
-                  :key="dept.ID" 
-                  :label="dept.Name" 
-                  :value="dept.Name" 
-                />
-              </el-select>
-            </el-form-item>
-            
-            <el-form-item label="登记日期">
-              <el-date-picker
-                v-model="filters.dateRange"
-                type="daterange"
-                range-separator="至"
-                start-placeholder="开始日期"
-                end-placeholder="结束日期"
-                format="YYYY-MM-DD"
-                value-format="YYYY-MM-DD"
-                size="small"
-              />
-            </el-form-item>
-            
-            <el-form-item>
-              <el-button type="primary" @click="handleSearch" size="small" style="width: 100%">
-                <el-icon><Search /></el-icon>
-                搜索
-              </el-button>
-            </el-form-item>
+          <el-form :model="filters" class="filter-form">
+            <el-row :gutter="16">
+              <el-col :span="6">
+                <el-form-item label="登记日期">
+                  <el-date-picker
+                    v-model="filters.dateRange"
+                    type="daterange"
+                    range-separator="至"
+                    start-placeholder="开始日期"
+                    end-placeholder="结束日期"
+                    format="YYYY-MM-DD"
+                    value-format="YYYY-MM-DD"
+                    style="width: 100%;"
+                    class="date-range-picker"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="3">
+                <el-form-item label="客户代码">
+                  <el-input 
+                    v-model="filters.customerCode" 
+                    placeholder="请输入" 
+                    clearable 
+                    @input="handleCustomerCodeInput"
+                    style="text-transform: uppercase;"
+                  />
+                </el-form-item>
+              </el-col>
+              <el-col :span="4">
+                <el-form-item label="工单号">
+                  <el-input 
+                    v-model="filterWorkOrderSuffix" 
+                    placeholder="输入工单" 
+                    clearable 
+                    @input="handleFilterWorkOrderInput"
+                    class="filter-work-order-suffix"
+                    style="text-transform: uppercase;"
+                    title="只能输入数字和小数点"
+                  >
+                    <template #prepend>
+                      <span style="color: #c0c4cc; font-weight: normal;">GD</span>
+                    </template>
+                  </el-input>
+                </el-form-item>
+              </el-col>
+              <el-col :span="7">
+                <el-form-item label="产品名称">
+                  <el-input v-model="filters.productName" placeholder="请输入" clearable />
+                </el-form-item>
+              </el-col>
+              <el-col :span="4">
+                <el-form-item label="责任单位">
+                  <el-select v-model="filters.responsibleUnit" placeholder="请选择" clearable style="width: 100%">
+                    <el-option 
+                      v-for="dept in departmentList" 
+                      :key="dept.ID" 
+                      :label="dept.Name" 
+                      :value="dept.Name" 
+                    />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+            </el-row>
+            <el-row :gutter="16">
+              <el-col :span="6">
+                <el-form-item label=" ">
+                  <el-button type="warning" plain @click="resetFilters" style="width: 100%; margin-bottom: 8px;">
+                    <el-icon><Refresh /></el-icon>
+                    重置
+                  </el-button>
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
+                <el-form-item label=" ">
+                  <el-button type="primary" @click="handleSearch" style="width: 100%; margin-bottom: 8px;">
+                    <el-icon><Search /></el-icon>
+                    搜索
+                  </el-button>
+                </el-form-item>
+              </el-col>
+              <el-col :span="6">
+                <!-- 占位列 -->
+              </el-col>
+              <el-col :span="6">
+                <!-- 占位列 -->
+              </el-col>
+            </el-row>
           </el-form>
         </el-card>
-      </el-aside>
-      
-      <el-main>
         <!-- 标签页 -->
         <el-tabs v-model="activeTab" @tab-click="handleTabClick">
           <!-- 记录清单标签页 -->
@@ -89,25 +139,27 @@
                 @selection-change="handleSelectionChange"
                 stripe
                 border
+                style="font-family: 'Arial', 'Helvetica', sans-serif;"
+                :header-cell-style="{ backgroundColor: '#f5f7fa', color: '#606266' }"
               >
                 <el-table-column type="selection" width="55" align="center" header-align="center" />
-                <el-table-column prop="publishing_date" label="出版日期" width="120" align="center" header-align="center">
+                <el-table-column prop="publishing_date" label="出版日期" width="110" align="center" header-align="center">
                   <template #default="{ row }">
                     {{ formatDate(row.publishing_date) }}
                   </template>
                 </el-table-column>
-                <el-table-column prop="customer_code" label="客户代码" width="120" align="center" header-align="center" />
-                <el-table-column prop="work_order_number" label="工单号" width="150" align="center" header-align="center" />
+                <el-table-column prop="customer_code" label="客户代码" width="86" max-width="90" align="center" header-align="center" />
+                <el-table-column prop="work_order_number" label="工单号" width="120" max-width="130" align="center" header-align="center" show-overflow-tooltip />
                 <el-table-column prop="product_name" label="产品名称" width="200" show-overflow-tooltip header-align="center" />
-                <el-table-column prop="plate_type" label="版类型" width="100" align="center" header-align="center" />
-                <el-table-column prop="publishing_sheets" label="出版张数" width="100" align="center" header-align="center" />
+                <el-table-column prop="plate_type" label="版类型" width="80" align="center" header-align="center" />
+                <el-table-column prop="publishing_sheets" label="张数" width="60" align="center" header-align="center" />
                 <el-table-column prop="exception_description" label="异常描述" width="200" show-overflow-tooltip header-align="center" />
                 <el-table-column prop="responsible_unit" label="责任单位" width="120" align="center" header-align="center" />
-                <el-table-column prop="responsible_person" label="责任人" width="100" align="center" header-align="center" />
-                <el-table-column prop="area_cm2" label="数量cm²" width="100" align="center" header-align="center" />
-                <el-table-column prop="amount" label="金额" width="100" align="center" header-align="center" />
+                <el-table-column prop="responsible_person" label="责任人" width="70" align="center" header-align="center" />
+                <el-table-column prop="area_cm2" label="数量cm²" width="80" align="center" header-align="center" />
+                <el-table-column prop="amount" label="金额" width="80" align="center" header-align="center" />
                 
-                <el-table-column label="操作" min-width="210" fixed="right">
+                <el-table-column label="操作" min-width="210" fixed="right" header-align="center">
                   <template #default="{ row }">
                     <div class="action-buttons">
                       <el-button type="primary" size="small" @click="handleView(row)">
@@ -132,7 +184,7 @@
                 <el-pagination
                   v-model:current-page="pagination.current"
                   v-model:page-size="pagination.pageSize"
-                  :page-sizes="[10, 20, 50, 100]"
+                  :page-sizes="[5, 10, 20, 50, 100]"
                   :total="pagination.total"
                   layout="total, sizes, prev, pager, next, jumper"
                   @size-change="handleSizeChange"
@@ -147,35 +199,19 @@
             <div class="statistics-content">
               <!-- 统计卡片 -->
               <el-row :gutter="20" class="stats-cards">
-                <el-col :span="6">
+                <el-col :span="12">
                   <el-card class="stat-card">
                     <div class="stat-item">
-                      <div class="stat-value">{{ statistics.summary?.total_count || 0 }}</div>
-                      <div class="stat-label">总记录数</div>
+                      <div class="stat-value">{{ statistics.monthly_new || 0 }}</div>
+                      <div class="stat-label">本月新增</div>
                     </div>
                   </el-card>
                 </el-col>
-                <el-col :span="6">
+                <el-col :span="12">
                   <el-card class="stat-card">
                     <div class="stat-item">
-                      <div class="stat-value">¥{{ formatNumber(statistics.summary?.total_amount || 0) }}</div>
-                      <div class="stat-label">总金额</div>
-                    </div>
-                  </el-card>
-                </el-col>
-                <el-col :span="6">
-                  <el-card class="stat-card">
-                    <div class="stat-item">
-                      <div class="stat-value">{{ formatNumber(statistics.summary?.total_area || 0) }}</div>
-                      <div class="stat-label">总面积(cm²)</div>
-                    </div>
-                  </el-card>
-                </el-col>
-                <el-col :span="6">
-                  <el-card class="stat-card">
-                    <div class="stat-item">
-                      <div class="stat-value">¥{{ formatNumber(statistics.summary?.avg_amount || 0) }}</div>
-                      <div class="stat-label">平均金额</div>
+                      <div class="stat-value">¥{{ formatNumber(statistics.cost_loss || 0) }}</div>
+                      <div class="stat-label">成本损失</div>
                     </div>
                   </el-card>
                 </el-col>
@@ -213,15 +249,15 @@
           </template>
           
           <div class="quick-actions">
-            <el-button type="primary" @click="handleAdd" style="width: 100%; margin-bottom: 10px;">
+            <el-button type="primary" @click="handleAdd" style="width: 100%; margin: 0 0 10px 0;">
               <el-icon><Plus /></el-icon>
               新增记录
             </el-button>
-            <el-button @click="handleExport" style="width: 100%; margin-bottom: 10px;">
+            <el-button @click="handleExport" style="width: 100%; margin: 0 0 10px 0">
               <el-icon><Download /></el-icon>
               导出数据
             </el-button>
-            <el-button @click="refreshData" style="width: 100%;">
+            <el-button @click="refreshData" style="width: 100%;margin: 0 0 10px 0">
               <el-icon><Refresh /></el-icon>
               刷新数据
             </el-button>
@@ -237,15 +273,11 @@
           <div class="info-items">
             <div class="info-item">
               <span class="info-label">本月新增:</span>
-              <span class="info-value">{{ monthlyCount }}</span>
+              <span class="info-value stat-number">{{ statistics.monthly_new || 0 }}</span>
             </div>
             <div class="info-item">
-              <span class="info-label">待处理:</span>
-              <span class="info-value">{{ pendingCount }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">已完成:</span>
-              <span class="info-value">{{ completedCount }}</span>
+              <span class="info-label">成本损失:</span>
+              <span class="info-value stat-number">{{ formatAmount(statistics.cost_loss || 0) }}</span>
             </div>
           </div>
         </el-card>
@@ -292,7 +324,12 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="客户代码" prop="customer_code">
-              <el-input v-model="formData.customer_code" placeholder="请输入客户代码" />
+              <el-input 
+                v-model="formData.customer_code" 
+                placeholder="请输入客户代码" 
+                @input="handleFormCustomerCodeInput"
+                style="text-transform: uppercase;"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -300,7 +337,17 @@
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="工单号" prop="work_order_number">
-              <el-input v-model="formData.work_order_number" placeholder="请输入工单号" />
+              <el-input 
+                v-model="workOrderSuffix" 
+                placeholder="请输入工单" 
+                @input="handleFormWorkOrderInput"
+                style="text-transform: uppercase;"
+                title="只能输入数字和小数点"
+              >
+                <template #prepend>
+                  <span style="color: #909399; font-weight: normal;">GD</span>
+                </template>
+              </el-input>
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -477,7 +524,7 @@
 import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Search, Plus, Delete, Download, View, Edit, Refresh
+  Search, Plus, Delete, Download, View, Edit, Refresh, Filter
 } from '@element-plus/icons-vue'
 import AppHeader from '@/components/common/AppHeader.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
@@ -497,7 +544,7 @@ const submitLoading = ref(false)
 // 筛选条件
 const filters = reactive({
   customerCode: '',
-  workOrderNumber: '',
+  workOrderNumber: 'GD',
   productName: '',
   responsibleUnit: '',
   dateRange: []
@@ -511,7 +558,7 @@ const tableRef = ref()
 // 分页
 const pagination = reactive({
   current: 1,
-  pageSize: 20,
+  pageSize: 5,  // 设置默认为5条/页
   total: 0
 })
 
@@ -554,6 +601,12 @@ const formData = reactive({
   amount: null
 })
 
+// 工单号后缀（用于界面显示）
+const workOrderSuffix = ref('')
+
+// 筛选区工单号后缀
+const filterWorkOrderSuffix = ref('')
+
 // 查看数据
 const viewData = ref({})
 
@@ -583,10 +636,7 @@ const formRef = ref()
 // 计算属性
 const dialogTitle = computed(() => isEdit.value ? '编辑出版异常' : '新增出版异常')
 
-// 统计信息
-const monthlyCount = ref(0)
-const pendingCount = ref(0)
-const completedCount = ref(0)
+
 
 // 部门列表
 const departmentList = ref([])
@@ -754,7 +804,80 @@ const resetFilters = () => {
       filters[key] = ''
     }
   })
+  // 重置筛选区工单号后缀
+  filterWorkOrderSuffix.value = ''
   handleSearch()
+}
+
+/**
+ * 处理客户代码输入，自动转换为大写
+ */
+const handleCustomerCodeInput = (value) => {
+  filters.customerCode = value.toUpperCase()
+}
+
+/**
+ * 处理表单中客户代码输入，自动转换为大写
+ */
+const handleFormCustomerCodeInput = (value) => {
+  formData.customer_code = value.toUpperCase()
+}
+
+/**
+ * 处理筛选区工单号输入，只允许输入数字和小数点，限制小数位数不超过2位
+ */
+const handleFilterWorkOrderInput = (value) => {
+  // 只允许数字和小数点
+  let filteredValue = value.replace(/[^0-9.]/g, '')
+  
+  // 确保只有一个小数点
+  const dotCount = (filteredValue.match(/\./g) || []).length
+  if (dotCount > 1) {
+    const firstDotIndex = filteredValue.indexOf('.')
+    filteredValue = filteredValue.substring(0, firstDotIndex + 1) + filteredValue.substring(firstDotIndex + 1).replace(/\./g, '')
+  }
+  
+  // 限制小数位数不超过2位
+  const dotIndex = filteredValue.indexOf('.')
+  if (dotIndex !== -1 && filteredValue.length > dotIndex + 3) {
+    filteredValue = filteredValue.substring(0, dotIndex + 3)
+  }
+  
+  filterWorkOrderSuffix.value = filteredValue
+  // 组合前缀"GD"和后缀生成完整工单号
+  filters.workOrderNumber = filteredValue ? 'GD' + filteredValue : ''
+}
+
+/**
+ * 处理工单号输入，自动转换为大写（保留原方法以防其他地方使用）
+ */
+const handleWorkOrderInput = (value) => {
+  filters.workOrderNumber = value.toUpperCase()
+}
+
+/**
+ * 处理表单中工单号输入，只允许输入数字和小数点，限制小数位数不超过2位
+ */
+const handleFormWorkOrderInput = (value) => {
+  // 只允许数字和小数点
+  let filteredValue = value.replace(/[^0-9.]/g, '')
+  
+  // 确保只有一个小数点
+  const dotCount = (filteredValue.match(/\./g) || []).length
+  if (dotCount > 1) {
+    const firstDotIndex = filteredValue.indexOf('.')
+    filteredValue = filteredValue.substring(0, firstDotIndex + 1) + filteredValue.substring(firstDotIndex + 1).replace(/\./g, '')
+  }
+  
+  // 限制小数位数不超过2位
+  const dotIndex = filteredValue.indexOf('.')
+  if (dotIndex !== -1 && filteredValue.length > dotIndex + 3) {
+    filteredValue = filteredValue.substring(0, dotIndex + 3)
+  }
+  
+  workOrderSuffix.value = filteredValue
+  // 组合前缀"GD"和后缀生成完整工单号
+  formData.work_order_number = 'GD' + filteredValue
 }
 
 /**
@@ -787,6 +910,13 @@ const handleEdit = (row) => {
   Object.keys(formData).forEach(key => {
     formData[key] = row[key]
   })
+  
+  // 处理工单号：提取后缀部分
+  if (row.work_order_number && row.work_order_number.startsWith('GD')) {
+    workOrderSuffix.value = row.work_order_number.substring(2)
+  } else {
+    workOrderSuffix.value = row.work_order_number || ''
+  }
   
   // 处理文件列表
   if (row.image_path) {
@@ -885,8 +1015,66 @@ const handleBatchDelete = async () => {
 /**
  * 导出数据
  */
-const handleExport = () => {
-  ElMessage.info('导出功能开发中...')
+/**
+ * 导出数据功能 - 调用后端Excel导出接口
+ */
+const handleExport = async () => {
+  try {
+    // 导出前确认对话框
+    await ElMessageBox.confirm(
+      '确定要导出当前数据吗？',
+      '导出确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    ElMessage.info('正在生成Excel文件，请稍候...')
+    
+    // 调用后端导出接口
+    const response = await fetch('/api/publishing-exceptions/export', {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error(`导出失败: ${response.status}`)
+    }
+    
+    // 获取文件名
+    const contentDisposition = response.headers.get('Content-Disposition')
+    let filename = `出版异常数据_${new Date().toISOString().slice(0, 10)}.xlsx`
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="(.+)"/)
+      if (filenameMatch) {
+        filename = decodeURIComponent(filenameMatch[1])
+      }
+    }
+    
+    // 获取文件数据
+    const blob = await response.blob()
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    link.style.display = 'none'
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('Excel文件导出成功')
+    
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败，请重试')
+  }
 }
 
 /**
@@ -965,12 +1153,19 @@ const handleDialogClose = () => {
  */
 const resetFormData = () => {
   Object.keys(formData).forEach(key => {
-    if (typeof formData[key] === 'number') {
+    if (key === 'work_order_number') {
+      formData[key] = 'GD' // 保持工单号默认值
+    } else if (key === 'responsible_unit') {
+      formData[key] = '设计部' // 保持责任单位默认值
+    } else if (typeof formData[key] === 'number') {
       formData[key] = null
     } else {
       formData[key] = ''
     }
   })
+  
+  // 重置工单号后缀
+  workOrderSuffix.value = ''
   
   // 设置默认登记日期为今天
   formData.registration_date = new Date().toISOString().split('T')[0]
@@ -1107,15 +1302,24 @@ watch(
   { immediate: true }
 )
 
+/**
+ * 格式化金额显示
+ * @param {number} amount - 金额
+ * @returns {string} 格式化后的金额字符串
+ */
+const formatAmount = (amount) => {
+  if (!amount || amount === 0) return '¥0.0'
+  return '¥' + Number(amount).toLocaleString('zh-CN', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  })
+}
+
 // 组件挂载时获取数据
 onMounted(() => {
   fetchDepartments()
   fetchData()
-  
-  // 模拟统计数据
-  monthlyCount.value = 15
-  pendingCount.value = 3
-  completedCount.value = 12
+  fetchStatistics() // 页面加载时获取统计数据
 })
 </script>
 
@@ -1126,8 +1330,73 @@ onMounted(() => {
   padding-top: 90px; /* 为导航栏留出空间 */
 }
 
+.el-main {
+  margin-top: 0 !important;
+  padding-top: 0;
+}
+
+.sidebar-placeholder {
+  margin-bottom: 20px;
+  border: 1px dashed #dcdfe6;
+  background-color: #fafafa;
+}
+
+.sidebar-placeholder :deep(.el-card__body) {
+  padding: 20px;
+  text-align: center;
+}
+
+.placeholder-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: #909399;
+  font-size: 14px;
+}
+
+.placeholder-content .el-icon {
+  font-size: 24px;
+}
+
 .filter-card {
   margin-bottom: 20px;
+}
+
+.filter-card :deep(.el-card__body) {
+  padding: 16px;
+}
+
+.filter-form {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.filter-form .el-form-item {
+  margin-bottom: 16px;
+}
+
+/* 日期选择器样式优化 */
+.date-range-picker {
+  width: 100%;
+}
+
+.date-range-picker :deep(.el-input__wrapper) {
+  min-width: 220px;
+  width: 100%;
+}
+
+.date-range-picker :deep(.el-range-input) {
+  font-size: 12px;
+  width: auto;
+  min-width: 80px;
+  flex: 1;
+}
+
+.date-range-picker :deep(.el-range-separator) {
+  padding: 0 4px;
+  font-size: 12px;
+  white-space: nowrap;
 }
 
 .card-header {
@@ -1192,6 +1461,14 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
+.quick-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 0;
+}
+
 .info-card {
   margin-top: 20px;
 }
@@ -1219,7 +1496,13 @@ onMounted(() => {
 
 .info-value {
   color: #409EFF;
-  font-weight: bold;
+  font-weight: 400;
+}
+
+.stat-number {
+  font-family: Arial, sans-serif;
+  color: rgb(196, 86, 86);
+  font-size: 1em;
 }
 
 .image-preview {
@@ -1255,6 +1538,62 @@ onMounted(() => {
 }
 
 
+
+/* 工单号前缀样式 - 移除背景色 */
+.el-input-group__prepend {
+  background-color: transparent !important;
+  border: none !important;
+  padding: 0 8px;
+}
+
+/* 设置筛选区工单号后缀输入框的左右padding */
+.filter-work-order-suffix .el-input__wrapper .el-input__inner {
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+}
+
+.filter-work-order-suffix .el-input__inner {
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+}
+
+.filter-work-order-suffix input {
+  padding-left: 2px !important;
+  padding-right: 2px !important;
+}
+
+/* 工单号输入框提示文字warning色样式 */
+.filter-work-order-suffix[title],
+.el-input[title*="只能输入数字和小数点"] {
+  position: relative;
+}
+
+.filter-work-order-suffix[title]:hover::after,
+.el-input[title*="只能输入数字和小数点"]:hover::after {
+  content: attr(title);
+  position: absolute;
+  top: -35px;
+  left: 0;
+  background-color: #f56c6c;
+  color: white;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  z-index: 1000;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.filter-work-order-suffix[title]:hover::before,
+.el-input[title*="只能输入数字和小数点"]:hover::before {
+  content: '';
+  position: absolute;
+  top: -5px;
+  left: 10px;
+  border: 5px solid transparent;
+  border-top-color: #f56c6c;
+  z-index: 1000;
+}
 
 /* 响应式设计 */
 @media (max-width: 768px) {

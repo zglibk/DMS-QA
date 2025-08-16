@@ -165,7 +165,194 @@ router.get('/', async (req, res) => {
 });
 
 /**
- * 根据ID获取单个出版异常记录
+ * 导出出版异常数据到Excel
+ */
+router.get('/export', async (req, res) => {
+  const { executeQuery } = require('../db');
+  const ExcelJS = require('exceljs');
+  
+  try {
+    console.log('开始导出出版异常数据...');
+    
+    // 获取所有数据
+    const result = await executeQuery(async (pool) => {
+      const query = `
+        SELECT 
+          id,
+          registration_date,
+          publishing_date,
+          customer_code,
+          work_order_number,
+          product_name,
+          plate_type,
+          publishing_sheets,
+          exception_description,
+          responsible_unit,
+          responsible_person,
+          length_cm,
+          width_cm,
+          piece_count,
+          area_cm2,
+          unit_price,
+          amount,
+          created_date,
+          updated_date
+        FROM publishing_exceptions 
+        WHERE isDeleted = 0
+        ORDER BY registration_date DESC, id DESC
+      `;
+      
+      return await pool.request().query(query);
+    });
+
+    // 创建工作簿和工作表
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('出版异常数据');
+    
+    // 定义表头
+    const headers = [
+      '登记日期', '出版日期', '客户代码', '工单号', '产品名称', '版型', 
+      '出版张数', '异常描述', '责任单位', '责任人', '长度(cm)', '宽度(cm)', 
+      '件数', '面积(cm²)', '单价', '金额', '创建时间', '更新时间'
+    ];
+    
+    // 设置表头
+    worksheet.addRow(headers);
+    
+    // 设置表头样式
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 25;
+    
+    // 设置表头背景色填充范围为A到有内容的最大列
+    for (let col = 1; col <= headers.length; col++) {
+      const cell = worksheet.getCell(1, col);
+      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF339966' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    }
+    
+    // 添加数据行
+    result.recordset.forEach((row, index) => {
+      const dataRow = [
+        row.registration_date ? new Date(row.registration_date).toLocaleDateString('zh-CN') : '',
+        row.publishing_date ? new Date(row.publishing_date).toLocaleDateString('zh-CN') : '',
+        row.customer_code || '',
+        row.work_order_number || '',
+        row.product_name || '',
+        row.plate_type || '',
+        row.publishing_sheets || '',
+        row.exception_description || '',
+        row.responsible_unit || '',
+        row.responsible_person || '',
+        row.length_cm || '',
+        row.width_cm || '',
+        row.piece_count || '',
+        row.area_cm2 || '',
+        row.unit_price ? `¥${parseFloat(row.unit_price).toFixed(4)}` : '',
+        row.amount ? `¥${parseFloat(row.amount).toFixed(2)}` : '¥0.00',
+        row.created_date ? new Date(row.created_date).toLocaleString('zh-CN') : '',
+        row.updated_date ? new Date(row.updated_date).toLocaleString('zh-CN') : ''
+      ];
+      
+      const excelRow = worksheet.addRow(dataRow);
+      
+      // 设置数据行样式
+      excelRow.font = { name: 'Arial', size: 10, color: { argb: 'FF737682' } }; // RGB(115, 118, 122)
+      excelRow.alignment = { vertical: 'middle', horizontal: 'center' };
+      excelRow.height = 18;
+      
+      // 设置产品名称列（第5列）左对齐
+      const productNameCell = worksheet.getCell(index + 2, 5);
+      productNameCell.alignment = { vertical: 'middle', horizontal: 'left' };
+      
+      // 设置异常描述列（第8列）左对齐
+      const exceptionDescCell = worksheet.getCell(index + 2, 8);
+      exceptionDescCell.alignment = { vertical: 'middle', horizontal: 'left' };
+      
+      // 隔行变色 - 只填充有内容的列范围
+      if ((index + 1) % 2 === 0) {
+        // 获取有内容的列数（表头列数）
+        const maxCol = headers.length;
+        for (let col = 1; col <= maxCol; col++) {
+          const cell = worksheet.getCell(index + 2, col); // index+2因为表头占第1行，数据从第2行开始
+          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2F3D9' } };
+        }
+      }
+    });
+    
+    // 设置列宽
+    worksheet.columns.forEach((column, index) => {
+      // 产品名称列（第5列，索引4）设置为30
+      if (index === 4) {
+        column.width = 30;
+      }
+      // 异常描述列（第8列，索引7）设置为35
+      else if (index === 7) {
+        column.width = 35;
+      }
+      // 责任单位列（第9列，索引8）设置为16.5
+      else if (index === 8) {
+        column.width = 16.5;
+      }
+      // 其他列使用自动列宽
+      else {
+        let maxLength = 0;
+        
+        // 检查表头长度
+        if (headers[index]) {
+          maxLength = Math.max(maxLength, headers[index].toString().length);
+        }
+        
+        // 检查数据行长度
+        column.eachCell({ includeEmpty: false }, (cell) => {
+          const cellValue = cell.value ? cell.value.toString() : '';
+          maxLength = Math.max(maxLength, cellValue.length);
+        });
+        
+        // 设置列宽，最小8，最大50
+        column.width = Math.min(Math.max(maxLength + 2, 8), 50);
+      }
+    });
+    
+    // 设置所有单元格边框
+    worksheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell, colNumber) => {
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FF339966' } },
+          left: { style: 'thin', color: { argb: 'FF339966' } },
+          bottom: { style: 'thin', color: { argb: 'FF339966' } },
+          right: { style: 'thin', color: { argb: 'FF339966' } }
+        };
+      });
+    });
+
+    // 关闭网格线视图
+    worksheet.views = [{
+      showGridLines: false
+    }];
+
+    // 设置响应头
+    const filename = `出版异常数据_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`); 
+
+    // 生成Excel文件并发送
+    await workbook.xlsx.write(res);
+    
+    console.log(`导出完成，共 ${result.recordset.length} 条记录`);
+
+  } catch (error) {
+    console.error('导出失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '导出失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取单个出版异常记录详情
  */
 router.get('/:id', async (req, res) => {
   try {
@@ -282,6 +469,122 @@ router.post('/', upload.single('image'), async (req, res) => {
     console.error('错误消息:', error.message);
     console.error('错误堆栈:', error.stack);
     res.status(500).json({ success: false, message: '创建失败', error: error.message });
+  }
+});
+
+/**
+ * 导出出版异常数据到Excel
+ */
+router.get('/export', async (req, res) => {
+  const { executeQuery } = require('../db');
+  const XLSX = require('xlsx');
+  
+  try {
+    console.log('开始导出出版异常数据...');
+    
+    // 获取所有数据
+    const result = await executeQuery(async (pool) => {
+      const query = `
+        SELECT 
+          id,
+          registration_date,
+          publishing_date,
+          customer_code,
+          work_order_number,
+          product_name,
+          plate_type,
+          publishing_sheets,
+          exception_description,
+          responsible_unit,
+          responsible_person,
+          length_cm,
+          width_cm,
+          piece_count,
+          area_cm2,
+          unit_price,
+          amount,
+          created_date,
+          updated_date
+        FROM publishing_exceptions 
+        WHERE isDeleted = 0
+        ORDER BY registration_date DESC, id DESC
+      `;
+      
+      return await pool.request().query(query);
+    });
+
+    // 创建工作簿
+    const workbook = XLSX.utils.book_new();
+    
+    // 准备数据 - 格式化日期和数值
+    const formattedData = result.recordset.map(row => ({
+      '登记日期': row.registration_date ? new Date(row.registration_date).toLocaleDateString('zh-CN') : '',
+      '出版日期': row.publishing_date ? new Date(row.publishing_date).toLocaleDateString('zh-CN') : '',
+      '客户代码': row.customer_code || '',
+      '工单号': row.work_order_number || '',
+      '产品名称': row.product_name || '',
+      '版型': row.plate_type || '',
+      '出版张数': row.publishing_sheets || '',
+      '异常描述': row.exception_description || '',
+      '责任单位': row.responsible_unit || '',
+      '责任人': row.responsible_person || '',
+      '长度(cm)': row.length_cm || '',
+      '宽度(cm)': row.width_cm || '',
+      '件数': row.piece_count || '',
+      '面积(cm²)': row.area_cm2 || '',
+      '单价': row.unit_price ? `¥${parseFloat(row.unit_price).toFixed(4)}` : '',
+      '金额': row.amount ? `¥${parseFloat(row.amount).toFixed(2)}` : '¥0.00',
+      '创建时间': row.created_date ? new Date(row.created_date).toLocaleString('zh-CN') : '',
+      '更新时间': row.updated_date ? new Date(row.updated_date).toLocaleString('zh-CN') : ''
+    }));
+
+    // 创建工作表
+    const worksheet = XLSX.utils.json_to_sheet(formattedData);
+
+    // 设置列宽
+    const colWidths = [
+      { wch: 12 }, // 登记日期
+      { wch: 12 }, // 出版日期
+      { wch: 15 }, // 客户代码
+      { wch: 20 }, // 工单号
+      { wch: 25 }, // 产品名称
+      { wch: 12 }, // 版型
+      { wch: 12 }, // 出版张数
+      { wch: 40 }, // 异常描述
+      { wch: 15 }, // 责任单位
+      { wch: 12 }, // 责任人
+      { wch: 12 }, // 长度
+      { wch: 12 }, // 宽度
+      { wch: 10 }, // 件数
+      { wch: 15 }, // 面积
+      { wch: 12 }, // 单价
+      { wch: 12 }, // 金额
+      { wch: 20 }, // 创建时间
+      { wch: 20 }  // 更新时间
+    ];
+    worksheet['!cols'] = colWidths;
+
+    // 添加工作表到工作簿
+    XLSX.utils.book_append_sheet(workbook, worksheet, '出版异常数据');
+
+    // 生成Excel文件
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+
+    // 设置响应头
+    const filename = `出版异常数据_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`); 
+
+    console.log(`导出完成，共 ${result.recordset.length} 条记录`);
+    res.send(excelBuffer);
+
+  } catch (error) {
+    console.error('导出失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '导出失败',
+      error: error.message
+    });
   }
 });
 
@@ -419,88 +722,54 @@ router.delete('/:id', async (req, res) => {
 });
 
 /**
- * 获取数据统计
+ * 获取数据统计 - 本月新增和成本损失
  */
 router.get('/statistics/summary', async (req, res) => {
   try {
-    const { startDate, endDate, responsibleUnit } = req.query;
-    
-    let whereClause = 'WHERE isDeleted = 0';
-    const params = [];
-    
-    if (startDate) {
-      whereClause += ' AND registration_date >= @startDate';
-      params.push({ name: 'startDate', type: sql.Date, value: startDate });
-    }
-    
-    if (endDate) {
-      whereClause += ' AND registration_date <= @endDate';
-      params.push({ name: 'endDate', type: sql.Date, value: endDate });
-    }
-    
-    if (responsibleUnit) {
-      whereClause += ' AND responsible_unit = @responsibleUnit';
-      params.push({ name: 'responsibleUnit', type: sql.NVarChar, value: responsibleUnit });
-    }
-
     const pool = await getConnection();
     
-    // 基础统计
-    const summaryQuery = `
+    // 获取当前月份的开始和结束日期
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const monthStart = `${currentYear}-${currentMonth.toString().padStart(2, '0')}-01`;
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    const monthEnd = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`;
+    
+    // 本月新增统计
+    const monthlyNewQuery = `
       SELECT 
-        COUNT(*) as total_count,
-        SUM(ISNULL(amount, 0)) as total_amount,
-        SUM(ISNULL(area_cm2, 0)) as total_area,
-        AVG(ISNULL(amount, 0)) as avg_amount
-      FROM publishing_exceptions ${whereClause}
+        COUNT(*) as monthly_new_count
+      FROM publishing_exceptions 
+      WHERE isDeleted = 0 
+        AND registration_date >= @monthStart 
+        AND registration_date < @monthEnd
     `;
     
-    let summaryRequest = pool.request();
-    params.forEach(param => {
-      summaryRequest.input(param.name, param.type, param.value);
-    });
-    const summaryResult = await summaryRequest.query(summaryQuery);
+    const monthlyNewRequest = pool.request()
+      .input('monthStart', sql.Date, monthStart)
+      .input('monthEnd', sql.Date, monthEnd);
+    const monthlyNewResult = await monthlyNewRequest.query(monthlyNewQuery);
     
-    // 按责任单位统计
-    const unitQuery = `
+    // 成本损失统计（仅统计责任单位为非"供应商"的损失金额）
+    const costLossQuery = `
       SELECT 
-        responsible_unit,
-        COUNT(*) as count,
-        SUM(ISNULL(amount, 0)) as total_amount
-      FROM publishing_exceptions ${whereClause}
-      GROUP BY responsible_unit
-      ORDER BY count DESC
+        SUM(ISNULL(amount, 0)) as cost_loss_amount
+      FROM publishing_exceptions 
+      WHERE isDeleted = 0 
+        AND responsible_unit != '供应商'
+        AND responsible_unit IS NOT NULL
     `;
     
-    let unitRequest = pool.request();
-    params.forEach(param => {
-      unitRequest.input(param.name, param.type, param.value);
-    });
-    const unitResult = await unitRequest.query(unitQuery);
-    
-    // 按月份统计
-    const monthlyQuery = `
-      SELECT 
-        FORMAT(registration_date, 'yyyy-MM') as month,
-        COUNT(*) as count,
-        SUM(ISNULL(amount, 0)) as total_amount
-      FROM publishing_exceptions ${whereClause}
-      GROUP BY FORMAT(registration_date, 'yyyy-MM')
-      ORDER BY month DESC
-    `;
-    
-    let monthlyRequest = pool.request();
-    params.forEach(param => {
-      monthlyRequest.input(param.name, param.type, param.value);
-    });
-    const monthlyResult = await monthlyRequest.query(monthlyQuery);
+    const costLossRequest = pool.request();
+    const costLossResult = await costLossRequest.query(costLossQuery);
 
     res.json({
       success: true,
       data: {
-        summary: summaryResult.recordset[0],
-        byUnit: unitResult.recordset,
-        byMonth: monthlyResult.recordset
+        monthly_new: monthlyNewResult.recordset[0].monthly_new_count || 0,
+        cost_loss: costLossResult.recordset[0].cost_loss_amount || 0
       }
     });
   } catch (error) {
@@ -508,5 +777,7 @@ router.get('/statistics/summary', async (req, res) => {
     res.status(500).json({ success: false, message: '获取统计数据失败', error: error.message });
   }
 });
+
+
 
 module.exports = router;
