@@ -8,7 +8,7 @@ const fs = require('fs');
 // 配置文件上传
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadPath = path.join(__dirname, '../uploads/site-images');
+    const uploadPath = path.join(__dirname, '../uploads/site-images/publishing-exception');
     // 确保目录存在
     if (!fs.existsSync(uploadPath)) {
       fs.mkdirSync(uploadPath, { recursive: true });
@@ -16,9 +16,20 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    // 生成唯一文件名
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, 'publishing-exception-' + uniqueSuffix + path.extname(file.originalname));
+    // 生成文件名：原文件名-时间戳.扩展名
+    const timestamp = Date.now();
+    // 处理中文文件名编码问题
+    let originalName;
+    try {
+      // 尝试解码文件名，处理中文字符
+      originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+      originalName = path.parse(originalName).name;
+    } catch (error) {
+      // 如果解码失败，使用原始文件名
+      originalName = path.parse(file.originalname).name;
+    }
+    const extension = path.extname(file.originalname); // 获取扩展名
+    cb(null, `${originalName}-${timestamp}${extension}`);
   }
 });
 
@@ -47,9 +58,28 @@ router.post('/upload-image', upload.single('file'), async (req, res) => {
       })
     }
 
+    // 构建完整的文件信息对象
+    const fileInfo = {
+      id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      originalName: req.file.originalname,
+      filename: req.file.filename,
+      relativePath: `site-images/publishing-exception/${req.file.filename}`,
+      accessUrl: `/files/site-images/publishing-exception/${req.file.filename}`,
+      fullUrl: `${req.protocol}://${req.get('host')}/files/site-images/publishing-exception/${req.file.filename}`,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+      uploadTime: new Date().toISOString(),
+      fileType: 'image',
+      category: 'exception_evidence'
+    };
+
+    console.log('出版异常图片上传成功:', fileInfo);
+
     res.json({
       success: true,
       message: '图片上传成功',
+      fileInfo: fileInfo,
+      // 保持向后兼容
       data: {
         filename: req.file.filename,
         originalname: req.file.originalname,
@@ -433,11 +463,11 @@ router.get('/:id', async (req, res) => {
 /**
  * 创建新的出版异常记录
  * 支持所有字段包括错误类型(error_type)
- * 支持图片文件上传
+ * 接收已上传的图片路径
  */
-router.post('/', upload.single('image'), async (req, res) => {
+router.post('/', async (req, res) => {
   try {
-    // 从请求体中解构所有字段，包括新增的error_type字段
+    // 从请求体中解构所有字段，包括新增的error_type字段和image_path
     const {
       registration_date,
       publishing_date,
@@ -456,11 +486,12 @@ router.post('/', upload.single('image'), async (req, res) => {
       area_cm2,
       unit_price,
       amount,
-      created_by
+      created_by,
+      image_path  // 接收前端传递的已上传图片路径
     } = req.body;
 
-    // 处理上传的图片文件路径
-    const image_path = req.file ? req.file.filename : null;
+    console.log('接收到的数据:', req.body);
+    console.log('图片路径:', image_path);
 
     // 获取数据库连接
     const pool = await getConnection();
@@ -640,13 +671,13 @@ router.get('/export', async (req, res) => {
 /**
  * 更新出版异常记录
  * 支持更新所有字段包括错误类型(error_type)
- * 支持图片文件上传和替换
+ * 接收已上传的图片路径
  */
-router.put('/:id', upload.single('image'), async (req, res) => {
+router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
-    // 从请求体中解构所有字段，包括新增的error_type字段
+    // 从请求体中解构所有字段，包括新增的error_type字段和image_path
     const {
       registration_date,
       publishing_date,
@@ -665,8 +696,14 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       area_cm2,
       unit_price,
       amount,
-      updated_by
+      updated_by,
+      image_path,  // 接收前端传递的已上传图片路径
+      removedFiles  // 接收前端传递的被删除文件列表
     } = req.body;
+
+    console.log('更新接收到的数据:', req.body);
+    console.log('更新图片路径:', image_path);
+    console.log('被删除的文件:', removedFiles);
 
     const pool = await getConnection();
     
@@ -679,18 +716,32 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       return res.status(404).json({ success: false, message: '记录不存在' });
     }
 
-    let image_path = checkResult.recordset[0].image_path;
-    
-    // 如果上传了新图片，删除旧图片
-    if (req.file) {
-      if (image_path) {
-        const oldImagePath = path.join(__dirname, '../uploads/site-images', image_path);
-        if (fs.existsSync(oldImagePath)) {
-          fs.unlinkSync(oldImagePath);
+    // 处理被删除的文件 - 删除物理文件
+    if (removedFiles && Array.isArray(removedFiles) && removedFiles.length > 0) {
+      console.log('开始删除被标记的文件:', removedFiles.length, '个文件');
+      
+      for (const removedFile of removedFiles) {
+        try {
+          // 构建文件的完整路径
+          const filePath = path.join(__dirname, '../uploads/site-images/publishing-exception', removedFile.filename);
+          
+          // 检查文件是否存在
+          if (fs.existsSync(filePath)) {
+            // 删除物理文件
+            fs.unlinkSync(filePath);
+            console.log('成功删除文件:', removedFile.filename);
+          } else {
+            console.log('文件不存在，跳过删除:', removedFile.filename);
+          }
+        } catch (deleteError) {
+          console.error('删除文件失败:', removedFile.filename, deleteError.message);
+          // 继续处理其他文件，不中断整个更新流程
         }
       }
-      image_path = req.file.filename;
     }
+
+    // 使用前端传递的image_path，如果为空则保持原有值
+    const finalImagePath = image_path !== undefined ? image_path : checkResult.recordset[0].image_path;
 
     const result = await pool.request()
       .input('id', sql.Int, id)
@@ -703,7 +754,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       .input('publishing_sheets', sql.Int, publishing_sheets || null)
       .input('exception_description', sql.NVarChar, exception_description)
       .input('error_type', sql.NVarChar, error_type)
-      .input('image_path', sql.NVarChar, image_path)
+      .input('image_path', sql.NVarChar, finalImagePath)
       .input('responsible_unit', sql.NVarChar, responsible_unit)
       .input('responsible_person', sql.NVarChar, responsible_person)
       .input('length_cm', sql.Decimal(10,2), length_cm || null)
