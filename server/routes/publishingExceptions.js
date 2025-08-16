@@ -67,8 +67,47 @@ router.post('/upload-image', upload.single('file'), async (req, res) => {
 })
 
 /**
+ * 获取去重的产品名称列表
+ * 功能：从出版异常记录表中获取所有不重复的产品名称，用于前端下拉选择器
+ */
+router.get('/product-names', async (req, res) => {
+  try {
+    const pool = await getConnection();
+    
+    // 查询去重的产品名称，排除空值和null值
+    const query = `
+      SELECT DISTINCT product_name
+      FROM publishing_exceptions
+      WHERE product_name IS NOT NULL 
+        AND product_name != ''
+        AND LTRIM(RTRIM(product_name)) != ''
+      ORDER BY product_name ASC
+    `;
+    
+    const request = pool.request();
+    const result = await request.query(query);
+    
+    // 提取产品名称数组
+    const productNames = result.recordset.map(row => row.product_name.trim());
+    
+    res.json({
+      success: true,
+      data: productNames
+    });
+  } catch (error) {
+    console.error('获取产品名称列表失败:', error);
+    res.status(500).json({ 
+      success: false, 
+      message: '获取产品名称列表失败', 
+      error: error.message 
+    });
+  }
+});
+
+/**
  * 获取出版异常列表
- * 支持分页、筛选和搜索
+ * 支持分页、筛选和排序
+ * 包含错误类型(errorType)筛选功能
  */
 router.get('/', async (req, res) => {
   try {
@@ -80,7 +119,8 @@ router.get('/', async (req, res) => {
       productName,
       startDate,
       endDate,
-      responsibleUnit
+      responsibleUnit,
+      errorType  // 错误类型筛选参数
     } = req.query;
 
     const offset = (page - 1) * pageSize;
@@ -117,6 +157,12 @@ router.get('/', async (req, res) => {
     if (endDate) {
       whereClause += ' AND registration_date <= @endDate';
       params.push({ name: 'endDate', type: sql.Date, value: endDate });
+    }
+    
+    // 错误类型筛选条件
+    if (errorType) {
+      whereClause += ' AND error_type LIKE @errorType';
+      params.push({ name: 'errorType', type: sql.NVarChar, value: `%${errorType}%` });
     }
 
     const pool = await getConnection();
@@ -166,6 +212,7 @@ router.get('/', async (req, res) => {
 
 /**
  * 导出出版异常数据到Excel
+ * 包含所有字段，包括错误类型(error_type)
  */
 router.get('/export', async (req, res) => {
   const { executeQuery } = require('../db');
@@ -187,6 +234,7 @@ router.get('/export', async (req, res) => {
           plate_type,
           publishing_sheets,
           exception_description,
+          error_type,  -- 错误类型字段，用于分类管理
           responsible_unit,
           responsible_person,
           length_cm,
@@ -212,7 +260,7 @@ router.get('/export', async (req, res) => {
     // 定义表头
     const headers = [
       '登记日期', '出版日期', '客户代码', '工单号', '产品名称', '版型', 
-      '出版张数', '异常描述', '责任单位', '责任人', '长度(cm)', '宽度(cm)', 
+      '出版张数', '异常描述', '错误类型', '责任单位', '责任人', '长度(cm)', '宽度(cm)', 
       '件数', '面积(cm²)', '单价', '金额', '创建时间', '更新时间'
     ];
     
@@ -242,6 +290,7 @@ router.get('/export', async (req, res) => {
         row.plate_type || '',
         row.publishing_sheets || '',
         row.exception_description || '',
+        row.error_type || '',
         row.responsible_unit || '',
         row.responsible_person || '',
         row.length_cm || '',
@@ -268,6 +317,10 @@ router.get('/export', async (req, res) => {
       // 设置异常描述列（第8列）左对齐
       const exceptionDescCell = worksheet.getCell(index + 2, 8);
       exceptionDescCell.alignment = { vertical: 'middle', horizontal: 'left' };
+      
+      // 设置错误类型列（第9列）左对齐
+      const errorTypeCell = worksheet.getCell(index + 2, 9);
+      errorTypeCell.alignment = { vertical: 'middle', horizontal: 'left' };
       
       // 隔行变色 - 只填充有内容的列范围
       if ((index + 1) % 2 === 0) {
@@ -377,12 +430,14 @@ router.get('/:id', async (req, res) => {
 /**
  * 创建新的出版异常记录
  */
+/**
+ * 创建新的出版异常记录
+ * 支持所有字段包括错误类型(error_type)
+ * 支持图片文件上传
+ */
 router.post('/', upload.single('image'), async (req, res) => {
   try {
-    console.log('=== 创建出版异常记录调试 ===');
-    console.log('请求体数据:', req.body);
-    console.log('上传文件:', req.file);
-    
+    // 从请求体中解构所有字段，包括新增的error_type字段
     const {
       registration_date,
       publishing_date,
@@ -392,6 +447,7 @@ router.post('/', upload.single('image'), async (req, res) => {
       plate_type,
       publishing_sheets,
       exception_description,
+      error_type,  // 错误类型字段，用于分类管理异常类型
       responsible_unit,
       responsible_person,
       length_cm,
@@ -403,24 +459,13 @@ router.post('/', upload.single('image'), async (req, res) => {
       created_by
     } = req.body;
 
-    console.log('解析后的数据:', {
-      registration_date,
-      customer_code,
-      work_order_number,
-      product_name,
-      responsible_unit,
-      responsible_person,
-      exception_description,
-      created_by
-    });
-
+    // 处理上传的图片文件路径
     const image_path = req.file ? req.file.filename : null;
-    console.log('图片路径:', image_path);
 
+    // 获取数据库连接
     const pool = await getConnection();
-    console.log('数据库连接获取成功');
     
-    console.log('准备执行SQL插入操作...');
+    // 执行SQL插入操作，包含error_type字段
     const result = await pool.request()
       .input('registration_date', sql.Date, registration_date)
       .input('publishing_date', sql.Date, publishing_date || null)
@@ -430,6 +475,7 @@ router.post('/', upload.single('image'), async (req, res) => {
       .input('plate_type', sql.NVarChar, plate_type)
       .input('publishing_sheets', sql.Int, publishing_sheets || null)
       .input('exception_description', sql.NVarChar, exception_description)
+      .input('error_type', sql.NVarChar, error_type)
       .input('image_path', sql.NVarChar, image_path)
       .input('responsible_unit', sql.NVarChar, responsible_unit)
       .input('responsible_person', sql.NVarChar, responsible_person)
@@ -444,14 +490,14 @@ router.post('/', upload.single('image'), async (req, res) => {
         INSERT INTO publishing_exceptions (
           registration_date, publishing_date, customer_code, work_order_number,
           product_name, plate_type, publishing_sheets, exception_description,
-          image_path, responsible_unit, responsible_person, length_cm, width_cm,
+          error_type, image_path, responsible_unit, responsible_person, length_cm, width_cm,
           piece_count, area_cm2, unit_price, amount, created_by
         ) 
         OUTPUT INSERTED.id
         VALUES (
           @registration_date, @publishing_date, @customer_code, @work_order_number,
           @product_name, @plate_type, @publishing_sheets, @exception_description,
-          @image_path, @responsible_unit, @responsible_person, @length_cm, @width_cm,
+          @error_type, @image_path, @responsible_unit, @responsible_person, @length_cm, @width_cm,
           @piece_count, @area_cm2, @unit_price, @amount, @created_by
         )
       `);
@@ -591,9 +637,16 @@ router.get('/export', async (req, res) => {
 /**
  * 更新出版异常记录
  */
+/**
+ * 更新出版异常记录
+ * 支持更新所有字段包括错误类型(error_type)
+ * 支持图片文件上传和替换
+ */
 router.put('/:id', upload.single('image'), async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // 从请求体中解构所有字段，包括新增的error_type字段
     const {
       registration_date,
       publishing_date,
@@ -603,6 +656,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       plate_type,
       publishing_sheets,
       exception_description,
+      error_type,  // 错误类型字段，支持分类管理异常
       responsible_unit,
       responsible_person,
       length_cm,
@@ -648,6 +702,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
       .input('plate_type', sql.NVarChar, plate_type)
       .input('publishing_sheets', sql.Int, publishing_sheets || null)
       .input('exception_description', sql.NVarChar, exception_description)
+      .input('error_type', sql.NVarChar, error_type)
       .input('image_path', sql.NVarChar, image_path)
       .input('responsible_unit', sql.NVarChar, responsible_unit)
       .input('responsible_person', sql.NVarChar, responsible_person)
@@ -668,6 +723,7 @@ router.put('/:id', upload.single('image'), async (req, res) => {
           plate_type = @plate_type,
           publishing_sheets = @publishing_sheets,
           exception_description = @exception_description,
+          error_type = @error_type,
           image_path = @image_path,
           responsible_unit = @responsible_unit,
           responsible_person = @responsible_person,
@@ -777,7 +833,5 @@ router.get('/statistics/summary', async (req, res) => {
     res.status(500).json({ success: false, message: '获取统计数据失败', error: error.message });
   }
 });
-
-
 
 module.exports = router;

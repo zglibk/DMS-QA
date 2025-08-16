@@ -68,12 +68,34 @@
               </el-col>
               <el-col :span="7">
                 <el-form-item label="产品名称">
-                  <el-input v-model="filters.productName" placeholder="请输入" clearable />
+                  <el-select 
+                    v-model="filters.productName" 
+                    placeholder="请选择或输入产品名称" 
+                    clearable 
+                    filterable 
+                    allow-create 
+                    default-first-option
+                    style="width: 100%"
+                    @change="handleSearch"
+                  >
+                    <el-option 
+                      v-for="productName in productNameList" 
+                      :key="productName" 
+                      :label="productName" 
+                      :value="productName" 
+                    />
+                  </el-select>
                 </el-form-item>
               </el-col>
               <el-col :span="4">
                 <el-form-item label="责任单位">
-                  <el-select v-model="filters.responsibleUnit" placeholder="请选择" clearable style="width: 100%">
+                  <el-select 
+                    v-model="filters.responsibleUnit" 
+                    placeholder="请选择" 
+                    clearable 
+                    style="width: 100%"
+                    @change="handleSearch"
+                  >
                     <el-option 
                       v-for="dept in departmentList" 
                       :key="dept.ID" 
@@ -85,7 +107,31 @@
               </el-col>
             </el-row>
             <el-row :gutter="16">
-              <el-col :span="6">
+              <!-- 错误类型筛选：支持按错误类型筛选出版异常记录 -->
+              <el-col :span="4">
+                <el-form-item label="错误类型">
+                  <el-select 
+                    v-model="filters.errorType" 
+                    placeholder="请选择" 
+                    clearable 
+                    filterable 
+                    style="width: 100%"
+                    @change="handleSearch"
+                  >
+                    <el-option label="排版变形" value="排版变形" />
+                    <el-option label="分色偏差" value="分色偏差" />
+                    <el-option label="套印偏差" value="套印偏差" />
+                    <el-option label="排版错误" value="排版错误" />
+                    <el-option label="出血位偏差" value="出血位偏差" />
+                    <el-option label="内容错误" value="内容错误" />
+                    <el-option label="图文残缺" value="图文残缺" />
+                    <el-option label="多出版" value="多出版" />
+                    <el-option label="漏出版" value="漏出版" />
+                    <el-option label="其它" value="其它" />
+                  </el-select>
+                </el-form-item>
+              </el-col>
+              <el-col :span="2">
                 <el-form-item label=" ">
                   <el-button type="warning" plain @click="resetFilters" style="width: 100%; margin-bottom: 8px;">
                     <el-icon><Refresh /></el-icon>
@@ -93,7 +139,7 @@
                   </el-button>
                 </el-form-item>
               </el-col>
-              <el-col :span="6">
+              <el-col :span="2">
                 <el-form-item label=" ">
                   <el-button type="primary" @click="handleSearch" style="width: 100%; margin-bottom: 8px;">
                     <el-icon><Search /></el-icon>
@@ -154,6 +200,8 @@
                 <el-table-column prop="plate_type" label="版类型" width="80" align="center" header-align="center" />
                 <el-table-column prop="publishing_sheets" label="张数" width="60" align="center" header-align="center" />
                 <el-table-column prop="exception_description" label="异常描述" width="200" show-overflow-tooltip header-align="center" />
+                <!-- 错误类型列：显示异常的分类类型 -->
+                <el-table-column prop="error_type" label="错误类型" width="100" align="center" header-align="center" />
                 <el-table-column prop="responsible_unit" label="责任单位" width="120" align="center" header-align="center" />
                 <el-table-column prop="responsible_person" label="责任人" width="70" align="center" header-align="center" />
                 <el-table-column prop="area_cm2" label="数量cm²" width="80" align="center" header-align="center" />
@@ -359,9 +407,9 @@
             <el-form-item label="版类型">
               <el-select v-model="formData.plate_type" placeholder="请选择版类型" style="width: 100%">
                 <el-option label="PS版" value="PS版" />
-                <el-option label="CTP版" value="CTP版" />
-                <el-option label="胶印版" value="胶印版" />
-                <el-option label="其他" value="其他" />
+                <el-option label="CTP" value="CTP" />
+                <el-option label="柔版" value="柔版" />
+                <el-option label="刀模" value="刀模" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -428,6 +476,28 @@
           </el-col>
         </el-row>
         
+        <!-- 错误类型选择器：用于分类管理出版异常的错误类型，支持搜索和清空 -->
+        <el-form-item label="错误类型" prop="error_type">
+          <el-select 
+            v-model="formData.error_type" 
+            placeholder="请选择错误类型" 
+            style="width: 100%"
+            filterable
+            clearable
+          >
+            <el-option label="排版变形" value="排版变形" />
+            <el-option label="分色偏差" value="分色偏差" />
+            <el-option label="套印偏差" value="套印偏差" />
+            <el-option label="排版错误" value="排版错误" />
+            <el-option label="出血位偏差" value="出血位偏差" />
+            <el-option label="内容错误" value="内容错误" />
+            <el-option label="图文残缺" value="图文残缺" />
+            <el-option label="多出版" value="多出版" />
+            <el-option label="漏出版" value="漏出版" />
+            <el-option label="其它" value="其它" />
+          </el-select>
+        </el-form-item>
+        
         <el-form-item label="异常描述" prop="exception_description">
           <el-input
             v-model="formData.exception_description"
@@ -488,7 +558,9 @@
         <el-descriptions-item label="数量cm²">{{ viewData.area_cm2 }}</el-descriptions-item>
         <el-descriptions-item label="单价">{{ viewData.unit_price }}</el-descriptions-item>
         <el-descriptions-item label="金额">{{ viewData.amount }}</el-descriptions-item>
-        <el-descriptions-item label="异常描述" :span="2">{{ viewData.exception_description }}</el-descriptions-item>
+        <el-descriptions-item label="异常描述" span="2">{{ viewData.exception_description }}</el-descriptions-item>
+        <!-- 错误类型显示：展示异常的分类类型 -->
+        <el-descriptions-item label="错误类型">{{ viewData.error_type }}</el-descriptions-item>
         <el-descriptions-item label="创建人">{{ viewData.created_by }}</el-descriptions-item>
         <el-descriptions-item label="创建日期">{{ viewData.created_date }}</el-descriptions-item>
       </el-descriptions>
@@ -547,6 +619,7 @@ const filters = reactive({
   workOrderNumber: 'GD',
   productName: '',
   responsibleUnit: '',
+  errorType: '',  // 错误类型筛选条件，用于按错误类型筛选出版异常记录
   dateRange: []
 })
 
@@ -591,6 +664,7 @@ const formData = reactive({
   plate_type: '',
   publishing_sheets: null,
   exception_description: '',
+  error_type: '',  // 错误类型字段，用于分类管理异常
   responsible_unit: '设计部',
   responsible_person: '',
   length_cm: null,
@@ -641,21 +715,42 @@ const dialogTitle = computed(() => isEdit.value ? '编辑出版异常' : '新增
 // 部门列表
 const departmentList = ref([])
 
+// 产品名称列表
+const productNameList = ref([])
+
 /**
  * 获取部门列表数据
  */
 const fetchDepartments = async () => {
   try {
     const response = await apiService.get('/departments')
-    console.log('部门API响应:', response.data)
+    // 获取部门列表数据用于下拉选择器
     if (response.data.success) {
       departmentList.value = response.data.data
-      console.log('部门列表数据:', departmentList.value)
     } else {
-      console.error('获取部门列表失败:', response.data.message)
+      ElMessage.error('获取部门列表失败')
     }
   } catch (error) {
-    console.error('获取部门列表失败:', error)
+    ElMessage.error('获取部门列表失败')
+  }
+}
+
+/**
+ * 获取产品名称列表数据
+ */
+const fetchProductNames = async () => {
+  try {
+    // 确保apiService已初始化
+    await apiService.initialize()
+    const response = await apiService.get('/publishing-exceptions/product-names')
+    if (response.data.success) {
+      productNameList.value = response.data.data
+    } else {
+      ElMessage.error('获取产品名称列表失败')
+    }
+  } catch (error) {
+    console.error('获取产品名称列表失败:', error)
+    ElMessage.error('获取产品名称列表失败')
   }
 }
 
@@ -686,7 +781,6 @@ const fetchData = async () => {
       ElMessage.error(response.data.message || '获取数据失败')
     }
   } catch (error) {
-    console.error('获取数据失败:', error)
     ElMessage.error('获取数据失败')
   } finally {
     loading.value = false
@@ -721,7 +815,7 @@ const fetchStatistics = async () => {
       })
     }
   } catch (error) {
-    console.error('获取统计数据失败:', error)
+    ElMessage.error('获取统计数据失败')
   }
 }
 
@@ -1318,6 +1412,7 @@ const formatAmount = (amount) => {
 // 组件挂载时获取数据
 onMounted(() => {
   fetchDepartments()
+  fetchProductNames() // 获取产品名称列表
   fetchData()
   fetchStatistics() // 页面加载时获取统计数据
 })
@@ -1333,6 +1428,141 @@ onMounted(() => {
 .el-main {
   margin-top: 0 !important;
   padding-top: 0;
+}
+
+/* el-tabs 美化样式 */
+.el-tabs {
+  background: #fff;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: hidden;
+  margin-bottom: 20px;
+  border: 1px solid #dcdfe6;
+}
+
+/* 标签页头部样式 */
+.el-tabs :deep(.el-tabs__header) {
+  margin: 0;
+  background: #fff;
+  border-bottom: 1px solid #dcdfe6;
+  border-radius: 0;
+  padding: 0 20px;
+}
+
+/* 标签页导航样式 */
+.el-tabs :deep(.el-tabs__nav-wrap) {
+  padding: 10px 0;
+}
+
+.el-tabs :deep(.el-tabs__nav) {
+  border: none;
+}
+
+/* 标签页项目样式 */
+.el-tabs :deep(.el-tabs__item) {
+  height: 45px;
+  line-height: 45px;
+  padding: 0 25px;
+  margin-right: 8px;
+  border: none;
+  border-radius: 0;
+  font-weight: 500;
+  font-size: 14px;
+  color: #666;
+  background: transparent;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.el-tabs :deep(.el-tabs__item):hover {
+  color: #409EFF;
+  background: transparent;
+}
+
+/* 激活状态的标签页 */
+.el-tabs :deep(.el-tabs__item.is-active) {
+  color: #409EFF;
+  background: transparent;
+}
+
+/* 移除默认的活动指示器 */
+.el-tabs :deep(.el-tabs__active-bar) {
+  display: none;
+}
+
+/* 标签页内容区域 */
+.el-tabs :deep(.el-tabs__content) {
+  background: #fff;
+  border-radius: 0;
+  min-height: 400px;
+  position: relative;
+}
+
+.el-tabs :deep(.el-tab-pane) {
+  padding: 25px;
+  animation: fadeInUp 0.5s ease-out;
+}
+
+/* 动画效果 */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 标签页切换动画 */
+.el-tabs :deep(.el-tabs__item) {
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .el-tabs :deep(.el-tabs__item) {
+    padding: 0 15px;
+    margin-right: 5px;
+    font-size: 13px;
+  }
+  
+  .el-tabs :deep(.el-tabs__header) {
+    padding: 0 10px;
+  }
+  
+  .el-tabs :deep(.el-tab-pane) {
+    padding: 15px;
+  }
+}
+
+/* 深色模式支持 */
+@media (prefers-color-scheme: dark) {
+  .el-tabs {
+    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%);
+  }
+  
+  .el-tabs :deep(.el-tabs__header) {
+    background: rgba(45, 55, 72, 0.95);
+  }
+  
+  .el-tabs :deep(.el-tabs__content) {
+    background: #2d3748;
+    color: #e2e8f0;
+  }
 }
 
 .sidebar-placeholder {
