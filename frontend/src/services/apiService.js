@@ -246,9 +246,24 @@ class ApiService {
 
   /**
    * 根据vite配置和环境获取API地址列表
+/**
    * 获取当前API地址
    */
   getCurrentApiUrl() {
+    return this.currentBaseURL
+  }
+
+  /**
+   * 获取baseURL属性（兼容性方法）
+   */
+  get baseURL() {
+    return this.currentBaseURL || '/api'
+  }
+
+  /**
+   * 获取baseURL属性（兼容性方法）
+   */
+  get baseURL() {
     return this.currentBaseURL
   }
 
