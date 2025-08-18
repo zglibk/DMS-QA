@@ -19,6 +19,12 @@ export default defineConfig({
         changeOrigin: true,
         secure: false
       },
+      // 静态文件代理配置
+      '/files': {
+        target: 'http://localhost:3001',
+        changeOrigin: true,
+        secure: false
+      },
       // 备用代理配置，使用127.0.0.1
       '/api-backup': {
         target: 'http://127.0.0.1:3001',

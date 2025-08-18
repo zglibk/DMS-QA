@@ -524,8 +524,11 @@
             v-model:fileList="fileList"
             @change="handleFileChange"
             @remove="handleFileRemove"
+            @preview="handleFilePreview"
           />
         </el-form-item>
+        
+
       </el-form>
       
       <template #footer>
@@ -536,6 +539,26 @@
           </el-button>
         </span>
       </template>
+    </el-dialog>
+    
+    <!-- 新增/编辑对话框中的图片预览对话框 -->
+    <el-dialog
+      v-model="dialogImagePreviewVisible"
+      title="图片预览"
+      :show-close="true"
+      :close-on-click-modal="true"
+      :close-on-press-escape="true"
+      width="90%"
+      style="max-width: 1200px;"
+      class="image-preview-dialog"
+      @close="closeDialogImagePreview"
+    >
+      <ImagePreview
+        v-if="currentDialogPreviewImage"
+        :file-path="currentDialogPreviewImage"
+        :width="'100%'"
+        :height="'70vh'"
+      />
     </el-dialog>
     
     <!-- 查看详情对话框 -->
@@ -578,17 +601,37 @@
             :src="imageInfo.url"
             :preview-src-list="getImageList(viewData.image_path).map(img => img.url)"
             :initial-index="index"
-            fit="contain"
-            style="width: 150px; height: 150px; margin-right: 10px; margin-bottom: 10px;"
+            fit="cover"
+            style="width: 150px; height: 150px; margin-right: 10px; margin-bottom: 10px; border-radius: 6px; cursor: pointer;"
+            @click="openImagePreview(imageInfo)"
           >
             <template #error>
               <div class="image-slot">
                 <el-icon><Picture /></el-icon>
-                <div>{{ imageInfo.originalName || imageInfo.filename }}</div>
               </div>
             </template>
           </el-image>
         </div>
+        
+        <!-- ImagePreview组件用于专业的图片放大显示 -->
+        <el-dialog
+          v-model="imagePreviewVisible"
+          title="图片预览"
+          :show-close="true"
+          :close-on-click-modal="true"
+          :close-on-press-escape="true"
+          width="90%"
+          style="max-width: 1200px;"
+          class="image-preview-dialog"
+          @close="closeImagePreview"
+        >
+          <ImagePreview
+            v-if="currentPreviewImage"
+            :file-path="currentPreviewImage"
+            :width="'100%'"
+            :height="'70vh'"
+          />
+        </el-dialog>
         <div class="image-info" v-if="getImageList(viewData.image_path).length > 0">
           <p><strong>图片信息：</strong></p>
           <ul>
@@ -625,6 +668,7 @@ import {
 import AppHeader from '@/components/common/AppHeader.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
 import FileUpload from '@/components/FileUpload.vue'
+import ImagePreview from '@/components/ImagePreview.vue'
 import apiService from '@/services/apiService'
 import { useUserStore } from '@/store/user'
 import * as echarts from 'echarts'
@@ -716,6 +760,14 @@ const filterWorkOrderSuffix = ref('')
 
 // 查看数据
 const viewData = ref({})
+
+// 图片预览相关
+const imagePreviewVisible = ref(false)
+const currentPreviewImage = ref('')
+
+// 新增/编辑对话框中的图片预览相关
+const dialogImagePreviewVisible = ref(false)
+const currentDialogPreviewImage = ref('')
 
 // 表单验证规则
 const formRules = {
@@ -1296,18 +1348,11 @@ const handleSubmit = async () => {
     
     submitLoading.value = true
     
-    // 先上传待上传的文件
+    // 获取新上传的文件信息
     let uploadedFileInfo = []
-    if (uploadRef.value && uploadRef.value.getPendingFiles().length > 0) {
-      try {
-        console.log('开始上传文件...')
-        uploadedFileInfo = await uploadRef.value.uploadPendingFiles()
-        console.log('文件上传成功:', uploadedFileInfo)
-      } catch (uploadError) {
-        console.error('文件上传失败:', uploadError)
-        ElMessage.error('文件上传失败，请重试')
-        return
-      }
+    if (tempUploadedFiles.value && tempUploadedFiles.value.length > 0) {
+      uploadedFileInfo = tempUploadedFiles.value
+      console.log('获取到新上传的文件:', uploadedFileInfo)
     }
     
     // 处理图片路径信息 - 合并原有文件和新增文件
@@ -1514,6 +1559,17 @@ const handleCustomUpload = (file) => {
  */
 const handleFileChange = (files) => {
   console.log('文件列表变化:', files)
+  console.log('当前 fileList.value.length:', fileList.value.length)
+  
+  // 只有当传入的文件数组长度大于当前文件列表长度时才更新
+  // 这样可以避免删除操作后重新添加文件
+  if (files.length > fileList.value.length) {
+    fileList.value = [...files]
+    console.log('更新后 fileList.value.length:', fileList.value.length)
+  } else {
+    console.log('跳过文件列表更新，避免删除后重新添加')
+  }
+  
   // 文件列表变化时不直接修改formData.image_path
   // 只在用户点击创建或更新时才将临时文件路径保存到formData.image_path
 }
@@ -1527,29 +1583,60 @@ const handleFileChange = (files) => {
  */
 const handleFileRemove = (deletedFiles) => {
   console.log('文件删除:', deletedFiles)
+  console.log('删除前 fileList.value:', fileList.value)
   
-  deletedFiles.forEach(deletedFile => {
-    // 从 fileList 中移除（这是关键，确保界面更新）
-    const fileListIndex = fileList.value.findIndex(file => 
-      file.filename === deletedFile.filename || file.name === deletedFile.name
-    )
+  deletedFiles.forEach((deletedFile) => {
+    console.log('处理删除文件:', deletedFile)
+    
+    // 获取删除文件的关键信息
+    const deletedFileName = deletedFile.name || deletedFile.originalName
+    const deletedFileFilename = deletedFile.filename
+    const deletedFileUrl = deletedFile.url
+    
+    // 创建文件匹配函数
+    const isFileMatch = (file) => {
+      const fileName = file.name || file.originalName
+      const fileFilename = file.filename
+      const fileUrl = file.url
+      
+      // 优先使用filename匹配，其次使用name，最后使用url
+      if (fileFilename && deletedFileFilename) {
+        return fileFilename === deletedFileFilename
+      }
+      if (fileName && deletedFileName) {
+        return fileName === deletedFileName
+      }
+      if (fileUrl && deletedFileUrl) {
+        return fileUrl === deletedFileUrl
+      }
+      return false
+    }
+    
+    // 从 fileList 中移除
+    const fileListIndex = fileList.value.findIndex(isFileMatch)
     if (fileListIndex > -1) {
       fileList.value.splice(fileListIndex, 1)
+      console.log('从fileList中删除了文件，剩余:', fileList.value.length)
     }
     
     // 从临时文件列表中移除
-    const tempIndex = tempUploadedFiles.value.findIndex(file => file.filename === deletedFile.filename)
+    const tempIndex = tempUploadedFiles.value.findIndex(isFileMatch)
     if (tempIndex > -1) {
       tempUploadedFiles.value.splice(tempIndex, 1)
+      console.log('从临时文件列表中删除了文件')
     }
     
     // 如果是原始文件，添加到删除列表中
-    const originalIndex = originalFiles.value.findIndex(file => file.filename === deletedFile.filename)
+    const originalIndex = originalFiles.value.findIndex(isFileMatch)
     if (originalIndex > -1) {
-      removedFiles.value.push(originalFiles.value[originalIndex])
+      const removedFile = originalFiles.value[originalIndex]
+      removedFiles.value.push(removedFile)
       originalFiles.value.splice(originalIndex, 1)
+      console.log('从原始文件列表中删除了文件，添加到删除列表')
     }
   })
+  
+  console.log('删除完成，最终 fileList.value:', fileList.value)
 }
 
 /**
@@ -1572,10 +1659,12 @@ const beforeUpload = (file) => {
 
 /**
  * 获取图片URL（兼容旧格式）
+ * 生成包含端口号8080的完整图片访问URL
  */
 const getImageUrl = (imagePath) => {
   if (!imagePath) return ''
-  return `${apiService.baseURL.replace('/api', '')}/files/site-images/publishing-exception/${imagePath}`
+  // 使用完整URL包含端口号8080，确保图片能正确访问
+  return `http://192.168.1.57:8080/files/site-images/publishing-exception/${imagePath}`
 }
 
 /**
@@ -1603,7 +1692,8 @@ const getImageList = (imagePath) => {
     return [{
       filename: imagePath,
       originalName: imagePath,
-      url: getImageUrl(imagePath)
+      url: getImageUrl(imagePath),
+      path: `uploads/site-images/publishing-exception/${imagePath}`
     }]
   }
   
@@ -1709,6 +1799,80 @@ const triggerFileUpload = () => {
   if (uploadRef.value) {
     // 调用 FileUpload 组件的 onClick 方法来触发文件选择
     uploadRef.value.onClick(0)
+  }
+}
+
+/**
+ * 打开图片预览弹窗
+ * @param {string|Object} imagePathOrInfo - 图片路径字符串或图片信息对象
+ */
+const openImagePreview = (imagePathOrInfo) => {
+  let imagePath = imagePathOrInfo
+  
+  // 如果传入的是对象（图片信息），优先使用完整的URL
+  if (typeof imagePathOrInfo === 'object' && imagePathOrInfo !== null) {
+    imagePath = imagePathOrInfo.fullUrl || imagePathOrInfo.accessUrl || imagePathOrInfo.url || imagePathOrInfo.path || imagePathOrInfo.filename
+  }
+  
+  currentPreviewImage.value = imagePath
+  imagePreviewVisible.value = true
+}
+
+/**
+ * 关闭图片预览弹窗
+ */
+const closeImagePreview = () => {
+  imagePreviewVisible.value = false
+  currentPreviewImage.value = ''
+}
+
+/**
+ * 打开新增/编辑对话框中的图片预览
+ * @param {Object} imageInfo - 图片信息对象
+ */
+const openImagePreviewInDialog = (imageInfo) => {
+  // 优先使用完整URL，然后是访问URL，最后是通过文件名生成URL
+  const imageUrl = imageInfo.url || imageInfo.fullUrl || imageInfo.accessUrl || getImageUrl(imageInfo.filename)
+  currentDialogPreviewImage.value = imageUrl
+  dialogImagePreviewVisible.value = true
+}
+
+/**
+ * 关闭新增/编辑对话框中的图片预览
+ */
+const closeDialogImagePreview = () => {
+  dialogImagePreviewVisible.value = false
+  currentDialogPreviewImage.value = ''
+}
+
+/**
+ * 处理FileUpload组件的文件预览事件
+ * @param {Object} fileInfo - 文件信息对象
+ * @param {string} url - 文件URL（可能是本地预览URL）
+ */
+const handleFilePreview = (fileInfo, url) => {
+  console.log('PublishingExceptions handleFilePreview triggered:', { fileInfo, url })
+  
+  let imageUrl = url
+  
+  // 如果没有传入URL，尝试从文件信息中获取
+  if (!imageUrl) {
+    imageUrl = fileInfo.url || fileInfo.fullUrl || fileInfo.accessUrl
+    
+    // 如果仍然没有URL且有文件名，则通过文件名生成URL
+    if (!imageUrl && fileInfo.filename) {
+      imageUrl = getImageUrl(fileInfo.filename)
+    }
+  }
+  
+  console.log('Final imageUrl:', imageUrl)
+  
+  if (imageUrl) {
+    currentDialogPreviewImage.value = imageUrl
+    dialogImagePreviewVisible.value = true
+    console.log('Dialog visibility set to:', dialogImagePreviewVisible.value)
+  } else {
+    console.warn('No valid image URL found for preview')
   }
 }
 

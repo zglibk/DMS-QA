@@ -28,8 +28,16 @@ const storage = multer.diskStorage({
       // 如果解码失败，使用原始文件名
       originalName = path.parse(file.originalname).name;
     }
+    
+    // 为了避免URL编码问题，将中文字符转换为安全的文件名
+    // 如果文件名包含非ASCII字符，使用时间戳和随机字符串
+    if (/[^\x00-\x7F]/.test(originalName)) {
+      const randomStr = Math.random().toString(36).substring(2, 8);
+      originalName = `file_${timestamp}_${randomStr}`;
+    }
+    
     const extension = path.extname(file.originalname); // 获取扩展名
-    cb(null, `${originalName}-${timestamp}${extension}`);
+    cb(null, `${originalName}${extension}`);
   }
 });
 
@@ -58,14 +66,30 @@ router.post('/upload-image', upload.single('file'), async (req, res) => {
       })
     }
 
+    // 处理原始文件名的编码问题
+    let correctedOriginalName;
+    try {
+      // 尝试解码文件名，处理中文字符编码问题
+      correctedOriginalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+      console.log('文件名编码修复:', {
+        original: req.file.originalname,
+        corrected: correctedOriginalName
+      });
+    } catch (error) {
+      // 如果解码失败，使用原始文件名
+      correctedOriginalName = req.file.originalname;
+      console.log('文件名编码修复失败，使用原始文件名:', req.file.originalname);
+    }
+
     // 构建完整的文件信息对象
     const fileInfo = {
       id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-      originalName: req.file.originalname,
+      originalName: correctedOriginalName,
       filename: req.file.filename,
       relativePath: `site-images/publishing-exception/${req.file.filename}`,
+      // 新上传的文件使用静态路径，因为还没有保存到数据库
       accessUrl: `/files/site-images/publishing-exception/${req.file.filename}`,
-      fullUrl: `${req.protocol}://${req.get('host')}/files/site-images/publishing-exception/${req.file.filename}`,
+      fullUrl: `${req.protocol}://${req.get('host')}:8080/files/site-images/publishing-exception/${req.file.filename}`,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
       uploadTime: new Date().toISOString(),
@@ -882,6 +906,119 @@ router.get('/statistics/summary', async (req, res) => {
   } catch (error) {
     console.error('获取统计数据失败:', error);
     res.status(500).json({ success: false, message: '获取统计数据失败', error: error.message });
+  }
+});
+
+/**
+ * 获取出版异常图片文件
+ * GET /api/publishing-exceptions/image/:id
+ * 功能：根据记录ID获取对应的图片文件，支持图片预览
+ */
+router.get('/image/:id', async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (!id || isNaN(id)) {
+      return res.status(400).json({ success: false, message: '无效的记录ID' });
+    }
+    
+    const pool = await getConnection();
+    
+    // 查询记录的图片路径
+    const result = await pool.request()
+      .input('id', sql.Int, parseInt(id))
+      .query('SELECT image_path FROM publishing_exceptions WHERE id = @id AND isDeleted = 0');
+    
+    if (result.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '记录不存在' });
+    }
+    
+    const imagePath = result.recordset[0].image_path;
+    
+    if (!imagePath) {
+      return res.status(404).json({ success: false, message: '该记录没有图片' });
+    }
+    
+    // 解析图片路径，支持多种格式
+    let imageFiles = [];
+    try {
+      // 如果是JSON格式的多图片路径
+      if (imagePath.startsWith('[') || imagePath.startsWith('{')) {
+        const parsedPath = JSON.parse(imagePath);
+        if (Array.isArray(parsedPath)) {
+          imageFiles = parsedPath;
+        } else if (parsedPath.filename) {
+          imageFiles = [parsedPath];
+        }
+      } else {
+        // 如果是单个文件名字符串
+        imageFiles = [{ filename: imagePath }];
+      }
+    } catch (error) {
+      // 如果解析失败，当作单个文件名处理
+      imageFiles = [{ filename: imagePath }];
+    }
+    
+    // 获取第一个图片文件（如果有多个图片，返回第一个）
+    const firstImage = imageFiles[0];
+    if (!firstImage || !firstImage.filename) {
+      return res.status(404).json({ success: false, message: '图片文件信息无效' });
+    }
+    
+    // 构建图片文件的完整路径
+    const fullImagePath = path.join(__dirname, '../uploads/site-images/publishing-exception', firstImage.filename);
+    
+    console.log(`查找图片文件: ${fullImagePath}`);
+    
+    // 检查文件是否存在
+    if (!fs.existsSync(fullImagePath)) {
+      console.log(`图片文件不存在: ${fullImagePath}`);
+      return res.status(404).json({ success: false, message: '图片文件不存在' });
+    }
+    
+    // 获取文件信息
+    const stat = fs.statSync(fullImagePath);
+    const fileName = path.basename(fullImagePath);
+    const ext = path.extname(fileName).toLowerCase();
+    
+    // 设置响应头
+    res.setHeader('Content-Length', stat.size);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(fileName)}"`);
+    
+    // 根据文件扩展名设置Content-Type
+    const mimeTypes = {
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png',
+      '.gif': 'image/gif',
+      '.bmp': 'image/bmp',
+      '.webp': 'image/webp'
+    };
+    
+    const contentType = mimeTypes[ext] || 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+    
+    console.log(`返回图片文件: ${fileName}, 类型: ${contentType}, 大小: ${stat.size}`);
+    
+    // 创建文件流并发送
+    const fileStream = fs.createReadStream(fullImagePath);
+    fileStream.pipe(res);
+    
+    fileStream.on('error', (error) => {
+      console.error('图片文件流错误:', error);
+      if (!res.headersSent) {
+        res.status(500).json({ success: false, message: '图片读取失败' });
+      }
+    });
+    
+  } catch (error) {
+    console.error('获取出版异常图片失败:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        success: false,
+        message: '获取图片失败: ' + error.message
+      });
+    }
   }
 });
 

@@ -146,7 +146,6 @@
             @load="onFullImageLoad"
             @error="onFullImageError"
             draggable="false"
-            style="max-width: 100%; max-height: 100%; object-fit: contain;"
           />
         </div>
         <div v-else class="no-image">
@@ -797,13 +796,18 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  position: relative;
 }
 
+
+
 .preview-image-full {
-  max-width: 100%;
-  max-height: 100%;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
   user-select: none;
+  display: block;
+  margin: auto;
 }
 
 /* 响应式样式 */

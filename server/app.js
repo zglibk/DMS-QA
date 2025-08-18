@@ -178,11 +178,27 @@ app.use('/api/publishing-exceptions', publishingExceptionsRouter);
  * 安全考虑：
  * - 文件路径限制在指定目录内
  * - Express.static自动处理路径遍历攻击
+ * - 添加CORS头解决跨域访问问题
  */
-app.use('/files/attachments', express.static(path.join(__dirname, 'uploads/attachments')));
-app.use('/files/site-images', express.static(path.join(__dirname, 'uploads/site-images')));
-app.use('/files/rework-attachments', express.static(path.join(__dirname, 'uploads/rework-attachments')));
-app.use('/uploads/complaints', express.static(path.join(__dirname, 'uploads/complaints')));
+
+// 静态文件CORS中间件
+const staticCorsMiddleware = (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept');
+  res.header('Cross-Origin-Resource-Policy', 'cross-origin');
+  
+  if (req.method === 'OPTIONS') {
+    res.sendStatus(200);
+  } else {
+    next();
+  }
+};
+
+app.use('/files/attachments', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/attachments')));
+app.use('/files/site-images', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/site-images')));
+app.use('/files/rework-attachments', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/rework-attachments')));
+app.use('/uploads/complaints', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/complaints')));
 
 // 添加共享文件访问路由
 app.use('/shared-files', require('./routes/shared-files'));

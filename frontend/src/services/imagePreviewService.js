@@ -26,6 +26,11 @@ class ImagePreviewService {
       return true
     }
 
+    // 如果是base64图片数据，检查MIME类型
+    if (filePath.startsWith('data:image/')) {
+      return true
+    }
+
     const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg']
     const extension = filePath.toLowerCase().substring(filePath.lastIndexOf('.'))
     return imageExtensions.includes(extension)

@@ -261,13 +261,6 @@ class ApiService {
   }
 
   /**
-   * 获取baseURL属性（兼容性方法）
-   */
-  get baseURL() {
-    return this.currentBaseURL
-  }
-
-  /**
    * 获取API状态信息
    */
   async getStatus() {
