@@ -786,9 +786,6 @@ router.get('/:id', async (req, res) => {
 
 /**
  * 创建新的出版异常记录
- */
-/**
- * 创建新的出版异常记录
  * 支持所有字段包括错误类型(error_type)
  * 接收已上传的图片路径
  */
@@ -1156,11 +1153,12 @@ router.delete('/:id', async (req, res) => {
 });
 
 /**
- * 获取数据统计 - 本月新增和成本损失
+ * 获取数据统计 - 本月新增、成本损失、按错误类型统计、成本趋势
  */
 router.get('/statistics/summary', async (req, res) => {
   try {
     const pool = await getConnection();
+    const { startDate, endDate, responsibleUnit, errorType } = req.query;
     
     // 获取当前月份的开始和结束日期
     const now = new Date();
@@ -1170,6 +1168,30 @@ router.get('/statistics/summary', async (req, res) => {
     const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
     const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
     const monthEnd = `${nextYear}-${nextMonth.toString().padStart(2, '0')}-01`;
+    
+    // 构建筛选条件
+    let whereConditions = ['isDeleted = 0'];
+    let filterParams = [];
+    
+    if (startDate && endDate) {
+      whereConditions.push('registration_date >= @startDate AND registration_date <= @endDate');
+      filterParams.push(
+        { name: 'startDate', type: sql.Date, value: startDate },
+        { name: 'endDate', type: sql.Date, value: endDate }
+      );
+    }
+    
+    if (responsibleUnit) {
+      whereConditions.push('responsible_unit = @responsibleUnit');
+      filterParams.push({ name: 'responsibleUnit', type: sql.NVarChar, value: responsibleUnit });
+    }
+    
+    if (errorType) {
+      whereConditions.push('error_type = @errorType');
+      filterParams.push({ name: 'errorType', type: sql.NVarChar, value: errorType });
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
     
     // 本月新增统计
     const monthlyNewQuery = `
@@ -1198,12 +1220,54 @@ router.get('/statistics/summary', async (req, res) => {
     
     const costLossRequest = pool.request();
     const costLossResult = await costLossRequest.query(costLossQuery);
+    
+    // 按错误类型统计（基于筛选条件）
+    const errorTypeQuery = `
+      SELECT 
+        ISNULL(error_type, '未分类') as error_type,
+        COUNT(*) as count
+      FROM publishing_exceptions 
+      WHERE ${whereClause}
+      GROUP BY error_type
+      ORDER BY count DESC
+    `;
+    
+    const errorTypeRequest = pool.request();
+    filterParams.forEach(param => {
+      errorTypeRequest.input(param.name, param.type, param.value);
+    });
+    const errorTypeResult = await errorTypeRequest.query(errorTypeQuery);
+    
+    // 获取筛选条件所在年度的成本损失趋势
+    let trendYear = currentYear;
+    if (startDate) {
+      trendYear = new Date(startDate).getFullYear();
+    }
+    
+    const costTrendQuery = `
+      SELECT 
+        CONVERT(VARCHAR(7), registration_date, 120) as month,
+        SUM(ISNULL(amount, 0)) as cost_loss
+      FROM publishing_exceptions 
+      WHERE isDeleted = 0 
+        AND YEAR(registration_date) = @trendYear
+        AND responsible_unit != '供应商'
+        AND responsible_unit IS NOT NULL
+      GROUP BY CONVERT(VARCHAR(7), registration_date, 120)
+      ORDER BY month
+    `;
+    
+    const costTrendRequest = pool.request()
+      .input('trendYear', sql.Int, trendYear);
+    const costTrendResult = await costTrendRequest.query(costTrendQuery);
 
     res.json({
       success: true,
       data: {
         monthly_new: monthlyNewResult.recordset[0].monthly_new_count || 0,
-        cost_loss: costLossResult.recordset[0].cost_loss_amount || 0
+        cost_loss: costLossResult.recordset[0].cost_loss_amount || 0,
+        byErrorType: errorTypeResult.recordset || [],
+        costTrend: costTrendResult.recordset || []
       }
     });
   } catch (error) {

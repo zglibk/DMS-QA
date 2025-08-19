@@ -3,16 +3,35 @@
     <AppHeader />
     <el-container>
       <el-aside width="200px">
-        <!-- 左侧边栏占位 -->
-        <el-card class="sidebar-placeholder" shadow="never">
-          <div class="placeholder-content">
-            <el-icon><Filter /></el-icon>
-            <span>筛选区域</span>
+        <!-- 数据统计卡片 -->
+        <el-card class="stat-card sidebar-stat-card sidebar-stat-card-blue" shadow="hover" style="margin-bottom: 15px;">
+          <div class="stat-item">
+            <div class="stat-icon">
+              <el-icon :size="20" color="#409EFF"><Plus /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ statistics.monthly_new || 0 }}</div>
+              <div class="stat-label">本月新增</div>
+            </div>
+          </div>
+        </el-card>
+        
+        <el-card class="stat-card sidebar-stat-card sidebar-stat-card-orange" shadow="hover" style="margin-bottom: 15px;">
+          <div class="stat-item">
+            <div class="stat-icon">
+              <el-icon :size="20" color="#E6A23C"><Money /></el-icon>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">¥{{ formatNumber(statistics.cost_loss || 0) }}</div>
+              <div class="stat-label">成本损失</div>
+            </div>
           </div>
         </el-card>
       </el-aside>
       
       <el-main>
+
+        
         <!-- 筛选卡片 -->
         <el-card class="filter-card" shadow="hover">
           <template #header>
@@ -246,42 +265,23 @@
           <!-- 数据统计标签页 -->
           <el-tab-pane label="数据统计" name="statistics">
             <div class="statistics-content">
-              <!-- 统计卡片 -->
-              <el-row :gutter="20" class="stats-cards">
-                <el-col :span="12">
-                  <el-card class="stat-card">
-                    <div class="stat-item">
-                      <div class="stat-value">{{ statistics.monthly_new || 0 }}</div>
-                      <div class="stat-label">本月新增</div>
-                    </div>
-                  </el-card>
-                </el-col>
-                <el-col :span="12">
-                  <el-card class="stat-card">
-                    <div class="stat-item">
-                      <div class="stat-value">¥{{ formatNumber(statistics.cost_loss || 0) }}</div>
-                      <div class="stat-label">成本损失</div>
-                    </div>
-                  </el-card>
-                </el-col>
-              </el-row>
               
               <!-- 图表区域 -->
               <el-row :gutter="20" class="charts-row">
                 <el-col :span="12">
                   <el-card class="chart-card">
                     <template #header>
-                      <span>按责任单位统计</span>
+                      <span>按错误类型统计</span>
                     </template>
-                    <div ref="unitChartRef" class="chart-container"></div>
+                    <div ref="errorTypeChartRef" class="chart-container"></div>
                   </el-card>
                 </el-col>
                 <el-col :span="12">
                   <el-card class="chart-card">
                     <template #header>
-                      <span>按月份统计</span>
+                      <span>年度成本损失趋势</span>
                     </template>
-                    <div ref="monthlyChartRef" class="chart-container"></div>
+                    <div ref="costTrendChartRef" class="chart-container"></div>
                   </el-card>
                 </el-col>
               </el-row>
@@ -313,23 +313,7 @@
           </div>
         </el-card>
         
-        <!-- 统计信息卡片 -->
-        <el-card class="info-card" shadow="hover" style="margin-top: 20px;">
-          <template #header>
-            <span>统计信息</span>
-          </template>
-          
-          <div class="info-items">
-            <div class="info-item">
-              <span class="info-label">本月新增:</span>
-              <span class="info-value stat-number">{{ statistics.monthly_new || 0 }}</span>
-            </div>
-            <div class="info-item">
-              <span class="info-label">成本损失:</span>
-              <span class="info-value stat-number">{{ formatAmount(statistics.cost_loss || 0) }}</span>
-            </div>
-          </div>
-        </el-card>
+        <!-- 统计信息卡片已移动到页面顶部 -->
       </el-aside>
     </el-container>
     
@@ -705,10 +689,10 @@
  * 5. 数据导出功能
  */
 
-import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Search, Plus, Delete, Download, View, Edit, Refresh, Filter, Picture, Check, DocumentAdd, Close, InfoFilled
+  Search, Plus, Delete, Download, View, Edit, Refresh, Filter, Picture, Check, DocumentAdd, Close, InfoFilled, Money
 } from '@element-plus/icons-vue'
 import AppHeader from '@/components/common/AppHeader.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
@@ -753,14 +737,16 @@ const pagination = reactive({
 const statistics = ref({
   summary: {},
   byUnit: [],
-  byMonth: []
+  byMonth: [],
+  byErrorType: [],  // 按错误类型统计
+  costTrend: []     // 成本损失趋势
 })
 
 // 图表引用
-const unitChartRef = ref()
-const monthlyChartRef = ref()
-let unitChart = null
-let monthlyChart = null
+const errorTypeChartRef = ref()
+const costTrendChartRef = ref()
+let errorTypeChart = null
+let costTrendChart = null
 
 // 对话框状态
 const dialogVisible = ref(false)
@@ -934,6 +920,10 @@ const fetchStatistics = async () => {
       params.responsibleUnit = filters.responsibleUnit
     }
     
+    if (filters.errorType) {
+      params.errorType = filters.errorType
+    }
+    
     const response = await apiService.get('/publishing-exceptions/statistics/summary', { params })
     
     if (response.data.success) {
@@ -953,56 +943,161 @@ const fetchStatistics = async () => {
  * 更新图表
  */
 const updateCharts = () => {
-  // 责任单位统计图表
-  if (unitChartRef.value && statistics.value.byUnit) {
-    if (!unitChart) {
-      unitChart = echarts.init(unitChartRef.value)
-    }
+
+  
+  // 按错误类型统计图表
+  if (errorTypeChartRef.value && statistics.value.byErrorType) {
+  
     
-    const unitOption = {
-      tooltip: {
-        trigger: 'item',
-        formatter: '{a} <br/>{b}: {c} ({d}%)'
-      },
-      series: [{
-        name: '异常数量',
-        type: 'pie',
-        radius: '50%',
-        data: statistics.value.byUnit.map(item => ({
-          name: item.responsible_unit,
-          value: item.count
-        }))
-      }]
+    try {
+      if (!errorTypeChart) {
+        errorTypeChart = echarts.init(errorTypeChartRef.value, null, {
+          width: 'auto',
+          height: 'auto'
+        })
+
+      }
+      
+      const errorTypeOption = {
+        title: {
+          show: false
+        },
+        tooltip: {
+          trigger: 'item',
+          formatter: '{a} <br/>{b}: {c}件 ({d}%)'
+        },
+        legend: {
+          orient: 'vertical',
+          left: 'left',
+          top: 'middle'
+        },
+        series: [{
+          name: '异常数量',
+          type: 'pie',
+          radius: ['40%', '70%'],
+          center: ['60%', '50%'],
+          avoidLabelOverlap: false,
+          itemStyle: {
+            borderRadius: 10,
+            borderColor: '#fff',
+            borderWidth: 2
+          },
+          label: {
+            show: false,
+            position: 'center'
+          },
+          emphasis: {
+            label: {
+              show: true,
+              fontSize: '18',
+              fontWeight: 'bold'
+            }
+          },
+          labelLine: {
+            show: false
+          },
+          data: statistics.value.byErrorType.map(item => ({
+            name: item.error_type || '未分类',
+            value: item.count
+          }))
+        }]
+      }
+      
+      errorTypeChart.setOption(errorTypeOption)
+      // 强制调用resize确保图表适应容器
+      setTimeout(() => {
+        errorTypeChart.resize()
+      }, 100)
+      
+    } catch (error) {
+      console.error('错误类型图表初始化失败:', error)
     }
-    
-    unitChart.setOption(unitOption)
   }
   
-  // 月份统计图表
-  if (monthlyChartRef.value && statistics.value.byMonth) {
-    if (!monthlyChart) {
-      monthlyChart = echarts.init(monthlyChartRef.value)
-    }
+  // 年度成本损失趋势图表
+  if (costTrendChartRef.value && statistics.value.costTrend && statistics.value.costTrend.length > 0) {
     
-    const monthlyOption = {
-      tooltip: {
-        trigger: 'axis'
-      },
-      xAxis: {
-        type: 'category',
-        data: statistics.value.byMonth.map(item => item.month)
-      },
-      yAxis: {
-        type: 'value'
-      },
-      series: [{
-        name: '异常数量',
-        type: 'bar',
-        data: statistics.value.byMonth.map(item => item.count)
-      }]
-    }
     
-    monthlyChart.setOption(monthlyOption)
+    try {
+      if (!costTrendChart) {
+        costTrendChart = echarts.init(costTrendChartRef.value, null, {
+          width: 'auto',
+          height: 'auto'
+        })
+
+      }
+      
+      const costTrendOption = {
+        title: {
+          show: false
+        },
+        tooltip: {
+          trigger: 'axis',
+          formatter: function(params) {
+            return params[0].name + '<br/>' + 
+                   params[0].seriesName + ': ¥' + 
+                   (params[0].value || 0).toLocaleString()
+          }
+        },
+        grid: {
+          left: '3%',
+          right: '4%',
+          bottom: '3%',
+          containLabel: true
+        },
+        xAxis: {
+          type: 'category',
+          boundaryGap: false,
+          data: statistics.value.costTrend.map(item => item.month || item.period)
+        },
+        yAxis: {
+          type: 'value',
+          axisLabel: {
+            formatter: function(value) {
+              return '¥' + (value / 1000).toFixed(0) + 'K'
+            }
+          }
+        },
+        series: [{
+          name: '成本损失',
+          type: 'line',
+          smooth: true,
+          symbol: 'circle',
+          symbolSize: 6,
+          lineStyle: {
+            color: '#ff6b6b',
+            width: 3
+          },
+          itemStyle: {
+            color: '#ff6b6b'
+          },
+          areaStyle: {
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 0,
+              y2: 1,
+              colorStops: [{
+                offset: 0, color: 'rgba(255, 107, 107, 0.3)'
+              }, {
+                offset: 1, color: 'rgba(255, 107, 107, 0.1)'
+              }]
+            }
+          },
+          data: statistics.value.costTrend.map(item => item.cost_loss || 0)
+        }]
+      }
+      
+      costTrendChart.setOption(costTrendOption)
+      // 强制调用resize确保图表适应容器
+      setTimeout(() => {
+        costTrendChart.resize()
+      }, 100)
+      
+    } catch (error) {
+      console.error('成本趋势图表初始化失败:', error)
+    }
   }
 }
 
@@ -1109,7 +1204,10 @@ const handleFormWorkOrderInput = (value) => {
  */
 const handleTabClick = (tab) => {
   if (tab.props.name === 'statistics') {
-    fetchStatistics()
+    // 使用nextTick确保DOM已渲染完成
+    nextTick(() => {
+      fetchStatistics()
+    })
   }
 }
 
@@ -2002,12 +2100,56 @@ const handleFilePreview = (fileInfo, url) => {
   }
 }
 
+// 监听activeTab变化，确保图表正确初始化
+watch(activeTab, (newTab) => {
+  if (newTab === 'statistics') {
+    nextTick(() => {
+      fetchStatistics()
+    })
+  }
+})
+
+/**
+ * 窗口大小变化处理函数
+ * 确保图表能够自适应容器大小变化
+ */
+const handleResize = () => {
+  // 延迟执行，确保容器尺寸已更新
+  setTimeout(() => {
+    if (errorTypeChart) {
+      errorTypeChart.resize()
+    }
+    if (costTrendChart) {
+      costTrendChart.resize()
+    }
+  }, 100)
+}
+
 // 组件挂载时获取数据
 onMounted(() => {
   fetchDepartments()
   fetchProductNames() // 获取产品名称列表
   fetchData()
   fetchStatistics() // 页面加载时获取统计数据
+  
+  // 添加窗口大小变化监听器
+  window.addEventListener('resize', handleResize)
+})
+
+// 组件卸载时清理监听器
+onUnmounted(() => {
+  // 移除窗口大小变化监听器
+  window.removeEventListener('resize', handleResize)
+  
+  // 销毁图表实例
+  if (errorTypeChart) {
+    errorTypeChart.dispose()
+    errorTypeChart = null
+  }
+  if (costTrendChart) {
+    costTrendChart.dispose()
+    costTrendChart = null
+  }
 })
 </script>
 
@@ -2060,7 +2202,7 @@ onMounted(() => {
   border: none;
   border-radius: 0;
   font-weight: 500;
-  font-size: 14px;
+  font-size: 16px;
   color: #666;
   background: transparent;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
@@ -2093,7 +2235,7 @@ onMounted(() => {
 }
 
 .el-tabs :deep(.el-tab-pane) {
-  padding: 25px;
+  /* padding: 25px; */
   animation: fadeInUp 0.5s ease-out;
 }
 
@@ -2130,7 +2272,7 @@ onMounted(() => {
   .el-tabs :deep(.el-tabs__item) {
     padding: 0 15px;
     margin-right: 5px;
-    font-size: 13px;
+    font-size: 14px;
   }
   
   .el-tabs :deep(.el-tabs__header) {
@@ -2228,10 +2370,19 @@ onMounted(() => {
   align-items: center;
 }
 
+/* 记录清单内容区域样式 */
+.records-content {
+  margin-top: 20px;
+}
+
 .toolbar {
   margin-bottom: 20px;
   display: flex;
   gap: 10px;
+}
+
+.toolbar .el-button:first-child {
+  margin-left: 20px;
 }
 
 .pagination-wrapper {
@@ -2257,7 +2408,7 @@ onMounted(() => {
 }
 
 .stat-value {
-  font-size: 28px;
+  font-size: 24px;
   font-weight: bold;
   color: #409EFF;
   margin-bottom: 8px;
@@ -2268,8 +2419,113 @@ onMounted(() => {
   color: #666;
 }
 
-.charts-row {
-  margin-top: 20px;
+/* 侧边栏统计卡片样式 */
+.sidebar-stat-card {
+  text-align: center;
+  background: rgba(64, 158, 255, 0.1);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border: 1px solid rgba(64, 158, 255, 0.3);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.sidebar-stat-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(64, 158, 255, 0.3);
+  background: rgba(64, 158, 255, 0.2);
+  border-color: rgba(64, 158, 255, 0.5);
+}
+
+
+
+.sidebar-stat-card .stat-item {
+  padding: 5px;
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sidebar-stat-card .stat-item:not(:last-child) {
+  border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+}
+
+.sidebar-stat-card .stat-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: rgba(64, 158, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+}
+
+.sidebar-stat-card:hover .stat-icon {
+  transform: scale(1.1);
+  background: rgba(64, 158, 255, 0.2);
+}
+
+.sidebar-stat-card .stat-content {
+  flex: 1;
+  text-align: left;
+}
+
+.sidebar-stat-card .stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #409EFF;
+  margin-bottom: 4px;
+  word-break: break-all;
+  line-height: 1.2;
+  transition: all 0.3s ease;
+}
+
+.sidebar-stat-card:hover .stat-value {
+  transform: scale(1.05);
+}
+
+.sidebar-stat-card .stat-label {
+  font-size: 11px;
+  color: #606266;
+  line-height: 1.2;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  opacity: 0.8;
+  transition: opacity 0.3s ease;
+}
+
+.sidebar-stat-card:hover .stat-label {
+  opacity: 1;
+}
+
+/* 蓝色统计卡片 */
+.sidebar-stat-card-blue {
+  background: rgba(64, 158, 255, 0.1);
+  border-color: rgba(64, 158, 255, 0.3);
+}
+
+.sidebar-stat-card-blue:hover {
+  background: rgba(64, 158, 255, 0.2);
+  border-color: rgba(64, 158, 255, 0.5);
+}
+
+
+
+/* 橙色统计卡片 */
+.sidebar-stat-card-orange {
+  background: rgba(230, 162, 60, 0.1);
+  border-color: rgba(230, 162, 60, 0.3);
+}
+
+.sidebar-stat-card-orange:hover {
+  background: rgba(230, 162, 60, 0.2);
+  border-color: rgba(230, 162, 60, 0.5);
 }
 
 .chart-card {
@@ -2277,7 +2533,42 @@ onMounted(() => {
 }
 
 .chart-container {
+  width: 100%;
   height: 300px;
+  min-height: 300px;
+  position: relative;
+}
+
+/* 图表响应式布局 */
+.charts-row {
+  margin-bottom: 20px;
+}
+
+.charts-row .el-col {
+  margin-bottom: 20px;
+}
+
+/* 响应式图表容器 */
+@media (max-width: 1200px) {
+  .chart-container {
+    height: 280px;
+    min-height: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .charts-row .el-col {
+    margin-bottom: 30px;
+  }
+  
+  .chart-container {
+    height: 250px;
+    min-height: 250px;
+  }
+  
+  .chart-card {
+    height: 350px;
+  }
 }
 
 .quick-actions-card {
