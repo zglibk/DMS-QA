@@ -436,6 +436,7 @@ defineExpose({
               :accept="accept"
               :multiple="multiple"
               @change="onUpload($event, n - 1)"
+              title="选择异常图片"
               style="display: none"
             />
             <div>
@@ -445,7 +446,7 @@ defineExpose({
               <p class="upload-tip">
                 <slot>{{ tip }}</slot>
               </p>
-              <div v-if="enablePaste && !disabled" class="paste-hint">或按 Ctrl+V 粘贴</div>
+              <div v-if="enablePaste && !disabled" class="paste-hint">或 Ctrl+V 粘贴</div>
             </div>
           </div>
           <div v-show="uploading[n - 1]" class="file-uploading">
@@ -528,12 +529,15 @@ defineExpose({
     width: 100px;
     height: 100px;
     border-radius: 8px;
-    border: 1px dashed #d9d9d9;
-    background-color: rgba(0, 0, 0, 0.02);
+    border: 2px dashed #d9d9d9;
+    background-color: rgba(64, 158, 255, 0.05);
     cursor: pointer;
-    transition: border-color 0.3s;
+    transition: all 0.3s ease;
     &:hover {
-      border-color: #1890ff;
+      border-color: #409EFF;
+      background-color: rgba(64, 158, 255, 0.1);
+      transform: translateY(-1px);
+      box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
     }
     .plus-svg {
       display: inline-block;
@@ -545,14 +549,16 @@ defineExpose({
       margin: 2px 0 0 0;
       padding: 0;
       font-size: 14px;
-      color: rgba(0, 0, 0, 0.88);
+      color: #409EFF;
       line-height: 1.2;
+      font-weight: 500;
     }
     .paste-hint {
       margin-top: 4px;
-      color: #999;
+      color: #F56C6C;
       font-size: 12px;
       font-style: italic;
+      font-weight: 500;
     }
   }
   .upload-disabled {

@@ -267,13 +267,18 @@ router.get('/', async (req, res) => {
 /**
  * 导出出版异常数据到Excel
  * 包含所有字段，包括错误类型(error_type)
+ * 支持includeImages参数，当为true时包含图片信息
  */
 router.get('/export', async (req, res) => {
   const { executeQuery } = require('../db');
-  const ExcelJS = require('exceljs');
+  const xl = require('excel4node');
   
   try {
     console.log('开始导出出版异常数据...');
+    
+    // 获取includeImages参数
+    const includeImages = req.query.includeImages === 'true';
+    console.log('是否包含图片:', includeImages);
     
     // 获取所有数据
     const result = await executeQuery(async (pool) => {
@@ -297,6 +302,7 @@ router.get('/export', async (req, res) => {
           area_cm2,
           unit_price,
           amount,
+          ${includeImages ? 'image_path,' : ''}
           created_date,
           updated_date
         FROM publishing_exceptions 
@@ -308,33 +314,150 @@ router.get('/export', async (req, res) => {
     });
 
     // 创建工作簿和工作表
-    const workbook = new ExcelJS.Workbook();
+    const workbook = new xl.Workbook();
     const worksheet = workbook.addWorksheet('出版异常数据');
     
-    // 定义表头
+    // 定义表头 - 根据是否包含图片动态调整
     const headers = [
       '登记日期', '出版日期', '客户代码', '工单号', '产品名称', '版型', 
       '出版张数', '异常描述', '错误类型', '责任单位', '责任人', '长度(cm)', '宽度(cm)', 
-      '件数', '面积(cm²)', '单价', '金额', '创建时间', '更新时间'
+      '件数', '面积(cm²)', '单价', '金额'
     ];
     
-    // 设置表头
-    worksheet.addRow(headers);
-    
-    // 设置表头样式
-    const headerRow = worksheet.getRow(1);
-    headerRow.height = 25;
-    
-    // 设置表头背景色填充范围为A到有内容的最大列
-    for (let col = 1; col <= headers.length; col++) {
-      const cell = worksheet.getCell(1, col);
-      cell.font = { name: 'Arial', size: 10, bold: true, color: { argb: 'FFFFFFFF' } };
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF339966' } };
-      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    // 如果包含图片，在金额后添加图片列
+    if (includeImages) {
+      headers.push('图片信息');
     }
     
+    headers.push('创建时间', '更新时间');
+    
+    // 创建表头样式
+    const headerStyle = workbook.createStyle({
+      font: {
+        name: 'Arial',
+        size: 10,
+        bold: true,
+        color: '#FFFFFF'
+      },
+      fill: {
+        type: 'pattern',
+        patternType: 'solid',
+        fgColor: '#339966'
+      },
+      alignment: {
+        vertical: 'center',
+        horizontal: 'center'
+      },
+      border: {
+        left: { style: 'thin', color: '#339966' },
+        right: { style: 'thin', color: '#339966' },
+        top: { style: 'thin', color: '#339966' },
+        bottom: { style: 'thin', color: '#339966' }
+      }
+    });
+    
+    // 设置表头
+    headers.forEach((header, index) => {
+      worksheet.cell(1, index + 1)
+        .string(header)
+        .style(headerStyle);
+    });
+    
+    // 设置表头行高
+    worksheet.row(1).setHeight(25);
+    
+    // 创建数据行样式
+    const dataStyle = workbook.createStyle({
+      font: {
+        name: 'Arial',
+        size: 10,
+        color: '#737682'
+      },
+      alignment: {
+        vertical: 'center',
+        horizontal: 'center'
+      },
+      border: {
+        left: { style: 'thin', color: '#339966' },
+        right: { style: 'thin', color: '#339966' },
+        top: { style: 'thin', color: '#339966' },
+        bottom: { style: 'thin', color: '#339966' }
+      }
+    });
+    
+    // 创建左对齐样式
+    const leftAlignStyle = workbook.createStyle({
+      font: {
+        name: 'Arial',
+        size: 10,
+        color: '#737682'
+      },
+      alignment: {
+        vertical: 'center',
+        horizontal: 'left'
+      },
+      border: {
+        left: { style: 'thin', color: '#339966' },
+        right: { style: 'thin', color: '#339966' },
+        top: { style: 'thin', color: '#339966' },
+        bottom: { style: 'thin', color: '#339966' }
+      }
+    });
+    
+    // 创建隔行变色样式
+    const alternateRowStyle = workbook.createStyle({
+      font: {
+        name: 'Arial',
+        size: 10,
+        color: '#737682'
+      },
+      alignment: {
+        vertical: 'center',
+        horizontal: 'center'
+      },
+      fill: {
+        type: 'pattern',
+        patternType: 'solid',
+        fgColor: '#E2F3D9'
+      },
+      border: {
+        left: { style: 'thin', color: '#339966' },
+        right: { style: 'thin', color: '#339966' },
+        top: { style: 'thin', color: '#339966' },
+        bottom: { style: 'thin', color: '#339966' }
+      }
+    });
+    
+    // 创建隔行变色左对齐样式
+    const alternateLeftAlignStyle = workbook.createStyle({
+      font: {
+        name: 'Arial',
+        size: 10,
+        color: '#737682'
+      },
+      alignment: {
+        vertical: 'center',
+        horizontal: 'left'
+      },
+      fill: {
+        type: 'pattern',
+        patternType: 'solid',
+        fgColor: '#E2F3D9'
+      },
+      border: {
+        left: { style: 'thin', color: '#339966' },
+        right: { style: 'thin', color: '#339966' },
+        top: { style: 'thin', color: '#339966' },
+        bottom: { style: 'thin', color: '#339966' }
+      }
+    });
+
     // 添加数据行
-    result.recordset.forEach((row, index) => {
+    for (let index = 0; index < result.recordset.length; index++) {
+      const row = result.recordset[index];
+      const rowIndex = index + 2; // 数据从第2行开始
+      const isAlternateRow = (index + 1) % 2 === 0;
+      
       const dataRow = [
         row.registration_date ? new Date(row.registration_date).toLocaleDateString('zh-CN') : '',
         row.publishing_date ? new Date(row.publishing_date).toLocaleDateString('zh-CN') : '',
@@ -352,99 +475,279 @@ router.get('/export', async (req, res) => {
         row.piece_count || '',
         row.area_cm2 || '',
         row.unit_price ? `¥${parseFloat(row.unit_price).toFixed(4)}` : '',
-        row.amount ? `¥${parseFloat(row.amount).toFixed(2)}` : '¥0.00',
-        row.created_date ? new Date(row.created_date).toLocaleString('zh-CN') : '',
-        row.updated_date ? new Date(row.updated_date).toLocaleString('zh-CN') : ''
+        row.amount ? `¥${parseFloat(row.amount).toFixed(2)}` : '¥0.00'
       ];
       
-      const excelRow = worksheet.addRow(dataRow);
-      
-      // 设置数据行样式
-      excelRow.font = { name: 'Arial', size: 10, color: { argb: 'FF737682' } }; // RGB(115, 118, 122)
-      excelRow.alignment = { vertical: 'middle', horizontal: 'center' };
-      excelRow.height = 18;
-      
-      // 设置产品名称列（第5列）左对齐
-      const productNameCell = worksheet.getCell(index + 2, 5);
-      productNameCell.alignment = { vertical: 'middle', horizontal: 'left' };
-      
-      // 设置异常描述列（第8列）左对齐
-      const exceptionDescCell = worksheet.getCell(index + 2, 8);
-      exceptionDescCell.alignment = { vertical: 'middle', horizontal: 'left' };
-      
-      // 设置错误类型列（第9列）左对齐
-      const errorTypeCell = worksheet.getCell(index + 2, 9);
-      errorTypeCell.alignment = { vertical: 'middle', horizontal: 'left' };
-      
-      // 隔行变色 - 只填充有内容的列范围
-      if ((index + 1) % 2 === 0) {
-        // 获取有内容的列数（表头列数）
-        const maxCol = headers.length;
-        for (let col = 1; col <= maxCol; col++) {
-          const cell = worksheet.getCell(index + 2, col); // index+2因为表头占第1行，数据从第2行开始
-          cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFE2F3D9' } };
+      // 如果包含图片，添加图片信息列
+      if (includeImages) {
+        // 处理图片路径信息，将图片插入到Excel中
+        let imageInfo = '无图片';
+        if (row.image_path) {
+          try {
+            const imagePaths = JSON.parse(row.image_path);
+            if (Array.isArray(imagePaths) && imagePaths.length > 0) {
+              let insertedCount = 0;
+              const failedImages = [];
+              
+              // 用于记录每张图片的实际宽度，以便正确计算后续图片的位置
+              const imageWidths = [];
+              
+              // 定义异步图片处理函数
+              const processImage = async (image, imgIndex) => {
+                const imagePath = path.join(__dirname, '../uploads/site-images/publishing-exception', image.filename);
+                
+                if (!fs.existsSync(imagePath)) {
+                  return { success: false, error: image.originalName || image.name || '未知文件' };
+                }
+                
+                try {
+                  // 获取图片原始尺寸并计算等比缩放后的尺寸
+                  const sharp = require('sharp');
+                  
+                  // 设置统一的图片显示尺寸（像素）- 单行排列
+                  const fixedImageHeight = 50; // 统一高度
+                  const margin = 3; // 图片间距
+                  
+                  let finalWidth = 55; // 默认宽度
+                  let finalHeight = fixedImageHeight; // 统一高度
+                  
+                  // 使用sharp库获取图片原始尺寸并计算等比缩放宽度
+                  try {
+                    const metadata = await sharp(imagePath).metadata();
+                    const originalWidth = metadata.width;
+                    const originalHeight = metadata.height;
+                    
+                    if (originalWidth && originalHeight) {
+                      // 根据固定高度计算等比缩放后的宽度
+                      const scale = fixedImageHeight / originalHeight;
+                      finalWidth = Math.floor(originalWidth * scale);
+                      
+                      // 限制最大宽度，避免图片过宽
+                      const maxImageWidth = 80;
+                      if (finalWidth > maxImageWidth) {
+                        finalWidth = maxImageWidth;
+                      }
+                    }
+                  } catch (sharpError) {
+                    console.warn('无法获取图片尺寸，使用默认尺寸:', sharpError.message);
+                  }
+                  
+                  // 记录当前图片的宽度
+                  imageWidths[imgIndex] = finalWidth;
+                  
+                  // 单行布局：所有图片排在同一行，从左到右排列
+                  // 计算当前图片在单行中的水平位置
+                  const leftMargin = 5; // 第一个图片的左边距
+                  const topMargin = 3; // 第一个图片的上边距
+                  
+                  let startX = leftMargin; // 从左边距开始
+                  for (let i = 0; i < imgIndex; i++) {
+                    // 累加前面图片的实际宽度和间距
+                    startX += (imageWidths[i] || 55) + margin;
+                  }
+                  
+                  const startY = topMargin; // 添加上边距
+                  const endX = startX + finalWidth;
+                  const endY = startY + finalHeight;
+                  
+                  // 转换为EMU单位（1像素 = 9525 EMU）
+                  const emuPerPixel = 9525;
+                  const imageColIndex = 18; // 图片列索引
+                  
+                  // 使用twoCellAnchor方式添加图片
+                  const imageObj = worksheet.addImage({
+                    path: imagePath,
+                    type: 'picture',
+                    position: {
+                      type: 'twoCellAnchor',
+                      from: {
+                        col: imageColIndex,
+                        colOff: Math.round(startX * emuPerPixel),
+                        row: rowIndex,
+                        rowOff: Math.round(startY * emuPerPixel)
+                      },
+                      to: {
+                        col: imageColIndex,
+                        colOff: Math.round(endX * emuPerPixel),
+                        row: rowIndex,
+                        rowOff: Math.round(endY * emuPerPixel)
+                      }
+                    }
+                  });
+                  
+                  return { success: true, width: finalWidth };
+                } catch (imageError) {
+                  console.error('插入图片失败:', imageError);
+                  return { success: false, error: image.originalName || image.name || '未知文件' };
+                }
+              };
+              
+              // 处理所有图片，但限制在单元格内合理排列
+              for (let imgIndex = 0; imgIndex < Math.min(imagePaths.length, 4); imgIndex++) {
+                const image = imagePaths[imgIndex];
+                const result = await processImage(image, imgIndex);
+                
+                if (result.success) {
+                  insertedCount++;
+                } else {
+                  failedImages.push(result.error);
+                }
+              }
+              
+              // 不在单元格中添加文字描述，只显示图片
+              imageInfo = '';
+            }
+          } catch (e) {
+            // 如果不是JSON格式，直接显示路径
+            imageInfo = row.image_path;
+          }
         }
+        dataRow.push(imageInfo);
       }
+      
+      // 添加创建时间和更新时间
+      dataRow.push(
+        row.created_date ? new Date(row.created_date).toLocaleString('zh-CN') : '',
+        row.updated_date ? new Date(row.updated_date).toLocaleString('zh-CN') : ''
+      );
+      
+      // 将数据写入单元格并应用样式
+      dataRow.forEach((cellValue, colIndex) => {
+        const cell = worksheet.cell(rowIndex, colIndex + 1);
+        
+        // 根据列类型设置不同的样式
+        let cellStyle;
+        if (colIndex === 4 || colIndex === 7 || colIndex === 8 || (includeImages && colIndex === 17)) {
+          // 产品名称、异常描述、错误类型、图片信息列使用左对齐
+          cellStyle = isAlternateRow ? alternateLeftAlignStyle : leftAlignStyle;
+        } else {
+          // 其他列使用居中对齐
+          cellStyle = isAlternateRow ? alternateRowStyle : dataStyle;
+        }
+        
+        if (typeof cellValue === 'string') {
+          cell.string(cellValue).style(cellStyle);
+        } else if (typeof cellValue === 'number') {
+          cell.number(cellValue).style(cellStyle);
+        } else {
+          cell.string(cellValue ? cellValue.toString() : '').style(cellStyle);
+        }
+      });
+      
+      // 设置行高
+      if (includeImages && row.image_path) {
+        try {
+          const imagePaths = JSON.parse(row.image_path);
+          if (Array.isArray(imagePaths) && imagePaths.length > 0) {
+            // 单行布局：所有图片都在同一行，行高根据图片高度设置
+            // Excel行高单位换算：1个Excel行高单位约等于1.33像素
+            // 图片高度50像素 + 适当边距 = 55像素
+            // 55像素 ÷ 1.33 ≈ 41个Excel行高单位（适当减小）
+            worksheet.row(rowIndex).setHeight(41);
+          } else {
+            worksheet.row(rowIndex).setHeight(18);
+          }
+        } catch (e) {
+          worksheet.row(rowIndex).setHeight(18);
+        }
+      } else {
+        worksheet.row(rowIndex).setHeight(18);
+      }
+    }
+    
+    // 计算每列的最大内容长度用于自动调整列宽
+    const columnMaxLengths = new Array(headers.length).fill(0);
+    
+    // 计算表头长度
+    headers.forEach((header, index) => {
+      columnMaxLengths[index] = Math.max(columnMaxLengths[index], header.toString().length);
+    });
+    
+    // 计算数据内容的最大长度
+    result.recordset.forEach((row) => {
+      const dataRow = [
+        row.registration_date ? new Date(row.registration_date).toLocaleDateString('zh-CN') : '',
+        row.publishing_date ? new Date(row.publishing_date).toLocaleDateString('zh-CN') : '',
+        row.customer_code || '',
+        row.work_order_number || '',
+        row.product_name || '',
+        row.plate_type || '',
+        row.publishing_sheets || '',
+        row.exception_description || '',
+        row.error_type || '',
+        row.responsible_unit || '',
+        row.responsible_person || '',
+        row.length_cm || '',
+        row.width_cm || '',
+        row.piece_count || '',
+        row.area_cm2 || '',
+        row.unit_price ? `¥${parseFloat(row.unit_price).toFixed(4)}` : '',
+        row.amount ? `¥${parseFloat(row.amount).toFixed(2)}` : '¥0.00'
+      ];
+      
+      // 如果包含图片，添加图片信息列
+      if (includeImages) {
+        // 图片信息列不添加文字描述，只保留空字符串
+        let imageInfo = '';
+        dataRow.push(imageInfo);
+      }
+      
+      // 添加创建时间和更新时间
+      dataRow.push(
+        row.created_date ? new Date(row.created_date).toLocaleString('zh-CN') : '',
+        row.updated_date ? new Date(row.updated_date).toLocaleString('zh-CN') : ''
+      );
+      
+      // 计算每列内容的长度
+      dataRow.forEach((cellValue, index) => {
+        if (index < columnMaxLengths.length) {
+          const cellLength = cellValue ? cellValue.toString().length : 0;
+          columnMaxLengths[index] = Math.max(columnMaxLengths[index], cellLength);
+        }
+      });
     });
     
     // 设置列宽
-    worksheet.columns.forEach((column, index) => {
-      // 产品名称列（第5列，索引4）设置为30
+    headers.forEach((header, index) => {
+      const colIndex = index + 1;
+      let width;
+      
+      // 产品名称列（第5列）：根据内容自动调整，最小20，最大40
       if (index === 4) {
-        column.width = 30;
+        width = Math.min(Math.max(columnMaxLengths[index] * 1.2, 20), 40);
       }
-      // 异常描述列（第8列，索引7）设置为35
+      // 异常描述列（第8列）：根据内容自动调整，最小25，最大50
       else if (index === 7) {
-        column.width = 35;
+        width = Math.min(Math.max(columnMaxLengths[index] * 1.1, 25), 50);
       }
-      // 责任单位列（第9列，索引8）设置为16.5
-      else if (index === 8) {
-        column.width = 16.5;
+      // 责任单位列（第10列）：根据内容自动调整，最小12，最大25
+      else if (index === 9) {
+        width = Math.min(Math.max(columnMaxLengths[index] * 1.3, 12), 25);
       }
-      // 其他列使用自动列宽
+      // 图片信息列（当包含图片时）设置为动态宽度以显示图片
+      else if (includeImages && index === 17) {
+        // Excel列宽单位换算：1个Excel列宽单位约等于7像素
+        // 4张图片(55px each) + 间距(3px each) + 边距(10px) = 240px
+        // 240px ÷ 7 ≈ 34个Excel列宽单位
+        width = 34;
+      }
+      // 其他列根据内容自动调整
       else {
-        let maxLength = 0;
-        
-        // 检查表头长度
-        if (headers[index]) {
-          maxLength = Math.max(maxLength, headers[index].toString().length);
-        }
-        
-        // 检查数据行长度
-        column.eachCell({ includeEmpty: false }, (cell) => {
-          const cellValue = cell.value ? cell.value.toString() : '';
-          maxLength = Math.max(maxLength, cellValue.length);
-        });
-        
-        // 设置列宽，最小8，最大50
-        column.width = Math.min(Math.max(maxLength + 2, 8), 50);
+        // 根据内容长度动态计算宽度，中文字符按1.5倍计算
+        const contentLength = columnMaxLengths[index];
+        width = Math.min(Math.max(contentLength * 1.2 + 2, 8), 35);
       }
+      
+      worksheet.column(colIndex).setWidth(width);
     });
-    
-    // 设置所有单元格边框
-    worksheet.eachRow((row, rowNumber) => {
-      row.eachCell((cell, colNumber) => {
-        cell.border = {
-          top: { style: 'thin', color: { argb: 'FF339966' } },
-          left: { style: 'thin', color: { argb: 'FF339966' } },
-          bottom: { style: 'thin', color: { argb: 'FF339966' } },
-          right: { style: 'thin', color: { argb: 'FF339966' } }
-        };
-      });
-    });
-
-    // 关闭网格线视图
-    worksheet.views = [{
-      showGridLines: false
-    }];
 
     // 设置响应头
-    const filename = `出版异常数据_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    const filename = `出版异常数据${includeImages ? '_含图片' : ''}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`); 
 
     // 生成Excel文件并发送
-    await workbook.xlsx.write(res);
+    workbook.write(filename, res);
     
     console.log(`导出完成，共 ${result.recordset.length} 条记录`);
 

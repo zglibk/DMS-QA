@@ -183,6 +183,7 @@
                 :data="tableData"
                 v-loading="loading"
                 @selection-change="handleSelectionChange"
+                @row-dblclick="handleRowDoubleClick"
                 stripe
                 border
                 style="font-family: 'Arial', 'Helvetica', sans-serif;"
@@ -398,11 +399,14 @@
               </el-input>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="16">
             <el-form-item label="产品名称" prop="product_name">
               <el-input v-model="formData.product_name" placeholder="请输入产品名称" />
             </el-form-item>
           </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="版类型">
               <el-select v-model="formData.plate_type" placeholder="请选择版类型" style="width: 100%">
@@ -413,9 +417,6 @@
               </el-select>
             </el-form-item>
           </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="出版张数">
               <el-input-number v-model="formData.publishing_sheets" :min="0" style="width: 100%" />
@@ -433,14 +434,14 @@
               </el-select>
             </el-form-item>
           </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="责任人" prop="responsible_person">
               <el-input v-model="formData.responsible_person" placeholder="请输入责任人" />
             </el-form-item>
           </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="件数">
               <el-input-number v-model="formData.piece_count" :min="0" style="width: 100%" />
@@ -451,14 +452,14 @@
               <el-input-number v-model="formData.length_cm" :min="0" :precision="2" style="width: 100%" />
             </el-form-item>
           </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="宽(cm)">
               <el-input-number v-model="formData.width_cm" :min="0" :precision="2" style="width: 100%" />
             </el-form-item>
           </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="数量cm²">
               <el-input-number v-model="formData.area_cm2" :min="0" :precision="2" style="width: 100%" readonly disabled />
@@ -469,36 +470,39 @@
               <el-input-number v-model="formData.unit_price" :min="0" :precision="4" style="width: 100%" />
             </el-form-item>
           </el-col>
+        </el-row>
+        <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="金额">
               <el-input-number v-model="formData.amount" :min="0" :precision="2" style="width: 100%" readonly disabled />
             </el-form-item>
           </el-col>
+          <el-col :span="8">
+            <!-- 错误类型选择器：用于分类管理出版异常的错误类型，支持搜索和清空 -->
+            <el-form-item label="错误类型" prop="error_type">
+              <el-select 
+                v-model="formData.error_type" 
+                placeholder="请选择错误类型" 
+                style="width: 100%"
+                filterable
+                clearable
+              >
+                <el-option label="排版变形" value="排版变形" />
+                <el-option label="分色偏差" value="分色偏差" />
+                <el-option label="套印偏差" value="套印偏差" />
+                <el-option label="排版错误" value="排版错误" />
+                <el-option label="出血位偏差" value="出血位偏差" />
+                <el-option label="内容错误" value="内容错误" />
+                <el-option label="图文残缺" value="图文残缺" />
+                <el-option label="多出版" value="多出版" />
+                <el-option label="漏出版" value="漏出版" />
+                <el-option label="其它" value="其它" />
+              </el-select>
+            </el-form-item>
+          </el-col>
         </el-row>
         
-        <!-- 错误类型选择器：用于分类管理出版异常的错误类型，支持搜索和清空 -->
-        <el-form-item label="错误类型" prop="error_type">
-          <el-select 
-            v-model="formData.error_type" 
-            placeholder="请选择错误类型" 
-            style="width: 100%"
-            filterable
-            clearable
-          >
-            <el-option label="排版变形" value="排版变形" />
-            <el-option label="分色偏差" value="分色偏差" />
-            <el-option label="套印偏差" value="套印偏差" />
-            <el-option label="排版错误" value="排版错误" />
-            <el-option label="出血位偏差" value="出血位偏差" />
-            <el-option label="内容错误" value="内容错误" />
-            <el-option label="图文残缺" value="图文残缺" />
-            <el-option label="多出版" value="多出版" />
-            <el-option label="漏出版" value="漏出版" />
-            <el-option label="其它" value="其它" />
-          </el-select>
-        </el-form-item>
-        
-        <el-form-item label="异常描述" prop="exception_description">
+        <el-form-item label="问题描述" prop="exception_description">
           <el-input
             v-model="formData.exception_description"
             type="textarea"
@@ -514,9 +518,9 @@
           <FileUpload
             ref="uploadRef"
             :multiple="true"
-            :max-count="5"
+            :max-count="4"
             accept="image/*"
-            tip="支持拖拽上传（最多5张）"
+            tip="支持拖拽上传（最多4张）"
             upload-mode="custom"
             :custom-request="handleCustomUpload"
             :before-upload="beforeUpload"
@@ -533,9 +537,13 @@
       
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="handleDialogClose">取消</el-button>
+          <el-button @click="handleDialogClose" type="danger">
+            <el-icon><Close /></el-icon>
+            取消
+          </el-button>
           <el-button type="primary" @click="handleSubmit" :loading="submitLoading">
-            {{ isEdit ? '更新' : '创建' }}
+            <el-icon><Check v-if="isEdit" /><DocumentAdd v-else /></el-icon>
+            {{ isEdit ? '保存' : '提交' }}
           </el-button>
         </span>
       </template>
@@ -636,6 +644,50 @@
         -->
       </div>
     </el-dialog>
+
+    <!-- 导出选项对话框 -->
+    <el-dialog
+      v-model="exportDialogVisible"
+      title="出版异常记录 - 导出确认"
+      width="480px"
+      :close-on-click-modal="false"
+      class="export-dialog"
+    >
+      <div class="export-options">         
+        <el-form label-width="0px" class="export-form">
+          <div class="export-option-item">
+            <div class="option-header">
+              <el-icon class="option-icon"><Picture /></el-icon>
+              <span class="option-label">导出内容</span>
+            </div>
+            <div class="option-content">
+              <el-checkbox v-model="includeImages" class="custom-checkbox">
+                <span class="checkbox-label">包含图片</span>
+              </el-checkbox>
+              <div class="export-tip">
+                <el-icon class="tip-icon"><InfoFilled /></el-icon>
+                <span class="tip-text">
+                  勾选后同步导出图片嵌入到 Excel 中，文件体积会变大
+                </span>
+              </div>
+            </div>
+          </div>
+        </el-form>
+      </div>
+      
+      <template #footer>
+        <div class="export-dialog-footer">
+          <el-button @click="exportDialogVisible = false" type="danger" >
+            <el-icon><Close /></el-icon>
+            取消
+          </el-button>
+          <el-button type="primary" @click="confirmExport" class="confirm-btn">
+            <el-icon><Download /></el-icon>
+            确认导出
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
     
     <AppFooter />
   </div>
@@ -656,7 +708,7 @@
 import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
-  Search, Plus, Delete, Download, View, Edit, Refresh, Filter, Picture
+  Search, Plus, Delete, Download, View, Edit, Refresh, Filter, Picture, Check, DocumentAdd, Close, InfoFilled
 } from '@element-plus/icons-vue'
 import AppHeader from '@/components/common/AppHeader.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
@@ -1185,6 +1237,14 @@ const handleView = (row) => {
 }
 
 /**
+ * 双击记录显示详情对话框
+ * @param {Object} row - 表格行数据
+ */
+const handleRowDoubleClick = (row) => {
+  handleView(row)
+}
+
+/**
  * 删除记录
  */
 const handleDelete = async (row) => {
@@ -1260,26 +1320,32 @@ const handleBatchDelete = async () => {
 /**
  * 导出数据
  */
+// 导出选项状态
+const exportDialogVisible = ref(false)
+const includeImages = ref(true)
+
 /**
- * 导出数据功能 - 调用后端Excel导出接口
+ * 导出数据功能 - 显示导出选项对话框
  */
-const handleExport = async () => {
+const handleExport = () => {
+  exportDialogVisible.value = true
+}
+
+/**
+ * 确认导出数据
+ */
+const confirmExport = async () => {
   try {
-    // 导出前确认对话框
-    await ElMessageBox.confirm(
-      '确定要导出当前数据吗？',
-      '导出确认',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
+    exportDialogVisible.value = false
     ElMessage.info('正在生成Excel文件，请稍候...')
     
+    // 构建导出参数
+    const exportParams = new URLSearchParams({
+      includeImages: includeImages.value.toString()
+    })
+    
     // 调用后端导出接口
-    const response = await fetch('/api/publishing-exceptions/export', {
+    const response = await fetch(`/api/publishing-exceptions/export?${exportParams}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
@@ -2269,8 +2335,16 @@ onMounted(() => {
 
 .dialog-footer {
   display: flex;
-  justify-content: flex-end;
-  gap: 10px;
+  justify-content: center;
+  gap: 20px;
+  padding: 20px 0;
+}
+
+.dialog-footer .el-button {
+  min-width: 120px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 /* 操作列按钮样式 */
@@ -2366,5 +2440,203 @@ onMounted(() => {
   .stats-cards .el-col {
     margin-bottom: 20px;
   }
+}
+
+/* 导出选项对话框样式 */
+.export-dialog {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.export-options {
+  padding: 0;
+}
+
+
+.export-icon {
+  font-size: 24px;
+  color: #409EFF;
+  margin-right: 12px;
+}
+
+.export-form {
+  padding: 20px 0;
+}
+
+.export-option-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.export-option-item:hover {
+  border-color: #409EFF;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.option-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.option-icon {
+  font-size: 18px;
+  color: #409EFF;
+  margin-right: 8px;
+}
+
+.option-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.option-content {
+  padding-left: 26px;
+}
+
+.custom-checkbox {
+  margin-bottom: 12px;
+}
+
+.checkbox-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.export-tip {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.tip-icon {
+  font-size: 16px;
+  color: #e6a23c;
+  margin-right: 8px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.tip-text {
+  font-size: 13px;
+  color: #856404;
+  line-height: 1.4;
+}
+
+.export-dialog-footer {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+  background: #f8f9fa;
+  margin: 20px 0 0 0;
+  box-sizing: border-box;
+}
+
+
+
+.confirm-btn {
+  min-width: 120px;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-weight: 500;
+  background: #409EFF;
+  border: 1px solid #409EFF;
+  transition: all 0.3s ease;
+}
+
+.confirm-btn:hover {
+  background: #66b1ff;
+  border-color: #66b1ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+.confirm-btn:active {
+  transform: translateY(0);
+}
+
+/* 覆盖Element Plus默认样式 */
+:deep(.export-dialog .el-dialog__header) {
+  background: #409EFF;
+  color: white;
+  padding: 20px;
+  margin: 0;
+}
+
+:deep(.export-dialog .el-dialog__title) {
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+:deep(.export-dialog .el-dialog__headerbtn) {
+  position: absolute;
+  top: -35px;
+  right: -35px;
+  width: 30px;
+  height: 30px;
+  background: #595B5E;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+}
+
+:deep(.export-dialog .el-dialog__headerbtn .el-dialog__close) {
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+:deep(.export-dialog .el-dialog__headerbtn .el-dialog__close:hover) {
+  color: white;
+  transform: scale(1.1);
+}
+
+:deep(.export-dialog .el-dialog__headerbtn:hover) {
+  background: #6c6f73;
+  transform: scale(1.05);
+}
+
+:deep(.export-dialog .el-dialog__body) {
+  padding: 0;
+}
+
+:deep(.export-dialog .el-dialog__footer) {
+  padding: 0;
+}
+
+:deep(.export-dialog .el-divider) {
+  margin: 16px 0;
+}
+
+:deep(.export-dialog .el-checkbox__label) {
+  font-size: 14px;
+  color: #606266;
+}
+
+:deep(.export-dialog .el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: #409EFF;
+  border-color: #409EFF;
+}
+
+:deep(.export-dialog .el-checkbox__input.is-checked + .el-checkbox__label) {
+  color: #409EFF;
+  font-weight: 500;
 }
 </style>
