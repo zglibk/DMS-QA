@@ -509,7 +509,7 @@
         
         <el-form-item>
           <template #label>
-            <el-button type="primary" link @click="triggerFileUpload">选择上传</el-button>
+            <el-text class="mx-1" >选择上传</el-text>
           </template>
           <FileUpload
             ref="uploadRef"
@@ -565,15 +565,18 @@
     <el-dialog
       v-model="viewDialogVisible"
       title="查看详情"
-      width="600px"
+      width="800px"
     >
       <el-descriptions :column="2" border>
         <el-descriptions-item label="ID">{{ viewData.id }}</el-descriptions-item>
         <el-descriptions-item label="登记日期">{{ formatDate(viewData.registration_date) }}</el-descriptions-item>
-        <el-descriptions-item label="出版日期">{{ formatDate(viewData.publishing_date) }}</el-descriptions-item>
-        <el-descriptions-item label="客户代码">{{ viewData.customer_code }}</el-descriptions-item>
         <el-descriptions-item label="工单号">{{ viewData.work_order_number }}</el-descriptions-item>
-        <el-descriptions-item label="产品名称">{{ viewData.product_name }}</el-descriptions-item>
+        <el-descriptions-item label="客户代码">{{ viewData.customer_code }}</el-descriptions-item>
+        <el-descriptions-item label="产品名称" :span="2">{{ viewData.product_name }}</el-descriptions-item>
+        <el-descriptions-item label="异常描述" span="2">{{ viewData.exception_description }}</el-descriptions-item>
+        <!-- 错误类型显示：展示异常的分类类型 -->
+        <el-descriptions-item label="错误类型">{{ viewData.error_type }}</el-descriptions-item>
+      <el-descriptions-item label="出版日期">{{ formatDate(viewData.publishing_date) }}</el-descriptions-item>
         <el-descriptions-item label="版类型">{{ viewData.plate_type }}</el-descriptions-item>
         <el-descriptions-item label="出版张数">{{ viewData.publishing_sheets }}</el-descriptions-item>
         <el-descriptions-item label="责任单位">{{ viewData.responsible_unit }}</el-descriptions-item>
@@ -584,11 +587,8 @@
         <el-descriptions-item label="数量cm²">{{ viewData.area_cm2 }}</el-descriptions-item>
         <el-descriptions-item label="单价">{{ viewData.unit_price }}</el-descriptions-item>
         <el-descriptions-item label="金额">{{ viewData.amount }}</el-descriptions-item>
-        <el-descriptions-item label="异常描述" span="2">{{ viewData.exception_description }}</el-descriptions-item>
-        <!-- 错误类型显示：展示异常的分类类型 -->
-        <el-descriptions-item label="错误类型">{{ viewData.error_type }}</el-descriptions-item>
         <el-descriptions-item label="创建人">{{ viewData.created_by }}</el-descriptions-item>
-        <el-descriptions-item label="创建日期">{{ viewData.created_date }}</el-descriptions-item>
+        <el-descriptions-item label="创建日期">{{ formatDateTime(viewData.created_date) }}</el-descriptions-item>
       </el-descriptions>
       
       <!-- 图片显示 -->
@@ -602,8 +602,7 @@
             :preview-src-list="getImageList(viewData.image_path).map(img => img.url)"
             :initial-index="index"
             fit="cover"
-            style="width: 150px; height: 150px; margin-right: 10px; margin-bottom: 10px; border-radius: 6px; cursor: pointer;"
-            @click="openImagePreview(imageInfo)"
+            style="width: 100px; height: 100px; margin-right: 8px; margin-bottom: 8px; border-radius: 6px; cursor: pointer;"
           >
             <template #error>
               <div class="image-slot">
@@ -613,7 +612,8 @@
           </el-image>
         </div>
         
-        <!-- ImagePreview组件用于专业的图片放大显示 -->
+        <!-- 注释掉自定义图片预览对话框，现在使用el-image的内置预览功能 -->
+        <!--
         <el-dialog
           v-model="imagePreviewVisible"
           title="图片预览"
@@ -630,17 +630,10 @@
             :file-path="currentPreviewImage"
             :width="'100%'"
             :height="'70vh'"
+            :module="'publishing-exception'"
           />
         </el-dialog>
-        <div class="image-info" v-if="getImageList(viewData.image_path).length > 0">
-          <p><strong>图片信息：</strong></p>
-          <ul>
-            <li v-for="(imageInfo, index) in getImageList(viewData.image_path)" :key="index">
-              文件名：{{ imageInfo.originalName || imageInfo.filename }} 
-              ({{ formatFileSize(imageInfo.fileSize || imageInfo.size) }})
-            </li>
-          </ul>
-        </div>
+        -->
       </div>
     </el-dialog>
     
@@ -1113,7 +1106,7 @@ const handleEdit = (row) => {
         // 新格式：JSON数组
         fileList.value = imageData.map(item => ({
           name: item.originalName || item.filename,
-          url: item.fullUrl || item.accessUrl || getImageUrl(item.filename),
+          url: getImageUrl(item.filename, false), // 强制重新生成URL，确保环境适配
           path: item.relativePath || `uploads\\site-images\\publishing-exception\\${item.filename}`,
           filename: item.filename,
           originalName: item.originalName,
@@ -1124,13 +1117,13 @@ const handleEdit = (row) => {
           category: item.category,
           id: item.id
         }))
-        tempUploadedFiles.value = [...imageData]
+        tempUploadedFiles.value = [] // 编辑模式下不应将已存在文件放入临时上传列表
         originalFiles.value = [...imageData] // 保存原始文件列表
       } else {
         // 可能是单个对象格式
         const fileInfo = {
           name: imageData.originalName || imageData.filename,
-          url: imageData.fullUrl || imageData.accessUrl || getImageUrl(imageData.filename),
+          url: getImageUrl(imageData.filename, false), // 强制重新生成URL，确保环境适配
           path: imageData.relativePath || `uploads\\site-images\\publishing-exception\\${imageData.filename}`,
           filename: imageData.filename,
           originalName: imageData.originalName,
@@ -1142,19 +1135,19 @@ const handleEdit = (row) => {
           id: imageData.id
         }
         fileList.value = [fileInfo]
-        tempUploadedFiles.value = [imageData]
-        originalFiles.value = [...imageData] // 保存原始文件列表
+        tempUploadedFiles.value = [] // 编辑模式下不应将已存在文件放入临时上传列表
+        originalFiles.value = [imageData] // 保存原始文件列表
       }
     } catch (e) {
       // 解析失败，按旧格式处理（字符串格式）
       const fileInfo = {
         name: row.image_path,
-        url: getImageUrl(row.image_path),
+        url: getImageUrl(row.image_path, false), // 已存在的图片不添加时间戳
         path: `uploads\\site-images\\publishing-exception\\${row.image_path}`,
         filename: row.image_path
       }
       fileList.value = [fileInfo]
-      tempUploadedFiles.value = [fileInfo]
+      tempUploadedFiles.value = [] // 编辑模式下不应将已存在文件放入临时上传列表
       originalFiles.value = [fileInfo] // 保存原始文件列表
     }
   } else {
@@ -1166,13 +1159,27 @@ const handleEdit = (row) => {
   // 清空删除文件列表
   removedFiles.value = []
   
+  // 调试信息：检查编辑模式下的文件列表
+  // 编辑模式下的文件列表已初始化
+  
   dialogVisible.value = true
 }
 
 /**
  * 查看记录
  */
+/**
+ * 查看详情
+ * 确保查看详情时不受编辑状态影响，清理可能的缓存数据
+ */
 const handleView = (row) => {
+  // 清理编辑状态的缓存数据，避免影响查看详情
+  fileList.value = []
+  tempUploadedFiles.value = []
+  originalFiles.value = []
+  removedFiles.value = []
+  
+  // 设置查看数据
   viewData.value = { ...row }
   viewDialogVisible.value = true
 }
@@ -1348,11 +1355,23 @@ const handleSubmit = async () => {
     
     submitLoading.value = true
     
-    // 获取新上传的文件信息
+    // 获取新上传的文件信息，过滤掉服务器路径的图片
     let uploadedFileInfo = []
     if (tempUploadedFiles.value && tempUploadedFiles.value.length > 0) {
-      uploadedFileInfo = tempUploadedFiles.value
-      console.log('获取到新上传的文件:', uploadedFileInfo)
+      // 过滤掉来自服务器的图片（路径包含uploads/或以http开头）
+      uploadedFileInfo = tempUploadedFiles.value.filter(file => {
+        const isServerPath = file.path && (
+          file.path.includes('uploads/') || 
+          file.path.includes('uploads\\') ||
+          (file.url && file.url.startsWith('http'))
+        )
+        if (isServerPath) {
+          // 过滤服务器路径图片
+          return false
+        }
+        return true
+      })
+      // 过滤后的新上传文件
     }
     
     // 处理图片路径信息 - 合并原有文件和新增文件
@@ -1371,20 +1390,20 @@ const handleSubmit = async () => {
         finalFileList = [...finalFileList, ...uploadedFileInfo]
       }
       
-      console.log('编辑模式 - 原有文件:', originalFiles.value.length, '删除文件:', removedFiles.value.length, '新增文件:', uploadedFileInfo.length, '最终文件:', finalFileList.length)
+      // 编辑模式文件统计
     } else {
       // 新增模式：只有新上传的文件
       finalFileList = uploadedFileInfo
-      console.log('新增模式 - 新增文件:', uploadedFileInfo.length)
+      // 新增模式文件统计
     }
     
     // 保存最终的文件列表
     if (finalFileList.length > 0) {
       formData.image_path = JSON.stringify(finalFileList)
-      console.log('保存最终文件信息到image_path:', formData.image_path)
+      // 保存文件信息到image_path
     } else {
       formData.image_path = ''
-      console.log('无文件，清空image_path')
+      // 无文件，清空image_path
     }
     
     const submitData = {
@@ -1528,7 +1547,7 @@ const handleCustomUpload = (file) => {
           // 旧格式兼容
           fileInfo = {
             name: file.name,
-            url: getImageUrl(data.data?.filename || data.filename),
+            url: getImageUrl(data.data?.filename || data.filename, true), // 新上传的文件使用防缓存机制
             path: data.data?.path || `uploads/site-images/publishing-exception/${data.data?.filename || data.filename}`,
             filename: data.data?.filename || data.filename,
             originalname: data.data?.originalname || data.originalName,
@@ -1539,7 +1558,7 @@ const handleCustomUpload = (file) => {
         // 保存到临时文件列表
         tempUploadedFiles.value.push(fileInfo)
         
-        console.log('文件上传成功，保存到临时列表:', fileInfo)
+        // 文件上传成功，保存到临时列表
         
         // 返回文件信息给组件
         resolve(fileInfo)
@@ -1558,16 +1577,15 @@ const handleCustomUpload = (file) => {
  * 文件列表变化处理
  */
 const handleFileChange = (files) => {
-  console.log('文件列表变化:', files)
-  console.log('当前 fileList.value.length:', fileList.value.length)
+  // 文件列表变化处理
   
   // 只有当传入的文件数组长度大于当前文件列表长度时才更新
   // 这样可以避免删除操作后重新添加文件
   if (files.length > fileList.value.length) {
     fileList.value = [...files]
-    console.log('更新后 fileList.value.length:', fileList.value.length)
+    // 更新文件列表
   } else {
-    console.log('跳过文件列表更新，避免删除后重新添加')
+    // 跳过文件列表更新，避免删除后重新添加
   }
   
   // 文件列表变化时不直接修改formData.image_path
@@ -1582,11 +1600,10 @@ const handleFileChange = (files) => {
  * @param {Array} deletedFiles - 被删除的文件列表
  */
 const handleFileRemove = (deletedFiles) => {
-  console.log('文件删除:', deletedFiles)
-  console.log('删除前 fileList.value:', fileList.value)
+  // 处理文件删除
   
   deletedFiles.forEach((deletedFile) => {
-    console.log('处理删除文件:', deletedFile)
+    // 处理删除文件
     
     // 获取删除文件的关键信息
     const deletedFileName = deletedFile.name || deletedFile.originalName
@@ -1616,14 +1633,14 @@ const handleFileRemove = (deletedFiles) => {
     const fileListIndex = fileList.value.findIndex(isFileMatch)
     if (fileListIndex > -1) {
       fileList.value.splice(fileListIndex, 1)
-      console.log('从fileList中删除了文件，剩余:', fileList.value.length)
+      // 从fileList中删除文件
     }
     
     // 从临时文件列表中移除
     const tempIndex = tempUploadedFiles.value.findIndex(isFileMatch)
     if (tempIndex > -1) {
       tempUploadedFiles.value.splice(tempIndex, 1)
-      console.log('从临时文件列表中删除了文件')
+      // 从临时文件列表中删除文件
     }
     
     // 如果是原始文件，添加到删除列表中
@@ -1632,11 +1649,11 @@ const handleFileRemove = (deletedFiles) => {
       const removedFile = originalFiles.value[originalIndex]
       removedFiles.value.push(removedFile)
       originalFiles.value.splice(originalIndex, 1)
-      console.log('从原始文件列表中删除了文件，添加到删除列表')
+      // 从原始文件列表中删除文件，添加到删除列表
     }
   })
   
-  console.log('删除完成，最终 fileList.value:', fileList.value)
+  // 删除完成
 }
 
 /**
@@ -1660,11 +1677,39 @@ const beforeUpload = (file) => {
 /**
  * 获取图片URL（兼容旧格式）
  * 生成包含端口号8080的完整图片访问URL
+ * @param {string} imagePath - 图片路径
+ * @param {boolean} preventCache - 是否添加时间戳防止缓存，默认false
  */
-const getImageUrl = (imagePath) => {
+/**
+ * 根据当前环境动态生成图片URL
+ * @param {string} imagePath - 图片路径
+ * @param {boolean} preventCache - 是否防止缓存
+ * @returns {string} 完整的图片URL
+ */
+const getImageUrl = (imagePath, preventCache = false) => {
   if (!imagePath) return ''
-  // 使用完整URL包含端口号8080，确保图片能正确访问
-  return `http://192.168.1.57:8080/files/site-images/publishing-exception/${imagePath}`
+  
+  // 动态获取API基础URL，支持开发环境和生产环境
+  const envApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+  
+  // 构建图片URL
+  let url
+  if (envApiBase.includes('localhost') || envApiBase.includes('127.0.0.1')) {
+    // 开发环境：使用后端服务的文件路由
+    url = `${envApiBase}/files/site-images/publishing-exception/${imagePath}`
+  } else {
+    // 生产环境：使用文件服务器端口8080
+    const baseUrl = envApiBase.replace(':3001', ':8080').replace('/api', '')
+    url = `${baseUrl}/files/site-images/publishing-exception/${imagePath}`
+  }
+  
+  // 只在需要防止缓存时添加时间戳参数
+  if (preventCache) {
+    const timestamp = Date.now()
+    url += `?t=${timestamp}`
+  }
+  
+  return url
 }
 
 /**
@@ -1679,12 +1724,12 @@ const getImageList = (imagePath) => {
     if (Array.isArray(imageArray)) {
       return imageArray.map(imageInfo => ({
         ...imageInfo,
-        url: imageInfo.accessUrl || imageInfo.url || getImageUrl(imageInfo.filename)
+        url: getImageUrl(imageInfo.filename, false) // 强制重新生成URL，确保环境适配
       }))
     }
   } catch (e) {
     // 如果解析失败，说明是旧格式（字符串）
-    console.log('使用旧格式图片路径:', imagePath)
+    // 使用旧格式图片路径
   }
   
   // 旧格式兼容：直接是文件名字符串
@@ -1692,7 +1737,7 @@ const getImageList = (imagePath) => {
     return [{
       filename: imagePath,
       originalName: imagePath,
-      url: getImageUrl(imagePath),
+      url: getImageUrl(imagePath, false), // 查看详情时不添加时间戳
       path: `uploads/site-images/publishing-exception/${imagePath}`
     }]
   }
@@ -1748,6 +1793,35 @@ const formatDate = (dateString) => {
   }
 }
 
+/**
+ * 格式化日期时间为 yyyy-mm-dd hh:mm:ss 格式
+ * 处理时区偏移问题，显示当前时区的日期时间
+ */
+const formatDateTime = (dateString) => {
+  if (!dateString) return ''
+  
+  try {
+    // 创建Date对象
+    const date = new Date(dateString)
+    
+    // 检查日期是否有效
+    if (isNaN(date.getTime())) return ''
+    
+    // 获取本地日期时间（避免时区偏移）
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    const hours = String(date.getHours()).padStart(2, '0')
+    const minutes = String(date.getMinutes()).padStart(2, '0')
+    const seconds = String(date.getSeconds()).padStart(2, '0')
+    
+    return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+  } catch (error) {
+    console.error('日期时间格式化错误:', error)
+    return ''
+  }
+}
+
 // 自动计算功能
 /**
  * 监听长度和宽度变化，自动计算数量cm²
@@ -1793,25 +1867,16 @@ const formatAmount = (amount) => {
 }
 
 /**
- * 触发文件上传
- */
-const triggerFileUpload = () => {
-  if (uploadRef.value) {
-    // 调用 FileUpload 组件的 onClick 方法来触发文件选择
-    uploadRef.value.onClick(0)
-  }
-}
-
-/**
  * 打开图片预览弹窗
  * @param {string|Object} imagePathOrInfo - 图片路径字符串或图片信息对象
  */
 const openImagePreview = (imagePathOrInfo) => {
   let imagePath = imagePathOrInfo
   
-  // 如果传入的是对象（图片信息），优先使用完整的URL
+  // 如果传入的是对象（图片信息），优先使用filename而不是完整URL
+  // ImagePreview组件需要的是原始文件名，它会自己生成正确的URL
   if (typeof imagePathOrInfo === 'object' && imagePathOrInfo !== null) {
-    imagePath = imagePathOrInfo.fullUrl || imagePathOrInfo.accessUrl || imagePathOrInfo.url || imagePathOrInfo.path || imagePathOrInfo.filename
+    imagePath = imagePathOrInfo.filename || imagePathOrInfo.path || imagePathOrInfo.url
   }
   
   currentPreviewImage.value = imagePath
@@ -1832,7 +1897,7 @@ const closeImagePreview = () => {
  */
 const openImagePreviewInDialog = (imageInfo) => {
   // 优先使用完整URL，然后是访问URL，最后是通过文件名生成URL
-  const imageUrl = imageInfo.url || imageInfo.fullUrl || imageInfo.accessUrl || getImageUrl(imageInfo.filename)
+  const imageUrl = getImageUrl(imageInfo.filename, false) // 强制重新生成URL，确保环境适配
   currentDialogPreviewImage.value = imageUrl
   dialogImagePreviewVisible.value = true
 }
@@ -1851,28 +1916,23 @@ const closeDialogImagePreview = () => {
  * @param {string} url - 文件URL（可能是本地预览URL）
  */
 const handleFilePreview = (fileInfo, url) => {
-  console.log('PublishingExceptions handleFilePreview triggered:', { fileInfo, url })
+  // 处理文件预览
   
   let imageUrl = url
   
-  // 如果没有传入URL，尝试从文件信息中获取
-  if (!imageUrl) {
-    imageUrl = fileInfo.url || fileInfo.fullUrl || fileInfo.accessUrl
-    
-    // 如果仍然没有URL且有文件名，则通过文件名生成URL
-    if (!imageUrl && fileInfo.filename) {
-      imageUrl = getImageUrl(fileInfo.filename)
-    }
+  // 如果没有传入URL，强制使用getImageUrl重新生成
+  if (!imageUrl && fileInfo.filename) {
+    imageUrl = getImageUrl(fileInfo.filename, false) // 强制重新生成URL，确保环境适配
   }
   
-  console.log('Final imageUrl:', imageUrl)
+  // 最终图片URL
   
   if (imageUrl) {
     currentDialogPreviewImage.value = imageUrl
     dialogImagePreviewVisible.value = true
-    console.log('Dialog visibility set to:', dialogImagePreviewVisible.value)
+    // 设置对话框可见性
   } else {
-    console.warn('No valid image URL found for preview')
+    // 警告：未找到有效的图片URL
   }
 }
 

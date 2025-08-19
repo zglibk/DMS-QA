@@ -157,9 +157,7 @@ export default defineComponent({
                 if (base64url.length > 2000000) {
                     ElMessage.error('头像图片过大，请选择更小的图片');
                     return;
-                }
-                
-                console.log('头像裁剪完成，base64长度:', base64url.length);
+                }                
                 
                 // 发出上传成功事件
                 emit('upload-success', base64url);
@@ -210,8 +208,6 @@ export default defineComponent({
                 
                 // 清空文件输入框，确保可以重新选择同一文件
                 e.target.value = '';
-                
-                // console.log('图片：', imgUrl);
                 nextTick(() => {
                     // 判定裁剪对象是否存在
                     // 存在销毁重新创建（这里不替换图片，图片不一样大时会变形），不存在创建对象

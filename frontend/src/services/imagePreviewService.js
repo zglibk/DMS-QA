@@ -171,9 +171,10 @@ class ImagePreviewService {
    * 通过文件路径获取图片预览URL（HTTP方式）
    * @param {string} filePath - 文件路径
    * @param {number|string} recordId - 关联的记录ID（用于API调用）
+   * @param {string} module - 模块名称，用于确定正确的文件路径（如'publishing-exception'）
    * @returns {Promise<string>} 图片的Blob URL
    */
-  async getImageUrlByPath(filePath, recordId) {
+  async getImageUrlByPath(filePath, recordId, module = null) {
     // 如果有recordId，优先使用记录ID方式获取（即使filePath为空）
     if (recordId) {
       return await this.getImageUrlByRecordId(recordId)
@@ -204,7 +205,14 @@ class ImagePreviewService {
       // 构建服务器文件URL，对路径的各个部分分别进行URL编码
       const pathParts = filePath.split('/')
       const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
-      return `/files/attachments/${encodedPath}`
+      
+      // 根据模块确定正确的文件路径
+      if (module === 'publishing-exception') {
+        return `/files/site-images/publishing-exception/${encodedPath}`
+      } else {
+        // 默认使用attachments路径（兼容其他模块）
+        return `/files/attachments/${encodedPath}`
+      }
     }
 
     // 其他情况抛出错误，因为我们不使用file://协议

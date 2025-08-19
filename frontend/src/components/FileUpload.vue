@@ -1,5 +1,6 @@
 <script setup>
-import { ref, watchEffect } from 'vue'
+import { ref, watchEffect, onMounted, onUnmounted } from 'vue'
+import { Upload } from '@element-plus/icons-vue'
 
 // 组件属性定义
 const props = defineProps({
@@ -62,6 +63,11 @@ const props = defineProps({
   fileList: {
     type: Array,
     default: () => []
+  },
+  // 新增：是否启用粘贴上传功能
+  enablePaste: {
+    type: Boolean,
+    default: true
   }
 })
 
@@ -70,11 +76,85 @@ const uploadedFiles = ref([]) // 上传文件列表
 const showUpload = ref(1)
 const uploading = ref(Array(props.maxCount).fill(false))
 const uploadInput = ref()
+const uploadContainer = ref() // 上传容器引用，用于粘贴事件监听
 watchEffect(() => {
   // 回调立即执行一次，同时会自动跟踪回调中所依赖的所有响应式依赖
   initUpload()
 })
+
+// 粘贴事件处理函数
+function handlePaste(event) {
+  // 如果禁用粘贴功能或组件被禁用，则不处理
+  if (!props.enablePaste || props.disabled) {
+    return
+  }
+  
+  // 检查是否还能上传更多文件
+  if (uploadedFiles.value.length >= props.maxCount) {
+    console.warn('已达到最大上传数量限制')
+    return
+  }
+  
+  const clipboardData = event.clipboardData || window.clipboardData
+  const items = clipboardData.items
+  
+  // 遍历剪贴板项目，查找图片
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    
+    // 检查是否为图片类型
+    if (item.type.indexOf('image') !== -1) {
+      event.preventDefault() // 阻止默认粘贴行为
+      
+      const file = item.getAsFile()
+      if (file) {
+        // 检查文件类型是否符合accept属性
+        if (props.accept !== '*' && !isFileTypeAccepted(file)) {
+          console.warn('粘贴的图片格式不被支持')
+          return
+        }
+        
+        // 找到下一个可用的上传位置
+        const nextIndex = uploadedFiles.value.length
+        if (nextIndex < props.maxCount) {
+          uploadFile(file, nextIndex)
+        }
+      }
+      break // 只处理第一个图片
+    }
+  }
+}
+
+// 检查文件类型是否被接受
+function isFileTypeAccepted(file) {
+  if (props.accept === '*') return true
+  
+  const acceptTypes = props.accept.split(',')
+  return acceptTypes.some(type => {
+    const trimmedType = type.trim()
+    if (trimmedType.startsWith('.')) {
+      // 扩展名匹配
+      return file.name.toLowerCase().endsWith(trimmedType.toLowerCase())
+    } else {
+      // MIME类型匹配
+      return file.type.match(new RegExp(trimmedType.replace('*', '.*')))
+    }
+  })
+}
+
+// 组件挂载时添加粘贴事件监听
+onMounted(() => {
+  if (props.enablePaste && !props.disabled) {
+    document.addEventListener('paste', handlePaste)
+  }
+})
+
+// 组件卸载时移除粘贴事件监听
+onUnmounted(() => {
+  document.removeEventListener('paste', handlePaste)
+})
 function initUpload() {
+  // 初始化上传文件列表
   uploadedFiles.value = [...props.fileList]
   if (uploadedFiles.value.length > props.maxCount) {
     uploadedFiles.value.splice(props.maxCount)
@@ -256,25 +336,21 @@ function customUpload(file, index) {
 }
 // 预览文件
 function onPreview(n, url) {
-  console.log('FileUpload onPreview triggered:', { index: n, url, fileInfo: uploadedFiles.value[n] })
-  
   const fileInfo = uploadedFiles.value[n]
   let previewUrl = url
   
   // 如果传入的URL是有效的（包括base64数据），直接使用
   if (previewUrl && (previewUrl.startsWith('data:') || previewUrl.startsWith('blob:') || previewUrl.startsWith('http'))) {
-    console.log('Using provided URL for preview:', previewUrl)
+    // 使用提供的URL
   }
   // 如果没有URL或URL不可用，且文件是本地文件，则创建预览URL
   else if (!previewUrl && fileInfo.file) {
     // 为本地文件创建预览URL
     previewUrl = URL.createObjectURL(fileInfo.file)
-    console.log('Created preview URL for local file:', previewUrl)
   }
   // 如果fileInfo中有url（base64数据），使用它
   else if (!previewUrl && fileInfo.url) {
     previewUrl = fileInfo.url
-    console.log('Using fileInfo.url for preview:', previewUrl)
   }
   
   // 触发自定义预览事件，让父组件处理预览逻辑
@@ -289,6 +365,31 @@ function onRemove(index) {
   emits('remove', removeFile)
   emits('update:fileList', uploadedFiles.value)
   emits('change', uploadedFiles.value)
+}
+
+/**
+ * 处理图片加载成功
+ * @param {number} index - 文件索引
+ * @param {string} url - 图片URL
+ */
+function onImageLoad(index, url) {
+  const fileInfo = uploadedFiles.value[index]
+  console.log('图片加载成功:', {
+    文件名: fileInfo?.name || fileInfo?.filename,
+    加载来源: url,
+    文件信息: fileInfo
+  })
+}
+
+/**
+ * 处理图片加载错误
+ * 当图片无法加载时（如后端文件已删除），自动从列表中移除该图片
+ * @param {number} index - 图片在列表中的索引
+ */
+function onImageError(index) {
+  console.warn('图片加载失败，自动移除:', uploadedFiles.value[index])
+  // 自动移除无法加载的图片
+  onRemove(index)
 }
 function onInfo(content) {
   console.log('Info:', content)
@@ -338,23 +439,13 @@ defineExpose({
               style="display: none"
             />
             <div>
-              <svg
-                focusable="false"
-                class="plus-svg"
-                data-icon="plus"
-                width="1em"
-                height="1em"
-                fill="currentColor"
-                aria-hidden="true"
-                viewBox="64 64 896 896"
-              >
-                <defs></defs>
-                <path d="M482 152h60q8 0 8 8v704q0 8-8 8h-60q-8 0-8-8V160q0-8 8-8z"></path>
-                <path d="M176 474h672q8 0 8 8v60q0 8-8 8H176q-8 0-8-8v-60q0-8 8-8z"></path>
-              </svg>
+              <el-icon class="plus-svg">
+                <Upload />
+              </el-icon>
               <p class="upload-tip">
                 <slot>{{ tip }}</slot>
               </p>
+              <div v-if="enablePaste && !disabled" class="paste-hint">或按 Ctrl+V 粘贴</div>
             </div>
           </div>
           <div v-show="uploading[n - 1]" class="file-uploading">
@@ -367,6 +458,8 @@ defineExpose({
               :alt="uploadedFiles[n - 1].filename || 'preview'"
               style="width: 82px; height: 82px; border-radius: 4px; object-fit: cover; cursor: pointer;"
               @click.prevent.stop="onPreview(n - 1, uploadedFiles[n - 1].previewUrl || uploadedFiles[n - 1].url)"
+              @load="onImageLoad(n - 1, uploadedFiles[n - 1].previewUrl || uploadedFiles[n - 1].url)"
+              @error="onImageError(n - 1)"
               title="点击预览图片"
             />
             <svg
@@ -449,10 +542,17 @@ defineExpose({
       fill: rgba(0, 0, 0, 0.88);
     }
     .upload-tip {
-      margin-top: 8px;
+      margin: 2px 0 0 0;
+      padding: 0;
       font-size: 14px;
       color: rgba(0, 0, 0, 0.88);
-      line-height: 1.5714285714285714;
+      line-height: 1.2;
+    }
+    .paste-hint {
+      margin-top: 4px;
+      color: #999;
+      font-size: 12px;
+      font-style: italic;
     }
   }
   .upload-disabled {

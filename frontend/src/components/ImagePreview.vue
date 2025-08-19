@@ -192,6 +192,10 @@ const props = defineProps({
   height: {
     type: String,
     default: '150px'
+  },
+  module: {
+    type: String,
+    default: null
   }
 })
 
@@ -323,7 +327,7 @@ const loadImage = async () => {
 
     // 其他情况通过服务获取
     console.log('通过服务获取图片:', pathStr)
-    const url = await imagePreviewService.getImageUrlByPath(pathStr, props.recordId)
+    const url = await imagePreviewService.getImageUrlByPath(pathStr, props.recordId, props.module)
     console.log('服务返回的URL:', url)
     imageUrl.value = url
   } catch (err) {
