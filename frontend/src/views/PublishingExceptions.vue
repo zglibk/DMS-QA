@@ -225,7 +225,11 @@
                 <el-table-column prop="responsible_unit" label="责任单位" width="120" align="center" header-align="center" />
                 <el-table-column prop="responsible_person" label="责任人" width="70" align="center" header-align="center" />
                 <el-table-column prop="area_cm2" label="数量cm²" width="80" align="center" header-align="center" />
-                <el-table-column prop="amount" label="金额" width="80" align="center" header-align="center" />
+                <el-table-column prop="amount" label="金额" width="80" align="center" header-align="center">
+                  <template #default="{ row }">
+                    {{ formatAmount(row.amount) }}
+                  </template>
+                </el-table-column>
                 
                 <el-table-column label="操作" min-width="210" fixed="right" header-align="center">
                   <template #default="{ row }">
@@ -578,7 +582,7 @@
         <el-descriptions-item label="件数">{{ viewData.piece_count }}</el-descriptions-item>
         <el-descriptions-item label="数量cm²">{{ viewData.area_cm2 }}</el-descriptions-item>
         <el-descriptions-item label="单价">{{ viewData.unit_price }}</el-descriptions-item>
-        <el-descriptions-item label="金额">{{ viewData.amount }}</el-descriptions-item>
+        <el-descriptions-item label="金额">{{ formatAmount(viewData.amount) }}</el-descriptions-item>
         <el-descriptions-item label="创建人">{{ viewData.created_by }}</el-descriptions-item>
         <el-descriptions-item label="创建日期">{{ formatDateTime(viewData.created_date) }}</el-descriptions-item>
       </el-descriptions>
@@ -1853,18 +1857,18 @@ const beforeUpload = (file) => {
 const getImageUrl = (imagePath, preventCache = false) => {
   if (!imagePath) return ''
   
-  // 动态获取API基础URL，支持开发环境和生产环境
-  const envApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
+  // 根据当前页面的hostname判断环境
+  const hostname = window.location.hostname
+  const protocol = window.location.protocol
   
   // 构建图片URL
   let url
-  if (envApiBase.includes('localhost') || envApiBase.includes('127.0.0.1')) {
-    // 开发环境：使用后端服务的文件路由
-    url = `${envApiBase}/files/site-images/publishing-exception/${imagePath}`
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    // 开发环境：使用Vite代理
+    url = `/files/site-images/publishing-exception/${imagePath}`
   } else {
-    // 生产环境：使用文件服务器端口8080
-    const baseUrl = envApiBase.replace(':3001', ':8080').replace('/api', '')
-    url = `${baseUrl}/files/site-images/publishing-exception/${imagePath}`
+    // 生产环境：使用Nginx文件服务器端口8080
+    url = `${protocol}//${hostname}:8080/files/site-images/publishing-exception/${imagePath}`
   }
   
   // 只在需要防止缓存时添加时间戳参数
@@ -2003,16 +2007,79 @@ watch(
 )
 
 /**
- * 监听数量和单价变化，自动计算金额
+ * 监听版类型变化，自动设置单价
+ * 切换版类型时先清空原有单价，然后为固定单价版类型填入默认值
+ * CTP: 7元/件，PS版: 10元/件，柔版: 0.15元/平方米，刀模: 0.7元/米
  */
 watch(
-  () => [formData.area_cm2, formData.unit_price],
-  ([area, price]) => {
-    if (area && price && area > 0 && price > 0) {
-      formData.amount = Number((area * price).toFixed(2))
-    } else {
-      formData.amount = null
+  () => formData.plate_type,
+  (plateType) => {
+    // 切换版类型时先清空原有单价
+    formData.unit_price = null
+    
+    // 为有固定单价的版类型填入默认值
+    if (plateType === 'CTP') {
+      formData.unit_price = 7
+    } else if (plateType === 'PS版') {
+      formData.unit_price = 10
+    } else if (plateType === '柔版') {
+      formData.unit_price = 0.15
+    } else if (plateType === '刀模') {
+      formData.unit_price = 0.7
     }
+  },
+  { immediate: true }
+)
+
+/**
+ * 监听相关字段变化，根据版类型自动计算金额
+ * 不同版类型使用不同的计算公式：
+ * - CTP: 单价 × 件数（7元/件）
+ * - PS版: 单价 × 件数（0.75元/件）
+ * - 柔版: 面积(平方米) × 单价 × 件数
+ * - 刀模: 周长 × 件数，周长 = (长×2)+(宽×2)
+ */
+watch(
+  () => [formData.plate_type, formData.area_cm2, formData.unit_price, formData.piece_count, formData.length_cm, formData.width_cm],
+  ([plateType, area, price, pieces, length, width]) => {
+    if (!plateType || !pieces || pieces <= 0) {
+      formData.amount = null
+      return
+    }
+
+    let amount = 0
+
+    switch (plateType) {
+      case 'CTP':
+      case 'PS版':
+        // CTP和PS版：单价 × 件数
+        if (price && price > 0) {
+          amount = price * pieces
+        }
+        break
+        
+      case '柔版':
+        // 柔版：面积(平方厘米) × 单价 × 件数
+        if (area && price && area > 0 && price > 0) {
+          amount = area * price * pieces
+        }
+        break
+        
+      case '刀模':
+        // 刀模：周长(米) × 件数 × 单价，周长 = (长×2)+(宽×2)，换算成米
+        if (length && width && price && length > 0 && width > 0 && price > 0) {
+          const perimeter = (length * 2) + (width * 2) // 计算周长(厘米)
+          const perimeterM = perimeter / 100 // 换算成米
+          amount = perimeterM * pieces * price
+        }
+        break
+        
+      default:
+        formData.amount = null
+        return
+    }
+
+    formData.amount = amount > 0 ? Number(amount.toFixed(2)) : null
   },
   { immediate: true }
 )

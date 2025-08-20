@@ -16,8 +16,10 @@ const storage = multer.diskStorage({
     cb(null, uploadPath);
   },
   filename: function (req, file, cb) {
-    // 生成文件名：原文件名-时间戳.扩展名
+    // 生成唯一文件名：时间戳-随机字符串.扩展名
     const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    
     // 处理中文文件名编码问题
     let originalName;
     try {
@@ -29,15 +31,19 @@ const storage = multer.diskStorage({
       originalName = path.parse(file.originalname).name;
     }
     
-    // 为了避免URL编码问题，将中文字符转换为安全的文件名
-    // 如果文件名包含非ASCII字符，使用时间戳和随机字符串
-    if (/[^\x00-\x7F]/.test(originalName)) {
-      const randomStr = Math.random().toString(36).substring(2, 8);
-      originalName = `file_${timestamp}_${randomStr}`;
+    // 为了确保文件名唯一性，始终添加时间戳和随机字符串
+    // 特别处理Ctrl+V上传的图片（通常文件名为image.png）
+    let finalName;
+    if (originalName === 'image' || /[^\x00-\x7F]/.test(originalName)) {
+      // 对于默认的image文件名或包含非ASCII字符的文件名，使用时间戳和随机字符串
+      finalName = `file_${timestamp}_${randomStr}`;
+    } else {
+      // 对于其他文件名，保留原名但添加时间戳确保唯一性
+      finalName = `${originalName}_${timestamp}_${randomStr}`;
     }
     
     const extension = path.extname(file.originalname); // 获取扩展名
-    cb(null, `${originalName}${extension}`);
+    cb(null, `${finalName}${extension}`);
   }
 });
 
@@ -1041,11 +1047,18 @@ router.put('/:id', async (req, res) => {
     }
 
     // 处理被删除的文件 - 删除物理文件
+    // 只在编辑模式下且确实有文件需要删除时才执行删除操作
     if (removedFiles && Array.isArray(removedFiles) && removedFiles.length > 0) {
       console.log('开始删除被标记的文件:', removedFiles.length, '个文件');
       
       for (const removedFile of removedFiles) {
         try {
+          // 确保removedFile有filename属性且不为空
+          if (!removedFile.filename) {
+            console.log('跳过无效的删除文件项:', removedFile);
+            continue;
+          }
+          
           // 构建文件的完整路径
           const filePath = path.join(__dirname, '../uploads/site-images/publishing-exception', removedFile.filename);
           
