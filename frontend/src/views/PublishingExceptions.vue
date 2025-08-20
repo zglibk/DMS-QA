@@ -11,7 +11,7 @@
             </div>
             <div class="stat-content">
               <div class="stat-value">{{ statistics.monthly_new || 0 }}</div>
-              <div class="stat-label">本月新增</div>
+              <div class="stat-label">{{ monthlyNewLabel }}</div>
             </div>
           </div>
         </el-card>
@@ -140,12 +140,16 @@
                     <el-option label="排版变形" value="排版变形" />
                     <el-option label="分色偏差" value="分色偏差" />
                     <el-option label="套印偏差" value="套印偏差" />
-                    <el-option label="排版错误" value="排版错误" />
+                    <el-option label="出标方向" value="出标方向" />
                     <el-option label="出血位偏差" value="出血位偏差" />
                     <el-option label="内容错误" value="内容错误" />
                     <el-option label="图文残缺" value="图文残缺" />
+                    <el-option label="字体错误" value="字体错误" />
+                    <el-option label="图文效果" value="图文效果" />
                     <el-option label="多出版" value="多出版" />
                     <el-option label="漏出版" value="漏出版" />
+                    <el-option label="制版错误" value="制版错误" />
+                    <el-option label="不匹配刀模" value="不匹配刀模" />
                     <el-option label="其它" value="其它" />
                   </el-select>
                 </el-form-item>
@@ -224,7 +228,11 @@
                 <el-table-column prop="error_type" label="错误类型" width="100" align="center" header-align="center" />
                 <el-table-column prop="responsible_unit" label="责任单位" width="120" align="center" header-align="center" />
                 <el-table-column prop="responsible_person" label="责任人" width="70" align="center" header-align="center" />
-                <el-table-column prop="area_cm2" label="数量cm²" width="80" align="center" header-align="center" />
+                <el-table-column prop="area_cm2" label="数量cm²" width="90" align="center" header-align="center" show-overflow-tooltip>
+                  <template #default="{ row }">
+                    <span style="white-space: nowrap;">{{ row.area_cm2 }}</span>
+                  </template>
+                </el-table-column>
                 <el-table-column prop="amount" label="金额" width="80" align="center" header-align="center">
                   <template #default="{ row }">
                     {{ formatAmount(row.amount) }}
@@ -327,6 +335,7 @@
       :title="dialogTitle"
       width="900px"
       :before-close="handleDialogClose"
+      @keydown="handleDialogKeydown"
     >
       <el-form
         ref="formRef"
@@ -396,12 +405,13 @@
         
         <el-row :gutter="20">
           <el-col :span="8">
-            <el-form-item label="版类型">
+            <el-form-item label="版类型" prop="plate_type">
               <el-select v-model="formData.plate_type" placeholder="请选择版类型" style="width: 100%">
                 <el-option label="PS版" value="PS版" />
                 <el-option label="CTP" value="CTP" />
                 <el-option label="柔版" value="柔版" />
                 <el-option label="刀模" value="刀模" />
+                <el-option label="文件" value="文件" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -478,12 +488,16 @@
                 <el-option label="排版变形" value="排版变形" />
                 <el-option label="分色偏差" value="分色偏差" />
                 <el-option label="套印偏差" value="套印偏差" />
-                <el-option label="排版错误" value="排版错误" />
+                <el-option label="出标方向" value="出标方向" />
                 <el-option label="出血位偏差" value="出血位偏差" />
                 <el-option label="内容错误" value="内容错误" />
                 <el-option label="图文残缺" value="图文残缺" />
+                <el-option label="字体错误" value="字体错误" />
+                <el-option label="图文效果" value="图文效果" />
                 <el-option label="多出版" value="多出版" />
                 <el-option label="漏出版" value="漏出版" />
+                <el-option label="制版错误" value="制版错误" />
+                <el-option label="不匹配刀模" value="不匹配刀模" />
                 <el-option label="其它" value="其它" />
               </el-select>
             </el-form-item>
@@ -746,6 +760,17 @@ const statistics = ref({
   costTrend: []     // 成本损失趋势
 })
 
+// 计算当前月份标题（yy-m格式）
+const getCurrentMonthLabel = () => {
+  const now = new Date()
+  const year = now.getFullYear().toString().slice(-2) // 获取年份后两位
+  const month = now.getMonth() + 1 // 获取月份（1-12）
+  return `${year}年${month}月新增`
+}
+
+// 当前月份标题
+const monthlyNewLabel = ref(getCurrentMonthLabel())
+
 // 图表引用
 const errorTypeChartRef = ref()
 const costTrendChartRef = ref()
@@ -810,6 +835,8 @@ const formRules = {
   customer_code: [{ required: true, message: '请输入客户代码', trigger: 'blur' }],
   work_order_number: [{ required: true, message: '请输入工单号', trigger: 'blur' }],
   product_name: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
+  plate_type: [{ required: true, message: '请选择版类型', trigger: 'change' }],
+  error_type: [{ required: true, message: '请选择错误类型', trigger: 'change' }],
   responsible_unit: [{ required: true, message: '请选择责任单位', trigger: 'change' }],
   responsible_person: [{ required: true, message: '请输入责任人', trigger: 'blur' }],
   exception_description: [{ required: true, message: '请输入异常描述', trigger: 'blur' }]
@@ -920,6 +947,19 @@ const fetchStatistics = async () => {
       params.endDate = filters.dateRange[1]
     }
     
+    // 传递所有筛选条件，确保统计数据与筛选结果一致
+    if (filters.customerCode) {
+      params.customerCode = filters.customerCode
+    }
+    
+    if (filters.workOrderNumber && filters.workOrderNumber !== 'GD') {
+      params.workOrderNumber = filters.workOrderNumber
+    }
+    
+    if (filters.productName) {
+      params.productName = filters.productName
+    }
+    
     if (filters.responsibleUnit) {
       params.responsibleUnit = filters.responsibleUnit
     }
@@ -964,41 +1004,95 @@ const updateCharts = () => {
       
       const errorTypeOption = {
         title: {
-          show: false
+          // text: '错误类型分布',
+          // subtext: '南丁格尔玫瑰图',
+          left: 'center',
+          textStyle: {
+            fontSize: 16,
+            fontWeight: 'bold'
+          },
+          subtextStyle: {
+            fontSize: 12,
+            color: '#999'
+          }
         },
         tooltip: {
           trigger: 'item',
           formatter: '{a} <br/>{b}: {c}件 ({d}%)'
         },
         legend: {
-          orient: 'vertical',
-          left: 'left',
-          top: 'middle'
+           orient: 'vertical',
+           left: 'left',
+           top: 'middle',
+           data: statistics.value.byErrorType.map(item => item.error_type || '未分类')
+         },
+        toolbox: {
+          show: true,
+          feature: {
+            mark: { show: true },
+            dataView: { 
+              show: true, 
+              readOnly: false,
+              title: '数据视图',
+              lang: ['数据视图', '关闭', '刷新'],
+              backgroundColor: '#fff',
+              textareaColor: '#fff',
+              textareaBorderColor: '#333',
+              textColor: '#000',
+              optionToContent: function(opt) {
+                const series = opt.series[0];
+                const data = series.data;
+                let table = '<div style="padding: 20px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">';
+                table += '<h3 style="text-align: center; color: #409EFF; margin-bottom: 20px; font-size: 16px;">📊 错误类型统计数据</h3>';
+                table += '<table style="width: 100%; border-collapse: collapse; margin: 0 auto; box-shadow: 0 2px 8px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden;">';
+                table += '<thead><tr style="background: linear-gradient(135deg, #409EFF, #66b3ff); color: white;">';
+                table += '<th style="padding: 8px 12px; text-align: left; font-weight: 600; font-size: 12px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">序号</th>';
+                table += '<th style="padding: 8px 12px; text-align: left; font-weight: 600; font-size: 12px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">错误类型</th>';
+                table += '<th style="padding: 8px 12px; text-align: center; font-weight: 600; font-size: 12px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">数量(张)</th>';
+                table += '<th style="padding: 8px 12px; text-align: center; font-weight: 600; font-size: 12px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">占比</th>';
+                table += '</tr></thead><tbody>';
+                
+                const total = data.reduce((sum, item) => sum + item.value, 0);
+                data.forEach((item, index) => {
+                  const percentage = ((item.value / total) * 100).toFixed(1);
+                  const rowBg = index % 2 === 0 ? '#f8f9fa' : '#ffffff';
+                  table += `<tr style="background-color: ${rowBg}; transition: background-color 0.3s;" onmouseover="this.style.backgroundColor='#e3f2fd'" onmouseout="this.style.backgroundColor='${rowBg}'">`;
+                  table += `<td style="padding: 6px 12px; border-bottom: 1px solid #eee; font-weight: 500; color: #666; font-size: 12px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">${index + 1}</td>`;
+                  table += `<td style="padding: 6px 12px; border-bottom: 1px solid #eee; font-weight: 500; color: #333; font-size: 12px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">${item.name}</td>`;
+                  table += `<td style="padding: 6px 12px; border-bottom: 1px solid #eee; text-align: center; font-weight: 600; color: #409EFF; font-size: 11px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">${item.value}</td>`;
+                  table += `<td style="padding: 6px 12px; border-bottom: 1px solid #eee; text-align: center; font-weight: 500; color: #666; font-size: 11px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">${percentage}%</td>`;
+                  table += '</tr>';
+                });
+                
+                table += '</tbody></table>';
+                table += `<div style="margin-top: 15px; text-align: center; color: #666; font-size: 12px; font-family: Segoe UI, Tahoma, Geneva, Verdana, sans-serif;">总计: <strong style="color: #409EFF;">${total}</strong> 张</div>`;
+                table += '</div>';
+                return table;
+              }
+            },
+            restore: { show: true },
+            saveAsImage: { show: true }
+          }
         },
         series: [{
           name: '异常数量',
           type: 'pie',
-          radius: ['40%', '70%'],
-          center: ['60%', '50%'],
-          avoidLabelOverlap: false,
+          radius: [20, 110],
+          center: ['50%', '50%'],
+          roseType: 'radius',
           itemStyle: {
-            borderRadius: 10,
+            borderRadius: 8,
             borderColor: '#fff',
             borderWidth: 2
           },
           label: {
-            show: false,
-            position: 'center'
-          },
+             show: true,
+             formatter: '{c} 张'
+           },
           emphasis: {
             label: {
-              show: true,
-              fontSize: '18',
-              fontWeight: 'bold'
+              show: true
             }
-          },
-          labelLine: {
-            show: false
           },
           data: statistics.value.byErrorType.map(item => ({
             name: item.error_type || '未分类',
@@ -1067,13 +1161,48 @@ const updateCharts = () => {
           type: 'line',
           smooth: true,
           symbol: 'circle',
-          symbolSize: 6,
+          symbolSize: 14,
           lineStyle: {
-            color: '#ff6b6b',
-            width: 3
+            color: {
+              type: 'linear',
+              x: 0,
+              y: 0,
+              x2: 1,
+              y2: 0,
+              colorStops: [{
+                offset: 0, color: '#ff6b6b'
+              }, {
+                offset: 0.5, color: '#ff8a80'
+              }, {
+                offset: 1, color: '#ffab91'
+              }]
+            },
+            width: 4,
+            shadowColor: 'rgba(255, 107, 107, 0.3)',
+            shadowBlur: 10,
+            shadowOffsetY: 3
           },
           itemStyle: {
-            color: '#ff6b6b'
+            color: '#ff6b6b',
+            borderColor: '#fff',
+            borderWidth: 3,
+            shadowColor: 'rgba(255, 107, 107, 0.5)',
+            shadowBlur: 8,
+            shadowOffsetY: 2
+          },
+          emphasis: {
+            itemStyle: {
+              color: '#ff5252',
+              borderColor: '#fff',
+              borderWidth: 4,
+              shadowColor: 'rgba(255, 82, 82, 0.8)',
+              shadowBlur: 15,
+              shadowOffsetY: 5
+            },
+            lineStyle: {
+              width: 5,
+              shadowBlur: 15
+            }
           },
           areaStyle: {
             color: {
@@ -1083,9 +1212,11 @@ const updateCharts = () => {
               x2: 0,
               y2: 1,
               colorStops: [{
-                offset: 0, color: 'rgba(255, 107, 107, 0.3)'
+                offset: 0, color: 'rgba(255, 107, 107, 0.4)'
               }, {
-                offset: 1, color: 'rgba(255, 107, 107, 0.1)'
+                offset: 0.5, color: 'rgba(255, 138, 128, 0.2)'
+              }, {
+                offset: 1, color: 'rgba(255, 171, 145, 0.05)'
               }]
             }
           },
@@ -1111,9 +1242,8 @@ const updateCharts = () => {
 const handleSearch = () => {
   pagination.current = 1
   fetchData()
-  if (activeTab.value === 'statistics') {
-    fetchStatistics()
-  }
+  // 每次搜索都更新统计数据，确保左侧统计卡片实时更新
+  fetchStatistics()
 }
 
 /**
@@ -1368,6 +1498,8 @@ const handleDelete = async (row) => {
     if (response.data.success) {
       ElMessage.success('删除成功')
       fetchData()
+      // 数据变更后更新统计信息
+      fetchStatistics()
     } else {
       ElMessage.error(response.data.message || '删除失败')
     }
@@ -1410,6 +1542,8 @@ const handleBatchDelete = async () => {
     
     ElMessage.success('批量删除成功')
     fetchData()
+    // 数据变更后更新统计信息
+    fetchStatistics()
     selectedRows.value = []
   } catch (error) {
     if (error !== 'cancel') {
@@ -1460,7 +1594,9 @@ const confirmExport = async () => {
     
     // 获取文件名
     const contentDisposition = response.headers.get('Content-Disposition')
-    let filename = `出版异常数据_${new Date().toISOString().slice(0, 10)}.xlsx`
+    const now = new Date()
+    const timestamp = `${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}${now.getSeconds().toString().padStart(2, '0')}`
+    let filename = `出版失误登记表_${timestamp}.xlsx`
     if (contentDisposition) {
       const filenameMatch = contentDisposition.match(/filename="(.+)"/)
       if (filenameMatch) {
@@ -1519,6 +1655,7 @@ const handleCurrentChange = (page) => {
  */
 const handleSubmit = async () => {
   try {
+    // 表单验证，如果验证失败会抛出异常
     await formRef.value.validate()
     
     submitLoading.value = true
@@ -1593,12 +1730,41 @@ const handleSubmit = async () => {
       ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
       dialogVisible.value = false
       fetchData()
+      // 数据变更后更新统计信息
+      fetchStatistics()
     } else {
       ElMessage.error(response.data.message || '操作失败')
     }
   } catch (error) {
     console.error('提交失败:', error)
-    ElMessage.error('操作失败')
+    
+    // Element Plus表单验证失败时，会直接抛出包含字段验证错误的对象
+    // 错误对象的结构是：{字段名: [错误对象数组], ...}
+    if (error && typeof error === 'object') {
+      // 检查是否是表单验证错误（直接包含字段名的对象）
+      const errorKeys = Object.keys(error)
+      if (errorKeys.length > 0) {
+        // 检查第一个键对应的值是否是数组（验证错误的特征）
+        const firstKey = errorKeys[0]
+        const firstValue = error[firstKey]
+        
+        if (Array.isArray(firstValue) && firstValue.length > 0) {
+          // 这是表单验证错误，提取第一个错误字段的提示信息
+          const firstErrorMessage = firstValue[0]?.message || '字段验证失败'
+          ElMessage.error(`${firstErrorMessage}`)
+          return // 直接返回，不继续执行后续逻辑
+        }
+      }
+      
+      // 检查是否有message属性（其他类型的错误）
+      if (error.message) {
+        ElMessage.error('请检查并完善必填项信息')
+        return
+      }
+    }
+    
+    // 如果不是表单验证错误，则可能是网络错误或其他错误
+    ElMessage.error('操作失败，请重试')
   } finally {
     submitLoading.value = false
   }
@@ -1616,6 +1782,28 @@ const handleDialogClose = () => {
   originalFiles.value = []
   removedFiles.value = []
   formRef.value?.clearValidate()
+}
+
+/**
+ * 处理对话框键盘事件
+ * 当用户在对话框中按下Enter键时，自动提交表单
+ */
+const handleDialogKeydown = (event) => {
+  // 检查是否按下了Enter键
+  if (event.key === 'Enter') {
+    // 防止在textarea中按Enter键时触发提交
+    if (event.target.tagName.toLowerCase() === 'textarea') {
+      return
+    }
+    
+    // 阻止默认行为
+    event.preventDefault()
+    
+    // 如果当前没有在提交中，则执行提交
+    if (!submitLoading.value) {
+      handleSubmit()
+    }
+  }
 }
 
 /**
@@ -1651,9 +1839,8 @@ const resetFormData = () => {
  */
 const refreshData = () => {
   fetchData()
-  if (activeTab.value === 'statistics') {
-    fetchStatistics()
-  }
+  // 每次刷新都更新统计数据，确保左侧统计卡片实时更新
+  fetchStatistics()
 }
 
 /**
@@ -2026,6 +2213,8 @@ watch(
       formData.unit_price = 0.15
     } else if (plateType === '刀模') {
       formData.unit_price = 0.7
+    } else if (plateType === '文件') {
+      formData.unit_price = 20
     }
   },
   { immediate: true }
@@ -2052,7 +2241,8 @@ watch(
     switch (plateType) {
       case 'CTP':
       case 'PS版':
-        // CTP和PS版：单价 × 件数
+      case '文件':
+        // CTP、PS版和文件：单价 × 件数
         if (price && price > 0) {
           amount = price * pieces
         }
@@ -2222,8 +2412,14 @@ onUnmounted(() => {
 
 <style scoped>
 .common-layout {
-  min-height: 100vh;
-  background: #f5f7fa;
+  padding: 20px;
+  background-color: #f5f7fa;
+  /* 参考进度跟踪页面的滚动条处理方式 */
+  height: auto; /* 改为自动高度 */
+  display: flex;
+  flex-direction: column;
+  overflow: visible; /* 改为可见，确保分页显示 */
+  min-height: 0; /* 解决flex容器高度问题 */
   padding-top: 90px; /* 为导航栏留出空间 */
 }
 
