@@ -8,6 +8,7 @@ const router = express.Router();
 const uploadDir = path.join(__dirname, '../uploads');
 const siteImagesDir = path.join(uploadDir, 'site-images');
 const attachmentDir = path.join(uploadDir, 'attachments');
+const customerComplaintDir = path.join(uploadDir, 'customer-complaint');
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -19,6 +20,10 @@ if (!fs.existsSync(siteImagesDir)) {
 
 if (!fs.existsSync(attachmentDir)) {
   fs.mkdirSync(attachmentDir, { recursive: true });
+}
+
+if (!fs.existsSync(customerComplaintDir)) {
+  fs.mkdirSync(customerComplaintDir, { recursive: true });
 }
 
 // 配置multer存储 - 网站图片
@@ -88,6 +93,46 @@ const attachmentStorage = multer.diskStorage({
 });
 
 // 配置multer存储 - 自定义路径投诉附件
+// 配置multer存储 - 客诉图片专用
+const customerComplaintStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // 确保客诉图片目录存在
+    if (!fs.existsSync(customerComplaintDir)) {
+      fs.mkdirSync(customerComplaintDir, { recursive: true });
+    }
+    cb(null, customerComplaintDir);
+  },
+  filename: function (req, file, cb) {
+    // 生成唯一文件名：时间戳-随机字符串.扩展名
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    
+    // 处理中文文件名编码问题
+    let originalName;
+    try {
+      // 尝试解码文件名，处理中文字符
+      originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+      originalName = path.parse(originalName).name;
+    } catch (error) {
+      // 如果解码失败，使用原始文件名
+      originalName = path.parse(file.originalname).name;
+    }
+    
+    // 为了确保文件名唯一性，始终添加时间戳和随机字符串
+    let finalName;
+    if (originalName === 'image' || /[^\x00-\x7F]/.test(originalName)) {
+      // 对于默认的image文件名或包含非ASCII字符的文件名，使用时间戳和随机字符串
+      finalName = `file_${timestamp}_${randomStr}`;
+    } else {
+      // 对于其他文件名，保留原名但添加时间戳确保唯一性
+      finalName = `${originalName}_${timestamp}_${randomStr}`;
+    }
+    
+    const extension = path.extname(file.originalname); // 获取扩展名
+    cb(null, `${finalName}${extension}`);
+  }
+});
+
 const customPathAttachmentStorage = multer.diskStorage({
   destination: function (req, file, cb) {
     console.log('=== Multer destination 调试信息 ===');
@@ -198,6 +243,15 @@ const attachmentUpload = multer({
   }
 });
 
+// 创建multer实例 - 客诉图片专用
+const customerComplaintUpload = multer({
+  storage: customerComplaintStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB限制
+  }
+});
+
 // 创建multer实例 - 自定义路径投诉附件
 const customPathAttachmentUpload = multer({
   storage: customPathAttachmentStorage,
@@ -258,6 +312,72 @@ router.post('/', upload.single('file'), (req, res) => {
       success: false,
       message: '图片上传失败: ' + error.message
     });
+  }
+});
+
+// 添加/image路由，用于客诉图片上传
+// 客诉图片上传路由 - 专用于客户投诉图片
+router.post('/image', customerComplaintUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: '请选择要上传的图片'
+      })
+    }
+
+    // 处理原始文件名的编码问题
+    let correctedOriginalName;
+    try {
+      // 尝试解码文件名，处理中文字符编码问题
+      correctedOriginalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+      console.log('文件名编码修复:', {
+        original: req.file.originalname,
+        corrected: correctedOriginalName
+      });
+    } catch (error) {
+      // 如果解码失败，使用原始文件名
+      correctedOriginalName = req.file.originalname;
+      console.log('文件名编码修复失败，使用原始文件名:', req.file.originalname);
+    }
+
+    // 构建完整的文件信息对象，参考出版异常的格式
+    const fileInfo = {
+      id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      originalName: correctedOriginalName,
+      filename: req.file.filename,
+      relativePath: `customer-complaint/${req.file.filename}`,
+      // 客诉图片使用customer-complaint路径
+      accessUrl: `/files/customer-complaint/${req.file.filename}`,
+      fullUrl: `${req.protocol}://${req.get('host')}:8080/files/customer-complaint/${req.file.filename}`,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+      uploadTime: new Date().toISOString(),
+      fileType: 'image',
+      category: 'customer_complaint'
+    };
+
+    console.log('客诉图片上传成功:', fileInfo);
+
+    res.json({
+      success: true,
+      message: '图片上传成功',
+      fileInfo: fileInfo,
+      // 保持向后兼容
+      url: fileInfo.accessUrl,
+      data: {
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        path: req.file.path,
+        size: req.file.size
+      }
+    })
+  } catch (error) {
+    console.error('客诉图片上传失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '图片上传失败'
+    })
   }
 });
 

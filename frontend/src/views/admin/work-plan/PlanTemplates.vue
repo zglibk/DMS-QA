@@ -774,15 +774,24 @@ const saveTemplate = async () => {
     console.log('模板名称值:', templateForm.templateName)
     
     // 执行表单验证
-    try {
-      const isValid = await templateFormRef.value.validate()
-      if (!isValid) {
-        ElMessage.warning('请检查表单填写是否完整')
-        return
-      }
-    } catch (error) {
-      console.error('表单验证失败:', error)
-      ElMessage.warning('请检查表单填写是否完整')
+    const isValid = await new Promise((resolve) => {
+      templateFormRef.value.validate((valid, fields) => {
+        if (!valid && fields) {
+          // 获取第一个验证失败的字段错误信息
+          const firstFieldKey = Object.keys(fields)[0]
+          const firstFieldErrors = fields[firstFieldKey]
+          if (firstFieldErrors && firstFieldErrors.length > 0) {
+            const errorMessage = firstFieldErrors[0].message
+            ElMessage.error(errorMessage)
+          } else {
+            ElMessage.error('请检查表单填写是否完整')
+          }
+        }
+        resolve(valid)
+      })
+    })
+    
+    if (!isValid) {
       return
     }
     

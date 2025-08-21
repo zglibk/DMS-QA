@@ -1330,7 +1330,7 @@ const dialogTitle = computed(() => {
 })
 
 const uploadUrl = computed(() => {
-  return `${import.meta.env.VITE_API_BASE_URL}/api/upload/rework-attachment`
+  return '/api/upload/rework-attachment'
 })
 
 // 生命周期

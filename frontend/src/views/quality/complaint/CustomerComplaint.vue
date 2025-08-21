@@ -342,7 +342,11 @@
             {{ row.defectRate }}%
           </template>
         </el-table-column>
-        <el-table-column prop="complaintMethod" label="投诉方式" width="120" />
+        <el-table-column prop="complaintMethod" label="投诉方式" width="120">
+          <template #default="{ row }">
+            {{ getComplaintMethodText(row.complaintMethod) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="processingDeadline" label="处理时限" width="120" />
         <el-table-column prop="status" label="处理状态" width="100">
           <template #default="{ row }">
@@ -422,12 +426,20 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="客户编号" prop="customerCode">
-                <el-input v-model="formData.customerCode" placeholder="请输入客户编号" />
+                <el-input 
+                  v-model="formData.customerCode" 
+                  placeholder="请输入客户编号" 
+                  @input="handleCustomerCodeInput"
+                />
               </el-form-item>
             </el-col>
             <el-col :span="8">
               <el-form-item label="工单号" prop="workOrderNo">
-                <el-input v-model="formData.workOrderNo" placeholder="请输入工单号" />
+                <el-input 
+                  v-model="formData.workOrderNo" 
+                  placeholder="请输入工单号" 
+                  @input="handleWorkOrderNoInput"
+                />
               </el-form-item>
             </el-col>
           </el-row>
@@ -489,6 +501,33 @@
                   list-type="picture-card"
                   accept="image/*"
                 >
+                  <template #file="{ file }">
+                    <div class="upload-file-item">
+                      <el-image
+                        :src="getImageUrl(file)"
+                        :preview-src-list="formData.problemImages.map(img => getImageUrl(img))"
+                        :initial-index="formData.problemImages.findIndex(img => img.uid === file.uid || getImageUrl(img) === getImageUrl(file))"
+                        fit="cover"
+                        style="width: 100%; height: 100%;"
+                        :lazy="true"
+                      >
+                        <template #error>
+                          <div class="image-error">
+                            <el-icon><Picture /></el-icon>
+                            <span>加载失败</span>
+                          </div>
+                        </template>
+                      </el-image>
+                      <div class="upload-file-overlay">
+                        <div class="upload-file-preview">
+                          <el-icon class="upload-file-preview-icon"><ZoomIn /></el-icon>
+                        </div>
+                        <div class="upload-file-actions">
+                          <el-icon class="upload-file-action" @click.stop="handleImageRemove(file)"><Delete /></el-icon>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
                   <el-icon><Plus /></el-icon>
                 </el-upload>
               </el-form-item>
@@ -782,18 +821,27 @@
           <p>{{ viewData.problemDescription }}</p>
         </div>
 
-        <div class="detail-section" v-if="viewData.problemImages && viewData.problemImages.length > 0">
+        <div class="detail-section" v-if="getValidImages(viewData.problemImages).length > 0">
           <h4>问题图片</h4>
           <div class="image-gallery">
-            <el-image
-              v-for="(image, index) in viewData.problemImages"
+            <div 
+              v-for="(image, index) in getValidImages(viewData.problemImages)"
               :key="index"
-              :src="image.url"
-              :preview-src-list="viewData.problemImages.map(img => img.url)"
-              :initial-index="index"
-              fit="cover"
-              style="width: 100px; height: 100px; margin-right: 10px;"
-            />
+              class="detail-image-item"
+            >
+              <el-image
+                :src="getImageUrl(image)"
+                :preview-src-list="getValidImages(viewData.problemImages).map(img => getImageUrl(img))"
+                :initial-index="index"
+                fit="cover"
+                style="width: 100%; height: 100%;"
+              />
+              <div class="detail-image-overlay">
+                <div class="detail-image-preview">
+                  <el-icon class="detail-image-preview-icon"><ZoomIn /></el-icon>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -840,7 +888,7 @@
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, Upload, Delete, Download, Close, Check, User, Document, Box, Clock, Loading, Setting } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Upload, Delete, Download, Close, Check, User, Document, Box, Clock, Loading, Setting, Picture, ZoomIn } from '@element-plus/icons-vue'
 import apiService from '@/services/apiService'
 import { useUserStore } from '@/store/user'
 import axios from 'axios'
@@ -863,6 +911,7 @@ const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
 const isEdit = ref(false)
 const viewData = ref(null)
+const removedFiles = ref([]) // 跟踪被删除的图片文件
 
 // 搜索表单
 const searchForm = reactive({
@@ -946,7 +995,7 @@ const dialogTitle = computed(() => {
 })
 
 const uploadUrl = computed(() => {
-  return `${import.meta.env.VITE_API_BASE_URL}/api/upload/image`
+  return '/api/customer-complaints/upload-image'
 })
 
 const uploadHeaders = computed(() => {
@@ -1029,7 +1078,7 @@ const formatDate = (dateString) => {
     const day = String(date.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
   } catch (error) {
-    console.error('日期格式化错误:', error)
+    console.error('日期格式化错误:', error?.message || '未知错误')
     return ''
   }
 }
@@ -1152,7 +1201,7 @@ const loadData = async () => {
       ElMessage.error(response.data.message || '获取数据失败')
     }
   } catch (error) {
-    console.error('加载数据失败:', error)
+    console.error('加载数据失败:', error?.message || '未知错误')
     ElMessage.error('加载数据失败')
   } finally {
     loading.value = false
@@ -1212,15 +1261,63 @@ const handleAdd = () => {
 }
 
 /**
- * 编辑
+ * 编辑 - 处理图片数据格式转换
+ * 参考出版异常页面的实现逻辑
  */
 const handleEdit = (row) => {
   isEdit.value = true
+  
+  // 使用新的getImageList函数处理问题图片数据
+  const imageList = getImageList(row.problemImages)
+  const convertedProblemImages = imageList.map((img, index) => {
+    return {
+      name: img.originalName || img.filename || `image_${index + 1}`,
+      url: img.url, // 已经通过getImageUrl处理过的URL
+      uid: img.id || Date.now() + index,
+      status: 'success',
+      // 保留原始数据用于提交
+      ...img
+    }
+  })
+  
+  // 转换报告附件数据格式
+  const convertedReportAttachments = (row.reportAttachments || []).filter(file => {
+    // 过滤掉空对象或无效数据
+    if (!file || typeof file !== 'object') return false
+    const hasValidKeys = Object.keys(file).length > 0
+    const hasValidUrl = file.url || file.accessUrl || file.filename
+    return hasValidKeys && hasValidUrl
+  }).map((file, index) => {
+    return {
+      name: file.name || file.originalName || `attachment_${index + 1}`,
+      url: file.url || file.accessUrl || (file.filename ? `/files/customer-complaint/${file.filename}` : ''),
+      uid: file.id || Date.now() + index,
+      status: 'success',
+      // 保留原始数据
+      ...file
+    }
+  })
+  
   Object.assign(formData, {
     ...row,
-    problemImages: row.problemImages || [],
-    reportAttachments: row.reportAttachments || []
+    problemImages: convertedProblemImages,
+    reportAttachments: convertedReportAttachments
   })
+  
+  console.log('📝 编辑数据加载（优化后）:')
+  console.log('原始图片数据:', row.problemImages)
+  console.log('原始图片数据类型:', typeof row.problemImages)
+  console.log('原始图片数据是否为数组:', Array.isArray(row.problemImages))
+  if (row.problemImages && typeof row.problemImages === 'object') {
+    console.log('原始图片数据键值:', Object.keys(row.problemImages))
+    console.log('原始图片数据内容详情:', JSON.stringify(row.problemImages, null, 2))
+  }
+  console.log('解析后图片列表:', imageList)
+  console.log('转换后图片数据:', convertedProblemImages)
+  console.log('原始附件数据:', row.reportAttachments)
+  console.log('转换后附件数据:', convertedReportAttachments)
+  console.log('='.repeat(50))
+  
   dialogVisible.value = true
 }
 
@@ -1252,7 +1349,7 @@ const handleDelete = async (row) => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('删除失败:', error)
+      console.error('删除失败:', error?.message || '未知错误')
       ElMessage.error('删除失败')
     }
   }
@@ -1263,25 +1360,97 @@ const handleDelete = async (row) => {
  */
 const handleSubmit = async () => {
   try {
-    // 表单验证
-    await formRef.value.validate()
+    // 表单验证 - 使用回调形式获取具体错误信息
+    const isValid = await new Promise((resolve) => {
+      formRef.value.validate((valid, fields) => {
+        if (!valid) {
+          // 获取第一个验证失败的字段
+          const firstErrorField = Object.keys(fields)[0]
+          const firstErrorMessage = fields[firstErrorField][0].message
+          ElMessage.error(firstErrorMessage)
+          resolve(false)
+        } else {
+          resolve(true)
+        }
+      })
+    })
+    
+    if (!isValid) {
+      return
+    }
+    
     submitLoading.value = true
     
     const submitData = {
       ...formData,
-      problemImages: formData.problemImages.map(img => ({
-        name: img.name,
-        url: img.url
-      })),
-      reportAttachments: formData.reportAttachments.map(file => ({
-        name: file.name,
-        url: file.url
-      }))
+      problemImages: formData.problemImages.map(img => {
+        // 保留完整的图片信息，参考出版异常页面的格式
+        if (img.filename || img.accessUrl || img.relativePath) {
+          return {
+            id: img.id,
+            originalName: img.originalName || img.name,
+            filename: img.filename,
+            relativePath: img.relativePath,
+            accessUrl: img.accessUrl || img.url,
+            fullUrl: img.fullUrl,
+            fileSize: img.fileSize,
+            mimeType: img.mimeType,
+            uploadTime: img.uploadTime,
+            fileType: img.fileType,
+            category: img.category,
+            // 兼容旧的字段名
+            name: img.name,
+            url: img.accessUrl || img.url,
+            path: img.relativePath,
+            size: img.fileSize
+          }
+        } else {
+          // 兼容旧格式
+          return {
+            name: img.name,
+            url: img.url
+          }
+        }
+      }),
+      reportAttachments: formData.reportAttachments.map(file => {
+        // 改进报告附件的数据格式
+        if (file.filename || file.accessUrl || file.relativePath) {
+          return {
+            id: file.id,
+            name: file.name,
+            originalName: file.originalName || file.name,
+            filename: file.filename,
+            relativePath: file.relativePath,
+            accessUrl: file.accessUrl || file.url,
+            fileSize: file.fileSize,
+            mimeType: file.mimeType,
+            uploadTime: file.uploadTime,
+            fileType: file.fileType,
+            category: file.category,
+            // 兼容旧的字段名
+            url: file.accessUrl || file.url,
+            size: file.fileSize
+          }
+        } else {
+          // 兼容旧格式
+          return {
+            name: file.name,
+            url: file.url
+          }
+        }
+      })
     }
     
     let response
     if (isEdit.value) {
-      response = await apiService.put(`/customer-complaints/${formData.id}`, submitData)
+      // 编辑模式：添加被删除的文件信息
+      const editData = {
+        ...submitData,
+        removedFiles: removedFiles.value
+      }
+      console.log('编辑提交数据:', editData)
+      console.log('被删除的文件列表:', removedFiles.value)
+      response = await apiService.put(`/customer-complaints/${formData.id}`, editData)
     } else {
       response = await apiService.post('/customer-complaints', submitData)
     }
@@ -1294,17 +1463,14 @@ const handleSubmit = async () => {
       ElMessage.error(response.data.message || '操作失败')
     }
   } catch (error) {
-    console.error('提交失败:', error)
-    
-    // 如果是表单验证错误
-    if (error && typeof error === 'object' && error.message) {
-      ElMessage.error(`表单验证失败: ${error.message}`)
-    } else if (error && error.response) {
-      // 如果是API请求错误
+    // API请求错误处理
+    if (error && error.response) {
+      console.error('API请求失败:', error.response.data?.message || error.response.statusText)
       const errorMessage = error.response.data?.message || error.response.statusText || '请求失败'
       ElMessage.error(`提交失败: ${errorMessage}`)
     } else {
-      ElMessage.error('提交失败，请检查网络连接或联系管理员')
+      console.error('提交失败:', error?.message || '未知错误')
+      ElMessage.error(`提交失败: ${error?.message || '未知错误'}`)
     }
   } finally {
     submitLoading.value = false
@@ -1345,6 +1511,9 @@ const resetForm = () => {
     status: 'pending'
   })
   
+  // 清空被删除文件列表
+  removedFiles.value = []
+  
   if (formRef.value) {
     formRef.value.resetFields()
   }
@@ -1381,26 +1550,262 @@ const handleCurrentChange = (page) => {
 }
 
 /**
- * 图片上传成功
+ * 解析图片数据，支持新的JSON格式和旧的字符串格式
+ * 参考出版异常页面的实现逻辑
+ */
+/**
+ * 验证图片对象是否有效
+ * @param {Object} img - 图片对象
+ * @returns {boolean} 是否为有效的图片对象
+ */
+const isValidImageObject = (img) => {
+  if (!img || typeof img !== 'object') {
+    return false
+  }
+  
+  const keys = Object.keys(img)
+  const hasValidKeys = keys.length > 0
+  const hasValidUrl = img.accessUrl || img.url || img.filename
+  
+  // 检查是否为空对象（所有值都为空）
+  const isEmptyObject = keys.length === 0 || keys.every(key => {
+    const value = img[key]
+    return value === null || value === undefined || value === '' || 
+           (typeof value === 'string' && value.trim() === '')
+  })
+  
+  return hasValidKeys && hasValidUrl && !isEmptyObject
+}
+
+/**
+ * 解析图片数据列表，支持多种格式兼容
+ * @param {*} imageData - 图片数据（可能是数组、JSON字符串或普通字符串）
+ * @returns {Array} 标准化的图片信息数组
+ */
+const getImageList = (imageData) => {
+  console.log('🔍 getImageList 调试信息:')
+  console.log('输入数据:', imageData)
+  console.log('数据类型:', typeof imageData)
+  console.log('是否为数组:', Array.isArray(imageData))
+  
+  // 数据为空的情况
+  if (!imageData || imageData === '' || imageData === '[]' || imageData === 'null') {
+    console.log('❌ 数据为空或无效，返回空数组')
+    return []
+  }
+  
+  // 如果已经是数组格式，直接处理
+  if (Array.isArray(imageData)) {
+    console.log('✅ 数据是数组格式，长度:', imageData.length)
+    console.log('数组内容:', imageData)
+    
+    const filteredImages = imageData.filter(img => {
+        console.log('检查图片项:', img)
+        const isValid = isValidImageObject(img)
+        console.log('图片项是否有效:', isValid)
+        if (!isValid) {
+          console.log('❌ 无效图片项，原因: 空对象或缺少必要字段')
+        }
+        return isValid
+      })
+    
+    console.log('过滤后的图片数量:', filteredImages.length)
+    
+    const mappedImages = filteredImages.map(imageInfo => ({
+      ...imageInfo,
+      url: getImageUrl(imageInfo) // 重新生成URL，确保环境适配
+    }))
+    
+    console.log('最终处理的图片列表:', mappedImages)
+    return mappedImages
+  }
+  
+  try {
+    console.log('🔄 尝试解析JSON格式')
+    // 尝试解析JSON格式（新格式）
+    const imageArray = JSON.parse(imageData)
+    console.log('JSON解析结果:', imageArray)
+    console.log('解析后是否为数组:', Array.isArray(imageArray))
+    
+    if (Array.isArray(imageArray)) {
+        console.log('✅ JSON解析成功，数组长度:', imageArray.length)
+        return imageArray.filter(img => isValidImageObject(img)).map(imageInfo => ({
+          ...imageInfo,
+          url: getImageUrl(imageInfo) // 重新生成URL，确保环境适配
+        }))
+      }
+  } catch (e) {
+    console.log('❌ JSON解析失败:', e.message)
+    // 如果解析失败，说明是旧格式（字符串）
+    // 继续处理旧格式
+  }
+  
+  // 旧格式兼容：直接是文件名字符串
+  if (typeof imageData === 'string' && imageData.trim()) {
+    console.log('✅ 处理字符串格式:', imageData)
+    const result = [{
+      filename: imageData,
+      originalName: imageData,
+      url: getImageUrl({ filename: imageData }),
+      path: `customer-complaint/${imageData}`
+    }]
+    console.log('字符串格式处理结果:', result)
+    return result
+  }
+  
+  console.log('❌ 无法处理的数据格式，返回空数组')
+  return []
+}
+
+/**
+ * 获取有效的图片列表 - 过滤空对象和无效数据
+ * 保持向后兼容
+ */
+const getValidImages = (images) => {
+  return getImageList(images)
+}
+
+/**
+ * 获取图片URL - 兼容新旧格式，支持环境自适应
+ * 参考出版异常页面的实现逻辑
+ */
+const getImageUrl = (image, preventCache = false) => {
+  if (!image) return ''
+  
+  // 处理el-upload组件中的文件对象
+  if (image.url && !image.accessUrl && !image.filename) {
+    // 这是el-upload组件中的文件对象，直接使用url
+    return preventCache ? `${image.url}?t=${Date.now()}` : image.url
+  }
+  
+  // 新格式：优先使用accessUrl（已经是完整URL）
+  if (image.accessUrl) {
+    return preventCache ? `${image.accessUrl}?t=${Date.now()}` : image.accessUrl
+  }
+  
+  // 旧格式：使用url（已经是完整URL）
+  if (image.url && (image.url.startsWith('http') || image.url.startsWith('/files/'))) {
+    return preventCache ? `${image.url}?t=${Date.now()}` : image.url
+  }
+  
+  // 如果有filename，根据环境构建URL路径
+  if (image.filename) {
+    const hostname = window.location.hostname
+    const protocol = window.location.protocol
+    
+    let url
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      // 开发环境：使用Vite代理
+      url = `/files/customer-complaint/${image.filename}`
+    } else {
+      // 生产环境：使用Nginx文件服务器端口8080
+      url = `${protocol}//${hostname}:8080/files/customer-complaint/${image.filename}`
+    }
+    
+    // 只在需要防止缓存时添加时间戳参数
+    if (preventCache) {
+      url += `?t=${Date.now()}`
+    }
+    
+    return url
+  }
+  
+  // 如果都没有，返回空字符串
+  return ''
+}
+
+/**
+ * 图片上传成功 - 处理新的文件信息格式
+ * 参考出版异常页面的实现逻辑
  */
 const handleImageSuccess = (response, file) => {
   if (response.success) {
-    formData.problemImages.push({
-      name: file.name,
-      url: response.data.url
-    })
+    let fileInfo
+    
+    if (response.fileInfo) {
+      // 新格式：使用完整的文件信息对象
+      fileInfo = {
+        id: response.fileInfo.id,
+        name: file.name,
+        originalName: response.fileInfo.originalName,
+        filename: response.fileInfo.filename,
+        relativePath: response.fileInfo.relativePath,
+        accessUrl: response.fileInfo.accessUrl,
+        fullUrl: response.fileInfo.fullUrl,
+        fileSize: response.fileInfo.fileSize,
+        mimeType: response.fileInfo.mimeType,
+        uploadTime: response.fileInfo.uploadTime,
+        fileType: response.fileInfo.fileType,
+        category: response.fileInfo.category,
+        // 兼容旧的字段名
+        url: response.fileInfo.accessUrl,
+        path: response.fileInfo.relativePath,
+        size: response.fileInfo.fileSize
+      }
+    } else {
+      // 旧格式兼容
+      fileInfo = {
+        id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+        name: file.name,
+        originalName: file.name,
+        filename: response.data?.filename || file.name,
+        relativePath: `customer-complaint/${response.data?.filename || file.name}`,
+        accessUrl: response.url || response.data?.url,
+        fileSize: file.size,
+        mimeType: file.type,
+        uploadTime: new Date().toISOString(),
+        fileType: 'image',
+        category: 'customer_complaint',
+        // 兼容旧的字段名
+        url: getImageUrl({ filename: response.data?.filename || file.name }, true), // 新上传的文件使用防缓存机制
+        path: `customer-complaint/${response.data?.filename || file.name}`,
+        size: file.size
+      }
+    }
+    
+    formData.problemImages.push(fileInfo)
+    console.log('客诉图片上传成功，保存文件信息:', fileInfo)
   } else {
     ElMessage.error('图片上传失败')
   }
 }
 
 /**
- * 移除图片
+ * 移除图片 - 支持新的文件信息格式
  */
 const handleImageRemove = (file) => {
-  const index = formData.problemImages.findIndex(img => img.url === file.url)
+  // 支持新旧两种格式的文件移除
+  const index = formData.problemImages.findIndex(img => {
+    // 新格式：通过accessUrl或filename匹配
+    if (img.accessUrl && file.url) {
+      return img.accessUrl === file.url
+    }
+    // 兼容旧格式：通过url匹配
+    if (img.url && file.url) {
+      return img.url === file.url
+    }
+    // 通过filename匹配
+    if (img.filename && file.name) {
+      return img.filename === file.name
+    }
+    return false
+  })
+  
   if (index > -1) {
+    const removedImage = formData.problemImages[index]
+    
+    // 如果是编辑模式且图片有filename（表示是已上传的文件），则添加到删除列表
+    if (isEdit.value && removedImage.filename) {
+      removedFiles.value.push({
+        filename: removedImage.filename,
+        originalName: removedImage.originalName || removedImage.name,
+        accessUrl: removedImage.accessUrl || removedImage.url
+      })
+      console.log('添加到删除列表:', removedImage.filename)
+    }
+    
     formData.problemImages.splice(index, 1)
+    console.log('移除图片:', removedImage)
   }
 }
 
@@ -1506,10 +1911,26 @@ const handleBatchDelete = async () => {
     }
   } catch (error) {
     if (error !== 'cancel') {
-      console.error('批量删除失败:', error)
+      console.error('批量删除失败:', error?.message || '未知错误')
       ElMessage.error('批量删除失败，请重试')
     }
   }
+}
+
+/**
+ * 处理客户编号输入 - 自动转换为大写
+ * @param {string} value - 输入的值
+ */
+const handleCustomerCodeInput = (value) => {
+  formData.customerCode = value.toUpperCase()
+}
+
+/**
+ * 处理工单号输入 - 自动转换为大写
+ * @param {string} value - 输入的值
+ */
+const handleWorkOrderNoInput = (value) => {
+  formData.workOrderNo = value.toUpperCase()
 }
 
 // 组件挂载时加载数据
@@ -1925,5 +2346,129 @@ onMounted(() => {
   .advanced-search-area .el-col {
     padding: 0 8px;
   }
+}
+
+/* 自定义上传文件项样式 */
+.upload-file-item {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.upload-file-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.upload-file-item:hover .upload-file-overlay {
+  opacity: 1;
+}
+
+.upload-file-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+}
+
+.upload-file-preview-icon {
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
+}
+
+.upload-file-actions {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 4px;
+  padding: 4px;
+  pointer-events: auto;
+}
+
+.upload-file-action {
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  transition: color 0.3s ease;
+}
+
+.upload-file-action:hover {
+  color: #f56c6c;
+}
+
+/* 图片加载失败样式 */
+.image-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  background: #f5f7fa;
+  color: #909399;
+  font-size: 12px;
+}
+
+.image-error .el-icon {
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+/* 详情对话框图片样式 */
+.detail-image-item {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  margin-right: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.detail-image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.detail-image-item:hover .detail-image-overlay {
+  opacity: 1;
+}
+
+.detail-image-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.detail-image-preview-icon {
+  color: white;
+  font-size: 20px;
+  cursor: pointer;
 }
 </style>

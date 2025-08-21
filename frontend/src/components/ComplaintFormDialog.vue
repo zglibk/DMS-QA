@@ -1122,18 +1122,10 @@ const isImageFile = (fileName) => {
   return imageExtensions.includes(extension)
 }
 
-// 获取API基础URL - 使用vite配置自动设置的地址
+// 获取API基础URL - 使用相对路径配合vite代理
 const getApiBaseUrl = () => {
-  // 使用axios的当前baseURL，这个已经通过vite配置自动设置了
-  if (axios.defaults.baseURL) {
-    console.log('ComplaintFormDialog 使用axios默认baseURL:', axios.defaults.baseURL)
-    return axios.defaults.baseURL
-  }
-
-  // 降级方案：使用环境变量
-  const envApiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001'
-  console.log('ComplaintFormDialog 使用环境变量VITE_API_BASE_URL:', envApiBase)
-  return envApiBase
+  // 直接返回空字符串，使用相对路径配合vite.config.js中的代理配置
+  return ''
 }
 
 // 判断文件路径类型并生成正确的预览URL

@@ -797,19 +797,29 @@ const handleAuditDialogClose = () => {
 
 // 提交表单
 const handleSubmit = () => {
-  formRef.value.validate((valid) => {
+  formRef.value.validate((valid, fields) => {
     if (valid) {
       // TODO: 实现提交逻辑
       console.log('提交数据:', formData)
       ElMessage.success(isEdit.value ? '更新成功' : '发起审核成功')
       handleDialogClose()
+    } else if (fields) {
+      // 获取第一个验证失败的字段错误信息
+      const firstFieldKey = Object.keys(fields)[0]
+      const firstFieldErrors = fields[firstFieldKey]
+      if (firstFieldErrors && firstFieldErrors.length > 0) {
+        const errorMessage = firstFieldErrors[0].message
+        ElMessage.error(errorMessage)
+      } else {
+        ElMessage.error('请检查表单填写是否完整')
+      }
     }
   })
 }
 
 // 提交审核
 const handleAuditSubmit = () => {
-  auditFormRef.value.validate((valid) => {
+  auditFormRef.value.validate((valid, fields) => {
     if (valid) {
       // TODO: 实现审核提交逻辑
       console.log('审核数据:', auditFormData)
@@ -824,6 +834,16 @@ const handleAuditSubmit = () => {
       
       ElMessage.success('审核提交成功')
       handleAuditDialogClose()
+    } else if (fields) {
+      // 获取第一个验证失败的字段错误信息
+      const firstFieldKey = Object.keys(fields)[0]
+      const firstFieldErrors = fields[firstFieldKey]
+      if (firstFieldErrors && firstFieldErrors.length > 0) {
+        const errorMessage = firstFieldErrors[0].message
+        ElMessage.error(errorMessage)
+      } else {
+        ElMessage.error('请检查表单填写是否完整')
+      }
     }
   })
 }

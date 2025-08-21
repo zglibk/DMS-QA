@@ -681,7 +681,7 @@ const formRules = {
 }
 
 // 上传地址
-const uploadUrl = '/upload'
+const uploadUrl = '/api/upload'
 
 // 计算属性
 const dialogTitle = computed(() => {
@@ -1298,9 +1298,29 @@ function handleDialogClose() {
  * 表单提交处理
  */
 async function handleSubmit() {
+  // 执行表单验证
+  const isValid = await new Promise((resolve) => {
+    formRef.value.validate((valid, fields) => {
+      if (!valid && fields) {
+        // 获取第一个验证失败的字段错误信息
+        const firstFieldKey = Object.keys(fields)[0]
+        const firstFieldErrors = fields[firstFieldKey]
+        if (firstFieldErrors && firstFieldErrors.length > 0) {
+          const errorMessage = firstFieldErrors[0].message
+          ElMessage.error(errorMessage)
+        } else {
+          ElMessage.error('请检查表单填写是否完整')
+        }
+      }
+      resolve(valid)
+    })
+  })
+  
+  if (!isValid) {
+    return
+  }
+  
   try {
-    await formRef.value.validate()
-    
     const submitData = { ...formData }
     
     // 处理分发部门数据 - 确保数据格式正确
@@ -1332,9 +1352,7 @@ async function handleSubmit() {
     }
   } catch (error) {
     console.error('保存失败:', error)
-    if (error !== false) {
-      ElMessage.error('保存失败')
-    }
+    ElMessage.error('保存失败')
   }
 }
 

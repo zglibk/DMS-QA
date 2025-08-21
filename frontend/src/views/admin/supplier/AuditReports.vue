@@ -833,7 +833,7 @@ const handleDialogClose = () => {
  * 提交表单
  */
 const handleSubmit = () => {
-  formRef.value.validate((valid) => {
+  formRef.value.validate((valid, fields) => {
     if (valid) {
       submitLoading.value = true
       // 这里调用保存API
@@ -843,6 +843,16 @@ const handleSubmit = () => {
         dialogVisible.value = false
         loadTableData()
       }, 1000)
+    } else if (fields) {
+      // 获取第一个验证失败的字段错误信息
+      const firstFieldKey = Object.keys(fields)[0]
+      const firstFieldErrors = fields[firstFieldKey]
+      if (firstFieldErrors && firstFieldErrors.length > 0) {
+        const errorMessage = firstFieldErrors[0].message
+        ElMessage.error(errorMessage)
+      } else {
+        ElMessage.error('请检查表单填写是否完整')
+      }
     }
   })
 }

@@ -409,7 +409,7 @@
               <UploadImg 
                 shape="round" 
                 :currentAvatar="addUserForm.Avatar || ''"
-                :uploadUrl="'/users/update-avatar'" 
+                :uploadUrl="'/api/users/update-avatar'" 
                 @upload-success="handleAvatarUploadSuccess"
               />
             </el-form-item>

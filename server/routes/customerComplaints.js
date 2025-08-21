@@ -11,17 +11,45 @@ const path = require('path');
 const fs = require('fs');
 
 // 配置文件上传
+const customerComplaintDir = path.join(__dirname, '../uploads/customer-complaint');
+
+// 确保客诉目录存在
+if (!fs.existsSync(customerComplaintDir)) {
+  fs.mkdirSync(customerComplaintDir, { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    const uploadDir = path.join(__dirname, '../uploads/complaints');
-    if (!fs.existsSync(uploadDir)) {
-      fs.mkdirSync(uploadDir, { recursive: true });
-    }
-    cb(null, uploadDir);
+    cb(null, customerComplaintDir);
   },
   filename: function (req, file, cb) {
-    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
+    // 生成唯一文件名：时间戳-随机字符串.扩展名
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    
+    // 处理中文文件名编码问题
+    let originalName;
+    try {
+      // 尝试解码文件名，处理中文字符
+      originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+      originalName = path.parse(originalName).name;
+    } catch (error) {
+      // 如果解码失败，使用原始文件名
+      originalName = path.parse(file.originalname).name;
+    }
+    
+    // 为了确保文件名唯一性，始终添加时间戳和随机字符串
+    let finalName;
+    if (originalName === 'image' || /[^\x00-\x7F]/.test(originalName)) {
+      // 对于默认的image文件名或包含非ASCII字符的文件名，使用时间戳和随机字符串
+      finalName = `file_${timestamp}_${randomStr}`;
+    } else {
+      // 对于其他文件名，保留原名但添加时间戳确保唯一性
+      finalName = `${originalName}_${timestamp}_${randomStr}`;
+    }
+    
+    const extension = path.extname(file.originalname); // 获取扩展名
+    cb(null, `${finalName}${extension}`);
   }
 });
 
@@ -288,10 +316,10 @@ router.get('/', async (req, res) => {
       SELECT * FROM (
         SELECT 
           ID, Date, CustomerCode, WorkOrderNo, ProductName, Specification,
-          OrderQuantity, ProblemDescription, DefectQuantity, DefectRate,
+          OrderQuantity, ProblemDescription, ProblemImages, DefectQuantity, DefectRate,
           ComplaintMethod, ProcessingDeadline, RequireReport, CauseAnalysis,
           CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
-          ReplyDate, FeedbackPerson, FeedbackDate, Processor, ImprovementVerification,
+          ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor, ImprovementVerification,
           VerificationDate, Status, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy,
           ROW_NUMBER() OVER (ORDER BY CreatedAt DESC, ID DESC) AS RowNum
         FROM CustomerComplaints 
@@ -303,9 +331,36 @@ router.get('/', async (req, res) => {
 
     const dataResult = await request.query(dataQuery);
     
+    // 处理JSON字段解析
+    const processedData = dataResult.recordset.map(record => {
+      // 解析问题图片JSON字段
+      if (record.ProblemImages) {
+        try {
+          record.ProblemImages = JSON.parse(record.ProblemImages);
+        } catch (e) {
+          record.ProblemImages = [];
+        }
+      } else {
+        record.ProblemImages = [];
+      }
+      
+      // 解析报告附件JSON字段
+      if (record.ReportAttachments) {
+        try {
+          record.ReportAttachments = JSON.parse(record.ReportAttachments);
+        } catch (e) {
+          record.ReportAttachments = [];
+        }
+      } else {
+        record.ReportAttachments = [];
+      }
+      
+      return record;
+    });
+    
       return {
         success: true,
-        data: dataResult.recordset,
+        data: processedData,
         pagination: {
           current: parseInt(page),
           pageSize: parseInt(pageSize),
@@ -450,7 +505,7 @@ router.post('/', async (req, res) => {
       request.input('defectQuantity', sql.Int, defectQuantity || 0);
       request.input('defectRate', sql.Decimal(5, 2), defectRate || 0);
       request.input('complaintMethod', sql.NVarChar, complaintMethod);
-      request.input('processingDeadline', sql.Date, processingDeadline);
+      request.input('processingDeadline', sql.Date, processingDeadline || null);
       request.input('requireReport', sql.Bit, requireReport || false);
       request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
       request.input('correctiveActions', sql.NVarChar, correctiveActions || null);
@@ -498,12 +553,57 @@ router.put('/:id', async (req, res) => {
       complaintMethod, processingDeadline, requireReport, causeAnalysis,
       correctiveActions, disposalMeasures, responsibleDepartment, responsiblePerson,
       replyDate, reportAttachments, feedbackPerson, feedbackDate, processor,
-      improvementVerification, verificationDate, status
+      improvementVerification, verificationDate, status,
+      removedFiles  // 接收前端传递的被删除文件列表
     } = req.body;
+    
+    console.log('更新接收到的数据:', req.body);
+    console.log('更新图片数据:', problemImages);
+    console.log('被删除的文件:', removedFiles);
     
     const currentUser = req.user?.username || '系统用户';
     
     const result = await executeQuery(async (pool) => {
+      // 检查记录是否存在并获取原有图片数据
+      const checkRequest = pool.request();
+      checkRequest.input('checkId', sql.Int, id);
+      const checkResult = await checkRequest.query('SELECT ProblemImages FROM CustomerComplaints WHERE ID = @checkId');
+      
+      if (checkResult.recordset.length === 0) {
+        throw new Error('客户投诉记录不存在');
+      }
+      
+      // 处理被删除的文件 - 删除物理文件
+      // 只在编辑模式下且确实有文件需要删除时才执行删除操作
+      if (removedFiles && Array.isArray(removedFiles) && removedFiles.length > 0) {
+        console.log('开始删除被标记的文件:', removedFiles.length, '个文件');
+        
+        for (const removedFile of removedFiles) {
+          try {
+            // 确保removedFile有filename属性且不为空
+            if (!removedFile.filename) {
+              console.log('跳过无效的删除文件项:', removedFile);
+              continue;
+            }
+            
+            // 构建文件的完整路径
+            const filePath = path.join(__dirname, '../uploads/customer-complaint', removedFile.filename);
+            
+            // 检查文件是否存在
+            if (fs.existsSync(filePath)) {
+              // 删除物理文件
+              fs.unlinkSync(filePath);
+              console.log('成功删除文件:', removedFile.filename);
+            } else {
+              console.log('文件不存在，跳过删除:', removedFile.filename);
+            }
+          } catch (deleteError) {
+            console.error('删除文件失败:', removedFile.filename, deleteError.message);
+            // 继续处理其他文件，不中断整个更新流程
+          }
+        }
+      }
+      
       const request = pool.request();
       const query = `
         UPDATE CustomerComplaints SET
@@ -550,7 +650,7 @@ router.put('/:id', async (req, res) => {
       request.input('defectQuantity', sql.Int, defectQuantity || 0);
       request.input('defectRate', sql.Decimal(5, 2), defectRate || 0);
       request.input('complaintMethod', sql.NVarChar, complaintMethod);
-      request.input('processingDeadline', sql.Date, processingDeadline);
+      request.input('processingDeadline', sql.Date, processingDeadline || null);
       request.input('requireReport', sql.Bit, requireReport || false);
       request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
       request.input('correctiveActions', sql.NVarChar, correctiveActions || null);
@@ -706,6 +806,62 @@ router.post('/upload', upload.array('files', 10), (req, res) => {
   } catch (error) {
     console.error('文件上传失败:', error);
     res.status(500).json({ success: false, message: '文件上传失败', error: error.message });
+  }
+});
+
+/**
+ * 客户投诉图片上传接口
+ * POST /api/customer-complaints/upload-image
+ */
+router.post('/upload-image', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: '请选择要上传的图片'
+      });
+    }
+
+    // 处理文件名编码问题
+    let originalName = req.file.originalname;
+    try {
+      // 尝试解码文件名，处理中文字符
+      originalName = Buffer.from(originalName, 'latin1').toString('utf8');
+    } catch (error) {
+      console.log('文件名解码失败，使用原始文件名:', error.message);
+    }
+
+    // 构建文件信息对象，与出版异常页面格式保持一致
+    const fileInfo = {
+      id: `file_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      name: path.parse(originalName).name + path.extname(originalName),
+      originalName: originalName,
+      filename: req.file.filename,
+      relativePath: `customer-complaint/${req.file.filename}`,
+      accessUrl: `/files/customer-complaint/${req.file.filename}`,
+      fullUrl: `${req.protocol}://${req.get('host')}/files/customer-complaint/${req.file.filename}`,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+      uploadTime: new Date().toISOString(),
+      fileType: 'image',
+      category: 'complaint_evidence',
+      url: `/files/customer-complaint/${req.file.filename}`,
+      path: `customer-complaint/${req.file.filename}`,
+      size: req.file.size
+    };
+
+    res.json({
+      success: true,
+      message: '图片上传成功',
+      data: fileInfo
+    });
+  } catch (error) {
+    console.error('图片上传失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '图片上传失败',
+      error: error.message
+    });
   }
 });
 
