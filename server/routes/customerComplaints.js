@@ -1007,8 +1007,8 @@ router.post('/', async (req, res) => {
       request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
       request.input('correctiveActions', sql.NVarChar, correctiveActions || null);
       request.input('disposalMeasures', sql.NVarChar, disposalMeasures || null);
-      request.input('responsibleDepartment', sql.NVarChar, responsibleDepartment);
-      request.input('responsiblePerson', sql.NVarChar, responsiblePerson);
+      request.input('responsibleDepartment', sql.NVarChar, responsibleDepartment || null);
+      request.input('responsiblePerson', sql.NVarChar, responsiblePerson || null);
       request.input('replyDate', sql.Date, replyDate || null);
       request.input('reportAttachments', sql.NVarChar, JSON.stringify(reportAttachments || []));
       request.input('feedbackPerson', sql.NVarChar, feedbackPerson || null);
@@ -1025,7 +1025,6 @@ router.post('/', async (req, res) => {
       request.input('inspectionCost', sql.Decimal(10, 2), inspectionCost || 0);
       request.input('transportationCost', sql.Decimal(10, 2), transportationCost || 0);
       request.input('preventionCost', sql.Decimal(10, 2), preventionCost || 0);
-      request.input('totalQualityCost', sql.Decimal(10, 2), totalQualityCost || 0);
       request.input('costRemarks', sql.NVarChar, costRemarks || null);
       request.input('createdBy', sql.NVarChar, currentUser);
       request.input('updatedBy', sql.NVarChar, currentUser);
@@ -1076,6 +1075,8 @@ router.put('/:id', async (req, res) => {
     console.log('更新接收到的数据:', req.body);
     console.log('更新图片数据:', problemImages);
     console.log('被删除的文件:', removedFiles);
+    console.log('责任部门字段值:', responsibleDepartment, '类型:', typeof responsibleDepartment);
+    console.log('责任人字段值:', responsiblePerson, '类型:', typeof responsiblePerson);
     
     const currentUser = req.user?.username || '系统用户';
     
@@ -1157,14 +1158,13 @@ router.put('/:id', async (req, res) => {
           InspectionCost = @inspectionCost,
           TransportationCost = @transportationCost,
           PreventionCost = @preventionCost,
-          TotalQualityCost = @totalQualityCost,
           CostRemarks = @costRemarks,
           UpdatedAt = GETDATE(),
           UpdatedBy = @updatedBy
         WHERE ID = @id
       `;
       
-      request.input('id', sql.Int, id);
+      request.input('id', sql.Int, validId);
       request.input('date', sql.Date, date);
       request.input('customerCode', sql.NVarChar, customerCode);
       request.input('workOrderNo', sql.NVarChar, workOrderNo);
@@ -1182,8 +1182,8 @@ router.put('/:id', async (req, res) => {
       request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
       request.input('correctiveActions', sql.NVarChar, correctiveActions || null);
       request.input('disposalMeasures', sql.NVarChar, disposalMeasures || null);
-      request.input('responsibleDepartment', sql.NVarChar, responsibleDepartment);
-      request.input('responsiblePerson', sql.NVarChar, responsiblePerson);
+      request.input('responsibleDepartment', sql.Int, responsibleDepartment || null);
+      request.input('responsiblePerson', sql.Int, responsiblePerson || null);
       request.input('replyDate', sql.Date, replyDate || null);
       request.input('reportAttachments', sql.NVarChar, JSON.stringify(reportAttachments || []));
       request.input('feedbackPerson', sql.NVarChar, feedbackPerson || null);
@@ -1200,7 +1200,6 @@ router.put('/:id', async (req, res) => {
       request.input('inspectionCost', sql.Decimal(10, 2), inspectionCost || 0);
       request.input('transportationCost', sql.Decimal(10, 2), transportationCost || 0);
       request.input('preventionCost', sql.Decimal(10, 2), preventionCost || 0);
-      request.input('totalQualityCost', sql.Decimal(10, 2), totalQualityCost || 0);
       request.input('costRemarks', sql.NVarChar, costRemarks || null);
       request.input('updatedBy', sql.NVarChar, currentUser);
       

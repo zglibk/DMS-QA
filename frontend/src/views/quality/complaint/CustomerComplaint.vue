@@ -358,8 +358,16 @@
             <el-tag :type="getStatusType(row.status)">{{ getStatusText(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="responsibleDepartment" label="责任部门" width="120" />
-        <el-table-column prop="responsiblePerson" label="责任人" width="100" />
+        <el-table-column prop="responsibleDepartment" label="责任部门" width="120">
+          <template #default="{ row }">
+            {{ getDepartmentText(row.responsibleDepartment) }}
+          </template>
+        </el-table-column>
+        <el-table-column prop="responsiblePerson" label="责任人" width="100">
+          <template #default="{ row }">
+            {{ getPersonText(row.responsiblePerson) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="replyDate" label="回复日期" width="120" />
         <el-table-column prop="feedbackPerson" label="反馈人" width="100" />
         <el-table-column prop="feedbackDate" label="反馈日期" width="120" />
@@ -1167,28 +1175,28 @@
         <div class="detail-section" v-if="hasQualityCostData(viewData)">
           <h4>质量成本</h4>
           <el-descriptions :column="3" border>
-            <el-descriptions-item label="质量罚款" v-if="viewData.qualityPenalty > 0">
+            <el-descriptions-item label="质量罚款">
               ¥{{ viewData.qualityPenalty?.toFixed(2) || '0.00' }}
             </el-descriptions-item>
-            <el-descriptions-item label="返工成本" v-if="viewData.reworkCost > 0">
+            <el-descriptions-item label="返工成本">
               ¥{{ viewData.reworkCost?.toFixed(2) || '0.00' }}
             </el-descriptions-item>
-            <el-descriptions-item label="客户赔偿" v-if="viewData.customerCompensation > 0">
+            <el-descriptions-item label="客户赔偿">
               ¥{{ viewData.customerCompensation?.toFixed(2) || '0.00' }}
             </el-descriptions-item>
-            <el-descriptions-item label="质量损失成本" v-if="viewData.qualityLossCost > 0">
+            <el-descriptions-item label="质量损失成本">
               ¥{{ viewData.qualityLossCost?.toFixed(2) || '0.00' }}
             </el-descriptions-item>
-            <el-descriptions-item label="检验成本" v-if="viewData.inspectionCost > 0">
+            <el-descriptions-item label="检验成本">
               ¥{{ viewData.inspectionCost?.toFixed(2) || '0.00' }}
             </el-descriptions-item>
-            <el-descriptions-item label="运输成本" v-if="viewData.transportationCost > 0">
+            <el-descriptions-item label="运输成本">
               ¥{{ viewData.transportationCost?.toFixed(2) || '0.00' }}
             </el-descriptions-item>
-            <el-descriptions-item label="预防成本" v-if="viewData.preventionCost > 0">
+            <el-descriptions-item label="预防成本">
               ¥{{ viewData.preventionCost?.toFixed(2) || '0.00' }}
             </el-descriptions-item>
-            <el-descriptions-item label="总质量成本" v-if="viewData.totalQualityCost > 0">
+            <el-descriptions-item label="总质量成本">
               <el-tag type="danger" size="large">
                 ¥{{ viewData.totalQualityCost?.toFixed(2) || '0.00' }}
               </el-tag>
@@ -1442,10 +1450,10 @@ const getDepartmentText = (department) => {
   // 兼容旧的字符串格式
   const textMap = {
     production: '生产部',
-    quality: '质检部',
-    technical: '技术部',
+    quality: '品质部',
+    technical: '设计部',
     procurement: '采购部',
-    sales: '销售部'
+    sales: '业务部'
   }
   return textMap[department] || department
 }
@@ -1696,7 +1704,7 @@ const handleAdd = () => {
  * 编辑 - 处理图片数据格式转换
  * 参考出版异常页面的实现逻辑
  */
-const handleEdit = (row) => {
+const handleEdit = async (row) => {
   isEdit.value = true
   
   // 使用新的getImageList函数处理问题图片数据
@@ -1730,13 +1738,45 @@ const handleEdit = (row) => {
     }
   })
   
+  // 处理责任部门字段：如果是字符串代码，转换为对应的部门ID
+  let processedResponsibleDepartment = row.responsibleDepartment
+  if (typeof row.responsibleDepartment === 'string' && isNaN(row.responsibleDepartment)) {
+    // 如果是字符串代码（如"technical"），查找对应的部门ID
+    const dept = departmentOptions.value.find(d => {
+      const textMap = {
+        production: '生产部',
+        quality: '品质部', 
+        technical: '设计部',
+        procurement: '采购部',
+        sales: '业务部'
+      }
+      return d.Name === textMap[row.responsibleDepartment]
+    })
+    processedResponsibleDepartment = dept ? dept.ID : row.responsibleDepartment
+  } else if (typeof row.responsibleDepartment === 'string' && !isNaN(row.responsibleDepartment)) {
+    // 如果是字符串格式的数字，转换为数字ID
+    processedResponsibleDepartment = parseInt(row.responsibleDepartment)
+  }
+  
+  // 处理责任人字段：确保是数字ID格式
+  let processedResponsiblePerson = row.responsiblePerson
+  if (typeof row.responsiblePerson === 'string' && !isNaN(row.responsiblePerson)) {
+    processedResponsiblePerson = parseInt(row.responsiblePerson)
+  }
+  
   Object.assign(formData, {
     ...row,
     problemImages: convertedProblemImages,
-    reportAttachments: convertedReportAttachments
+    reportAttachments: convertedReportAttachments,
+    responsibleDepartment: processedResponsibleDepartment,
+    responsiblePerson: processedResponsiblePerson
   })
   
   console.log('📝 编辑数据加载（优化后）:')
+  console.log('原始责任部门:', row.responsibleDepartment)
+  console.log('处理后责任部门:', processedResponsibleDepartment)
+  console.log('原始责任人:', row.responsiblePerson)
+  console.log('处理后责任人:', processedResponsiblePerson)
   console.log('原始图片数据:', row.problemImages)
   console.log('原始图片数据类型:', typeof row.problemImages)
   console.log('原始图片数据是否为数组:', Array.isArray(row.problemImages))
@@ -1750,10 +1790,22 @@ const handleEdit = (row) => {
   console.log('转换后附件数据:', convertedReportAttachments)
   console.log('='.repeat(50))
   
-  // 如果有责任部门，加载对应的人员列表
+  // 如果有责任部门，先加载对应的人员列表，然后再打开对话框
   if (formData.responsibleDepartment) {
-    loadPersonsByDepartment(formData.responsibleDepartment)
+    await loadPersonsByDepartment(formData.responsibleDepartment)
+    
+    // 确保责任人字段也是数字ID格式
+    if (formData.responsiblePerson && typeof formData.responsiblePerson === 'string' && !isNaN(formData.responsiblePerson)) {
+      formData.responsiblePerson = parseInt(formData.responsiblePerson)
+    }
   }
+  
+  console.log('📝 编辑对话框打开前的最终数据:')
+  console.log('责任部门ID:', formData.responsibleDepartment)
+  console.log('责任人ID:', formData.responsiblePerson)
+  console.log('部门选项列表:', departmentOptions.value)
+  console.log('人员选项列表:', personOptions.value)
+  console.log('='.repeat(50))
   
   dialogVisible.value = true
 }
@@ -2507,17 +2559,8 @@ const getPersonName = (personId) => {
 const hasQualityCostData = (data) => {
   if (!data) return false
   
-  return (
-    (data.qualityPenalty && data.qualityPenalty > 0) ||
-    (data.reworkCost && data.reworkCost > 0) ||
-    (data.customerCompensation && data.customerCompensation > 0) ||
-    (data.qualityLossCost && data.qualityLossCost > 0) ||
-    (data.inspectionCost && data.inspectionCost > 0) ||
-    (data.transportationCost && data.transportationCost > 0) ||
-    (data.preventionCost && data.preventionCost > 0) ||
-    (data.totalQualityCost && data.totalQualityCost > 0) ||
-    (data.costRemarks && data.costRemarks.trim() !== '')
-  )
+  // 始终显示质量成本区域，不管数值是否为0
+  return true
 }
 
 /**
