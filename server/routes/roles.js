@@ -6,7 +6,7 @@
 const express = require('express')
 const router = express.Router()
 const sql = require('mssql')
-const { getConnection } = require('../db')
+const { getConnection, executeQuery } = require('../db')
 
 // 获取角色列表（支持分页和搜索）
 router.get('/', async (req, res) => {
@@ -19,65 +19,76 @@ router.get('/', async (req, res) => {
     } = req.query
     
     const offset = (page - 1) * size
-    const pool = await getConnection()
     
-    // 构建查询条件
-    let whereConditions = ['1=1']  // 移除硬编码的状态过滤
-    let queryParams = []
-    
-    if (keyword) {
-      whereConditions.push('(r.RoleName LIKE @keyword OR r.RoleCode LIKE @keyword)')
-      queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
-    }
-    
-    if (status !== null && status !== '') {
-      whereConditions.push('r.Status = @status')
-      queryParams.push({ name: 'status', type: sql.Bit, value: status === 'true' })
-    }
-    
-    const whereClause = whereConditions.join(' AND ')
-    
-    // 获取总数
-    let countRequest = pool.request()
-    queryParams.forEach(param => {
-      countRequest.input(param.name, param.type, param.value)
-    })
-    
-    const countResult = await countRequest.query(`
-      SELECT COUNT(*) as total
-      FROM Roles r
-      WHERE ${whereClause}
-    `)
-    
-    // 获取分页数据
-    let dataRequest = pool.request()
-    queryParams.forEach(param => {
-      dataRequest.input(param.name, param.type, param.value)
-    })
-    dataRequest.input('offset', sql.Int, offset)
-    dataRequest.input('size', sql.Int, parseInt(size))
-    
-    const dataResult = await dataRequest.query(`
-      SELECT * FROM (
-        SELECT 
-          ROW_NUMBER() OVER (ORDER BY r.SortOrder ASC, r.CreatedAt DESC) as RowNum,
-          r.ID,
-          r.RoleName as Name,
-          r.RoleCode as Code,
-          r.Description,
-          r.SortOrder,
-          r.Status,
-          r.CreatedAt,
-          r.UpdatedAt,
-          COUNT(ur.UserID) as UserCount
+    const result = await executeQuery(async (pool) => {
+      // 构建查询条件
+      let whereConditions = ['1=1']  // 移除硬编码的状态过滤
+      let queryParams = []
+      
+      if (keyword) {
+        whereConditions.push('(r.RoleName LIKE @keyword OR r.RoleCode LIKE @keyword)')
+        queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
+      }
+      
+      if (status !== null && status !== '') {
+        whereConditions.push('r.Status = @status')
+        queryParams.push({ name: 'status', type: sql.Bit, value: status === 'true' })
+      }
+      
+      const whereClause = whereConditions.join(' AND ')
+      
+      // 获取总数
+      let countRequest = pool.request()
+      queryParams.forEach(param => {
+        countRequest.input(param.name, param.type, param.value)
+      })
+      
+      const countResult = await countRequest.query(`
+        SELECT COUNT(*) as total
         FROM Roles r
-        LEFT JOIN UserRoles ur ON r.ID = ur.RoleID
         WHERE ${whereClause}
-        GROUP BY r.ID, r.RoleName, r.RoleCode, r.Description, r.SortOrder, r.Status, r.CreatedAt, r.UpdatedAt
-      ) AS T
-      WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
-      ORDER BY T.RowNum
-    `)
+      `)
+      
+      // 获取分页数据
+      let dataRequest = pool.request()
+      queryParams.forEach(param => {
+        dataRequest.input(param.name, param.type, param.value)
+      })
+      dataRequest.input('offset', sql.Int, offset)
+      dataRequest.input('size', sql.Int, parseInt(size))
+      
+      const dataResult = await dataRequest.query(`
+        SELECT * FROM (
+          SELECT 
+            ROW_NUMBER() OVER (ORDER BY r.SortOrder ASC, r.CreatedAt DESC) as RowNum,
+            r.ID,
+            r.RoleName as Name,
+            r.RoleCode as Code,
+            r.Description,
+            r.SortOrder,
+            r.Status,
+            r.CreatedAt,
+            r.UpdatedAt,
+            COUNT(ur.UserID) as UserCount
+          FROM Roles r
+          LEFT JOIN UserRoles ur ON r.ID = ur.RoleID
+          WHERE ${whereClause}
+          GROUP BY r.ID, r.RoleName, r.RoleCode, r.Description, r.SortOrder, r.Status, r.CreatedAt, r.UpdatedAt
+        ) AS T
+        WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
+        ORDER BY T.RowNum
+      `)
+      
+      return { countResult, dataResult }
+    })
+    
+    // 检查executeQuery是否返回null（数据库连接失败）
+    if (!result) {
+      console.error('获取角色列表失败: executeQuery返回null，可能是数据库连接问题')
+      return res.json({ success: true, data: [], total: 0, page: parseInt(page), size: parseInt(size) })
+    }
+    
+    const { countResult, dataResult } = result
     
     res.json({
       success: true,

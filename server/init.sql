@@ -1273,6 +1273,17 @@ BEGIN
         [VerificationDate] DATE NULL,                         -- 验证日期，可空
         [Status] NVARCHAR(20) NULL DEFAULT 'pending',         -- 处理状态，默认pending
         
+        -- 质量成本字段
+        [QualityPenalty] DECIMAL(18,2) NULL DEFAULT 0,        -- 质量罚款金额
+        [ReworkCost] DECIMAL(18,2) NULL DEFAULT 0,            -- 返工成本
+        [CustomerCompensation] DECIMAL(18,2) NULL DEFAULT 0,  -- 客户赔偿金额
+        [QualityLossCost] DECIMAL(18,2) NULL DEFAULT 0,       -- 质量损失成本（包括废品损失、停工损失等）
+        [InspectionCost] DECIMAL(18,2) NULL DEFAULT 0,        -- 额外检验成本
+        [TransportationCost] DECIMAL(18,2) NULL DEFAULT 0,    -- 运输成本（退货、换货运费）
+        [PreventionCost] DECIMAL(18,2) NULL DEFAULT 0,        -- 预防成本（改进措施投入）
+        [TotalQualityCost] AS ([QualityPenalty] + [ReworkCost] + [CustomerCompensation] + [QualityLossCost] + [InspectionCost] + [TransportationCost] + [PreventionCost]) PERSISTED,  -- 总质量成本（计算字段）
+        [CostRemarks] NVARCHAR(1000) NULL,                   -- 成本备注说明
+        
         -- 系统字段
         [CreatedBy] NVARCHAR(50) NULL,                        -- 创建人
         [CreatedAt] DATETIME NULL DEFAULT GETDATE(),          -- 创建时间
@@ -1288,6 +1299,10 @@ BEGIN
     CREATE INDEX [IX_CustomerComplaints_ResponsibleDepartment] ON [dbo].[CustomerComplaints] ([ResponsibleDepartment]);
     CREATE INDEX [IX_CustomerComplaints_ResponsiblePerson] ON [dbo].[CustomerComplaints] ([ResponsiblePerson]);
     CREATE INDEX [IX_CustomerComplaints_ComplaintType] ON [dbo].[CustomerComplaints] ([ComplaintType]);
+    
+    -- 质量成本字段索引
+    CREATE INDEX [IX_CustomerComplaints_QualityPenalty] ON [dbo].[CustomerComplaints] ([QualityPenalty]);
+    CREATE INDEX [IX_CustomerComplaints_TotalQualityCost] ON [dbo].[CustomerComplaints] ([TotalQualityCost]);
     
     PRINT 'CustomerComplaints 表创建成功。';
 END
@@ -2281,6 +2296,91 @@ CREATE TABLE publishing_exceptions (
 -- 创建索引
 CREATE INDEX IX_publishing_exceptions_registration_date ON publishing_exceptions(registration_date);
 CREATE INDEX IX_publishing_exceptions_customer_code ON publishing_exceptions(customer_code);
+
+-- =====================================================
+-- 质量成本字段注释说明
+-- 功能：为CustomerComplaints表的质量成本字段添加详细注释
+-- =====================================================
+
+-- 添加质量成本字段注释
+EXEC sys.sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'质量罚款金额', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'CustomerComplaints', 
+    @level2type = N'COLUMN', @level2name = N'QualityPenalty';
+
+EXEC sys.sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'返工成本', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'CustomerComplaints', 
+    @level2type = N'COLUMN', @level2name = N'ReworkCost';
+
+EXEC sys.sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'客户赔偿金额', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'CustomerComplaints', 
+    @level2type = N'COLUMN', @level2name = N'CustomerCompensation';
+
+EXEC sys.sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'质量损失成本（包括废品损失、停工损失等）', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'CustomerComplaints', 
+    @level2type = N'COLUMN', @level2name = N'QualityLossCost';
+
+EXEC sys.sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'额外检验成本', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'CustomerComplaints', 
+    @level2type = N'COLUMN', @level2name = N'InspectionCost';
+
+EXEC sys.sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'运输成本（退货、换货运费）', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'CustomerComplaints', 
+    @level2type = N'COLUMN', @level2name = N'TransportationCost';
+
+EXEC sys.sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'预防成本（改进措施投入）', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'CustomerComplaints', 
+    @level2type = N'COLUMN', @level2name = N'PreventionCost';
+
+EXEC sys.sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'总质量成本（自动计算）', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'CustomerComplaints', 
+    @level2type = N'COLUMN', @level2name = N'TotalQualityCost';
+
+EXEC sys.sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'成本备注说明', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'CustomerComplaints', 
+    @level2type = N'COLUMN', @level2name = N'CostRemarks';
+
+PRINT '===================================================';
+PRINT '数据库初始化完成！';
+PRINT '===================================================';
+PRINT '已包含质量成本管理功能：';
+PRINT '1. QualityPenalty - 质量罚款';
+PRINT '2. ReworkCost - 返工成本';
+PRINT '3. CustomerCompensation - 客户赔偿';
+PRINT '4. QualityLossCost - 质量损失成本';
+PRINT '5. InspectionCost - 检验成本';
+PRINT '6. TransportationCost - 运输成本';
+PRINT '7. PreventionCost - 预防成本';
+PRINT '8. TotalQualityCost - 总质量成本（计算字段）';
+PRINT '9. CostRemarks - 成本备注';
+PRINT '===================================================';
+PRINT 'DMS-QA 质量管理系统数据库初始化脚本执行完成！';
 CREATE INDEX IX_publishing_exceptions_work_order ON publishing_exceptions(work_order_number);
 CREATE INDEX IX_publishing_exceptions_isDeleted ON publishing_exceptions(isDeleted);
 CREATE INDEX IX_publishing_exceptions_error_type ON publishing_exceptions(error_type);

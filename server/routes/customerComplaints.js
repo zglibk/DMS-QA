@@ -502,12 +502,391 @@ router.get('/persons/:departmentId', async (req, res) => {
 });
 
 /**
+ * 获取客户选项
+ * GET /api/customer-complaints/customers
+ * 功能：获取所有客户信息用于筛选
+ */
+router.get('/customers', async (req, res) => {
+  try {
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      const query = `
+        SELECT DISTINCT 
+          CustomerCode as id,
+          CustomerCode as name
+        FROM CustomerComplaints 
+        WHERE CustomerCode IS NOT NULL AND CustomerCode != ''
+        ORDER BY CustomerCode
+      `;
+      
+      const queryResult = await request.query(query);
+      return queryResult;
+    });
+    
+    // 检查executeQuery是否返回null（数据库连接失败）
+    if (!result) {
+      console.error('获取客户选项失败: executeQuery返回null，可能是数据库连接问题');
+      return res.json({ success: true, data: [] }); // 返回空数组而不是错误
+    }
+    
+    res.json({ success: true, data: result.recordset || [] });
+  } catch (error) {
+    console.error('获取客户选项失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取客户选项失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取质量成本统计数据
+ * GET /api/customer-complaints/cost-statistics
+ * 功能：提供质量成本的多维度统计分析
+ */
+router.get('/cost-statistics', async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      dimension = 'month',
+      customerId,
+      page = 1,
+      pageSize = 20
+    } = req.query;
+
+    // 确保page和pageSize是有效的数字
+    const validPage = Math.max(1, parseInt(page) || 1);
+    const validPageSize = Math.max(1, Math.min(100, parseInt(pageSize) || 20));
+    const offset = (validPage - 1) * validPageSize;
+
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      
+      // 构建基础查询条件
+      let whereConditions = ['1=1'];
+      
+      if (startDate) {
+        whereConditions.push('Date >= @startDate');
+        request.input('startDate', sql.Date, startDate);
+      }
+      
+      if (endDate) {
+        whereConditions.push('Date <= @endDate');
+        request.input('endDate', sql.Date, endDate);
+      }
+      
+      if (customerId) {
+        whereConditions.push('CustomerCode = @customerId');
+        request.input('customerId', sql.NVarChar, customerId);
+      }
+      
+      const whereClause = whereConditions.join(' AND ');
+      
+      // 获取概览数据
+      const overviewQuery = `
+        SELECT 
+          ISNULL(SUM(TotalQualityCost), 0) as totalCost,
+          ISNULL(SUM(QualityPenalty), 0) as penaltyCost,
+          ISNULL(SUM(CustomerCompensation), 0) as compensationCost,
+          ISNULL(SUM(ReworkCost), 0) as reworkCost,
+          COUNT(*) as totalComplaints
+        FROM CustomerComplaints 
+        WHERE ${whereClause}
+      `;
+      
+      const overviewResult = await request.query(overviewQuery);
+      const overview = overviewResult.recordset[0];
+      
+      // 计算趋势（与上期对比）
+      let trendQuery = '';
+      if (startDate && endDate) {
+        const startDateObj = new Date(startDate);
+        const endDateObj = new Date(endDate);
+        const daysDiff = Math.ceil((endDateObj - startDateObj) / (1000 * 60 * 60 * 24));
+        
+        const prevStartDate = new Date(startDateObj);
+        prevStartDate.setDate(prevStartDate.getDate() - daysDiff);
+        const prevEndDate = new Date(startDateObj);
+        prevEndDate.setDate(prevEndDate.getDate() - 1);
+        
+        request.input('prevStartDate', sql.Date, prevStartDate.toISOString().slice(0, 10));
+        request.input('prevEndDate', sql.Date, prevEndDate.toISOString().slice(0, 10));
+        
+        trendQuery = `
+          SELECT ISNULL(SUM(TotalQualityCost), 0) as prevTotalCost
+          FROM CustomerComplaints 
+          WHERE Date >= @prevStartDate AND Date <= @prevEndDate
+          ${customerId ? 'AND CustomerCode = @customerId' : ''}
+        `;
+        
+        const trendResult = await request.query(trendQuery);
+        const prevTotalCost = trendResult.recordset[0].prevTotalCost;
+        
+        if (prevTotalCost > 0) {
+          const trendValue = ((overview.totalCost - prevTotalCost) / prevTotalCost * 100);
+          overview.totalTrend = isNaN(trendValue) ? 0 : parseFloat(trendValue.toFixed(1));
+        } else {
+          overview.totalTrend = 0;
+        }
+      } else {
+        overview.totalTrend = 0;
+      }
+      
+      // 获取趋势数据
+      let periodFormat = '';
+      switch (dimension) {
+        case 'month':
+          periodFormat = "CONVERT(VARCHAR(7), Date, 120)";
+          break;
+        case 'quarter':
+          periodFormat = "CONCAT(YEAR(Date), '-Q', DATEPART(QUARTER, Date))";
+          break;
+        case 'year':
+          periodFormat = "YEAR(Date)";
+          break;
+        default:
+          periodFormat = "CONVERT(VARCHAR(7), Date, 120)";
+      }
+      
+      const trendDataQuery = `
+        SELECT 
+          ${periodFormat} as period,
+          ISNULL(SUM(QualityPenalty), 0) as qualityPenalty,
+          ISNULL(SUM(ReworkCost), 0) as reworkCost,
+          ISNULL(SUM(CustomerCompensation), 0) as customerCompensation,
+          ISNULL(SUM(TotalQualityCost), 0) as totalCost
+        FROM CustomerComplaints 
+        WHERE ${whereClause}
+        GROUP BY ${periodFormat}
+        ORDER BY ${periodFormat}
+      `;
+      
+      const trendDataResult = await request.query(trendDataQuery);
+      
+      // 获取成本构成数据
+      const compositionQuery = `
+        SELECT 
+          '质量罚款' as name, ISNULL(SUM(QualityPenalty), 0) as value
+        FROM CustomerComplaints WHERE ${whereClause}
+        UNION ALL
+        SELECT 
+          '返工成本' as name, ISNULL(SUM(ReworkCost), 0) as value
+        FROM CustomerComplaints WHERE ${whereClause}
+        UNION ALL
+        SELECT 
+          '客户赔偿' as name, ISNULL(SUM(CustomerCompensation), 0) as value
+        FROM CustomerComplaints WHERE ${whereClause}
+        UNION ALL
+        SELECT 
+          '质量损失' as name, ISNULL(SUM(QualityLossCost), 0) as value
+        FROM CustomerComplaints WHERE ${whereClause}
+        UNION ALL
+        SELECT 
+          '检验成本' as name, ISNULL(SUM(InspectionCost), 0) as value
+        FROM CustomerComplaints WHERE ${whereClause}
+        UNION ALL
+        SELECT 
+          '运输成本' as name, ISNULL(SUM(TransportationCost), 0) as value
+        FROM CustomerComplaints WHERE ${whereClause}
+        UNION ALL
+        SELECT 
+          '预防成本' as name, ISNULL(SUM(PreventionCost), 0) as value
+        FROM CustomerComplaints WHERE ${whereClause}
+      `;
+      
+      const compositionResult = await request.query(compositionQuery);
+      const costComposition = compositionResult.recordset.filter(item => item.value > 0);
+      
+      // 获取客户排行数据
+      const customerRankingQuery = `
+        SELECT TOP 10
+          CustomerCode as customerName,
+          ISNULL(SUM(TotalQualityCost), 0) as totalCost,
+          COUNT(*) as complaintCount
+        FROM CustomerComplaints 
+        WHERE ${whereClause} AND CustomerCode IS NOT NULL AND CustomerCode != ''
+        GROUP BY CustomerCode
+        ORDER BY SUM(TotalQualityCost) DESC
+      `;
+      
+      const customerRankingResult = await request.query(customerRankingQuery);
+      
+      // 获取详细统计数据（分页）
+      request.input('offset', sql.Int, offset);
+      request.input('pageSize', sql.Int, validPageSize);
+      
+      const statisticsQuery = `
+        SELECT 
+          ${periodFormat} as period,
+          CustomerCode as customerName,
+          COUNT(*) as complaintCount,
+          ISNULL(SUM(QualityPenalty), 0) as qualityPenalty,
+          ISNULL(SUM(ReworkCost), 0) as reworkCost,
+          ISNULL(SUM(CustomerCompensation), 0) as customerCompensation,
+          ISNULL(SUM(QualityLossCost), 0) as qualityLossCost,
+          ISNULL(SUM(InspectionCost), 0) as inspectionCost,
+          ISNULL(SUM(TransportationCost), 0) as transportationCost,
+          ISNULL(SUM(PreventionCost), 0) as preventionCost,
+          ISNULL(SUM(TotalQualityCost), 0) as totalCost
+        FROM CustomerComplaints 
+        WHERE ${whereClause}
+        GROUP BY ${periodFormat}, CustomerCode
+        ORDER BY SUM(TotalQualityCost) DESC
+        OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
+      `;
+      
+      const statisticsResult = await request.query(statisticsQuery);
+      
+      // 获取总记录数
+      const countQuery = `
+        SELECT COUNT(DISTINCT CONCAT(${periodFormat}, '-', CustomerCode)) as total
+        FROM CustomerComplaints 
+        WHERE ${whereClause}
+      `;
+      
+      const countResult = await request.query(countQuery);
+      
+      return {
+        overview,
+        trendData: trendDataResult.recordset,
+        costComposition,
+        customerRanking: customerRankingResult.recordset,
+        statistics: statisticsResult.recordset,
+        total: countResult.recordset[0].total
+      };
+    });
+    
+    // 检查executeQuery是否返回null（数据库连接失败）
+    if (!result) {
+      console.error('获取质量成本统计数据失败: executeQuery返回null，可能是数据库连接问题');
+      return res.json({ 
+        success: true, 
+        data: {
+          overview: { totalCost: 0, totalComplaints: 0, avgCostPerComplaint: 0 },
+          trendData: [],
+          costComposition: [],
+          customerRanking: [],
+          statistics: [],
+          total: 0
+        }
+      });
+    }
+    
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('获取质量成本统计数据失败:', error);
+    res.status(500).json({ success: false, message: '获取质量成本统计数据失败', error: error.message });
+  }
+});
+
+/**
+ * 导出质量成本统计数据
+ * GET /api/customer-complaints/cost-statistics/export
+ * 功能：导出质量成本统计数据为Excel文件
+ */
+router.get('/cost-statistics/export', async (req, res) => {
+  try {
+    const {
+      startDate,
+      endDate,
+      dimension = 'month',
+      customerId
+    } = req.query;
+
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      
+      // 构建查询条件
+      let whereConditions = ['1=1'];
+      
+      if (startDate) {
+        whereConditions.push('Date >= @startDate');
+        request.input('startDate', sql.Date, startDate);
+      }
+      
+      if (endDate) {
+        whereConditions.push('Date <= @endDate');
+        request.input('endDate', sql.Date, endDate);
+      }
+      
+      if (customerId) {
+        whereConditions.push('CustomerCode = @customerId');
+        request.input('customerId', sql.NVarChar, customerId);
+      }
+      
+      const whereClause = whereConditions.join(' AND ');
+      
+      // 获取详细数据用于导出
+      let periodFormat = '';
+      switch (dimension) {
+        case 'month':
+          periodFormat = "CONVERT(VARCHAR(7), Date, 120)";
+          break;
+        case 'quarter':
+          periodFormat = "CONCAT(YEAR(Date), '-Q', DATEPART(QUARTER, Date))";
+          break;
+        case 'year':
+          periodFormat = "YEAR(Date)";
+          break;
+        default:
+          periodFormat = "CONVERT(VARCHAR(7), Date, 120)";
+      }
+      
+      const exportQuery = `
+        SELECT 
+          ${periodFormat} as 统计期间,
+          CustomerCode as 客户名称,
+          COUNT(*) as 投诉数量,
+          ISNULL(SUM(QualityPenalty), 0) as 质量罚款,
+          ISNULL(SUM(ReworkCost), 0) as 返工成本,
+          ISNULL(SUM(CustomerCompensation), 0) as 客户赔偿,
+          ISNULL(SUM(QualityLossCost), 0) as 质量损失成本,
+          ISNULL(SUM(InspectionCost), 0) as 检验成本,
+          ISNULL(SUM(TransportationCost), 0) as 运输成本,
+          ISNULL(SUM(PreventionCost), 0) as 预防成本,
+          ISNULL(SUM(TotalQualityCost), 0) as 总质量成本
+        FROM CustomerComplaints 
+        WHERE ${whereClause}
+        GROUP BY ${periodFormat}, CustomerCode
+        ORDER BY SUM(TotalQualityCost) DESC
+      `;
+      
+      const queryResult = await request.query(exportQuery);
+      return queryResult.recordset;
+    });
+    
+    // 使用简单的CSV格式导出（可以后续升级为Excel）
+    const csvHeader = '统计期间,客户名称,投诉数量,质量罚款,返工成本,客户赔偿,质量损失成本,检验成本,运输成本,预防成本,总质量成本\n';
+    const csvData = result.map(row => {
+      return `${row.统计期间},${row.客户名称},${row.投诉数量},${row.质量罚款},${row.返工成本},${row.客户赔偿},${row.质量损失成本},${row.检验成本},${row.运输成本},${row.预防成本},${row.总质量成本}`;
+    }).join('\n');
+    
+    const csvContent = csvHeader + csvData;
+    
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', `attachment; filename="质量成本统计_${new Date().toISOString().slice(0, 10)}.csv"`);
+    res.send('\uFEFF' + csvContent); // 添加BOM以支持中文
+  } catch (error) {
+    console.error('导出质量成本统计数据失败:', error);
+    res.status(500).json({ success: false, message: '导出质量成本统计数据失败', error: error.message });
+  }
+});
+
+/**
  * 获取单个客户投诉记录详情
  * GET /api/customer-complaints/:id
  */
 router.get('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // 验证ID参数
+    const validId = parseInt(id);
+    if (isNaN(validId) || validId <= 0) {
+      return res.status(400).json({ success: false, message: '无效的ID参数' });
+    }
     
     const result = await executeQuery(async (pool) => {
       const request = pool.request();
@@ -524,7 +903,7 @@ router.get('/:id', async (req, res) => {
         WHERE ID = @id
       `;
       
-      request.input('id', sql.Int, id);
+      request.input('id', sql.Int, validId);
       const queryResult = await request.query(query);
       
       return queryResult;
@@ -576,7 +955,10 @@ router.post('/', async (req, res) => {
       complaintMethod, complaintType, processingDeadline, requireReport, causeAnalysis,
       correctiveActions, disposalMeasures, responsibleDepartment, responsiblePerson,
       replyDate, reportAttachments, feedbackPerson, feedbackDate, processor,
-      improvementVerification, verificationDate, status
+      improvementVerification, verificationDate, status,
+      // 质量成本相关字段
+      qualityPenalty, reworkCost, customerCompensation, qualityLossCost,
+      inspectionCost, transportationCost, preventionCost, totalQualityCost, costRemarks
     } = req.body;
     
     const currentUser = req.user?.username || '系统用户';
@@ -591,6 +973,8 @@ router.post('/', async (req, res) => {
           CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
           ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor,
           ImprovementVerification, VerificationDate, Status,
+          QualityPenalty, ReworkCost, CustomerCompensation, QualityLossCost,
+          InspectionCost, TransportationCost, PreventionCost, TotalQualityCost, CostRemarks,
           CreatedBy, UpdatedBy
         ) VALUES (
           @date, @customerCode, @workOrderNo, @productName, @specification,
@@ -599,6 +983,8 @@ router.post('/', async (req, res) => {
           @correctiveActions, @disposalMeasures, @responsibleDepartment, @responsiblePerson,
           @replyDate, @reportAttachments, @feedbackPerson, @feedbackDate, @processor,
           @improvementVerification, @verificationDate, @status,
+          @qualityPenalty, @reworkCost, @customerCompensation, @qualityLossCost,
+          @inspectionCost, @transportationCost, @preventionCost, @totalQualityCost, @costRemarks,
           @createdBy, @updatedBy
         );
         SELECT SCOPE_IDENTITY() as ID;
@@ -631,6 +1017,16 @@ router.post('/', async (req, res) => {
       request.input('improvementVerification', sql.NVarChar, improvementVerification || null);
       request.input('verificationDate', sql.Date, verificationDate || null);
       request.input('status', sql.NVarChar, status || 'pending');
+      // 质量成本字段参数绑定
+      request.input('qualityPenalty', sql.Decimal(10, 2), qualityPenalty || 0);
+      request.input('reworkCost', sql.Decimal(10, 2), reworkCost || 0);
+      request.input('customerCompensation', sql.Decimal(10, 2), customerCompensation || 0);
+      request.input('qualityLossCost', sql.Decimal(10, 2), qualityLossCost || 0);
+      request.input('inspectionCost', sql.Decimal(10, 2), inspectionCost || 0);
+      request.input('transportationCost', sql.Decimal(10, 2), transportationCost || 0);
+      request.input('preventionCost', sql.Decimal(10, 2), preventionCost || 0);
+      request.input('totalQualityCost', sql.Decimal(10, 2), totalQualityCost || 0);
+      request.input('costRemarks', sql.NVarChar, costRemarks || null);
       request.input('createdBy', sql.NVarChar, currentUser);
       request.input('updatedBy', sql.NVarChar, currentUser);
       
@@ -658,6 +1054,12 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    
+    // 验证ID参数是否为有效数字
+    const validId = parseInt(id);
+    if (isNaN(validId) || validId <= 0) {
+      return res.status(400).json({ success: false, message: '无效的记录ID' });
+    }
     const {
       date, customerCode, workOrderNo, productName, specification,
       orderQuantity, problemDescription, problemImages, defectQuantity, defectRate,
@@ -665,6 +1067,9 @@ router.put('/:id', async (req, res) => {
       correctiveActions, disposalMeasures, responsibleDepartment, responsiblePerson,
       replyDate, reportAttachments, feedbackPerson, feedbackDate, processor,
       improvementVerification, verificationDate, status,
+      // 质量成本相关字段
+      qualityPenalty, reworkCost, customerCompensation, qualityLossCost,
+      inspectionCost, transportationCost, preventionCost, totalQualityCost, costRemarks,
       removedFiles  // 接收前端传递的被删除文件列表
     } = req.body;
     
@@ -677,7 +1082,7 @@ router.put('/:id', async (req, res) => {
     const result = await executeQuery(async (pool) => {
       // 检查记录是否存在并获取原有图片数据
       const checkRequest = pool.request();
-      checkRequest.input('checkId', sql.Int, id);
+      checkRequest.input('checkId', sql.Int, validId);
       const checkResult = await checkRequest.query('SELECT ProblemImages FROM CustomerComplaints WHERE ID = @checkId');
       
       if (checkResult.recordset.length === 0) {
@@ -745,6 +1150,15 @@ router.put('/:id', async (req, res) => {
           ImprovementVerification = @improvementVerification,
           VerificationDate = @verificationDate,
           Status = @status,
+          QualityPenalty = @qualityPenalty,
+          ReworkCost = @reworkCost,
+          CustomerCompensation = @customerCompensation,
+          QualityLossCost = @qualityLossCost,
+          InspectionCost = @inspectionCost,
+          TransportationCost = @transportationCost,
+          PreventionCost = @preventionCost,
+          TotalQualityCost = @totalQualityCost,
+          CostRemarks = @costRemarks,
           UpdatedAt = GETDATE(),
           UpdatedBy = @updatedBy
         WHERE ID = @id
@@ -778,6 +1192,16 @@ router.put('/:id', async (req, res) => {
       request.input('improvementVerification', sql.NVarChar, improvementVerification || null);
       request.input('verificationDate', sql.Date, verificationDate || null);
       request.input('status', sql.NVarChar, status || 'pending');
+      // 质量成本字段参数绑定
+      request.input('qualityPenalty', sql.Decimal(10, 2), qualityPenalty || 0);
+      request.input('reworkCost', sql.Decimal(10, 2), reworkCost || 0);
+      request.input('customerCompensation', sql.Decimal(10, 2), customerCompensation || 0);
+      request.input('qualityLossCost', sql.Decimal(10, 2), qualityLossCost || 0);
+      request.input('inspectionCost', sql.Decimal(10, 2), inspectionCost || 0);
+      request.input('transportationCost', sql.Decimal(10, 2), transportationCost || 0);
+      request.input('preventionCost', sql.Decimal(10, 2), preventionCost || 0);
+      request.input('totalQualityCost', sql.Decimal(10, 2), totalQualityCost || 0);
+      request.input('costRemarks', sql.NVarChar, costRemarks || null);
       request.input('updatedBy', sql.NVarChar, currentUser);
       
       const queryResult = await request.query(query);
@@ -804,10 +1228,16 @@ router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
+    // 验证ID参数是否为有效数字
+    const validId = parseInt(id);
+    if (isNaN(validId) || validId <= 0) {
+      return res.status(400).json({ success: false, message: '无效的记录ID' });
+    }
+    
     const result = await executeQuery(async (pool) => {
       const request = pool.request();
       const query = 'DELETE FROM CustomerComplaints WHERE ID = @id';
-      request.input('id', sql.Int, id);
+      request.input('id', sql.Int, validId);
       const queryResult = await request.query(query);
       
       return queryResult;
@@ -1030,4 +1460,5 @@ router.get('/statistics/overview', async (req, res) => {
  * GET /api/customer-complaints/complaint-types
  * 功能：从CustomerComplaintType表中获取所有投诉类型的Name字段作为下拉选项
  */
+
 module.exports = router;

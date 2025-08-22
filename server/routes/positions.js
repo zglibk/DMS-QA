@@ -6,7 +6,7 @@
 const express = require('express')
 const router = express.Router()
 const sql = require('mssql')
-const { getConnection } = require('../db')
+const { getConnection, executeQuery } = require('../db')
 
 // 获取岗位列表（支持分页和搜索）
 router.get('/', async (req, res) => {
@@ -20,82 +20,99 @@ router.get('/', async (req, res) => {
     } = req.query
     
     const offset = (page - 1) * size
-    const pool = await getConnection()
     
-    // 构建查询条件
-    let whereConditions = ['p.Status = 1']
-    let queryParams = []
-    
-    if (keyword) {
-      whereConditions.push('(p.PositionName LIKE @keyword OR p.PositionCode LIKE @keyword)')
-      queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
-    }
-    
-    if (departmentId) {
-      whereConditions.push('p.DepartmentID = @departmentId')
-      queryParams.push({ name: 'departmentId', type: sql.Int, value: parseInt(departmentId) })
-    }
-    
-    if (status !== null && status !== '') {
-      whereConditions.push('p.Status = @status')
-      queryParams.push({ name: 'status', type: sql.Bit, value: status === 'true' })
-    }
-    
-    const whereClause = whereConditions.join(' AND ')
-    
-    // 获取总数
-    let countRequest = pool.request()
-    queryParams.forEach(param => {
-      countRequest.input(param.name, param.type, param.value)
-    })
-    
-    const countResult = await countRequest.query(`
-      SELECT COUNT(*) as total
-      FROM Positions p
-      LEFT JOIN Department d ON p.DepartmentID = d.ID
-      WHERE ${whereClause}
-    `)
-    
-    // 获取分页数据
-    let dataRequest = pool.request()
-    queryParams.forEach(param => {
-      dataRequest.input(param.name, param.type, param.value)
-    })
-    dataRequest.input('offset', sql.Int, offset)
-    dataRequest.input('size', sql.Int, parseInt(size))
-    
-    const dataResult = await dataRequest.query(`
-      SELECT * FROM (
-        SELECT 
-          ROW_NUMBER() OVER (ORDER BY p.SortOrder ASC, p.CreatedAt DESC) as RowNum,
-          p.ID,
-          p.PositionName as Name,
-          p.PositionCode as Code,
-          p.DepartmentID,
-          d.Name as DepartmentName,
-          p.Level,
-          p.Description,
-          p.Requirements,
-          p.SortOrder,
-          p.Status,
-          p.CreatedAt,
-          p.UpdatedAt
+    const result = await executeQuery(async (pool) => {
+      // 构建查询条件
+      let whereConditions = ['p.Status = 1']
+      let queryParams = []
+      
+      if (keyword) {
+        whereConditions.push('(p.PositionName LIKE @keyword OR p.PositionCode LIKE @keyword)')
+        queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
+      }
+      
+      if (departmentId) {
+        whereConditions.push('p.DepartmentID = @departmentId')
+        queryParams.push({ name: 'departmentId', type: sql.Int, value: parseInt(departmentId) })
+      }
+      
+      if (status !== null && status !== '') {
+        whereConditions.push('p.Status = @status')
+        queryParams.push({ name: 'status', type: sql.Bit, value: status === 'true' })
+      }
+      
+      const whereClause = whereConditions.join(' AND ')
+      
+      // 获取总数
+      let countRequest = pool.request()
+      queryParams.forEach(param => {
+        countRequest.input(param.name, param.type, param.value)
+      })
+      
+      const countResult = await countRequest.query(`
+        SELECT COUNT(*) as total
         FROM Positions p
         LEFT JOIN Department d ON p.DepartmentID = d.ID
         WHERE ${whereClause}
-      ) AS T
-      WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
-      ORDER BY T.RowNum
-    `)
-    
-    res.json({
-      success: true,
-      data: {
+      `)
+      
+      // 获取分页数据
+      let dataRequest = pool.request()
+      queryParams.forEach(param => {
+        dataRequest.input(param.name, param.type, param.value)
+      })
+      dataRequest.input('offset', sql.Int, offset)
+      dataRequest.input('size', sql.Int, parseInt(size))
+      
+      const dataResult = await dataRequest.query(`
+        SELECT * FROM (
+          SELECT 
+            ROW_NUMBER() OVER (ORDER BY p.SortOrder ASC, p.CreatedAt DESC) as RowNum,
+            p.ID,
+            p.PositionName as Name,
+            p.PositionCode as Code,
+            p.DepartmentID,
+            d.Name as DepartmentName,
+            p.Level,
+            p.Description,
+            p.Requirements,
+            p.SortOrder,
+            p.Status,
+            p.CreatedAt,
+            p.UpdatedAt
+          FROM Positions p
+          LEFT JOIN Department d ON p.DepartmentID = d.ID
+          WHERE ${whereClause}
+        ) AS T
+        WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
+        ORDER BY T.RowNum
+      `)
+      
+      return {
         list: dataResult.recordset,
         total: countResult.recordset[0].total,
         page: parseInt(page),
         size: parseInt(size)
       }
+    })
+    
+    // 检查executeQuery是否返回null（数据库连接失败）
+    if (!result) {
+      console.error('获取岗位列表失败: executeQuery返回null，可能是数据库连接问题')
+      return res.json({
+        success: true,
+        data: {
+          list: [],
+          total: 0,
+          page: parseInt(page),
+          size: parseInt(size)
+        }
+      })
+    }
+    
+    res.json({
+      success: true,
+      data: result
     })
   } catch (error) {
     console.error('获取岗位列表失败:', error)

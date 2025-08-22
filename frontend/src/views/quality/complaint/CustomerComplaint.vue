@@ -111,7 +111,7 @@
               <span style="color: #409eff; font-weight: 500;">高级搜索条件</span>
             </el-divider>
             
-            <el-row :gutter="28">
+            <el-row :gutter="20">
               <el-col :span="4">
                 <el-form-item label="规格">
                   <el-input 
@@ -182,7 +182,7 @@
               </el-col>
             </el-row>
             
-            <el-row :gutter="28">
+            <el-row :gutter="20">
               <el-col :span="4">
                 <el-form-item label="创建人">
                   <el-input 
@@ -242,7 +242,7 @@
               </el-col>
             </el-row>
             
-            <el-row :gutter="28">
+            <el-row :gutter="20">
               <el-col :span="6">
                 <el-form-item label="反馈日期">
                   <el-date-picker
@@ -403,20 +403,20 @@
     <el-dialog
       :title="dialogTitle"
       v-model="dialogVisible"
-      width="45%"
+      width="50%"
       :before-close="handleDialogClose"
     >
       <el-form
         ref="formRef"
         :model="formData"
         :rules="formRules"
-        label-width="100px"
+        label-width="120px"
         class="complaint-form"
       >
         <!-- 基本信息区域 - 三列布局 -->
         <div class="form-section">
           <h4 class="section-title">基本信息</h4>
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="日期" prop="date">
                 <el-date-picker
@@ -449,7 +449,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="品名" prop="productName">
                 <el-input v-model="formData.productName" placeholder="请输入品名" />
@@ -457,7 +457,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="规格" prop="specification">
                 <el-input v-model="formData.specification" placeholder="请输入规格" />
@@ -479,7 +479,7 @@
         <!-- 问题信息区域 - 三列布局 -->
         <div class="form-section">
           <h4 class="section-title">问题信息</h4>
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="问题描述" prop="problemDescription">
                 <el-input
@@ -492,7 +492,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="问题图片">
                 <el-upload
@@ -539,7 +539,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="不良数" prop="defectQuantity">
                 <el-input-number
@@ -575,7 +575,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="处理时限" prop="processingDeadline">
                 <el-date-picker
@@ -634,7 +634,7 @@
               </el-upload>
             </div>
           </div>
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="原因分析">
                 <el-input
@@ -647,7 +647,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="纠正预防措施">
                 <el-input
@@ -660,7 +660,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="处置措施和结果">
                 <el-input
@@ -673,7 +673,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="责任部门" prop="responsibleDepartment">
                 <el-select 
@@ -713,10 +713,231 @@
           </el-row>
         </div>
 
+        <!-- 质量成本区域 - 三列布局 -->
+        <div class="form-section">
+          <h4 class="section-title">质量成本</h4>
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item>
+                <template #label>
+                  <span>质量罚款</span>
+                  <el-tooltip
+                    content="因产品质量问题导致的罚款金额，包括客户罚款、监管部门罚款等"
+                    placement="top"
+                  >
+                    <el-icon style="margin-left: 4px; color: #E6A23C; cursor: help;">
+                       <QuestionFilled />
+                    </el-icon>
+                  </el-tooltip>
+                </template>
+                <el-input-number
+                  v-model="formData.qualityPenalty"
+                  :min="0"
+                  :precision="2"
+                  placeholder="请输入质量罚款金额"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item>
+                <template #label>
+                  <span>返工成本</span>
+                  <el-tooltip
+                    content="因质量问题需要重新加工、修复产品所产生的人工、材料、设备等成本"
+                    placement="top"
+                  >
+                    <el-icon style="margin-left: 4px; color: #E6A23C; cursor: help;">
+                      <QuestionFilled />
+                    </el-icon>
+                  </el-tooltip>
+                </template>
+                <el-input-number
+                  v-model="formData.reworkCost"
+                  :min="0"
+                  :precision="2"
+                  placeholder="请输入返工成本"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item>
+                <template #label>
+                  <span>客户赔偿</span>
+                  <el-tooltip
+                    content="因质量问题给客户造成损失而最终支付的'赔偿'金额，包括直接损失和间接损失(不含罚款)"
+                    placement="top"
+                  >
+                    <el-icon style="margin-left: 4px; color: #E6A23C; cursor: help;">
+                       <QuestionFilled />
+                     </el-icon>
+                   </el-tooltip>
+                 </template>
+                 <el-input-number
+                   v-model="formData.customerCompensation"
+                  :min="0"
+                  :precision="2"
+                  placeholder="请输入客户赔偿金额"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item>
+                <template #label>
+                  <span>质量损失成本</span>
+                  <el-tooltip
+                    content="因质量问题导致的直接经济损失，如废品损失、降级/折价损失、停工损失等"
+                    placement="top"
+                  >
+                    <el-icon style="margin-left: 4px; color: #E6A23C; cursor: help;">
+                       <QuestionFilled />
+                     </el-icon>
+                   </el-tooltip>
+                 </template>
+                 <el-input-number
+                   v-model="formData.qualityLossCost"
+                  :min="0"
+                  :precision="2"
+                  placeholder="请输入质量损失成本"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item>
+                <template #label>
+                  <span>检验成本</span>
+                  <el-tooltip
+                    content="为确保重工/返工质量而进行的检验、测试、审核等产生的成本"
+                    placement="top"
+                  >
+                    <el-icon style="margin-left: 4px; color: #E6A23C; cursor: help;">
+                       <QuestionFilled />
+                     </el-icon>
+                   </el-tooltip>
+                 </template>
+                 <el-input-number
+                   v-model="formData.inspectionCost"
+                  :min="0"
+                  :precision="2"
+                  placeholder="请输入检验成本"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item>
+                <template #label>
+                  <span>运输成本</span>
+                  <el-tooltip
+                    content="因质量问题产生的额外运输费用，如退货运费、重新发货运费等"
+                    placement="top"
+                  >
+                    <el-icon style="margin-left: 4px; color: #E6A23C; cursor: help;">
+                       <QuestionFilled />
+                     </el-icon>
+                   </el-tooltip>
+                 </template>
+                 <el-input-number
+                   v-model="formData.transportationCost"
+                  :min="0"
+                  :precision="2"
+                  placeholder="请输入运输成本"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-row :gutter="20">
+            <el-col :span="8">
+              <el-form-item>
+                <template #label>
+                  <span>预防成本</span>
+                  <el-tooltip
+                    content="为预防质量问题发生而投入的成本，如质量培训、工艺改进、设备维护等"
+                    placement="top"
+                  >
+                    <el-icon style="margin-left: 4px; color: #E6A23C; cursor: help;">
+                       <QuestionFilled />
+                     </el-icon>
+                   </el-tooltip>
+                 </template>
+                 <el-input-number
+                   v-model="formData.preventionCost"
+                  :min="0"
+                  :precision="2"
+                  placeholder="请输入预防成本"
+                  style="width: 100%"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item>
+                <template #label>
+                  <span>总质量成本</span>
+                  <el-tooltip
+                    content="所有质量相关成本的总和，可选择自动计算或手动输入"
+                    placement="top"
+                  >
+                    <el-icon style="margin-left: 4px; color: #E6A23C; cursor: help;">
+                       <QuestionFilled />
+                     </el-icon>
+                   </el-tooltip>
+                 </template>
+                 <el-input-number
+                   v-model="formData.totalQualityCost"
+                  :min="0"
+                  :precision="2"
+                  placeholder="自动计算或手动输入"
+                  style="width: 100%"
+                  :disabled="autoCalculateTotal"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="8">
+              <el-form-item>
+                <el-checkbox v-model="autoCalculateTotal" style="margin-top: 8px;">
+                  自动计算总成本
+                </el-checkbox>
+              </el-form-item>
+            </el-col>
+          </el-row>
+
+          <el-row :gutter="20">
+            <el-col :span="24">
+              <el-form-item>
+                <template #label>
+                  <span>成本备注</span>
+                  <el-tooltip
+                    content="对质量成本的详细说明，包括成本构成、计算依据、特殊情况说明等"
+                    placement="top"
+                  >
+                    <el-icon style="margin-left: 4px; color: #E6A23C; cursor: help;">
+                       <QuestionFilled />
+                     </el-icon>
+                   </el-tooltip>
+                 </template>
+                 <el-input
+                   v-model="formData.costRemarks"
+                  type="textarea"
+                  :rows="2"
+                  placeholder="请输入质量成本相关备注信息"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+
         <!-- 反馈验证区域 - 三列布局 -->
         <div class="form-section">
           <h4 class="section-title">反馈验证</h4>
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="回复日期">
                 <el-date-picker
@@ -755,7 +976,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="8">
               <el-form-item label="处理人">
                 <el-cascader
@@ -792,7 +1013,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <el-row :gutter="20">
             <el-col :span="24">
               <el-form-item label="改善验证">
                 <el-input
@@ -806,7 +1027,7 @@
           </el-row>
 
           <!-- 显示已上传的附件列表 -->
-          <el-row :gutter="16" v-if="formData.reportAttachments && formData.reportAttachments.length > 0">
+          <el-row :gutter="20" v-if="formData.reportAttachments && formData.reportAttachments.length > 0">
             <el-col :span="24">
               <el-form-item label="已上传附件">
                 <div class="attachment-list">
@@ -861,7 +1082,7 @@
     <el-dialog
       title="投诉记录详情"
       v-model="viewDialogVisible"
-      width="45%"
+      width="50%"
     >
       <div class="detail-content" v-if="viewData">
         <el-descriptions :column="2" border>
@@ -942,6 +1163,43 @@
           <p>{{ viewData.improvementVerification }}</p>
         </div>
 
+        <!-- 质量成本信息 -->
+        <div class="detail-section" v-if="hasQualityCostData(viewData)">
+          <h4>质量成本</h4>
+          <el-descriptions :column="3" border>
+            <el-descriptions-item label="质量罚款" v-if="viewData.qualityPenalty > 0">
+              ¥{{ viewData.qualityPenalty?.toFixed(2) || '0.00' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="返工成本" v-if="viewData.reworkCost > 0">
+              ¥{{ viewData.reworkCost?.toFixed(2) || '0.00' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="客户赔偿" v-if="viewData.customerCompensation > 0">
+              ¥{{ viewData.customerCompensation?.toFixed(2) || '0.00' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="质量损失成本" v-if="viewData.qualityLossCost > 0">
+              ¥{{ viewData.qualityLossCost?.toFixed(2) || '0.00' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="检验成本" v-if="viewData.inspectionCost > 0">
+              ¥{{ viewData.inspectionCost?.toFixed(2) || '0.00' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="运输成本" v-if="viewData.transportationCost > 0">
+              ¥{{ viewData.transportationCost?.toFixed(2) || '0.00' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="预防成本" v-if="viewData.preventionCost > 0">
+              ¥{{ viewData.preventionCost?.toFixed(2) || '0.00' }}
+            </el-descriptions-item>
+            <el-descriptions-item label="总质量成本" v-if="viewData.totalQualityCost > 0">
+              <el-tag type="danger" size="large">
+                ¥{{ viewData.totalQualityCost?.toFixed(2) || '0.00' }}
+              </el-tag>
+            </el-descriptions-item>
+          </el-descriptions>
+          <div v-if="viewData.costRemarks" style="margin-top: 12px;">
+            <strong>成本备注：</strong>
+            <p style="margin-top: 8px; color: #606266;">{{ viewData.costRemarks }}</p>
+          </div>
+        </div>
+
         <div class="detail-section" v-if="viewData.reportAttachments && viewData.reportAttachments.length > 0">
           <h4>报告附件</h4>
           <div class="attachment-list">
@@ -963,9 +1221,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Plus, Search, Refresh, Upload, Delete, Download, Close, Check, User, Document, Box, Clock, Loading, Setting, Picture, ZoomIn } from '@element-plus/icons-vue'
+import { Plus, Search, Refresh, Upload, Delete, Download, Close, Check, User, Document, Box, Clock, Loading, Setting, Picture, ZoomIn, QuestionFilled } from '@element-plus/icons-vue'
 import apiService from '@/services/apiService'
 import { useUserStore } from '@/store/user'
 import axios from 'axios'
@@ -1054,8 +1312,21 @@ const formData = reactive({
   processor: [], // 处理人级联选择 [部门ID, 人员ID]
   improvementVerification: '',
   verificationDate: '',
-  status: 'pending'
+  status: 'pending',
+  // 质量成本相关字段
+  qualityPenalty: 0, // 质量罚款
+  reworkCost: 0, // 返工成本
+  customerCompensation: 0, // 客户赔偿
+  qualityLossCost: 0, // 质量损失成本
+  inspectionCost: 0, // 检验成本
+  transportationCost: 0, // 运输成本
+  preventionCost: 0, // 预防成本
+  totalQualityCost: 0, // 总质量成本
+  costRemarks: '' // 成本备注
 })
+
+// 自动计算总成本开关
+const autoCalculateTotal = ref(true)
 
 // 表单验证规则
 const formRules = {
@@ -1086,6 +1357,25 @@ const uploadHeaders = computed(() => {
   return {
     'Authorization': `Bearer ${userStore.token}`
   }
+})
+
+/**
+ * 计算总质量成本
+ */
+const calculatedTotalCost = computed(() => {
+  const {
+    qualityPenalty = 0,
+    reworkCost = 0,
+    customerCompensation = 0,
+    qualityLossCost = 0,
+    inspectionCost = 0,
+    transportationCost = 0,
+    preventionCost = 0
+  } = formData
+  
+  return Number(qualityPenalty) + Number(reworkCost) + Number(customerCompensation) + 
+         Number(qualityLossCost) + Number(inspectionCost) + Number(transportationCost) + 
+         Number(preventionCost)
 })
 
 /**
@@ -1325,7 +1615,17 @@ const loadData = async () => {
         createdAt: formatDate(item.CreatedAt),
         createdBy: item.CreatedBy,
         updatedAt: formatDate(item.UpdatedAt),
-        updatedBy: item.UpdatedBy
+        updatedBy: item.UpdatedBy,
+        // 质量成本相关字段
+        qualityPenalty: item.QualityPenalty || 0,
+        reworkCost: item.ReworkCost || 0,
+        customerCompensation: item.CustomerCompensation || 0,
+        qualityLossCost: item.QualityLossCost || 0,
+        inspectionCost: item.InspectionCost || 0,
+        transportationCost: item.TransportationCost || 0,
+        preventionCost: item.PreventionCost || 0,
+        totalQualityCost: item.TotalQualityCost || 0,
+        costRemarks: item.CostRemarks || ''
       }))
       tableData.value = convertedData
       pagination.total = response.data.pagination?.total || 0
@@ -1645,8 +1945,21 @@ const resetForm = () => {
     processor: '',
     improvementVerification: '',
     verificationDate: '',
-    status: 'pending'
+    status: 'pending',
+    // 质量成本相关字段
+    qualityPenalty: 0,
+    reworkCost: 0,
+    customerCompensation: 0,
+    qualityLossCost: 0,
+    inspectionCost: 0,
+    transportationCost: 0,
+    preventionCost: 0,
+    totalQualityCost: 0,
+    costRemarks: ''
   })
+  
+  // 重置自动计算开关
+  autoCalculateTotal.value = true
   
   // 清空被删除文件列表
   removedFiles.value = []
@@ -2185,6 +2498,42 @@ const getPersonName = (personId) => {
   const person = personOptions.value.find(p => p.ID === personId)
   return person ? person.Name : ''
 }
+
+/**
+ * 判断是否有质量成本数据需要显示
+ * @param {Object} data - 投诉数据
+ * @returns {boolean} 是否有质量成本数据
+ */
+const hasQualityCostData = (data) => {
+  if (!data) return false
+  
+  return (
+    (data.qualityPenalty && data.qualityPenalty > 0) ||
+    (data.reworkCost && data.reworkCost > 0) ||
+    (data.customerCompensation && data.customerCompensation > 0) ||
+    (data.qualityLossCost && data.qualityLossCost > 0) ||
+    (data.inspectionCost && data.inspectionCost > 0) ||
+    (data.transportationCost && data.transportationCost > 0) ||
+    (data.preventionCost && data.preventionCost > 0) ||
+    (data.totalQualityCost && data.totalQualityCost > 0) ||
+    (data.costRemarks && data.costRemarks.trim() !== '')
+  )
+}
+
+/**
+ * 监听质量成本字段变化，自动计算总成本
+ */
+watch(
+  [() => formData.qualityPenalty, () => formData.reworkCost, () => formData.customerCompensation,
+   () => formData.qualityLossCost, () => formData.inspectionCost, () => formData.transportationCost,
+   () => formData.preventionCost, () => autoCalculateTotal.value],
+  () => {
+    if (autoCalculateTotal.value) {
+      formData.totalQualityCost = calculatedTotalCost.value
+    }
+  },
+  { immediate: true }
+)
 
 // 组件挂载时加载数据
 onMounted(() => {

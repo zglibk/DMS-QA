@@ -336,6 +336,18 @@ export const breadcrumbConfig = {
     icon: 'Money'
   },
 
+  // 质量成本统计
+  '/admin/copq/cost-statistics': {
+    title: '质量成本统计',
+    icon: 'DataAnalysis'
+  },
+
+  // 质量成本统计（数据库菜单路径）
+  '/admin/copq/quality-cost-statistics': {
+    title: '质量成本统计',
+    icon: 'DataAnalysis'
+  },
+
   // 系统管理
   '/admin/system': {
     title: '系统管理',

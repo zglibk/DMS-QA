@@ -199,6 +199,16 @@ const routes = [
         component: MaterialPriceList, // 物料单价页面
         meta: { requiresAuth: true }
       },
+      {
+        path: 'copq/cost-statistics',
+        component: () => import('../views/quality/cost/CostStatistics.vue'), // 质量成本统计页面
+        meta: { title: '质量成本统计', requiresAuth: true }
+      },
+      {
+        path: 'copq/quality-cost-statistics',
+        component: () => import('../views/quality/cost/CostStatistics.vue'), // 质量成本统计页面（数据库菜单路径）
+        meta: { title: '质量成本统计', requiresAuth: true }
+      },
 
       // 系统管理模块
       {
