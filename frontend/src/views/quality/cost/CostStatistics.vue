@@ -21,18 +21,18 @@
             end-placeholder="结束日期"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
-            @change="handleDateRangeChange"
+            @change="handleDateRangeChange"  style="width: 240px"
           />
         </el-form-item>
         <el-form-item label="统计维度">
-          <el-select v-model="filterForm.dimension" @change="handleDimensionChange">
+          <el-select v-model="filterForm.dimension" @change="handleDimensionChange" style="width: 120px">
             <el-option label="按月统计" value="month" />
             <el-option label="按季度统计" value="quarter" />
             <el-option label="按年统计" value="year" />
           </el-select>
         </el-form-item>
         <el-form-item label="客户">
-          <el-select v-model="filterForm.customerId" clearable placeholder="全部客户" filterable>
+          <el-select v-model="filterForm.customerId" clearable placeholder="全部客户" filterable  style="width: 120px">
             <el-option
               v-for="customer in customerOptions"
               :key="customer.id"
