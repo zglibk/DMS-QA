@@ -317,7 +317,7 @@ router.get('/', async (req, res) => {
         SELECT 
           ID, Date, CustomerCode, WorkOrderNo, ProductName, Specification,
           OrderQuantity, ProblemDescription, ProblemImages, DefectQuantity, DefectRate,
-          ComplaintMethod, ProcessingDeadline, RequireReport, CauseAnalysis,
+          ComplaintMethod, ComplaintType, ProcessingDeadline, RequireReport, CauseAnalysis,
           CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
           ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor, ImprovementVerification,
           VerificationDate, Status, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy,
@@ -388,6 +388,116 @@ router.get('/', async (req, res) => {
   } catch (error) {
     console.error('获取客户投诉记录失败:', error);
     res.status(500).json({ success: false, message: '获取客户投诉记录失败', error: error.message });
+  }
+});
+
+/**
+ * 获取投诉类型选项
+ * GET /api/customer-complaints/complaint-types
+ */
+router.get('/complaint-types', async (req, res) => {
+  try {
+    const result = await executeQuery(async (pool) => {
+      const query = `
+        SELECT Name 
+        FROM CustomerComplaintType 
+        ORDER BY Name
+      `;
+      
+      const queryResult = await pool.request().query(query);
+      return queryResult.recordset;
+    });
+    
+    // 返回包含Name字段的对象数组
+    res.json({
+      success: true,
+      data: result,
+      message: '获取投诉类型选项成功'
+    });
+  } catch (error) {
+    console.error('获取投诉类型选项失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取投诉类型选项失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取部门列表
+ * GET /api/customer-complaints/departments
+ * 功能：获取所有部门信息，支持级联选择
+ */
+router.get('/departments', async (req, res) => {
+  console.log('开始获取部门列表...');
+  try {
+    const result = await executeQuery(async (pool) => {
+      console.log('连接池获取成功，开始执行查询...');
+      const query = `
+        SELECT ID, Name, ParentID
+        FROM Department 
+        ORDER BY Name
+      `;
+      console.log('执行SQL查询:', query);
+      
+      const queryResult = await pool.request().query(query);
+      console.log('查询结果:', queryResult.recordset?.length || 0, '条记录');
+      return queryResult.recordset;
+    });
+    
+    console.log('部门列表获取成功');
+    res.json({
+      success: true,
+      data: result || [],
+      message: '获取部门列表成功'
+    });
+  } catch (error) {
+    console.error('获取部门列表失败:', error);
+    console.error('错误堆栈:', error.stack);
+    res.status(500).json({
+      success: false,
+      message: '获取部门列表失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 根据部门获取人员列表
+ * GET /api/customer-complaints/persons/:departmentId
+ * 功能：根据部门ID获取该部门下的所有人员
+ */
+router.get('/persons/:departmentId', async (req, res) => {
+  try {
+    const { departmentId } = req.params;
+    
+    const result = await executeQuery(async (pool) => {
+      const request = pool.request();
+      const query = `
+        SELECT ID, Name, DepartmentID
+        FROM Person 
+        WHERE DepartmentID = @departmentId
+        ORDER BY Name
+      `;
+      
+      request.input('departmentId', sql.Int, departmentId);
+      const queryResult = await request.query(query);
+      return queryResult.recordset;
+    });
+    
+    res.json({
+      success: true,
+      data: result,
+      message: '获取人员列表成功'
+    });
+  } catch (error) {
+    console.error('获取人员列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取人员列表失败',
+      error: error.message
+    });
   }
 });
 
@@ -463,7 +573,7 @@ router.post('/', async (req, res) => {
     const {
       date, customerCode, workOrderNo, productName, specification,
       orderQuantity, problemDescription, problemImages, defectQuantity, defectRate,
-      complaintMethod, processingDeadline, requireReport, causeAnalysis,
+      complaintMethod, complaintType, processingDeadline, requireReport, causeAnalysis,
       correctiveActions, disposalMeasures, responsibleDepartment, responsiblePerson,
       replyDate, reportAttachments, feedbackPerson, feedbackDate, processor,
       improvementVerification, verificationDate, status
@@ -477,7 +587,7 @@ router.post('/', async (req, res) => {
         INSERT INTO CustomerComplaints (
           Date, CustomerCode, WorkOrderNo, ProductName, Specification,
           OrderQuantity, ProblemDescription, ProblemImages, DefectQuantity, DefectRate,
-          ComplaintMethod, ProcessingDeadline, RequireReport, CauseAnalysis,
+          ComplaintMethod, ComplaintType, ProcessingDeadline, RequireReport, CauseAnalysis,
           CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
           ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor,
           ImprovementVerification, VerificationDate, Status,
@@ -485,7 +595,7 @@ router.post('/', async (req, res) => {
         ) VALUES (
           @date, @customerCode, @workOrderNo, @productName, @specification,
           @orderQuantity, @problemDescription, @problemImages, @defectQuantity, @defectRate,
-          @complaintMethod, @processingDeadline, @requireReport, @causeAnalysis,
+          @complaintMethod, @complaintType, @processingDeadline, @requireReport, @causeAnalysis,
           @correctiveActions, @disposalMeasures, @responsibleDepartment, @responsiblePerson,
           @replyDate, @reportAttachments, @feedbackPerson, @feedbackDate, @processor,
           @improvementVerification, @verificationDate, @status,
@@ -505,6 +615,7 @@ router.post('/', async (req, res) => {
       request.input('defectQuantity', sql.Int, defectQuantity || 0);
       request.input('defectRate', sql.Decimal(5, 2), defectRate || 0);
       request.input('complaintMethod', sql.NVarChar, complaintMethod);
+      request.input('complaintType', sql.NVarChar, complaintType || null);
       request.input('processingDeadline', sql.Date, processingDeadline || null);
       request.input('requireReport', sql.Bit, requireReport || false);
       request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
@@ -550,7 +661,7 @@ router.put('/:id', async (req, res) => {
     const {
       date, customerCode, workOrderNo, productName, specification,
       orderQuantity, problemDescription, problemImages, defectQuantity, defectRate,
-      complaintMethod, processingDeadline, requireReport, causeAnalysis,
+      complaintMethod, complaintType, processingDeadline, requireReport, causeAnalysis,
       correctiveActions, disposalMeasures, responsibleDepartment, responsiblePerson,
       replyDate, reportAttachments, feedbackPerson, feedbackDate, processor,
       improvementVerification, verificationDate, status,
@@ -618,6 +729,7 @@ router.put('/:id', async (req, res) => {
           DefectQuantity = @defectQuantity,
           DefectRate = @defectRate,
           ComplaintMethod = @complaintMethod,
+          ComplaintType = @complaintType,
           ProcessingDeadline = @processingDeadline,
           RequireReport = @requireReport,
           CauseAnalysis = @causeAnalysis,
@@ -650,6 +762,7 @@ router.put('/:id', async (req, res) => {
       request.input('defectQuantity', sql.Int, defectQuantity || 0);
       request.input('defectRate', sql.Decimal(5, 2), defectRate || 0);
       request.input('complaintMethod', sql.NVarChar, complaintMethod);
+      request.input('complaintType', sql.NVarChar, complaintType);
       request.input('processingDeadline', sql.Date, processingDeadline || null);
       request.input('requireReport', sql.Bit, requireReport || false);
       request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
@@ -912,4 +1025,9 @@ router.get('/statistics/overview', async (req, res) => {
   }
 });
 
+/**
+ * 获取投诉类型选项
+ * GET /api/customer-complaints/complaint-types
+ * 功能：从CustomerComplaintType表中获取所有投诉类型的Name字段作为下拉选项
+ */
 module.exports = router;

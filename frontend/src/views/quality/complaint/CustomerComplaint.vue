@@ -347,6 +347,11 @@
             {{ getComplaintMethodText(row.complaintMethod) }}
           </template>
         </el-table-column>
+        <el-table-column prop="complaintType" label="投诉类型" width="120">
+          <template #default="{ row }">
+            {{ getComplaintTypeText(row.complaintType) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="processingDeadline" label="处理时限" width="120" />
         <el-table-column prop="status" label="处理状态" width="100">
           <template #default="{ row }">
@@ -591,12 +596,44 @@
                 </el-radio-group>
               </el-form-item>
             </el-col>
+            <el-col :span="8">
+              <el-form-item label="投诉类型" prop="complaintType">
+                <el-select v-model="formData.complaintType" placeholder="请选择投诉类型" style="width: 100%">
+                  <el-option 
+                    v-for="option in complaintTypeOptions" 
+                    :key="option.Name" 
+                    :label="option.Name" 
+                    :value="option.Name" 
+                  />
+                </el-select>
+              </el-form-item>
+            </el-col>
           </el-row>
         </div>
 
         <!-- 处理信息区域 - 三列布局 -->
         <div class="form-section">
-          <h4 class="section-title">处理信息</h4>
+          <div class="section-header">
+            <h4 class="section-title">处理信息</h4>
+            <div class="section-actions">
+              <el-upload
+                ref="reportUploadRef"
+                :action="uploadUrl"
+                :headers="uploadHeaders"
+                :file-list="formData.reportAttachments"
+                :on-success="handleReportSuccess"
+                :on-remove="handleReportRemove"
+                :before-upload="beforeReportUpload"
+                :show-file-list="false"
+                style="display: inline-block;"
+              >
+                <el-button type="primary" size="small">
+                  <el-icon><Upload /></el-icon>
+                  上传附件
+                </el-button>
+              </el-upload>
+            </div>
+          </div>
           <el-row :gutter="16">
             <el-col :span="24">
               <el-form-item label="原因分析">
@@ -639,18 +676,38 @@
           <el-row :gutter="16">
             <el-col :span="8">
               <el-form-item label="责任部门" prop="responsibleDepartment">
-                <el-select v-model="formData.responsibleDepartment" placeholder="请选择责任部门" style="width: 100%">
-                  <el-option label="生产部" value="production" />
-                  <el-option label="质检部" value="quality" />
-                  <el-option label="技术部" value="technical" />
-                  <el-option label="采购部" value="procurement" />
-                  <el-option label="销售部" value="sales" />
+                <el-select 
+                  v-model="formData.responsibleDepartment" 
+                  placeholder="请选择责任部门" 
+                  style="width: 100%"
+                  @change="handleDepartmentChange"
+                  clearable
+                >
+                  <el-option 
+                    v-for="dept in departmentOptions" 
+                    :key="dept.ID" 
+                    :label="dept.Name" 
+                    :value="dept.ID" 
+                  />
                 </el-select>
               </el-form-item>
             </el-col>
             <el-col :span="8">
               <el-form-item label="责任人" prop="responsiblePerson">
-                <el-input v-model="formData.responsiblePerson" placeholder="请输入责任人" />
+                <el-select 
+                  v-model="formData.responsiblePerson" 
+                  placeholder="请选择责任人" 
+                  style="width: 100%"
+                  clearable
+                  :disabled="!formData.responsibleDepartment"
+                >
+                  <el-option 
+                    v-for="person in personOptions" 
+                    :key="person.ID" 
+                    :label="person.Name" 
+                    :value="person.ID" 
+                  />
+                </el-select>
               </el-form-item>
             </el-col>
           </el-row>
@@ -674,7 +731,14 @@
             </el-col>
             <el-col :span="8">
               <el-form-item label="反馈人">
-                <el-input v-model="formData.feedbackPerson" placeholder="请输入反馈人" />
+                <el-cascader
+                  v-model="formData.feedbackPerson"
+                  :options="feedbackCascaderOptions"
+                  placeholder="请选择部门和人员"
+                  :props="{ expandTrigger: 'hover' }"
+                  style="width: 100%"
+                  clearable
+                />
               </el-form-item>
             </el-col>
             <el-col :span="8">
@@ -694,7 +758,14 @@
           <el-row :gutter="16">
             <el-col :span="8">
               <el-form-item label="处理人">
-                <el-input v-model="formData.processor" placeholder="请输入处理人" />
+                <el-cascader
+                  v-model="formData.processor"
+                  :options="processorCascaderOptions"
+                  placeholder="请选择部门和人员"
+                  :props="{ expandTrigger: 'hover' }"
+                  style="width: 100%"
+                  clearable
+                />
               </el-form-item>
             </el-col>
             <el-col :span="8">
@@ -734,23 +805,28 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="16">
+          <!-- 显示已上传的附件列表 -->
+          <el-row :gutter="16" v-if="formData.reportAttachments && formData.reportAttachments.length > 0">
             <el-col :span="24">
-              <el-form-item label="报告附件">
-                <el-upload
-                  ref="reportUploadRef"
-                  :action="uploadUrl"
-                  :headers="uploadHeaders"
-                  :file-list="formData.reportAttachments"
-                  :on-success="handleReportSuccess"
-                  :on-remove="handleReportRemove"
-                  :before-upload="beforeReportUpload"
-                >
-                  <el-button type="primary">
-                    <el-icon><Upload /></el-icon>
-                    上传附件
-                  </el-button>
-                </el-upload>
+              <el-form-item label="已上传附件">
+                <div class="attachment-list">
+                  <div 
+                    v-for="(file, index) in formData.reportAttachments" 
+                    :key="index" 
+                    class="attachment-item"
+                  >
+                    <el-icon class="attachment-icon"><Document /></el-icon>
+                    <span class="attachment-name">{{ file.name }}</span>
+                    <el-button 
+                      type="danger" 
+                      size="small" 
+                      text 
+                      @click="handleReportRemove(file)"
+                    >
+                      <el-icon><Delete /></el-icon>
+                    </el-button>
+                  </div>
+                </div>
               </el-form-item>
             </el-col>
           </el-row>
@@ -798,10 +874,11 @@
           <el-descriptions-item label="不良数">{{ viewData.defectQuantity }}</el-descriptions-item>
           <el-descriptions-item label="不良比例">{{ viewData.defectRate }}%</el-descriptions-item>
           <el-descriptions-item label="投诉方式">{{ getComplaintMethodText(viewData.complaintMethod) }}</el-descriptions-item>
+          <el-descriptions-item label="投诉类型">{{ getComplaintTypeText(viewData.complaintType) }}</el-descriptions-item>
           <el-descriptions-item label="处理时限">{{ viewData.processingDeadline }}</el-descriptions-item>
           <el-descriptions-item label="要求报告回复">{{ viewData.requireReport ? '是' : '否' }}</el-descriptions-item>
           <el-descriptions-item label="责任部门">{{ getDepartmentText(viewData.responsibleDepartment) }}</el-descriptions-item>
-          <el-descriptions-item label="责任人">{{ viewData.responsiblePerson }}</el-descriptions-item>
+                <el-descriptions-item label="责任人">{{ getPersonText(viewData.responsiblePerson) }}</el-descriptions-item>
           <el-descriptions-item label="回复日期">{{ viewData.replyDate }}</el-descriptions-item>
           <el-descriptions-item label="反馈人">{{ viewData.feedbackPerson }}</el-descriptions-item>
           <el-descriptions-item label="反馈日期">{{ viewData.feedbackDate }}</el-descriptions-item>
@@ -906,6 +983,11 @@ const submitLoading = ref(false)
 const tableData = ref([])
 const selectedRows = ref([])
 const showAdvanced = ref(false)
+const complaintTypeOptions = ref([]) // 投诉类型选项
+const departmentOptions = ref([]) // 部门选项
+const personOptions = ref([]) // 人员选项
+const feedbackCascaderOptions = ref([]) // 反馈人级联选择器选项
+const processorCascaderOptions = ref([]) // 处理人级联选择器选项
 
 const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
@@ -959,6 +1041,7 @@ const formData = reactive({
   complaintMethod: '',
   processingDeadline: '',
   requireReport: false,
+  complaintType: '', // 投诉类型字段
   causeAnalysis: '',
   correctiveActions: '',
   disposalMeasures: '',
@@ -966,9 +1049,9 @@ const formData = reactive({
   responsiblePerson: '',
   replyDate: '',
   reportAttachments: [],
-  feedbackPerson: '',
+  feedbackPerson: [], // 反馈人级联选择 [部门ID, 人员ID]
   feedbackDate: '',
-  processor: '',
+  processor: [], // 处理人级联选择 [部门ID, 人员ID]
   improvementVerification: '',
   verificationDate: '',
   status: 'pending'
@@ -981,7 +1064,8 @@ const formRules = {
   workOrderNo: [{ required: true, message: '请输入工单号', trigger: 'blur' }],
   productName: [{ required: true, message: '请输入品名', trigger: 'blur' }],
   problemDescription: [{ required: true, message: '请输入问题描述', trigger: 'blur' }],
-  complaintMethod: [{ required: true, message: '请选择投诉方式', trigger: 'change' }]
+  complaintMethod: [{ required: true, message: '请选择投诉方式', trigger: 'change' }],
+  complaintType: [{ required: true, message: '请选择投诉类型', trigger: 'change' }]
 }
 
 // 引用
@@ -1047,9 +1131,25 @@ const getComplaintMethodText = (method) => {
 }
 
 /**
+ * 获取投诉类型文本
+ */
+const getComplaintTypeText = (type) => {
+  // 现在直接返回投诉类型名称，因为我们使用数据库中的Name字段
+  return type || ''
+}
+
+/**
  * 获取部门文本
  */
 const getDepartmentText = (department) => {
+  // 如果是数字ID，从部门选项中查找名称
+  if (typeof department === 'number' || (typeof department === 'string' && !isNaN(department))) {
+    const departmentId = parseInt(department)
+    const dept = departmentOptions.value.find(d => d.ID === departmentId)
+    return dept ? dept.Name : ''
+  }
+  
+  // 兼容旧的字符串格式
   const textMap = {
     production: '生产部',
     quality: '质检部',
@@ -1058,6 +1158,21 @@ const getDepartmentText = (department) => {
     sales: '销售部'
   }
   return textMap[department] || department
+}
+
+/**
+ * 获取人员文本
+ */
+const getPersonText = (person) => {
+  // 如果是数字ID，从人员选项中查找名称
+  if (typeof person === 'number' || (typeof person === 'string' && !isNaN(person))) {
+    const personId = parseInt(person)
+    const p = personOptions.value.find(p => p.ID === personId)
+    return p ? p.Name : ''
+  }
+  
+  // 兼容旧的字符串格式，直接返回
+  return person || ''
 }
 
 /**
@@ -1091,6 +1206,22 @@ const calculateDefectRate = () => {
     formData.defectRate = Number(((formData.defectQuantity / formData.orderQuantity) * 100).toFixed(2))
   } else {
     formData.defectRate = 0
+  }
+}
+
+/**
+ * 获取投诉类型选项
+ */
+const loadComplaintTypes = async () => {
+  try {
+    const response = await apiService.get('/customer-complaints/complaint-types')
+    if (response.data.success) {
+      complaintTypeOptions.value = response.data.data || []
+    } else {
+      console.error('获取投诉类型失败:', response.data.message)
+    }
+  } catch (error) {
+    console.error('获取投诉类型失败:', error?.message || '未知错误')
   }
 }
 
@@ -1175,6 +1306,7 @@ const loadData = async () => {
         defectQuantity: item.DefectQuantity,
         defectRate: item.DefectRate,
         complaintMethod: item.ComplaintMethod,
+        complaintType: item.ComplaintType,
         processingDeadline: formatDate(item.ProcessingDeadline),
         requireReport: item.RequireReport,
         causeAnalysis: item.CauseAnalysis,
@@ -1317,6 +1449,11 @@ const handleEdit = (row) => {
   console.log('原始附件数据:', row.reportAttachments)
   console.log('转换后附件数据:', convertedReportAttachments)
   console.log('='.repeat(50))
+  
+  // 如果有责任部门，加载对应的人员列表
+  if (formData.responsibleDepartment) {
+    loadPersonsByDepartment(formData.responsibleDepartment)
+  }
   
   dialogVisible.value = true
 }
@@ -1933,9 +2070,127 @@ const handleWorkOrderNoInput = (value) => {
   formData.workOrderNo = value.toUpperCase()
 }
 
+/**
+ * 获取部门列表
+ */
+const loadDepartments = async () => {
+  try {
+    const response = await apiService.get('/customer-complaints/departments')
+    if (response.data.success) {
+      departmentOptions.value = response.data.data
+      // 构建级联选择器数据
+      await buildCascaderOptions()
+    } else {
+      console.error('获取部门列表失败:', response.data.message)
+    }
+  } catch (error) {
+    console.error('获取部门列表失败:', error)
+  }
+}
+
+/**
+ * 构建级联选择器数据结构
+ * 将部门和人员数据转换为Cascader组件所需的树形结构
+ */
+const buildCascaderOptions = async () => {
+  try {
+    const cascaderData = []
+    
+    // 为每个部门构建级联数据
+    for (const department of departmentOptions.value) {
+      // 获取该部门的人员列表
+      const response = await apiService.get(`/customer-complaints/persons/${department.ID}`)
+      
+      if (response.data.success) {
+        const persons = response.data.data
+        
+        // 构建部门节点
+        const departmentNode = {
+          value: department.ID,
+          label: department.Name,
+          children: persons.map(person => ({
+            value: person.ID,
+            label: person.Name
+          }))
+        }
+        
+        cascaderData.push(departmentNode)
+      }
+    }
+    
+    // 设置反馈人和处理人的级联选择器数据
+    feedbackCascaderOptions.value = cascaderData
+    processorCascaderOptions.value = cascaderData
+    
+  } catch (error) {
+    console.error('构建级联选择器数据失败:', error)
+  }
+}
+
+/**
+ * 根据部门获取人员列表
+ * @param {number} departmentId - 部门ID
+ */
+const loadPersonsByDepartment = async (departmentId) => {
+  try {
+    if (!departmentId) {
+      personOptions.value = []
+      return
+    }
+    
+    const response = await apiService.get(`/customer-complaints/persons/${departmentId}`)
+    if (response.data.success) {
+      personOptions.value = response.data.data
+    } else {
+      console.error('获取人员列表失败:', response.data.message)
+      personOptions.value = []
+    }
+  } catch (error) {
+    console.error('获取人员列表失败:', error)
+    personOptions.value = []
+  }
+}
+
+
+
+/**
+ * 处理部门选择变化
+ * @param {number} departmentId - 选中的部门ID
+ */
+const handleDepartmentChange = (departmentId) => {
+  // 清空责任人选择
+  formData.responsiblePerson = ''
+  // 根据选中的部门加载对应的人员列表
+  loadPersonsByDepartment(departmentId)
+}
+
+
+
+/**
+ * 获取部门名称
+ * @param {number} departmentId - 部门ID
+ * @returns {string} 部门名称
+ */
+const getDepartmentName = (departmentId) => {
+  const department = departmentOptions.value.find(dept => dept.ID === departmentId)
+  return department ? department.Name : ''
+}
+
+/**
+ * 获取人员名称
+ * @param {number} personId - 人员ID
+ * @returns {string} 人员名称
+ */
+const getPersonName = (personId) => {
+  const person = personOptions.value.find(p => p.ID === personId)
+  return person ? person.Name : ''
+}
+
 // 组件挂载时加载数据
 onMounted(() => {
   loadData()
+  loadComplaintTypes()
+  loadDepartments()
 })
 </script>
 
@@ -2121,10 +2376,13 @@ onMounted(() => {
 .section-title {
   margin: 0 0 16px 0;
   padding-bottom: 8px;
+  padding-left: 12px;
   font-size: 14px;
   font-weight: 600;
   color: #303133;
   border-bottom: 1px solid #e4e7ed;
+  border-left: 4px solid #409EFF;
+  position: relative;
 }
 
 .dialog-footer {
@@ -2145,9 +2403,11 @@ onMounted(() => {
 
 .detail-section h4 {
   margin: 0 0 10px 0;
+  padding-left: 12px;
   color: #303133;
   font-size: 14px;
   font-weight: 600;
+  border-left: 4px solid #409EFF;
 }
 
 .detail-section p {
@@ -2327,10 +2587,77 @@ onMounted(() => {
   white-space: nowrap;
 }
 
+/* 模块标题栏样式 */
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.section-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 附件列表样式 */
+.attachment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.attachment-item {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: #f5f7fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.3s ease;
+}
+
+.attachment-item:hover {
+  background: #ecf5ff;
+  border-color: #b3d8ff;
+}
+
+.attachment-icon {
+  color: #409eff;
+  margin-right: 8px;
+  font-size: 16px;
+}
+
+.attachment-name {
+  flex: 1;
+  color: #606266;
+  font-size: 14px;
+  margin-right: 8px;
+}
+
 /* 响应式设计 */
 @media (max-width: 1200px) {
   .advanced-search-area .el-col {
     margin-bottom: 8px;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .section-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
 }
 

@@ -1254,6 +1254,7 @@ BEGIN
         [DefectQuantity] INT NULL,                             -- 不良数量，可空
         [DefectRate] DECIMAL(5,2) NULL,                       -- 不良率，可空
         [ComplaintMethod] NVARCHAR(20) NOT NULL,               -- 投诉方式，必填
+        [ComplaintType] NVARCHAR(50) NULL,                     -- 投诉类型，可空
         
         -- 处理信息字段
         [ProcessingDeadline] DATE NULL,                        -- 处理时限，可空
@@ -1286,6 +1287,7 @@ BEGIN
     CREATE INDEX [IX_CustomerComplaints_Status] ON [dbo].[CustomerComplaints] ([Status]);
     CREATE INDEX [IX_CustomerComplaints_ResponsibleDepartment] ON [dbo].[CustomerComplaints] ([ResponsibleDepartment]);
     CREATE INDEX [IX_CustomerComplaints_ResponsiblePerson] ON [dbo].[CustomerComplaints] ([ResponsiblePerson]);
+    CREATE INDEX [IX_CustomerComplaints_ComplaintType] ON [dbo].[CustomerComplaints] ([ComplaintType]);
     
     PRINT 'CustomerComplaints 表创建成功。';
 END
@@ -1293,6 +1295,29 @@ ELSE
 BEGIN
     PRINT 'CustomerComplaints 表已存在，跳过创建。';
 END
+
+-- 为CustomerComplaints表的ComplaintType字段添加外键约束
+-- 引用CustomerComplaintType表的Name字段
+IF NOT EXISTS (
+    SELECT * FROM sys.foreign_keys 
+    WHERE object_id = OBJECT_ID(N'[dbo].[FK_CustomerComplaints_ComplaintType]') 
+    AND parent_object_id = OBJECT_ID(N'[dbo].[CustomerComplaints]')
+)
+BEGIN
+    ALTER TABLE [dbo].[CustomerComplaints]
+    ADD CONSTRAINT [FK_CustomerComplaints_ComplaintType]
+    FOREIGN KEY ([ComplaintType])
+    REFERENCES [dbo].[CustomerComplaintType] ([Name])
+    ON DELETE SET NULL  -- 当引用的投诉类型被删除时，将ComplaintType设为NULL
+    ON UPDATE CASCADE;  -- 当引用的投诉类型名称更新时，自动更新ComplaintType
+    
+    PRINT 'CustomerComplaints表ComplaintType字段外键约束创建成功。';
+END
+ELSE
+BEGIN
+    PRINT 'CustomerComplaints表ComplaintType字段外键约束已存在，跳过创建。';
+END
+GO
 
 PRINT '客户投诉记录表结构创建完成！';
 
