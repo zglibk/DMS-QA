@@ -2395,4 +2395,392 @@ END
 
 PRINT '✅ 出版失误管理表 publishing_exceptions 创建成功';
 PRINT '✅ 出版失误管理表索引创建成功';
-PRINT '✅ 出版失误管理表外键约束创建成功';}]}}
+PRINT '✅ 出版失误管理表外键约束创建成功';
+
+-- =====================================================
+-- 用户级权限管理数据库完整创建脚本
+-- 功能：支持针对具体用户进行菜单或按钮权限的分配
+-- 创建时间：2024年
+-- =====================================================
+
+-- 1. 用户权限表（UserPermissions）
+-- 用于存储用户的个人权限配置，可以覆盖角色权限
+CREATE TABLE [UserPermissions] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,
+    [UserID] INT NOT NULL,                    -- 用户ID，关联User表
+    [MenuID] INT NOT NULL,                    -- 菜单ID，关联Menus表
+    [PermissionType] NVARCHAR(20) NOT NULL,   -- 权限类型：'grant'(授予) 或 'deny'(拒绝)
+    [PermissionLevel] NVARCHAR(20) NOT NULL,  -- 权限级别：'menu'(菜单访问) 或 'action'(操作权限)
+    [ActionCode] NVARCHAR(50) NULL,           -- 具体操作代码（如：add, edit, delete, view等）
+    [GrantedBy] INT NULL,                     -- 授权人ID，关联User表
+    [GrantedAt] DATETIME2 DEFAULT GETDATE(),  -- 授权时间
+    [ExpiresAt] DATETIME2 NULL,               -- 权限过期时间（NULL表示永久有效）
+    [Reason] NVARCHAR(500) NULL,              -- 授权原因说明
+    [Status] BIT DEFAULT 1,                   -- 状态：1=有效，0=无效
+    [CreatedAt] DATETIME2 DEFAULT GETDATE(),  -- 创建时间
+    [UpdatedAt] DATETIME2 DEFAULT GETDATE(),  -- 更新时间
+    
+    -- 外键约束
+    CONSTRAINT [FK_UserPermissions_User] FOREIGN KEY ([UserID]) REFERENCES [User]([ID]) ON DELETE CASCADE,
+    CONSTRAINT [FK_UserPermissions_Menu] FOREIGN KEY ([MenuID]) REFERENCES [Menus]([ID]) ON DELETE CASCADE,
+    CONSTRAINT [FK_UserPermissions_GrantedBy] FOREIGN KEY ([GrantedBy]) REFERENCES [User]([ID]),
+    
+    -- 检查约束
+    CONSTRAINT [CK_UserPermissions_PermissionType] CHECK ([PermissionType] IN ('grant', 'deny')),
+    CONSTRAINT [CK_UserPermissions_PermissionLevel] CHECK ([PermissionLevel] IN ('menu', 'action')),
+    
+    -- 唯一约束：同一用户对同一菜单的同一操作只能有一条有效记录
+    CONSTRAINT [UK_UserPermissions_Unique] UNIQUE ([UserID], [MenuID], [PermissionLevel], [ActionCode], [Status])
+);
+GO
+
+-- 2. 创建索引以提高查询性能
+-- 用户权限查询索引
+CREATE INDEX [IX_UserPermissions_UserID_Status] ON [UserPermissions] ([UserID], [Status]);
+
+-- 菜单权限查询索引
+CREATE INDEX [IX_UserPermissions_MenuID_Status] ON [UserPermissions] ([MenuID], [Status]);
+
+-- 权限类型查询索引
+CREATE INDEX [IX_UserPermissions_PermissionType_Status] ON [UserPermissions] ([PermissionType], [Status]);
+
+-- 过期时间查询索引
+CREATE INDEX [IX_UserPermissions_ExpiresAt] ON [UserPermissions] ([ExpiresAt]);
+GO
+
+-- 3. 用户权限历史记录表（UserPermissionHistory）
+-- 用于记录权限变更历史，便于审计和追踪
+CREATE TABLE [UserPermissionHistory] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,
+    [UserPermissionID] INT NULL,              -- 关联的用户权限ID（删除时为NULL）
+    [UserID] INT NOT NULL,                    -- 用户ID
+    [MenuID] INT NOT NULL,                    -- 菜单ID
+    [PermissionType] NVARCHAR(20) NOT NULL,   -- 权限类型
+    [PermissionLevel] NVARCHAR(20) NOT NULL,  -- 权限级别
+    [ActionCode] NVARCHAR(50) NULL,           -- 操作代码
+    [Action] NVARCHAR(20) NOT NULL,           -- 历史操作：'create', 'update', 'delete'
+    [OldValue] NVARCHAR(MAX) NULL,            -- 变更前的值（JSON格式）
+    [NewValue] NVARCHAR(MAX) NULL,            -- 变更后的值（JSON格式）
+    [OperatorID] INT NOT NULL,                -- 操作人ID
+    [OperatedAt] DATETIME2 DEFAULT GETDATE(), -- 操作时间
+    [Reason] NVARCHAR(500) NULL,              -- 操作原因
+    
+    -- 外键约束
+    CONSTRAINT [FK_UserPermissionHistory_UserPermission] FOREIGN KEY ([UserPermissionID]) REFERENCES [UserPermissions]([ID]),
+    CONSTRAINT [FK_UserPermissionHistory_User] FOREIGN KEY ([UserID]) REFERENCES [User]([ID]),
+    CONSTRAINT [FK_UserPermissionHistory_Menu] FOREIGN KEY ([MenuID]) REFERENCES [Menus]([ID]),
+    CONSTRAINT [FK_UserPermissionHistory_Operator] FOREIGN KEY ([OperatorID]) REFERENCES [User]([ID]),
+    
+    -- 检查约束
+    CONSTRAINT [CK_UserPermissionHistory_Action] CHECK ([Action] IN ('create', 'update', 'delete'))
+);
+GO
+
+-- 4. 创建历史记录表索引
+CREATE INDEX [IX_UserPermissionHistory_UserID] ON [UserPermissionHistory] ([UserID]);
+CREATE INDEX [IX_UserPermissionHistory_OperatedAt] ON [UserPermissionHistory] ([OperatedAt]);
+CREATE INDEX [IX_UserPermissionHistory_OperatorID] ON [UserPermissionHistory] ([OperatorID]);
+GO
+
+-- 5. 创建触发器以自动记录权限变更历史
+-- 插入触发器
+CREATE TRIGGER [TR_UserPermissions_Insert]
+ON [UserPermissions]
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO [UserPermissionHistory] (
+        [UserPermissionID], [UserID], [MenuID], [PermissionType], 
+        [PermissionLevel], [ActionCode], [Action], [NewValue], 
+        [OperatorID], [Reason]
+    )
+    SELECT 
+        i.[ID],
+        i.[UserID],
+        i.[MenuID],
+        i.[PermissionType],
+        i.[PermissionLevel],
+        i.[ActionCode],
+        'create',
+        CONCAT('{"PermissionType":"', i.[PermissionType], '","PermissionLevel":"', i.[PermissionLevel], '","ActionCode":"', ISNULL(i.[ActionCode], ''), '","Status":', i.[Status], ',"ExpiresAt":"', ISNULL(CONVERT(NVARCHAR, i.[ExpiresAt], 120), ''), '"}'),
+        ISNULL(i.[GrantedBy], 1),
+        i.[Reason]
+    FROM inserted i;
+END;
+GO
+
+-- 更新触发器
+CREATE TRIGGER [TR_UserPermissions_Update]
+ON [UserPermissions]
+AFTER UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO [UserPermissionHistory] (
+        [UserPermissionID], [UserID], [MenuID], [PermissionType], 
+        [PermissionLevel], [ActionCode], [Action], [OldValue], [NewValue], 
+        [OperatorID], [Reason]
+    )
+    SELECT 
+        i.[ID],
+        i.[UserID],
+        i.[MenuID],
+        i.[PermissionType],
+        i.[PermissionLevel],
+        i.[ActionCode],
+        'update',
+        CONCAT('{"PermissionType":"', d.[PermissionType], '","PermissionLevel":"', d.[PermissionLevel], '","ActionCode":"', ISNULL(d.[ActionCode], ''), '","Status":', d.[Status], ',"ExpiresAt":"', ISNULL(CONVERT(NVARCHAR, d.[ExpiresAt], 120), ''), '"}'),
+        CONCAT('{"PermissionType":"', i.[PermissionType], '","PermissionLevel":"', i.[PermissionLevel], '","ActionCode":"', ISNULL(i.[ActionCode], ''), '","Status":', i.[Status], ',"ExpiresAt":"', ISNULL(CONVERT(NVARCHAR, i.[ExpiresAt], 120), ''), '"}'),
+        ISNULL(i.[GrantedBy], 1),
+        i.[Reason]
+    FROM inserted i
+    INNER JOIN deleted d ON i.[ID] = d.[ID];
+END;
+GO
+
+-- 删除触发器
+CREATE TRIGGER [TR_UserPermissions_Delete]
+ON [UserPermissions]
+AFTER DELETE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    INSERT INTO [UserPermissionHistory] (
+        [UserPermissionID], [UserID], [MenuID], [PermissionType], 
+        [PermissionLevel], [ActionCode], [Action], [OldValue], 
+        [OperatorID], [Reason]
+    )
+    SELECT 
+        NULL,
+        d.[UserID],
+        d.[MenuID],
+        d.[PermissionType],
+        d.[PermissionLevel],
+        d.[ActionCode],
+        'delete',
+        CONCAT('{"PermissionType":"', d.[PermissionType], '","PermissionLevel":"', d.[PermissionLevel], '","ActionCode":"', ISNULL(d.[ActionCode], ''), '","Status":', d.[Status], ',"ExpiresAt":"', ISNULL(CONVERT(NVARCHAR, d.[ExpiresAt], 120), ''), '"}'),
+        1,
+        '权限记录被删除'
+    FROM deleted d;
+END;
+GO
+
+-- 6. 创建用户完整权限视图
+-- 该视图整合了角色权限和用户个人权限，用于权限验证
+CREATE VIEW [V_UserCompletePermissions] AS
+SELECT DISTINCT
+    u.[ID] AS [UserID],
+    u.[Username],
+    u.[Name] AS [UserName],
+    m.[ID] AS [MenuID],
+    m.[Name] AS [MenuName],
+    m.[Path] AS [MenuPath],
+    m.[Component] AS [MenuComponent],
+    m.[Permission] AS [MenuPermission],
+    CASE 
+        WHEN up.[PermissionType] = 'deny' THEN 0
+        WHEN up.[PermissionType] = 'grant' THEN 1
+        WHEN rm.[MenuID] IS NOT NULL THEN 1
+        ELSE 0
+    END AS [HasPermission],
+    CASE 
+        WHEN up.[ID] IS NOT NULL THEN 'user'
+        ELSE 'role'
+    END AS [PermissionSource],
+    up.[ExpiresAt],
+    up.[GrantedBy],
+    up.[GrantedAt]
+FROM [User] u
+CROSS JOIN [Menus] m
+LEFT JOIN [UserRole] ur ON u.[ID] = ur.[UserID]
+LEFT JOIN [RoleMenu] rm ON ur.[RoleID] = rm.[RoleID] AND m.[ID] = rm.[MenuID]
+LEFT JOIN [UserPermissions] up ON u.[ID] = up.[UserID] 
+    AND m.[ID] = up.[MenuID] 
+    AND up.[Status] = 1 
+    AND up.[PermissionLevel] = 'menu'
+    AND (up.[ExpiresAt] IS NULL OR up.[ExpiresAt] > GETDATE())
+WHERE u.[Status] = 1 AND m.[Status] = 1;
+GO
+
+-- 7. 添加表和视图注释
+EXEC sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'用户权限表：存储用户的个人权限配置，可以覆盖角色权限', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'UserPermissions';
+
+EXEC sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'用户权限历史记录表：记录权限变更历史，便于审计和追踪', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'TABLE', @level1name = N'UserPermissionHistory';
+
+EXEC sp_addextendedproperty 
+    @name = N'MS_Description', 
+    @value = N'用户完整权限视图：整合角色权限和用户个人权限，用于权限验证', 
+    @level0type = N'SCHEMA', @level0name = N'dbo', 
+    @level1type = N'VIEW', @level1name = N'V_UserCompletePermissions';
+GO
+
+-- =====================================================
+-- 8. 添加用户权限管理菜单项
+-- =====================================================
+
+-- 检查并创建"权限管理"父菜单
+IF NOT EXISTS (SELECT 1 FROM [Menus] WHERE [Name] = '权限管理' AND [ParentID] IS NULL)
+BEGIN
+    INSERT INTO [Menus] ([Name], [Path], [Component], [Icon], [Sort], [Status], [Permission], [ParentID], [CreatedAt], [UpdatedAt])
+    VALUES ('权限管理', '/permission', 'Layout', 'el-icon-lock', 90, 1, 'permission:view', NULL, GETDATE(), GETDATE());
+    
+    PRINT '✅ 权限管理父菜单创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ 权限管理父菜单已存在，跳过创建';
+END
+
+-- 获取权限管理父菜单ID
+DECLARE @PermissionParentMenuID INT;
+SELECT @PermissionParentMenuID = [ID] FROM [Menus] WHERE [Name] = '权限管理' AND [ParentID] IS NULL;
+
+-- 检查并创建"用户权限管理"子菜单
+IF NOT EXISTS (SELECT 1 FROM [Menus] WHERE [Name] = '用户权限管理' AND [ParentID] = @PermissionParentMenuID)
+BEGIN
+    INSERT INTO [Menus] ([Name], [Path], [Component], [Icon], [Sort], [Status], [Permission], [ParentID], [CreatedAt], [UpdatedAt])
+    VALUES ('用户权限管理', '/permission/user-permissions', 'permission/UserPermissions', 'el-icon-user', 1, 1, 'user-permission:view', @PermissionParentMenuID, GETDATE(), GETDATE());
+    
+    PRINT '✅ 用户权限管理子菜单创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ 用户权限管理子菜单已存在，跳过创建';
+END
+
+-- 获取管理员角色ID
+DECLARE @AdminRoleID INT;
+SELECT @AdminRoleID = [ID] FROM [Role] WHERE [Name] = '管理员' OR [Name] = 'admin' OR [Name] = 'Administrator';
+
+IF @AdminRoleID IS NOT NULL
+BEGIN
+    -- 为管理员角色分配权限管理父菜单权限
+    IF NOT EXISTS (SELECT 1 FROM [RoleMenu] WHERE [RoleID] = @AdminRoleID AND [MenuID] = @PermissionParentMenuID)
+    BEGIN
+        INSERT INTO [RoleMenu] ([RoleID], [MenuID], [CreatedAt], [UpdatedAt])
+        VALUES (@AdminRoleID, @PermissionParentMenuID, GETDATE(), GETDATE());
+        
+        PRINT '✅ 管理员角色权限管理父菜单权限分配成功';
+    END
+    ELSE
+    BEGIN
+        PRINT '⚠️ 管理员角色权限管理父菜单权限已存在，跳过分配';
+    END
+    
+    -- 获取用户权限管理子菜单ID
+    DECLARE @UserPermissionMenuID INT;
+    SELECT @UserPermissionMenuID = [ID] FROM [Menus] WHERE [Name] = '用户权限管理' AND [ParentID] = @PermissionParentMenuID;
+    
+    -- 为管理员角色分配用户权限管理子菜单权限
+    IF NOT EXISTS (SELECT 1 FROM [RoleMenu] WHERE [RoleID] = @AdminRoleID AND [MenuID] = @UserPermissionMenuID)
+    BEGIN
+        INSERT INTO [RoleMenu] ([RoleID], [MenuID], [CreatedAt], [UpdatedAt])
+        VALUES (@AdminRoleID, @UserPermissionMenuID, GETDATE(), GETDATE());
+        
+        PRINT '✅ 管理员角色用户权限管理子菜单权限分配成功';
+    END
+    ELSE
+    BEGIN
+        PRINT '⚠️ 管理员角色用户权限管理子菜单权限已存在，跳过分配';
+    END
+END
+ELSE
+BEGIN
+    PRINT '⚠️ 未找到管理员角色，无法分配菜单权限';
+END
+GO
+
+-- =====================================================
+-- 9. 为admin用户初始化权限管理权限
+-- =====================================================
+
+-- 获取admin用户ID
+DECLARE @AdminUserID INT;
+SELECT @AdminUserID = [ID] FROM [User] WHERE [Username] = 'admin';
+
+-- 获取用户权限管理菜单ID
+DECLARE @UserPermMenuID INT;
+SELECT @UserPermMenuID = [ID] FROM [Menus] WHERE [Name] = '用户权限管理';
+
+IF @AdminUserID IS NOT NULL AND @UserPermMenuID IS NOT NULL
+BEGIN
+    -- 为admin用户授予用户权限管理的完整权限
+    IF NOT EXISTS (SELECT 1 FROM [UserPermissions] WHERE [UserID] = @AdminUserID AND [MenuID] = @UserPermMenuID AND [PermissionLevel] = 'menu')
+    BEGIN
+        INSERT INTO [UserPermissions] (
+            [UserID], [MenuID], [PermissionType], [PermissionLevel], 
+            [ActionCode], [GrantedBy], [GrantedAt], [Reason], [Status]
+        )
+        VALUES (
+            @AdminUserID, @UserPermMenuID, 'grant', 'menu', 
+            NULL, @AdminUserID, GETDATE(), '系统初始化：管理员默认权限', 1
+        );
+        
+        PRINT '✅ admin用户权限管理菜单权限初始化成功';
+    END
+    ELSE
+    BEGIN
+        PRINT '⚠️ admin用户权限管理菜单权限已存在，跳过初始化';
+    END
+    
+    -- 为admin用户授予用户权限管理的操作权限
+    DECLARE @ActionCodes TABLE (ActionCode NVARCHAR(50));
+    INSERT INTO @ActionCodes VALUES ('view'), ('add'), ('edit'), ('delete'), ('grant'), ('revoke');
+    
+    DECLARE @ActionCode NVARCHAR(50);
+    DECLARE action_cursor CURSOR FOR SELECT ActionCode FROM @ActionCodes;
+    
+    OPEN action_cursor;
+    FETCH NEXT FROM action_cursor INTO @ActionCode;
+    
+    WHILE @@FETCH_STATUS = 0
+    BEGIN
+        IF NOT EXISTS (SELECT 1 FROM [UserPermissions] WHERE [UserID] = @AdminUserID AND [MenuID] = @UserPermMenuID AND [PermissionLevel] = 'action' AND [ActionCode] = @ActionCode)
+        BEGIN
+            INSERT INTO [UserPermissions] (
+                [UserID], [MenuID], [PermissionType], [PermissionLevel], 
+                [ActionCode], [GrantedBy], [GrantedAt], [Reason], [Status]
+            )
+            VALUES (
+                @AdminUserID, @UserPermMenuID, 'grant', 'action', 
+                @ActionCode, @AdminUserID, GETDATE(), '系统初始化：管理员默认操作权限', 1
+            );
+        END
+        
+        FETCH NEXT FROM action_cursor INTO @ActionCode;
+    END
+    
+    CLOSE action_cursor;
+    DEALLOCATE action_cursor;
+    
+    PRINT '✅ admin用户权限管理操作权限初始化成功';
+END
+ELSE
+BEGIN
+    IF @AdminUserID IS NULL
+        PRINT '⚠️ 未找到admin用户，无法初始化权限';
+    IF @UserPermMenuID IS NULL
+        PRINT '⚠️ 未找到用户权限管理菜单，无法初始化权限';
+END
+GO
+
+PRINT '✅ 用户权限管理数据库初始化完成';
+PRINT '✅ 用户权限管理表创建成功';
+PRINT '✅ 用户权限管理索引创建成功';
+PRINT '✅ 用户权限管理触发器创建成功';
+PRINT '✅ 用户权限管理视图创建成功';
+PRINT '✅ 用户权限管理菜单初始化成功';
+PRINT '✅ admin用户权限初始化成功';
+GO

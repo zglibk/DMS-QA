@@ -108,6 +108,35 @@ export const useUserStore = defineStore('user', {
       return menus.some(menu => menu.Permission === action)
     },
 
+    // 检查用户是否有特定操作权限（支持用户级权限优先级）
+    hasActionPermissionAsync: (state) => async (action) => {
+      try {
+        // 如果是管理员，直接返回true
+        if ((state.user?.roles || []).some(role => 
+          role.name === 'admin' || role.name === '系统管理员' ||
+          role.Name === 'admin' || role.Name === '系统管理员' ||
+          role.code === 'admin' || role.Code === 'admin'
+        )) {
+          return true
+        }
+
+        // 调用后端API检查完整权限（包括用户级权限优先级）
+        const response = await apiService.get(`/auth/check-permission/${encodeURIComponent(action)}`)
+        if (response.data.success) {
+          return response.data.data.hasPermission
+        }
+        
+        // API调用失败时，回退到本地权限检查
+        const menus = state.user?.permissions?.menus || []
+        return menus.some(menu => menu.Permission === action)
+      } catch (error) {
+        console.warn('权限检查API调用失败，使用本地权限检查:', error)
+        // API调用失败时，回退到本地权限检查
+        const menus = state.user?.permissions?.menus || []
+        return menus.some(menu => menu.Permission === action)
+      }
+    },
+
     // 获取用户可访问的菜单树
     accessibleMenus: (state) => {
       return buildMenuTree(state.user?.permissions?.menus || [])

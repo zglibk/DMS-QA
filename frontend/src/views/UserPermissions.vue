@@ -303,66 +303,198 @@
       </template>
     </el-dialog>
 
-    <!-- 权限历史对话框 -->
-    <el-dialog
+    <!-- 权限历史页面 -->
+    <el-drawer
       v-model="historyDialog.visible"
       title="权限变更历史"
-      width="800px"
+      direction="rtl"
+      size="80%"
+      :before-close="handleHistoryClose"
     >
-      <el-table
-        :data="historyData"
-        v-loading="historyDialog.loading"
-        stripe
-        border
-        max-height="400"
-      >
-        <el-table-column prop="Action" label="操作" width="80">
-          <template #default="{ row }">
-            <el-tag
-              :type="getActionType(row.Action)"
-              size="small"
-            >
-              {{ getActionText(row.Action) }}
+      <template #header>
+        <div class="history-header">
+          <el-icon class="history-icon"><Clock /></el-icon>
+          <span class="history-title">权限变更历史</span>
+          <div class="history-user-info" v-if="currentHistoryUser">
+            <el-tag type="info" size="large">
+              <el-icon><User /></el-icon>
+              {{ currentHistoryUser.Username }} ({{ currentHistoryUser.RealName }})
             </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="PermissionType" label="权限类型" width="100">
-          <template #default="{ row }">
-            <el-tag :type="row.PermissionType === 'grant' ? 'success' : 'danger'" size="small">
-              {{ row.PermissionType === 'grant' ? '授予' : '拒绝' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column prop="ActionCode" label="操作代码" width="100" />
-        <el-table-column prop="OperatorName" label="操作人" width="100" />
-        <el-table-column prop="OperatedAt" label="操作时间" width="160">
-          <template #default="{ row }">
-            {{ formatDateTime(row.OperatedAt) }}
-          </template>
-        </el-table-column>
-        <el-table-column prop="Reason" label="原因" min-width="150" show-overflow-tooltip />
-      </el-table>
+          </div>
+        </div>
+      </template>
       
-      <!-- 历史记录分页 -->
-      <div class="pagination-wrapper" style="margin-top: 20px;">
-        <el-pagination
-          v-model:current-page="historyPagination.page"
-          v-model:page-size="historyPagination.pageSize"
-          :page-sizes="[10, 20, 50]"
-          :total="historyPagination.total"
-          layout="total, sizes, prev, pager, next"
-          @size-change="loadHistory"
-          @current-change="loadHistory"
-        />
+      <div class="history-content">
+        <!-- 历史记录统计信息 -->
+        <div class="history-stats">
+          <div class="stats-grid">
+            <div class="stat-item">
+              <div class="stat-value">{{ historyPagination.total }}</div>
+              <div class="stat-label">总记录数</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ getActionCount('create') }}</div>
+              <div class="stat-label">创建记录</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ getActionCount('update') }}</div>
+              <div class="stat-label">更新记录</div>
+            </div>
+            <div class="stat-item">
+              <div class="stat-value">{{ getActionCount('delete') }}</div>
+              <div class="stat-label">删除记录</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 历史记录表格 -->
+        <el-card class="history-table-card" shadow="never">
+          <template #header>
+            <div class="card-header">
+              <span class="card-title">变更记录详情</span>
+              <div class="header-actions">
+                <el-button
+                  type="primary"
+                  :icon="Refresh"
+                  @click="loadHistory"
+                  :loading="historyDialog.loading"
+                >
+                  刷新
+                </el-button>
+              </div>
+            </div>
+          </template>
+          
+          <el-table
+            :data="historyData"
+            v-loading="historyDialog.loading"
+            stripe
+            border
+            style="width: 100%"
+            :row-class-name="getRowClassName"
+          >
+            <el-table-column prop="Action" label="操作类型" width="120" align="center">
+              <template #default="{ row }">
+                <el-tag
+                  :type="getActionType(row.Action)"
+                  size="large"
+                  effect="dark"
+                >
+                  <el-icon style="margin-right: 4px;">
+                    <component :is="getActionIcon(row.Action)" />
+                  </el-icon>
+                  {{ getActionText(row.Action) }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="PermissionType" label="权限类型" width="120" align="center">
+              <template #default="{ row }">
+                <el-tag 
+                  :type="row.PermissionType === 'grant' ? 'success' : 'danger'" 
+                  size="large"
+                  effect="dark"
+                >
+                  <el-icon style="margin-right: 4px;">
+                    <component :is="row.PermissionType === 'grant' ? Check : Close" />
+                  </el-icon>
+                  {{ row.PermissionType === 'grant' ? '授予' : '拒绝' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="MenuName" label="菜单名称" width="150" show-overflow-tooltip />
+            <el-table-column prop="ActionCode" label="操作代码" width="120" align="center">
+              <template #default="{ row }">
+                <el-tag v-if="row.ActionCode" type="info" size="small">
+                  {{ row.ActionCode }}
+                </el-tag>
+                <span v-else class="text-muted">-</span>
+              </template>
+            </el-table-column>
+            <el-table-column prop="OperatorName" label="操作人" width="120" align="center">
+              <template #default="{ row }">
+                <div class="operator-info">
+                  <el-avatar :size="24" style="margin-right: 8px;">
+                    <el-icon><User /></el-icon>
+                  </el-avatar>
+                  {{ row.OperatorName }}
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="OperatedAt" label="操作时间" width="180" align="center">
+              <template #default="{ row }">
+                <div class="time-info">
+                  <el-icon style="margin-right: 4px; color: #909399;"><Clock /></el-icon>
+                  {{ formatDateTime(row.OperatedAt) }}
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="Reason" label="操作原因" min-width="200">
+              <template #default="{ row }">
+                <div class="reason-content">
+                  <el-text v-if="row.Reason" type="primary">{{ row.Reason }}</el-text>
+                  <el-text v-else type="info">未填写原因</el-text>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column prop="PermissionLevel" label="权限级别" width="120" align="center">
+              <template #default="{ row }">
+                <div class="permission-type">
+                  <el-tag v-if="row.PermissionLevel === 'menu'" type="primary" size="small">
+                    <el-icon style="margin-right: 4px;"><Menu /></el-icon>
+                    菜单权限
+                  </el-tag>
+                  <el-tag v-else-if="row.PermissionLevel === 'action'" type="success" size="small">
+                    <el-icon style="margin-right: 4px;"><Operation /></el-icon>
+                    按钮权限
+                  </el-tag>
+                  <el-tag v-else type="info" size="small">
+                    {{ row.PermissionLevel || '未知' }}
+                  </el-tag>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="120" align="center">
+              <template #default="{ row }">
+                <div class="operation-buttons">
+                  <el-button
+                    v-if="row.Action === 'delete'"
+                    type="primary"
+                    size="small"
+                    @click="restorePermission(row)"
+                    :loading="restoreLoading"
+                  >
+                    <el-icon><RefreshRight /></el-icon>
+                    恢复
+                  </el-button>
+                  <el-text v-else type="info" size="small">-</el-text>
+                </div>
+              </template>
+            </el-table-column>
+          </el-table>
+          
+          <!-- 历史记录分页 -->
+          <div class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="historyPagination.page"
+              v-model:page-size="historyPagination.pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="historyPagination.total"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="loadHistory"
+              @current-change="loadHistory"
+              background
+            />
+          </div>
+        </el-card>
       </div>
-    </el-dialog>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Plus, Delete } from '@element-plus/icons-vue'
+import { Search, Refresh, Plus, Delete, Clock, User, Check, Close, Edit, CirclePlus, Remove, RefreshRight, Menu, Operation } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
 import api from '@/services/api'
 
@@ -372,6 +504,7 @@ const userStore = useUserStore()
 // 响应式数据
 const loading = ref(false)
 const userLoading = ref(false)
+const restoreLoading = ref(false)
 const permissions = ref([])
 const userOptions = ref([])
 const menuOptions = ref([])
@@ -440,11 +573,12 @@ const historyDialog = reactive({
 const historyData = ref([])
 const historyPagination = reactive({
   page: 1,
-  pageSize: 20,
+  pageSize: 10,
   total: 0
 })
 
 const currentHistoryUserId = ref(null)
+const currentHistoryUser = ref(null)
 
 /**
  * 权限检查函数
@@ -704,6 +838,13 @@ const submitGrant = async () => {
       ElMessage.success('权限授予成功')
       grantDialog.visible = false
       loadPermissions()
+      
+      // 如果修改的是当前登录用户的权限，刷新用户信息以更新权限缓存
+      const currentUser = userStore.user
+      if (currentUser && currentUser.id === data.userId) {
+        await userStore.fetchProfile(true) // 强制刷新用户信息
+        console.log('已刷新当前用户权限信息')
+      }
     } else {
       ElMessage.error(response.data.message || '权限授予失败')
     }
@@ -739,6 +880,13 @@ const revokePermission = async (row) => {
     if (response.data.success) {
       ElMessage.success('权限撤销成功')
       loadPermissions()
+      
+      // 如果修改的是当前登录用户的权限，刷新用户信息以更新权限缓存
+      const currentUser = userStore.user
+      if (currentUser && currentUser.id === row.UserId) {
+        await userStore.fetchProfile(true) // 强制刷新用户信息
+        console.log('已刷新当前用户权限信息')
+      }
     } else {
       ElMessage.error(response.data.message || '权限撤销失败')
     }
@@ -750,11 +898,67 @@ const revokePermission = async (row) => {
 }
 
 /**
+ * 恢复权限
+ * @param {Object} row - 历史记录行数据
+ */
+const restorePermission = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要恢复用户 "${row.UserRealName}" 对菜单 "${row.MenuName}" 的权限吗？`,
+      '恢复权限',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    restoreLoading.value = true
+    
+    // 调用恢复权限API
+    const response = await api.post('/user-permissions/restore', {
+      userId: row.UserID,
+      menuId: row.MenuID,
+      permissionType: row.PermissionType,
+      permissionLevel: row.PermissionLevel || 'menu',
+      reason: '从历史记录恢复权限'
+    })
+    
+    if (response.data.success) {
+      ElMessage.success('权限恢复成功')
+      // 刷新权限历史和权限列表
+      loadHistory()
+      loadPermissions()
+      
+      // 如果修改的是当前登录用户的权限，刷新用户信息以更新权限缓存
+      const currentUser = userStore.user
+      if (currentUser && currentUser.id === row.UserID) {
+        await userStore.fetchProfile(true) // 强制刷新用户信息
+        console.log('已刷新当前用户权限信息')
+      }
+    } else {
+      ElMessage.error(response.data.message || '权限恢复失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('恢复权限失败:', error)
+      ElMessage.error('恢复权限失败')
+    }
+  } finally {
+    restoreLoading.value = false
+  }
+}
+
+/**
  * 查看权限历史
  * @param {Object} row - 权限行数据
  */
 const viewHistory = (row) => {
   currentHistoryUserId.value = row.UserID
+  currentHistoryUser.value = {
+    Username: row.Username,
+    RealName: row.RealName
+  }
   historyPagination.page = 1
   historyDialog.visible = true
   loadHistory()
@@ -785,6 +989,56 @@ const loadHistory = async () => {
   } finally {
     historyDialog.loading = false
   }
+}
+
+/**
+ * 处理历史抽屉关闭
+ * @param {Function} done - 关闭回调函数
+ */
+const handleHistoryClose = (done) => {
+  currentHistoryUserId.value = null
+  currentHistoryUser.value = null
+  historyData.value = []
+  done()
+}
+
+/**
+ * 获取操作统计数量
+ * @param {string} action - 操作类型
+ * @returns {number} 统计数量
+ */
+const getActionCount = (action) => {
+  return historyData.value.filter(item => item.Action === action).length
+}
+
+/**
+ * 获取操作图标
+ * @param {string} action - 操作类型
+ * @returns {Component} 图标组件
+ */
+const getActionIcon = (action) => {
+  const iconMap = {
+    'create': CirclePlus,
+    'update': Edit,
+    'delete': Remove
+  }
+  return iconMap[action] || Edit
+}
+
+/**
+ * 获取表格行样式类名
+ * @param {Object} param - 行数据参数
+ * @returns {string} 样式类名
+ */
+const getRowClassName = ({ row }) => {
+  if (row.Action === 'delete') {
+    return 'danger-row'
+  } else if (row.Action === 'create') {
+    return 'success-row'
+  } else if (row.Action === 'update') {
+    return 'warning-row'
+  }
+  return ''
 }
 
 /**
@@ -869,7 +1123,7 @@ onMounted(() => {
 }
 
 .pagination-wrapper {
-  margin-top: 20px;
+  /* margin-top: 20px; */
   display: flex;
   justify-content: center;
 }
@@ -923,6 +1177,175 @@ onMounted(() => {
   font-weight: 500;
 }
 
+/* 权限历史抽屉样式 */
+.history-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 20px;
+  height: 40px;
+  margin: 0 !important;
+}
+
+/* 覆盖抽屉头部的默认样式 */
+:deep(.el-drawer__header) {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.history-icon {
+  font-size: 16px;
+  color: #409eff;
+}
+
+.history-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+  line-height: 1.2;
+}
+
+.history-user-info {
+  margin-left: auto;
+}
+
+.history-content {
+  padding: 10px 20px 20px 20px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.history-stats {
+  margin-bottom: 20px;
+  background: #ffffff;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+  padding: 20px;
+}
+
+.stat-item {
+  text-align: center;
+  padding: 16px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-radius: 8px;
+  border: 1px solid #dee2e6;
+  transition: all 0.3s ease;
+}
+
+.stat-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  color: #409eff;
+  margin-bottom: 8px;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.history-table-card {
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+}
+
+.card-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+
+.operator-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.time-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.reason-content {
+  padding: 8px;
+  line-height: 1.5;
+}
+
+.text-muted {
+  color: #909399;
+  font-style: italic;
+}
+
+/* 表格行样式 */
+.el-table :deep(.success-row) {
+  background-color: #f0f9ff;
+}
+
+.el-table :deep(.warning-row) {
+  background-color: #fefce8;
+}
+
+.el-table :deep(.danger-row) {
+  background-color: #fef2f2;
+}
+
+.el-table :deep(.success-row:hover > td) {
+  background-color: #e0f2fe !important;
+}
+
+.el-table :deep(.warning-row:hover > td) {
+  background-color: #fef3c7 !important;
+}
+
+.el-table :deep(.danger-row:hover > td) {
+  background-color: #fee2e2 !important;
+}
+
+/* 权限历史表格标签样式修复 */
+.el-table :deep(.el-tag) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1;
+  min-height: 28px;
+  padding: 6px 12px;
+  box-sizing: border-box;
+}
+
+/* 操作原因列左对齐 */
+.reason-content {
+  text-align: left;
+  width: 100%;
+}
+
+.el-table :deep(.el-tag .el-icon) {
+  margin-right: 4px;
+  flex-shrink: 0;
+  display: inline-block;
+}
+
+.el-table :deep(.el-tag span) {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  text-align: center;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .user-permissions-container {
@@ -944,6 +1367,34 @@ onMounted(() => {
   .header-actions {
     width: 100%;
     justify-content: flex-end;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    padding: 16px;
+  }
+  
+  .stat-item {
+    padding: 12px;
+  }
+  
+  .stat-value {
+    font-size: 24px;
+  }
+  
+  .history-content {
+    padding: 16px;
+  }
+  
+  .history-header {
+    padding: 0 16px;
+    flex-wrap: wrap;
+  }
+  
+  .history-user-info {
+    margin-left: 0;
+    margin-top: 8px;
   }
 }
 </style>

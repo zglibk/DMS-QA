@@ -729,25 +729,27 @@ router.get('/user/:userId/roles-permissions', authenticateToken, async (req, res
         WHERE ur.UserID = @UserId AND r.Status = 1
       `);
     
-    // 获取用户权限信息（通过角色获取菜单权限）
+    // 获取用户完整权限信息（包括角色权限和用户级权限）
     const permissionsResult = await pool.request()
       .input('UserId', sql.Int, userId)
       .query(`
         SELECT DISTINCT
-          m.ID as id,
-          m.MenuName as name,
-          m.MenuCode as code,
-          m.Path as path,
+          v.MenuID as id,
+          v.MenuName as name,
+          v.MenuCode as code,
+          v.Path as path,
           m.MenuType as type,
           m.ParentID as parentId,
-          m.Permission,
-          m.SortOrder
-        FROM [UserRoles] ur
-        INNER JOIN [RoleMenus] rm ON ur.RoleID = rm.RoleID
-        INNER JOIN [Menus] m ON rm.MenuID = m.ID
-        WHERE ur.UserID = @UserId AND m.Status = 1
+          v.Permission,
+          m.SortOrder,
+          v.PermissionSource,
+          v.PermissionType,
+          v.HasPermission
+        FROM [V_UserCompletePermissions] v
+        INNER JOIN [Menus] m ON v.MenuID = m.ID
+        WHERE v.UserID = @UserId AND v.HasPermission = 1
         ORDER BY m.SortOrder
-      `);
+       `);
     
     const roles = rolesResult.recordset || [];
     const permissions = permissionsResult.recordset || [];
@@ -894,6 +896,46 @@ router.post('/user/:userId/assign-roles', authenticateToken, async (req, res) =>
   } catch (err) {
     console.error('分配用户角色失败:', err);
     res.status(500).json({ success: false, message: '分配角色失败，请重试' });
+  }
+});
+
+// ===================== 权限检查 =====================
+// GET /api/auth/check-permission/:permission
+// 检查当前用户是否具有指定权限
+router.get('/check-permission/:permission', authenticateToken, async (req, res) => {
+  try {
+    const { permission } = req.params;
+    const userId = req.user.id;
+    
+    if (!permission) {
+      return res.status(400).json({
+        success: false,
+        message: '权限标识不能为空'
+      });
+    }
+    
+    // 导入权限检查函数
+    const { checkUserPermission } = require('../middleware/auth');
+    
+    // 检查用户权限
+    const hasPermission = await checkUserPermission(userId, permission);
+    
+    res.json({
+      success: true,
+      data: {
+        userId: userId,
+        permission: permission,
+        hasPermission: hasPermission
+      }
+    });
+    
+  } catch (error) {
+    console.error('检查权限失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '检查权限失败',
+      error: error.message
+    });
   }
 });
 

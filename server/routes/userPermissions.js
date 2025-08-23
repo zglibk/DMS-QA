@@ -253,7 +253,7 @@ router.post('/', authenticateToken, checkPermission('user-permission:grant'), as
     }
     
     // 插入新权限
-    const insertResult = await pool.request()
+    await pool.request()
       .input('UserID', sql.Int, userId)
       .input('MenuID', sql.Int, menuId)
       .input('PermissionType', sql.NVarChar, permissionType)
@@ -267,18 +267,21 @@ router.post('/', authenticateToken, checkPermission('user-permission:grant'), as
           UserID, MenuID, PermissionType, PermissionLevel, ActionCode,
           GrantedBy, ExpiresAt, Reason, Status
         )
-        OUTPUT INSERTED.ID
         VALUES (
           @UserID, @MenuID, @PermissionType, @PermissionLevel, @ActionCode,
           @GrantedBy, @ExpiresAt, @Reason, 1
         )
       `);
     
+    // 获取插入的ID
+    const idResult = await pool.request().query('SELECT SCOPE_IDENTITY() as ID');
+    const insertedId = idResult.recordset[0].ID;
+    
     res.json({
       success: true,
       message: '权限授予成功',
       data: {
-        id: insertResult.recordset[0].ID,
+        id: insertedId,
         userId,
         menuId,
         permissionType,
@@ -392,7 +395,7 @@ router.post('/batch', authenticateToken, checkPermission('user-permission:grant'
         
         if (existingResult.recordset.length === 0) {
           // 插入新权限
-          const insertResult = await transaction.request()
+          await transaction.request()
             .input('UserID', sql.Int, userId)
             .input('MenuID', sql.Int, menuId)
             .input('PermissionType', sql.NVarChar, permissionType)
@@ -406,19 +409,22 @@ router.post('/batch', authenticateToken, checkPermission('user-permission:grant'
                 UserID, MenuID, PermissionType, PermissionLevel, ActionCode,
                 GrantedBy, ExpiresAt, Reason, Status
               )
-              OUTPUT INSERTED.ID
               VALUES (
                 @UserID, @MenuID, @PermissionType, @PermissionLevel, @ActionCode,
                 @GrantedBy, @ExpiresAt, @Reason, 1
               )
             `);
           
+          // 获取插入的ID
+          const idResult = await transaction.request().query('SELECT SCOPE_IDENTITY() as ID');
+          const insertedId = idResult.recordset[0].ID;
+          
           results.push({
             menuId,
             permissionLevel,
             actionCode,
             status: 'created',
-            id: insertResult.recordset[0].ID
+            id: insertedId
           });
         } else {
           results.push({
@@ -530,7 +536,109 @@ router.get('/:userId/history', authenticateToken, checkPermission('user-permissi
 
 /**
  * 清理过期权限
- * POST /api/user-permissions/cleanup-expired
+ * POST /api/user-permissions/cleanup-expired/**
+ * 恢复权限
+ * POST /api/user-permissions/restore
+ * 从历史记录中恢复已删除的权限
+ */
+router.post('/restore', authenticateToken, checkPermission('user-permission:grant'), async (req, res) => {
+  try {
+    const { userId, menuId, permissionType, permissionLevel = 'menu', reason = '从历史记录恢复权限' } = req.body;
+    const operatorId = req.user.id;
+    
+    // 参数验证
+    if (!userId || !menuId || !permissionType) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少必要参数：userId, menuId, permissionType'
+      });
+    }
+    
+    const pool = await sql.connect(await getDynamicConfig());
+    
+    // 检查是否已存在相同的权限配置
+    const existingPermission = await pool.request()
+      .input('userId', sql.Int, userId)
+      .input('menuId', sql.Int, menuId)
+      .input('permissionType', sql.VarChar(20), permissionType)
+      .query(`
+        SELECT ID FROM [UserPermissions]
+        WHERE UserID = @userId 
+          AND MenuID = @menuId 
+          AND PermissionType = @permissionType 
+          AND Status = 1
+      `);
+    
+    if (existingPermission.recordset.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: '该权限配置已存在，无需恢复'
+      });
+    }
+    
+    // 插入新的权限记录
+    const insertResult = await pool.request()
+      .input('userId', sql.Int, userId)
+      .input('menuId', sql.Int, menuId)
+      .input('permissionType', sql.VarChar(20), permissionType)
+      .input('permissionLevel', sql.VarChar(20), permissionLevel)
+      .input('operatorId', sql.Int, operatorId)
+      .query(`
+        INSERT INTO [UserPermissions] (
+          UserID, MenuID, PermissionType, PermissionLevel, 
+          Status, CreatedAt, UpdatedAt, CreatedBy
+        )
+        VALUES (
+          @userId, @menuId, @permissionType, @permissionLevel,
+          1, GETDATE(), GETDATE(), @operatorId
+        );
+        SELECT SCOPE_IDENTITY() as NewID;
+      `);
+    
+    const newPermissionId = insertResult.recordset[0].NewID;
+    
+    // 记录权限历史
+    await pool.request()
+      .input('userID', sql.Int, userId)
+      .input('menuID', sql.Int, menuId)
+      .input('permissionType', sql.VarChar(20), permissionType)
+      .input('permissionLevel', sql.VarChar(20), permissionLevel)
+      .input('action', sql.VarChar(20), 'create')
+      .input('reason', sql.NVarChar(500), reason)
+      .input('operatorId', sql.Int, operatorId)
+      .query(`
+        INSERT INTO [UserPermissionHistory] (
+          UserID, MenuID, PermissionType, PermissionLevel, 
+          Action, Reason, OperatedAt, OperatorID
+        )
+        VALUES (
+          @userID, @menuID, @permissionType, @permissionLevel,
+          @action, @reason, GETDATE(), @operatorId
+        )
+      `);
+    
+    res.json({
+      success: true,
+      message: '权限恢复成功',
+      data: {
+        id: newPermissionId,
+        userId,
+        menuId,
+        permissionType,
+        permissionLevel
+      }
+    });
+  } catch (error) {
+    console.error('恢复权限失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '恢复权限失败',
+      error: error.message
+    });
+  }
+});
+
+/**
  * 清理所有过期的用户权限
  */
 router.post('/cleanup-expired', authenticateToken, checkPermission('user-permission:manage'), async (req, res) => {

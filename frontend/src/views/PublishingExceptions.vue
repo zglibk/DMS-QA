@@ -725,45 +725,64 @@ const userStore = useUserStore()
 const currentUser = computed(() => userStore.user?.Username || '系统')
 
 // 权限检查
-const canAdd = computed(() => {
-  // 检查用户是否有系统管理员或质量经理角色
-  const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
-  
-  // 检查用户是否有出版异常新增的操作权限
-  const hasAddPermission = userStore.hasActionPermission && userStore.hasActionPermission('publishing-exceptions:add')
-  
-  return hasAdminRole || hasAddPermission
+// 权限状态管理
+const permissions = reactive({
+  canAdd: false,
+  canEdit: false,
+  canDelete: false,
+  canExport: false
 })
 
-const canEdit = computed(() => {
-  // 检查用户是否有系统管理员或质量经理角色
-  const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
-  
-  // 检查用户是否有出版异常编辑的操作权限
-  const hasEditPermission = userStore.hasActionPermission && userStore.hasActionPermission('publishing-exceptions:edit')
-  
-  return hasAdminRole || hasEditPermission
-})
+// 检查权限的异步方法
+const checkPermissions = async () => {
+  try {
+    console.log('开始权限检查...')
+    // 检查是否有管理员角色
+    const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
+    console.log('管理员角色检查:', hasAdminRole)
+    
+    if (hasAdminRole) {
+      // 管理员拥有所有权限
+      permissions.canAdd = true
+      permissions.canEdit = true
+      permissions.canDelete = true
+      permissions.canExport = true
+      console.log('管理员权限设置完成:', permissions)
+    } else {
+      // 使用异步权限检查（支持用户级权限优先级）
+      console.log('开始异步权限检查...')
+      const [addPerm, editPerm, deletePerm, exportPerm] = await Promise.all([
+        userStore.hasActionPermissionAsync('quality:publishing:add'),
+        userStore.hasActionPermissionAsync('quality:publishing:edit'),
+        userStore.hasActionPermissionAsync('quality:publishing:delete'),
+        userStore.hasActionPermissionAsync('quality:publishing:export')
+      ])
+      
+      console.log('权限检查结果:', { addPerm, editPerm, deletePerm, exportPerm })
+      
+      permissions.canAdd = addPerm
+      permissions.canEdit = editPerm
+      permissions.canDelete = deletePerm
+      permissions.canExport = exportPerm
+      console.log('权限设置完成:', permissions)
+    }
+  } catch (error) {
+    console.error('权限检查失败:', error)
+    // 权限检查失败时，回退到角色权限
+    const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
+    permissions.canAdd = hasAdminRole
+    permissions.canEdit = hasAdminRole
+    permissions.canDelete = hasAdminRole
+    permissions.canExport = hasAdminRole
+  }
+}
 
-const canDelete = computed(() => {
-  // 检查用户是否有系统管理员或质量经理角色
-  const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
-  
-  // 检查用户是否有出版异常删除的操作权限
-  const hasDeletePermission = userStore.hasActionPermission && userStore.hasActionPermission('publishing-exceptions:delete')
-  
-  return hasAdminRole || hasDeletePermission
-})
+// 兼容性computed属性（保持向后兼容）
+const canAdd = computed(() => permissions.canAdd)
 
-const canExport = computed(() => {
-  // 检查用户是否有系统管理员或质量经理角色
-  const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
-  
-  // 检查用户是否有出版异常导出的操作权限
-  const hasExportPermission = userStore.hasActionPermission && userStore.hasActionPermission('publishing-exceptions:export')
-  
-  return hasAdminRole || hasExportPermission
-})
+const canEdit = computed(() => permissions.canEdit)
+const canDelete = computed(() => permissions.canDelete)
+const canExport = computed(() => permissions.canExport)
 
 // 页面状态
 const activeTab = ref('records')
@@ -2454,15 +2473,25 @@ const handleResize = () => {
 }
 
 // 组件挂载时获取数据
-onMounted(() => {
+onMounted(async () => {
   fetchDepartments()
   fetchProductNames() // 获取产品名称列表
   fetchData()
   fetchStatistics() // 页面加载时获取统计数据
   
+  // 检查权限
+  await checkPermissions()
+  
   // 添加窗口大小变化监听器
   window.addEventListener('resize', handleResize)
 })
+
+// 监听用户变化，重新检查权限
+watch(() => userStore.user, async (newUser) => {
+  if (newUser) {
+    await checkPermissions()
+  }
+}, { deep: true })
 
 // 组件卸载时清理监听器
 onUnmounted(() => {
