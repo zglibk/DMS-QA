@@ -186,15 +186,15 @@
             <div class="records-content">
               <!-- 操作工具栏 -->
               <div class="toolbar">
-                <el-button type="primary" @click="handleAdd">
+                <el-button type="primary" @click="handleAdd" :disabled="!canAdd">
                   <el-icon><Plus /></el-icon>
                   新增记录
                 </el-button>
-                <el-button type="danger" @click="handleBatchDelete" :disabled="selectedRows.length === 0">
+                <el-button type="danger" @click="handleBatchDelete" :disabled="selectedRows.length === 0 || !canDelete">
                   <el-icon><Delete /></el-icon>
                   批量删除
                 </el-button>
-                <el-button @click="handleExport">
+                <el-button @click="handleExport" :disabled="!canExport">
                   <el-icon><Download /></el-icon>
                   导出数据
                 </el-button>
@@ -246,11 +246,11 @@
                         <el-icon><View /></el-icon>
                         查看
                       </el-button>
-                      <el-button type="warning" size="small" @click="handleEdit(row)">
+                      <el-button type="primary" size="small" @click="handleEdit(row)" :disabled="!canEdit">
                         <el-icon><Edit /></el-icon>
                         编辑
                       </el-button>
-                      <el-button type="danger" size="small" @click="handleDelete(row)">
+                      <el-button type="danger" size="small" @click="handleDelete(row)" :disabled="!canDelete">
                         <el-icon><Delete /></el-icon>
                         删除
                       </el-button>
@@ -723,6 +723,47 @@ import * as echarts from 'echarts'
 // 用户信息
 const userStore = useUserStore()
 const currentUser = computed(() => userStore.user?.Username || '系统')
+
+// 权限检查
+const canAdd = computed(() => {
+  // 检查用户是否有系统管理员或质量经理角色
+  const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
+  
+  // 检查用户是否有出版异常新增的操作权限
+  const hasAddPermission = userStore.hasActionPermission && userStore.hasActionPermission('publishing-exceptions:add')
+  
+  return hasAdminRole || hasAddPermission
+})
+
+const canEdit = computed(() => {
+  // 检查用户是否有系统管理员或质量经理角色
+  const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
+  
+  // 检查用户是否有出版异常编辑的操作权限
+  const hasEditPermission = userStore.hasActionPermission && userStore.hasActionPermission('publishing-exceptions:edit')
+  
+  return hasAdminRole || hasEditPermission
+})
+
+const canDelete = computed(() => {
+  // 检查用户是否有系统管理员或质量经理角色
+  const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
+  
+  // 检查用户是否有出版异常删除的操作权限
+  const hasDeletePermission = userStore.hasActionPermission && userStore.hasActionPermission('publishing-exceptions:delete')
+  
+  return hasAdminRole || hasDeletePermission
+})
+
+const canExport = computed(() => {
+  // 检查用户是否有系统管理员或质量经理角色
+  const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
+  
+  // 检查用户是否有出版异常导出的操作权限
+  const hasExportPermission = userStore.hasActionPermission && userStore.hasActionPermission('publishing-exceptions:export')
+  
+  return hasAdminRole || hasExportPermission
+})
 
 // 页面状态
 const activeTab = ref('records')
@@ -1349,6 +1390,12 @@ const handleTabClick = (tab) => {
  * 新增记录
  */
 const handleAdd = () => {
+  // 权限检查
+  if (!canAdd.value) {
+    ElMessage.warning('您没有新增出版异常记录的权限')
+    return
+  }
+  
   isEdit.value = false
   currentEditId.value = null
   resetFormData()
@@ -1366,6 +1413,12 @@ const handleAdd = () => {
  * 编辑记录
  */
 const handleEdit = (row) => {
+  // 权限检查
+  if (!canEdit.value) {
+    ElMessage.warning('您没有编辑出版异常记录的权限')
+    return
+  }
+  
   isEdit.value = true
   currentEditId.value = row.id
   
@@ -1480,6 +1533,12 @@ const handleRowDoubleClick = (row) => {
  * 删除记录
  */
 const handleDelete = async (row) => {
+  // 权限检查
+  if (!canDelete.value) {
+    ElMessage.warning('您没有删除出版异常记录的权限')
+    return
+  }
+  
   try {
     await ElMessageBox.confirm(
       `确定要删除这条记录吗？`,
@@ -1515,6 +1574,12 @@ const handleDelete = async (row) => {
  * 批量删除
  */
 const handleBatchDelete = async () => {
+  // 权限检查
+  if (!canDelete.value) {
+    ElMessage.warning('您没有删除出版异常记录的权限')
+    return
+  }
+  
   if (selectedRows.value.length === 0) {
     ElMessage.warning('请选择要删除的记录')
     return
@@ -1564,6 +1629,12 @@ const includeImages = ref(true)
  * 导出数据功能 - 显示导出选项对话框
  */
 const handleExport = () => {
+  // 权限检查
+  if (!canExport.value) {
+    ElMessage.warning('您没有导出出版异常数据的权限')
+    return
+  }
+  
   exportDialogVisible.value = true
 }
 

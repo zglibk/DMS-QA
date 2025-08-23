@@ -30,7 +30,6 @@ router.get('/tree', async (req, res) => {
           CreatedAt,
           UpdatedAt
         FROM Menus
-        WHERE Status = 1
         ORDER BY SortOrder ASC, CreatedAt ASC
       `)
     

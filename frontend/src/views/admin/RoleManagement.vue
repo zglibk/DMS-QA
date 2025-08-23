@@ -433,11 +433,23 @@ const fetchRoles = async () => {
 // 获取菜单列表
 const fetchMenus = async () => {
   try {
-    // 获取所有菜单数据，设置足够大的分页参数
-    const response = await axios.get('/menus?size=1000')
-    // 修复：从分页数据结构中提取list数组
-    const data = response.data.data || {}
-    menuList.value = data.list || []
+    // 使用tree接口获取所有菜单数据，不受分页限制
+    const response = await axios.get('/menus/tree')
+    const treeData = response.data.data || []
+    
+    // 将树形结构转换为扁平数组，用于权限分配
+    const flattenMenus = (menus) => {
+      let result = []
+      menus.forEach(menu => {
+        result.push(menu)
+        if (menu.children && menu.children.length > 0) {
+          result = result.concat(flattenMenus(menu.children))
+        }
+      })
+      return result
+    }
+    
+    menuList.value = flattenMenus(treeData)
   } catch (error) {
     console.error('获取菜单列表失败:', error)
   }
