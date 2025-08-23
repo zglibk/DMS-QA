@@ -882,6 +882,35 @@ onMounted(() => {
   font-size: 14px;
 }
 
+/* 权限列表表格样式 - 垂直和水平居中，禁止换行 */
+.el-table :deep(.el-table__cell) {
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.el-table :deep(.cell) {
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 表头背景色设置为浅灰色 */
+.el-table :deep(.el-table__header-wrapper) {
+  background-color: #f5f7fa;
+}
+
+.el-table :deep(.el-table__header) {
+  background-color: #f5f7fa;
+}
+
+.el-table :deep(.el-table__header th) {
+  background-color: #f5f7fa !important;
+}
+
 .el-dialog__body {
   padding: 20px;
 }
