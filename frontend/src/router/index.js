@@ -246,6 +246,16 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
+        path: 'system/user-permissions',
+        component: () => import('../views/UserPermissions.vue'), // 用户权限管理页面
+        meta: { requiresAuth: true }
+      },
+      {
+        path: 'user-permissions',
+        component: () => import('../views/UserPermissions.vue'), // 用户权限管理页面
+        meta: { requiresAuth: true }
+      },
+      {
         path: 'system/accordion-table-example',
         component: () => import('../examples/AccordionTableExample.vue'), // AccordionTable组件示例页面
         meta: { requiresAuth: true }

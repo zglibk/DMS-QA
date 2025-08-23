@@ -955,8 +955,7 @@ router.post('/generate-report', async (req, res) => {
     const minute = now.getMinutes().toString().padStart(2, '0')
     const timestamp = `${year}${month}${day}${hour}${minute}`
     
-    console.log('=== 文件名生成调试 ===')
-    console.log('时间戳生成:', timestamp)
+    // 生成文件名时间戳
     
     // 为每个投诉记录创建一个工作表
     for (let i = 0; i < result.recordset.length; i++) {

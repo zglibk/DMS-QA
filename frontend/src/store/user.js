@@ -118,9 +118,35 @@ export const useUserStore = defineStore('user', {
       return (state.user?.roles || []).some(role => role.name === 'admin' || role.name === '系统管理员')
     },
 
-    // 检查用户是否具有指定角色
-    hasRole: (state) => (roleName) => {
-      return (state.user?.roles || []).some(role => role.name === roleName)
+    // 通用权限检查方法
+    hasPermission: (state) => (permission) => {
+      // 检查是否为管理员，管理员拥有所有权限
+      // 兼容不同的字段名格式：name/Name, code/Code
+      if ((state.user?.roles || []).some(role => 
+        role.name === 'admin' || role.name === '系统管理员' ||
+        role.Name === 'admin' || role.Name === '系统管理员' ||
+        role.code === 'admin' || role.Code === 'admin'
+      )) {
+        return true
+      }
+      
+      // 检查菜单权限中是否包含该权限
+      const menus = state.user?.permissions?.menus || []
+      return menus.some(menu => {
+        // 检查菜单的Permission字段
+        if (menu.Permission === permission) {
+          return true
+        }
+        // 检查菜单代码是否匹配权限
+        if (menu.MenuCode && permission.includes(menu.MenuCode)) {
+          return true
+        }
+        // 检查路径是否匹配权限
+        if (menu.path && permission.includes(menu.path.replace('/', ''))) {
+          return true
+        }
+        return false
+      })
     },
 
     // 检查用户是否有任何 /admin 路由下的权限（使用正则表达式）

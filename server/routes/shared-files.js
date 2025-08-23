@@ -93,8 +93,7 @@ router.get('/*', async (req, res) => {
   try {
     const requestedPath = req.params[0]; // 获取通配符匹配的路径
 
-    console.log('=== 共享文件访问请求 ===');
-    console.log('请求路径:', requestedPath);
+    // 处理共享文件访问请求
 
     // 如果是空路径，返回健康检查信息
     if (!requestedPath || requestedPath.trim() === '') {
@@ -108,7 +107,7 @@ router.get('/*', async (req, res) => {
 
     // 安全检查
     if (!isSecurePath(requestedPath)) {
-      console.log('❌ 路径安全检查失败');
+      // 路径安全检查失败
       return res.status(403).json({
         success: false,
         message: '访问被拒绝：路径不安全'
@@ -117,11 +116,11 @@ router.get('/*', async (req, res) => {
     
     // 构建完整的网络路径
     const fullNetworkPath = buildNetworkPath(requestedPath);
-    console.log('完整网络路径:', fullNetworkPath);
+    // 构建完整网络路径
     
     // 检查文件类型
     if (!isSupportedFileType(fullNetworkPath)) {
-      console.log('❌ 不支持的文件类型');
+      // 不支持的文件类型
       return res.status(415).json({
         success: false,
         message: '不支持的文件类型'
@@ -133,17 +132,17 @@ router.get('/*', async (req, res) => {
       const stats = fs.statSync(fullNetworkPath);
       
       if (!stats.isFile()) {
-        console.log('❌ 不是文件');
+        // 不是文件
         return res.status(404).json({
           success: false,
           message: '文件不存在'
         });
       }
       
-      console.log('✅ 文件存在，大小:', stats.size, 'bytes');
+      // 文件存在，开始传输
       
     } catch (statError) {
-      console.log('❌ 文件访问失败:', statError.message);
+      // 文件访问失败
       return res.status(404).json({
         success: false,
         message: '文件不存在或无法访问'
@@ -163,7 +162,7 @@ router.get('/*', async (req, res) => {
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     
-    console.log('✅ 开始传输文件');
+    // 开始传输文件
     
     // 创建文件流并发送
     const fileStream = fs.createReadStream(fullNetworkPath);
@@ -179,7 +178,7 @@ router.get('/*', async (req, res) => {
     });
     
     fileStream.on('end', () => {
-      console.log('✅ 文件传输完成');
+      // 文件传输完成
     });
     
     // 管道传输文件

@@ -289,12 +289,7 @@ router.get('/list', async (req, res) => {
     
     const dataResult = await request.query(dataQuery);
     
-    // 调试日志：检查查询结果
-    console.log('列表API查询结果:', dataResult.recordset);
-    if (dataResult.recordset.length > 0) {
-      console.log('第一条记录的ReworkCategory:', dataResult.recordset[0].ReworkCategory);
-      console.log('第一条记录的所有字段:', Object.keys(dataResult.recordset[0]));
-    }
+    // 返工记录列表查询完成
     
     res.json({
       success: true,
@@ -328,7 +323,7 @@ router.get('/list', async (req, res) => {
  */
 router.get('/options', async (req, res) => {
   try {
-    console.log('开始获取返工选项数据...');
+    // 获取返工选项数据
     const pool = await getConnection();
     
     // 默认选项数据
@@ -359,7 +354,7 @@ router.get('/options', async (req, res) => {
         options.workshops = workshopResult.recordset.map(item => item.Name);
       }
     } catch (err) {
-      console.log('Workshop表不存在或查询失败，使用默认数据');
+      // Workshop表不存在，使用默认数据
     }
     
     try {
@@ -371,7 +366,7 @@ router.get('/options', async (req, res) => {
         options.departments = deptResult.recordset.map(item => item.Name);
       }
     } catch (err) {
-      console.log('Department表不存在或查询失败，使用默认数据');
+      // Department表不存在，使用默认数据
     }
     
     try {
@@ -387,7 +382,7 @@ router.get('/options', async (req, res) => {
         options.persons = personResult.recordset;
       }
     } catch (err) {
-      console.log('Person表不存在或查询失败，使用默认数据');
+      // Person表不存在，使用默认数据
     }
     
     try {
@@ -399,10 +394,10 @@ router.get('/options', async (req, res) => {
         options.defectiveCategories = defectiveCategoryResult.recordset.map(item => item.Name);
       }
     } catch (err) {
-      console.log('DefectiveCategory表不存在或查询失败，使用默认数据');
+      // DefectiveCategory表不存在，使用默认数据
     }
     
-    console.log('返工选项数据获取成功，返回数据:', Object.keys(options));
+    // 返工选项数据获取成功
     res.json({
       success: true,
       data: options
@@ -464,7 +459,7 @@ router.get('/quality-levels', async (req, res) => {
         return;
       }
     } catch (dbError) {
-      console.log('QualityLevelSettings表不存在，返回默认数据');
+      // QualityLevelSettings表不存在，返回默认数据
     }
     
     // 如果数据库中没有数据或表不存在，返回默认数据
@@ -1164,11 +1159,11 @@ router.get('/statistics/summary', async (req, res) => {
       whereConditions.push('ReworkDate >= @startDate AND ReworkDate <= @endDate');
       parameters.push({ name: 'startDate', type: sql.Date, value: startDate });
       parameters.push({ name: 'endDate', type: sql.Date, value: endDate });
-      console.log(`查询时间范围: ${startDate} 到 ${endDate}`);
+      // 查询指定时间范围
     } else {
       whereConditions.push('YEAR(ReworkDate) = @year');
       parameters.push({ name: 'year', type: sql.Int, value: year });
-      console.log(`查询年份: ${year}`);
+      // 查询指定年份
     }
     
     // 筛选条件
@@ -1188,7 +1183,7 @@ router.get('/statistics/summary', async (req, res) => {
     }
     
     const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
-    console.log(`WHERE子句: ${whereClause}`);
+    // 构建查询条件
     
     // 获取时间范围内的汇总数据
     const summaryRequest = pool.request();
@@ -1378,7 +1373,7 @@ router.get('/statistics/hours', async (req, res) => {
       responsiblePerson
     } = req.query;
     
-    console.log('获取工时损耗统计数据请求参数:', { startDate, endDate, department, workshop, responsiblePerson });
+    // 获取工时损耗统计数据
     
     const pool = await getConnection();
     
@@ -1504,7 +1499,7 @@ router.get('/statistics/hours', async (req, res) => {
     // 按工时降序排序
     allData.sort((a, b) => b.totalHours - a.totalHours);
     
-    console.log('工时损耗统计查询结果:', allData);
+    // 工时损耗统计查询完成
     
     res.json({
       success: true,

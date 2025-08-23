@@ -100,7 +100,7 @@ router.get('/', async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('获取角色列表失败:', error)
+    // 获取角色列表失败
     res.status(500).json({
       success: false,
       message: '获取角色列表失败',
@@ -402,7 +402,7 @@ router.put('/:id', async (req, res) => {
       throw error
     }
   } catch (error) {
-    console.error('更新角色失败:', error)
+    // 更新角色失败
     res.status(500).json({
       success: false,
       message: '更新角色失败',
@@ -516,7 +516,7 @@ router.get('/:id/menus', async (req, res) => {
       data: menuIds
     })
   } catch (error) {
-    console.error('获取角色权限失败:', error)
+    // 获取角色权限失败
     res.status(500).json({
       success: false,
       message: '获取角色权限失败',
@@ -621,7 +621,7 @@ router.get('/:id/departments', async (req, res) => {
       data: departmentIds
     })
   } catch (error) {
-    console.error('获取角色部门失败:', error)
+    // 获取角色部门失败
     res.status(500).json({
       success: false,
       message: '获取角色部门失败',
@@ -683,7 +683,7 @@ router.post('/:id/departments', async (req, res) => {
       throw error
     }
   } catch (error) {
-    console.error('保存角色部门失败:', error)
+    // 保存角色部门失败
     res.status(500).json({
       success: false,
       message: '保存角色部门失败',

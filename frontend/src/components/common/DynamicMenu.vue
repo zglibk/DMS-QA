@@ -341,6 +341,14 @@ const getDefaultMenus = () => {
           Path: '/admin/menu-management',
           Icon: 'Menu',
           Type: 'menu'
+        },
+        {
+          ID: 55,
+          Name: '用户权限管理',
+          Code: 'user-permission-management',
+          Path: '/admin/user-permissions',
+          Icon: 'Lock',
+          Type: 'menu'
         }
       ]
     },

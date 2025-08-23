@@ -339,19 +339,7 @@ router.get('/', async (req, res) => {
     const total = countResult.recordset[0].total;
     const records = dataResult.recordset;
     
-    // 添加调试日志
-    console.log('质量目标列表查询结果:', {
-      总记录数: total,
-      当前页记录数: records.length,
-      前3条记录样本: records.slice(0, 3).map(record => ({
-        ID: record.ID,
-        QualityTarget: record.QualityTarget,
-        TargetValue: record.TargetValue,
-        TargetValueType: typeof record.TargetValue,
-        Status: record.Status,
-        StatusType: typeof record.Status
-      }))
-    });
+    // 质量目标列表查询完成
     
     res.json({
       success: true,
@@ -421,14 +409,7 @@ router.get('/options', async (req, res) => {
       }
     };
     
-    console.log('质量目标选项数据响应:', {
-      categoriesCount: categories.length,
-      unitsCount: units.length,
-      personsCount: persons.length,
-      sampleCategories: categories.slice(0, 3),
-      sampleUnits: units.slice(0, 3),
-      samplePersons: persons.slice(0, 3)
-    });
+    // 质量目标选项数据获取完成
     
     res.json(responseData);
     

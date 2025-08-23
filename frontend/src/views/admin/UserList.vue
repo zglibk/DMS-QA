@@ -1544,6 +1544,11 @@ const handleSelectionChange = (selection) => {
 
 // 获取部门标签类型（为不同部门分配不同颜色）
 const getDepartmentTagType = (department) => {
+  // 检查部门参数是否为空或null
+  if (!department || typeof department !== 'string') {
+    return 'info' // 默认返回info类型
+  }
+  
   const departmentColors = {
     '珠海源信': 'primary',
     '供应商': 'success', 

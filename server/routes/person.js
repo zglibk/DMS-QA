@@ -5,7 +5,85 @@ const { authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
 
-// ===================== 获取人员列表 =====================
+// ===================== 获取用户列表 =====================
+// GET /api/person?page=1&pageSize=10&search=xxx&includeInactive=false
+router.get('/', authenticateToken, async (req, res) => {
+  const { page = 1, pageSize = 10, search = '', includeInactive = 'false' } = req.query;
+  
+  try {
+    const pool = await sql.connect(await getDynamicConfig());
+    
+    // 构建WHERE条件
+    let whereConditions = [];
+    
+    // 搜索条件
+    if (search) {
+      whereConditions.push(`(u.Username LIKE N'%${search}%' OR u.RealName LIKE N'%${search}%' OR d.Name LIKE N'%${search}%')`);
+    }
+    
+    // 是否包含非活跃用户
+    if (includeInactive === 'false' || includeInactive === false) {
+      whereConditions.push('u.Status = 1');
+    }
+    
+    const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+    
+    // 获取总数
+    const countResult = await pool.request().query(`
+      SELECT COUNT(*) AS total 
+      FROM [User] u 
+      LEFT JOIN Department d ON u.DepartmentID = d.ID 
+      ${whereClause}
+    `);
+    const total = countResult.recordset[0].total;
+    
+    // 分页查询
+    const offset = (page - 1) * pageSize;
+    const sqlQuery = `
+      SELECT * FROM (
+        SELECT 
+          u.ID, u.Username, u.RealName, u.DepartmentID, u.Status,
+          ISNULL(d.Name, '未分配') as DepartmentName,
+          ROW_NUMBER() OVER (ORDER BY u.Username) AS RowNum
+        FROM [User] u 
+        LEFT JOIN Department d ON u.DepartmentID = d.ID
+        ${whereClause}
+      ) AS NumberedResult
+      WHERE RowNum BETWEEN ${offset + 1} AND ${offset + parseInt(pageSize)}
+      ORDER BY RowNum
+    `;
+    
+    const result = await pool.request().query(sqlQuery);
+    
+    // 转换数据格式
+    const processedData = result.recordset.map(user => ({
+      ID: user.ID,
+      Username: user.Username,
+      RealName: user.RealName || user.Username,
+      Name: user.RealName || user.Username, // 兼容前端期望的Name字段
+      DepartmentID: user.DepartmentID,
+      DepartmentName: user.DepartmentName,
+      IsActive: user.Status === 1, // 转换Status为IsActive
+      Status: user.Status
+    }));
+    
+    res.json({
+      success: true,
+      data: processedData,
+      total: total,
+      page: parseInt(page),
+      pageSize: parseInt(pageSize)
+    });
+  } catch (error) {
+    console.error('获取用户列表失败:', error);
+    res.status(500).json({ 
+      success: false,
+      error: '获取用户列表失败', 
+      details: error.message 
+    });
+  }
+});
+
 // GET /api/person/list?page=1&pageSize=10&search=xxx&includeInactive=false
 router.get('/list', authenticateToken, async (req, res) => {
   const { page = 1, pageSize = 10, search = '', includeInactive = 'false' } = req.query;

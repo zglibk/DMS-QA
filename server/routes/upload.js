@@ -135,9 +135,7 @@ const customerComplaintStorage = multer.diskStorage({
 
 const customPathAttachmentStorage = multer.diskStorage({
   destination: function (req, file, cb) {
-    console.log('=== Multer destination 调试信息 ===');
-    console.log('req.body:', req.body);
-    console.log('req.headers:', req.headers);
+    // 处理文件上传目标目录
 
     // 在multer的destination函数中，req.body可能还没有被完全解析
     // 我们先使用默认路径，稍后在路由处理中移动文件
@@ -146,27 +144,23 @@ const customPathAttachmentStorage = multer.diskStorage({
     // 确保临时目录存在
     if (!fs.existsSync(defaultDir)) {
       fs.mkdirSync(defaultDir, { recursive: true });
-      console.log(`创建临时目录: ${defaultDir}`);
+      // 创建临时目录
     }
 
-    console.log(`文件将临时保存到: ${defaultDir}`);
-    console.log('================================');
+    // 文件将保存到临时目录
     cb(null, defaultDir);
   },
   filename: function (req, file, cb) {
     // 处理文件名编码问题
     let filename = file.originalname;
 
-    console.log('=== 文件名编码处理 ===');
-    console.log('原始文件名:', filename);
-    console.log('文件名Buffer:', Buffer.from(filename));
-    console.log('文件名编码检测:', filename.split('').map(char => char.charCodeAt(0)));
+    // 处理文件名编码
 
     try {
       // 检查是否包含中文字符的编码问题
       // 如果文件名看起来像是被错误编码的，尝试修复
       if (filename.includes('é') || filename.includes('\\x') || /[\u00C0-\u00FF]/.test(filename)) {
-        console.log('检测到可能的编码问题，尝试修复...');
+        // 检测到编码问题，尝试修复
 
         // 尝试多种编码修复方法
         const methods = [
@@ -178,33 +172,32 @@ const customPathAttachmentStorage = multer.diskStorage({
         for (let i = 0; i < methods.length; i++) {
           try {
             const fixedName = methods[i]();
-            console.log(`方法${i + 1}修复结果:`, fixedName);
+            // 尝试编码修复方法
 
             // 检查修复后的文件名是否合理（包含正常的中文字符）
             if (fixedName && fixedName !== filename && !/[\u00C0-\u00FF]/.test(fixedName)) {
               filename = fixedName;
-              console.log('编码修复成功:', filename);
+              // 编码修复成功
               break;
             }
           } catch (e) {
-            console.log(`方法${i + 1}失败:`, e.message);
+            // 编码修复方法失败
           }
         }
       }
     } catch (error) {
-      console.error('文件名编码修复失败:', error);
+      // 文件名编码修复失败
     }
 
     // 如果文件名仍然有问题，使用时间戳作为备用
     if (!filename || filename.includes('é') || filename.includes('\\x')) {
-      console.log('使用备用文件名策略');
+      // 使用备用文件名策略
       const timestamp = Date.now();
       const ext = path.extname(file.originalname) || '.jpg';
       filename = `file_${timestamp}${ext}`;
     }
 
-    console.log(`最终使用文件名: ${filename}`);
-    console.log('====================');
+    // 文件名处理完成
     cb(null, filename);
   }
 });
@@ -331,14 +324,11 @@ router.post('/image', customerComplaintUpload.single('file'), async (req, res) =
     try {
       // 尝试解码文件名，处理中文字符编码问题
       correctedOriginalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
-      console.log('文件名编码修复:', {
-        original: req.file.originalname,
-        corrected: correctedOriginalName
-      });
+      // 文件名编码修复成功
     } catch (error) {
       // 如果解码失败，使用原始文件名
       correctedOriginalName = req.file.originalname;
-      console.log('文件名编码修复失败，使用原始文件名:', req.file.originalname);
+      // 文件名编码修复失败，使用原始文件名
     }
 
     // 构建完整的文件信息对象，参考出版异常的格式
@@ -533,17 +523,14 @@ router.post('/complaint-attachment', customPathAttachmentUpload.single('file'), 
     const file = req.file;
     const customPath = req.body.customPath;
 
-    console.log('=== 路由处理阶段调试 ===');
-    console.log('file.path (当前位置):', file.path);
-    console.log('customPath (来自请求):', customPath);
+    // 处理文件路径和自定义路径
 
     // 如果有自定义路径，将文件移动到正确位置
     if (customPath && customPath.trim()) {
       const targetDir = path.join(attachmentDir, customPath.trim());
       const targetPath = path.join(targetDir, file.filename);
 
-      console.log('目标目录:', targetDir);
-      console.log('目标路径:', targetPath);
+      // 设置目标目录和路径
 
       // 确保目标目录存在
       if (!fs.existsSync(targetDir)) {
@@ -553,15 +540,14 @@ router.post('/complaint-attachment', customPathAttachmentUpload.single('file'), 
 
       // 移动文件到正确位置
       fs.renameSync(file.path, targetPath);
-      console.log(`文件已移动: ${file.path} -> ${targetPath}`);
+      // 文件已移动到目标位置
 
       // 更新file对象的路径
       file.path = targetPath;
       file.destination = targetDir;
     }
 
-    console.log('最终文件路径:', file.path);
-    console.log('========================');
+    // 文件路径处理完成
 
     // 计算相对路径（相对于attachments目录）
     let relativePath = path.relative(attachmentDir, file.path);
@@ -569,28 +555,15 @@ router.post('/complaint-attachment', customPathAttachmentUpload.single('file'), 
     // 服务器完整路径
     const serverPath = file.path;
 
-    console.log('=== 详细路径计算调试 ===');
-    console.log('attachmentDir:', attachmentDir);
-    console.log('file.path:', file.path);
-    console.log('file.destination:', file.destination);
-    console.log('file.filename:', file.filename);
-    console.log('customPath from request:', customPath);
-    console.log('计算的relativePath:', relativePath);
+    // 计算文件相对路径
 
     // 保持Windows路径格式（用于数据库存储，匹配现有的路径格式）
     // 确保使用反斜杠作为路径分隔符
     const windowsPath = relativePath.replace(/\//g, '\\');
 
-    console.log('最终windowsPath:', windowsPath);
-    console.log('========================');
+    // Windows路径格式转换完成
 
-    console.log(`投诉附件上传成功:`, {
-      originalName: file.originalname,
-      filename: file.filename,
-      size: file.size,
-      relativePath: windowsPath,
-      serverPath: serverPath,
-      destination: file.destination,
+    // 投诉附件上传成功，准备返回结果
       customPath: customPath
     });
 

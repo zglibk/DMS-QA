@@ -50,7 +50,7 @@ function isAdmin(user) {
 }
 
 /**
- * 查询用户权限
+ * 查询用户权限（支持用户级权限覆盖角色权限）
  * @param {number} userId - 用户ID
  * @param {string} permission - 权限标识
  * @returns {Promise<boolean>} 是否具有权限
@@ -59,23 +59,76 @@ async function checkUserPermission(userId, permission) {
   try {
     const pool = await sql.connect(await getDynamicConfig());
     
-    // 查询用户是否具有指定权限
+    // 使用用户完整权限视图查询权限
+    // 该视图已经处理了用户权限覆盖角色权限的逻辑
     const result = await pool.request()
       .input('UserId', sql.Int, userId)
       .input('Permission', sql.NVarChar, permission)
       .query(`
         SELECT COUNT(*) as count
-        FROM [UserRoles] ur
-        INNER JOIN [RoleMenus] rm ON ur.RoleID = rm.RoleID
-        INNER JOIN [Menus] m ON rm.MenuID = m.ID
-        WHERE ur.UserID = @UserId 
-          AND m.Permission = @Permission 
-          AND m.Status = 1
+        FROM [V_UserCompletePermissions] v
+        WHERE v.UserID = @UserId 
+          AND v.Permission = @Permission 
+          AND v.HasPermission = 1
+          AND (v.ExpiresAt IS NULL OR v.ExpiresAt > GETDATE())
       `);
     
     return result.recordset[0].count > 0;
   } catch (error) {
     console.error('查询用户权限失败:', error);
+    
+    // 如果视图不存在，回退到原有的角色权限查询
+    try {
+      const fallbackResult = await pool.request()
+        .input('UserId', sql.Int, userId)
+        .input('Permission', sql.NVarChar, permission)
+        .query(`
+          SELECT COUNT(*) as count
+          FROM [UserRoles] ur
+          INNER JOIN [RoleMenus] rm ON ur.RoleID = rm.RoleID
+          INNER JOIN [Menus] m ON rm.MenuID = m.ID
+          WHERE ur.UserID = @UserId 
+            AND m.Permission = @Permission 
+            AND m.Status = 1
+        `);
+      
+      return fallbackResult.recordset[0].count > 0;
+    } catch (fallbackError) {
+      console.error('回退权限查询也失败:', fallbackError);
+      return false;
+    }
+  }
+}
+
+/**
+ * 查询用户操作权限（支持用户级权限覆盖角色权限）
+ * @param {number} userId - 用户ID
+ * @param {string} menuCode - 菜单代码
+ * @param {string} actionCode - 操作代码
+ * @returns {Promise<boolean>} 是否具有操作权限
+ */
+async function checkUserActionPermission(userId, menuCode, actionCode) {
+  try {
+    const pool = await sql.connect(await getDynamicConfig());
+    
+    // 使用用户完整权限视图查询操作权限
+    const result = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .input('MenuCode', sql.NVarChar, menuCode)
+      .input('ActionCode', sql.NVarChar, actionCode)
+      .query(`
+        SELECT COUNT(*) as count
+        FROM [V_UserCompletePermissions] v
+        WHERE v.UserID = @UserId 
+          AND v.MenuCode = @MenuCode 
+          AND v.ActionCode = @ActionCode
+          AND v.HasPermission = 1
+          AND (v.ExpiresAt IS NULL OR v.ExpiresAt > GETDATE())
+      `);
+    
+    return result.recordset[0].count > 0;
+  } catch (error) {
+    console.error('查询用户操作权限失败:', error);
     return false;
   }
 }
@@ -124,5 +177,8 @@ const checkPermission = (permission) => {
 // 导出中间件函数
 module.exports = {
   authenticateToken,
-  checkPermission
+  checkPermission,
+  checkUserPermission,
+  checkUserActionPermission,
+  isAdmin
 };

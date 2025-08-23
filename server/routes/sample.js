@@ -280,8 +280,7 @@ router.post('/create', authenticateToken, async (req, res) => {
 
     // 自动生成样版编号
     const certificateNo = await generateCertificateNo();
-    console.log('生成的样版编号:', certificateNo);
-    console.log('接收到的数据:', JSON.stringify(req.body, null, 2));
+    // 样版编号生成成功
 
     const query = `
       INSERT INTO SampleApproval (

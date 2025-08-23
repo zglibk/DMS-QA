@@ -58,6 +58,7 @@ const noticeRouter = require('./routes/notice');              // 通知公告管
 const supplierComplaintsRouter = require('./routes/supplierComplaints'); // 供应商投诉管理路由
 const qualityTargetsRouter = require('./routes/quality-targets'); // 质量目标管理路由
 const publishingExceptionsRouter = require('./routes/publishingExceptions'); // 出版异常管理路由
+const userPermissionsRouter = require('./routes/userPermissions'); // 用户权限管理路由
 
 /**
  * 创建Express应用实例
@@ -167,6 +168,7 @@ app.use('/api/notice', noticeRouter);
 app.use('/api/supplier-complaints', supplierComplaintsRouter);
 app.use('/api/quality-targets', qualityTargetsRouter);
 app.use('/api/publishing-exceptions', publishingExceptionsRouter);
+app.use('/api/user-permissions', userPermissionsRouter);
 
 /**
  * 静态文件服务配置
