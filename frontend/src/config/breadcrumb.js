@@ -466,6 +466,24 @@ export const breadcrumbConfig = {
   '/admin/work-plan/statistics': {
     title: '统计分析',
     icon: 'DataAnalysis'
+  },
+
+  // 出版异常管理
+  '/admin/publishing-exceptions': {
+    title: '出版异常',
+    icon: 'DocumentRemove'
+  },
+
+  // 质量管理 - 出版异常
+  '/admin/quality/publishing-exceptions': {
+    title: '出版异常',
+    icon: 'DocumentRemove'
+  },
+
+  // 出版异常页面（兼容不同路径）
+  '/publishing-exceptions': {
+    title: '出版异常',
+    icon: 'DocumentRemove'
   }
 }
 

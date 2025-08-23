@@ -147,6 +147,11 @@ const routes = [
         component: () => import('../views/quality/targets/QualityTargetStatistics.vue'),
         meta: { title: '目标统计数据', requiresAuth: true }
       },
+      {
+        path: 'publishing-exceptions',
+        component: () => import('../components/PublishingExceptionsContent.vue'),
+        meta: { title: '出版异常', requiresAuth: true }
+      },
 
       // 工作计划管理模块
       {
