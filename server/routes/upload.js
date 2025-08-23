@@ -564,9 +564,6 @@ router.post('/complaint-attachment', customPathAttachmentUpload.single('file'), 
     // Windows路径格式转换完成
 
     // 投诉附件上传成功，准备返回结果
-      customPath: customPath
-    });
-
     res.json({
       success: true,
       message: '文件上传成功',

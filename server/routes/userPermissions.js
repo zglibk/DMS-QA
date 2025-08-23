@@ -470,39 +470,42 @@ router.get('/:userId/history', authenticateToken, checkPermission('user-permissi
     
     const total = countResult.recordset[0].total;
     
-    // 查询历史记录
-    const offset = (page - 1) * pageSize;
+    // 查询历史记录 - 使用ROW_NUMBER()分页（兼容SQL Server 2008）
+    const startRow = (page - 1) * pageSize + 1;
+    const endRow = page * pageSize;
     const result = await pool.request()
       .input('UserID', sql.Int, userId)
-      .input('Offset', sql.Int, offset)
-      .input('PageSize', sql.Int, parseInt(pageSize))
+      .input('StartRow', sql.Int, startRow)
+      .input('EndRow', sql.Int, endRow)
       .query(`
-        SELECT 
-          h.ID,
-          h.UserPermissionID,
-          h.UserID,
-          u.Username,
-          u.RealName as UserRealName,
-          h.MenuID,
-          m.MenuName,
-          m.MenuCode,
-          h.PermissionType,
-          h.PermissionLevel,
-          h.ActionCode,
-          h.Action,
-          h.OldValue,
-          h.NewValue,
-          h.OperatedAt,
-          h.Reason,
-          op.RealName as OperatorName
-        FROM [UserPermissionHistory] h
-        INNER JOIN [User] u ON h.UserID = u.ID
-        INNER JOIN [Menus] m ON h.MenuID = m.ID
-        LEFT JOIN [User] op ON h.OperatorID = op.ID
-        WHERE h.UserID = @UserID
-        ORDER BY h.OperatedAt DESC
-        OFFSET @Offset ROWS
-        FETCH NEXT @PageSize ROWS ONLY
+        SELECT * FROM (
+          SELECT 
+            h.ID,
+            h.UserPermissionID,
+            h.UserID,
+            u.Username,
+            u.RealName as UserRealName,
+            h.MenuID,
+            m.MenuName,
+            m.MenuCode,
+            h.PermissionType,
+            h.PermissionLevel,
+            h.ActionCode,
+            h.Action,
+            h.OldValue,
+            h.NewValue,
+            h.OperatedAt,
+            h.Reason,
+            op.RealName as OperatorName,
+            ROW_NUMBER() OVER (ORDER BY h.OperatedAt DESC) as RowNum
+          FROM [UserPermissionHistory] h
+          INNER JOIN [User] u ON h.UserID = u.ID
+          INNER JOIN [Menus] m ON h.MenuID = m.ID
+          LEFT JOIN [User] op ON h.OperatorID = op.ID
+          WHERE h.UserID = @UserID
+        ) AS T
+        WHERE T.RowNum BETWEEN @StartRow AND @EndRow
+        ORDER BY T.RowNum
       `);
     
     res.json({
