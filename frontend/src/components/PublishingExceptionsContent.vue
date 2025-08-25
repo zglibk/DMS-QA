@@ -318,6 +318,50 @@
           </div>
         </el-tab-pane>
       </el-tabs>
+
+    <!-- 导出选项对话框 -->
+    <el-dialog
+      v-model="exportDialogVisible"
+      title="出版异常记录 - 导出确认"
+      width="480px"
+      :close-on-click-modal="false"
+      class="export-dialog"
+    >
+      <div class="export-options">         
+        <el-form label-width="0px" class="export-form">
+          <div class="export-option-item">
+            <div class="option-header">
+              <el-icon class="option-icon"><Picture /></el-icon>
+              <span class="option-label">导出内容</span>
+            </div>
+            <div class="option-content">
+              <el-checkbox v-model="includeImages" class="custom-checkbox">
+                <span class="checkbox-label">包含图片</span>
+              </el-checkbox>
+              <div class="export-tip">
+                <el-icon class="tip-icon"><InfoFilled /></el-icon>
+                <span class="tip-text">
+                  勾选后同步导出图片嵌入到 Excel 中，文件体积会变大
+                </span>
+              </div>
+            </div>
+          </div>
+        </el-form>
+      </div>
+      
+      <template #footer>
+        <div class="export-dialog-footer">
+          <el-button @click="exportDialogVisible = false" type="danger" >
+            <el-icon><Close /></el-icon>
+            取消
+          </el-button>
+          <el-button type="primary" @click="confirmExport" class="confirm-btn">
+            <el-icon><Download /></el-icon>
+            确认导出
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1274,18 +1318,12 @@ const includeImages = ref(true)
  * 导出数据功能 - 显示导出选项对话框
  */
 const handleExport = () => {
-  console.log('handleExport 被调用')
-  console.log('canExport.value:', canExport.value)
-  console.log('permissions:', permissions)
-  
   // 权限检查
   if (!canExport.value) {
-    console.log('权限检查失败，无导出权限')
     ElMessage.warning('您没有导出出版异常数据的权限')
     return
   }
   
-  console.log('权限检查通过，显示导出对话框')
   exportDialogVisible.value = true
 }
 
@@ -2367,5 +2405,199 @@ onUnmounted(() => {
   padding-right: 2px !important;
 }
 
+/* 导出选项对话框样式 */
+.export-dialog {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.export-options {
+  padding: 0;
+}
+
+.export-icon {
+  font-size: 24px;
+  color: #409EFF;
+  margin-right: 12px;
+}
+
+.export-form {
+  padding: 20px 0;
+}
+
+.export-option-item {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 20px;
+  border: 1px solid #e9ecef;
+  transition: all 0.3s ease;
+}
+
+.export-option-item:hover {
+  border-color: #409EFF;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.1);
+}
+
+.option-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.option-icon {
+  font-size: 18px;
+  color: #409EFF;
+  margin-right: 8px;
+}
+
+.option-label {
+  font-size: 15px;
+  font-weight: 500;
+  color: #303133;
+}
+
+.option-content {
+  padding-left: 26px;
+}
+
+.custom-checkbox {
+  margin-bottom: 12px;
+}
+
+.checkbox-label {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+.export-tip {
+  display: flex;
+  align-items: flex-start;
+  padding: 12px;
+  background: #fff3cd;
+  border: 1px solid #ffeaa7;
+  border-radius: 6px;
+  margin-top: 8px;
+}
+
+.tip-icon {
+  font-size: 16px;
+  color: #e6a23c;
+  margin-right: 8px;
+  margin-top: 1px;
+  flex-shrink: 0;
+}
+
+.tip-text {
+  font-size: 13px;
+  color: #856404;
+  line-height: 1.4;
+}
+
+.export-dialog-footer {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px;
+  background: #f8f9fa;
+  margin: 20px 0 0 0;
+  box-sizing: border-box;
+}
+
+.confirm-btn {
+  min-width: 120px;
+  padding: 10px 24px;
+  border-radius: 6px;
+  font-weight: 500;
+  background: #409EFF;
+  border: 1px solid #409EFF;
+  transition: all 0.3s ease;
+}
+
+.confirm-btn:hover {
+  background: #66b1ff;
+  border-color: #66b1ff;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+.confirm-btn:active {
+  transform: translateY(0);
+}
+
+/* 覆盖Element Plus默认样式 */
+:deep(.export-dialog .el-dialog__header) {
+  background: #409EFF;
+  color: white;
+  padding: 20px;
+  margin: 0;
+}
+
+:deep(.export-dialog .el-dialog__title) {
+  color: white;
+  font-weight: 600;
+  font-size: 16px;
+}
+
+:deep(.export-dialog .el-dialog__headerbtn) {
+  position: absolute;
+  top: -35px;
+  right: -35px;
+  width: 30px;
+  height: 30px;
+  background: #595B5E;
+  border-radius: 50%;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  z-index: 1001;
+}
+
+:deep(.export-dialog .el-dialog__headerbtn .el-dialog__close) {
+  color: white;
+  font-size: 16px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+:deep(.export-dialog .el-dialog__headerbtn .el-dialog__close:hover) {
+  color: white;
+  transform: scale(1.1);
+}
+
+:deep(.export-dialog .el-dialog__headerbtn:hover) {
+  background: #6c6f73;
+  transform: scale(1.05);
+}
+
+:deep(.export-dialog .el-dialog__body) {
+  padding: 0;
+}
+
+:deep(.export-dialog .el-dialog__footer) {
+  padding: 0;
+}
+
+:deep(.export-dialog .el-divider) {
+  margin: 16px 0;
+}
+
+:deep(.export-dialog .el-checkbox__label) {
+  font-size: 14px;
+  color: #606266;
+}
+
+:deep(.export-dialog .el-checkbox__input.is-checked .el-checkbox__inner) {
+  background-color: #409EFF;
+  border-color: #409EFF;
+}
+
+:deep(.export-dialog .el-checkbox__input.is-checked + .el-checkbox__label) {
+  color: #409EFF;
+  font-weight: 500;
+}
 
 </style>
