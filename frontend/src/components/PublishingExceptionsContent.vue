@@ -362,6 +362,266 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 新增/编辑对话框 -->
+    <el-dialog
+      v-model="dialogVisible"
+      :title="isEdit ? '编辑记录' : '新增记录'"
+      width="900px"
+      :close-on-click-modal="false"
+      @close="handleDialogClose"
+    >
+      <el-form
+        ref="formRef"
+        :model="formData"
+        :rules="formRules"
+        label-width="100px"
+        label-position="left"
+      >
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="登记日期" prop="registration_date">
+              <el-date-picker
+                v-model="formData.registration_date"
+                type="date"
+                placeholder="选择登记日期"
+                style="width: 100%"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="出版日期" prop="publishing_date">
+              <el-date-picker
+                v-model="formData.publishing_date"
+                type="date"
+                placeholder="选择出版日期"
+                style="width: 100%"
+                format="YYYY-MM-DD"
+                value-format="YYYY-MM-DD"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="客户代码" prop="customer_code">
+              <el-input v-model="formData.customer_code" placeholder="请输入客户代码" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="工单号" prop="work_order_number">
+              <el-input v-model="formData.work_order_number" placeholder="请输入工单号" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="产品名称" prop="product_name">
+              <el-input v-model="formData.product_name" placeholder="请输入产品名称" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="版类型" prop="plate_type">
+              <el-select v-model="formData.plate_type" placeholder="请选择版类型" style="width: 100%">
+                <el-option label="胶印版" value="胶印版" />
+                <el-option label="柔印版" value="柔印版" />
+                <el-option label="凹印版" value="凹印版" />
+                <el-option label="丝印版" value="丝印版" />
+                <el-option label="数码版" value="数码版" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="出版张数" prop="publishing_sheets">
+              <el-input-number v-model="formData.publishing_sheets" :min="0" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="责任单位" prop="responsible_unit">
+              <el-select v-model="formData.responsible_unit" placeholder="请选择责任单位" style="width: 100%">
+                <el-option 
+                  v-for="dept in departmentList" 
+                  :key="dept.ID" 
+                  :label="dept.Name" 
+                  :value="dept.Name" 
+                />
+              </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="责任人" prop="responsible_person">
+              <el-input v-model="formData.responsible_person" placeholder="请输入责任人" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="件数">
+              <el-input-number v-model="formData.piece_count" :min="0" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="长(cm)">
+              <el-input-number v-model="formData.length_cm" :min="0" :precision="2" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="宽(cm)">
+              <el-input-number v-model="formData.width_cm" :min="0" :precision="2" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <el-form-item label="数量cm²">
+              <el-input-number v-model="formData.area_cm2" :min="0" :precision="2" style="width: 100%" readonly disabled />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="单价">
+              <el-input-number v-model="formData.unit_price" :min="0" :precision="4" style="width: 100%" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="金额">
+              <el-input-number v-model="formData.amount" :min="0" :precision="2" style="width: 100%" readonly disabled />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-row :gutter="20">
+          <el-col :span="8">
+            <!-- 错误类型选择器：用于分类管理出版异常的错误类型，支持搜索和清空 -->
+            <el-form-item label="错误类型" prop="error_type">
+              <el-select 
+                v-model="formData.error_type" 
+                placeholder="请选择错误类型" 
+                style="width: 100%"
+                filterable
+                clearable
+              >
+                <el-option label="排版变形" value="排版变形" />
+                <el-option label="分色偏差" value="分色偏差" />
+                <el-option label="套印偏差" value="套印偏差" />
+                <el-option label="出标方向" value="出标方向" />
+                <el-option label="出血位偏差" value="出血位偏差" />
+                <el-option label="内容错误" value="内容错误" />
+                <el-option label="图文残缺" value="图文残缺" />
+                <el-option label="字体错误" value="字体错误" />
+                <el-option label="图文效果" value="图文效果" />
+                <el-option label="多出版" value="多出版" />
+                <el-option label="漏出版" value="漏出版" />
+                <el-option label="制版错误" value="制版错误" />
+                <el-option label="不匹配刀模" value="不匹配刀模" />
+                <el-option label="其它" value="其它" />
+              </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        
+        <el-form-item label="问题描述" prop="exception_description">
+          <el-input
+            v-model="formData.exception_description"
+            type="textarea"
+            :rows="3"
+            placeholder="请详细描述异常情况"
+          />
+        </el-form-item>
+        
+        <el-form-item>
+          <template #label>
+            <el-text class="mx-1" >选择上传</el-text>
+          </template>
+          <FileUpload
+            ref="uploadRef"
+            :multiple="true"
+            :max-count="4"
+            accept="image/*"
+            tip="支持拖拽上传（最多4张）"
+            upload-mode="custom"
+            :custom-request="handleCustomUpload"
+            :before-upload="beforeUpload"
+            :deferred-upload="true"
+            v-model:fileList="fileList"
+            @change="handleFileChange"
+            @remove="handleFileRemove"
+            @preview="handleFilePreview"
+          />
+        </el-form-item>
+      </el-form>
+      
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="handleDialogClose" type="danger">
+            <el-icon><Close /></el-icon>
+            取消
+          </el-button>
+          <el-button type="primary" @click="handleSubmit" :loading="submitLoading">
+            <el-icon><Check v-if="isEdit" /><DocumentAdd v-else /></el-icon>
+            {{ isEdit ? '保存' : '提交' }}
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
+    <!-- 查看详情对话框 -->
+    <el-dialog
+      v-model="viewDialogVisible"
+      title="查看详情"
+      width="800px"
+    >
+      <el-descriptions :column="2" border>
+        <el-descriptions-item label="ID">{{ viewData.id }}</el-descriptions-item>
+        <el-descriptions-item label="登记日期">{{ formatDate(viewData.registration_date) }}</el-descriptions-item>
+        <el-descriptions-item label="工单号">{{ viewData.work_order_number }}</el-descriptions-item>
+        <el-descriptions-item label="客户代码">{{ viewData.customer_code }}</el-descriptions-item>
+        <el-descriptions-item label="产品名称" :span="2">{{ viewData.product_name }}</el-descriptions-item>
+        <el-descriptions-item label="异常描述" span="2">{{ viewData.exception_description }}</el-descriptions-item>
+        <!-- 错误类型显示：展示异常的分类类型 -->
+        <el-descriptions-item label="错误类型">{{ viewData.error_type }}</el-descriptions-item>
+        <el-descriptions-item label="出版日期">{{ formatDate(viewData.publishing_date) }}</el-descriptions-item>
+        <el-descriptions-item label="版类型">{{ viewData.plate_type }}</el-descriptions-item>
+        <el-descriptions-item label="出版张数">{{ viewData.publishing_sheets }}</el-descriptions-item>
+        <el-descriptions-item label="责任单位">{{ viewData.responsible_unit }}</el-descriptions-item>
+        <el-descriptions-item label="责任人">{{ viewData.responsible_person }}</el-descriptions-item>
+        <el-descriptions-item label="长(cm)">{{ viewData.length_cm }}</el-descriptions-item>
+        <el-descriptions-item label="宽(cm)">{{ viewData.width_cm }}</el-descriptions-item>
+        <el-descriptions-item label="件数">{{ viewData.piece_count }}</el-descriptions-item>
+        <el-descriptions-item label="数量cm²">{{ viewData.area_cm2 }}</el-descriptions-item>
+        <el-descriptions-item label="单价">{{ viewData.unit_price }}</el-descriptions-item>
+        <el-descriptions-item label="金额">{{ formatAmount(viewData.amount) }}</el-descriptions-item>
+        <el-descriptions-item label="创建人">{{ viewData.created_by }}</el-descriptions-item>
+        <el-descriptions-item label="创建日期">{{ formatDateTime(viewData.created_date) }}</el-descriptions-item>
+      </el-descriptions>
+      
+      <!-- 图片显示 -->
+      <div v-if="getImageList(viewData.image_path).length > 0" class="image-preview">
+        <el-divider>异常图片</el-divider>
+        <div class="image-gallery">
+          <el-image
+            v-for="(imageInfo, index) in getImageList(viewData.image_path)"
+            :key="index"
+            :src="imageInfo.url"
+            :preview-src-list="getImageList(viewData.image_path).map(img => img.url)"
+            :initial-index="index"
+            fit="cover"
+            style="width: 100px; height: 100px; margin-right: 8px; margin-bottom: 8px; border-radius: 6px; cursor: pointer;"
+          >
+            <template #error>
+              <div class="image-slot">
+                <el-icon><Picture /></el-icon>
+              </div>
+            </template>
+          </el-image>
+        </div>
+      </div>
+    </el-dialog>
   </div>
 </template>
 
@@ -587,49 +847,13 @@ const formRef = ref()
 // 计算属性
 const dialogTitle = computed(() => isEdit.value ? '编辑出版异常' : '新增出版异常')
 
-
-
 // 部门列表
 const departmentList = ref([])
 
 // 产品名称列表
 const productNameList = ref([])
 
-/**
- * 获取部门列表数据
- */
-const fetchDepartments = async () => {
-  try {
-    const response = await apiService.get('/departments')
-    // 获取部门列表数据用于下拉选择器
-    if (response.data.success) {
-      departmentList.value = response.data.data
-    } else {
-      ElMessage.error('获取部门列表失败')
-    }
-  } catch (error) {
-    ElMessage.error('获取部门列表失败')
-  }
-}
 
-/**
- * 获取产品名称列表数据
- */
-const fetchProductNames = async () => {
-  try {
-    // 确保apiService已初始化
-    await apiService.initialize()
-    const response = await apiService.get('/publishing-exceptions/product-names')
-    if (response.data.success) {
-      productNameList.value = response.data.data
-    } else {
-      ElMessage.error('获取产品名称列表失败')
-    }
-  } catch (error) {
-    console.error('获取产品名称列表失败:', error)
-    ElMessage.error('获取产品名称列表失败')
-  }
-}
 
 /**
  * 获取出版异常列表数据
@@ -1038,30 +1262,7 @@ const handleWorkOrderInput = (value) => {
   filters.workOrderNumber = value.toUpperCase()
 }
 
-/**
- * 处理表单中工单号输入，只允许输入数字和小数点，限制小数位数不超过2位
- */
-const handleFormWorkOrderInput = (value) => {
-  // 只允许数字和小数点
-  let filteredValue = value.replace(/[^0-9.]/g, '')
-  
-  // 确保只有一个小数点
-  const dotCount = (filteredValue.match(/\./g) || []).length
-  if (dotCount > 1) {
-    const firstDotIndex = filteredValue.indexOf('.')
-    filteredValue = filteredValue.substring(0, firstDotIndex + 1) + filteredValue.substring(firstDotIndex + 1).replace(/\./g, '')
-  }
-  
-  // 限制小数位数不超过2位
-  const dotIndex = filteredValue.indexOf('.')
-  if (dotIndex !== -1 && filteredValue.length > dotIndex + 3) {
-    filteredValue = filteredValue.substring(0, dotIndex + 3)
-  }
-  
-  workOrderSuffix.value = filteredValue
-  // 组合前缀"GD"和后缀生成完整工单号
-  formData.work_order_number = 'GD' + filteredValue
-}
+
 
 /**
  * 标签页切换
@@ -1073,29 +1274,6 @@ const handleTabClick = (tab) => {
       fetchStatistics()
     })
   }
-}
-
-/**
- * 新增记录
- */
-const handleAdd = () => {
-  // 权限检查
-  if (!canAdd.value) {
-    ElMessage.warning('您没有新增出版异常记录的权限')
-    return
-  }
-  
-  isEdit.value = false
-  currentEditId.value = null
-  resetFormData()
-  
-  // 清空所有文件相关列表
-  fileList.value = []
-  tempUploadedFiles.value = []
-  originalFiles.value = []
-  removedFiles.value = []
-  
-  dialogVisible.value = true
 }
 
 /**
@@ -1210,54 +1388,12 @@ const handleView = (row) => {
   viewDialogVisible.value = true
 }
 
-/**
- * 双击记录显示详情对话框
- * @param {Object} row - 表格行数据
- */
-const handleRowDoubleClick = (row) => {
-  handleView(row)
-}
+
 
 /**
  * 删除记录
  */
-const handleDelete = async (row) => {
-  // 权限检查
-  if (!canDelete.value) {
-    ElMessage.warning('您没有删除出版异常记录的权限')
-    return
-  }
-  
-  try {
-    await ElMessageBox.confirm(
-      `确定要删除这条记录吗？`,
-      '确认删除',
-      {
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-        type: 'warning'
-      }
-    )
-    
-    const response = await apiService.delete(`/publishing-exceptions/${row.id}`, {
-      data: { deleted_by: currentUser.value }
-    })
-    
-    if (response.data.success) {
-      ElMessage.success('删除成功')
-      fetchData()
-      // 数据变更后更新统计信息
-      fetchStatistics()
-    } else {
-      ElMessage.error(response.data.message || '删除失败')
-    }
-  } catch (error) {
-    if (error !== 'cancel') {
-      console.error('删除失败:', error)
-      ElMessage.error('删除失败')
-    }
-  }
-}
+
 
 /**
  * 批量删除
@@ -1310,6 +1446,433 @@ const handleBatchDelete = async () => {
 /**
  * 导出数据
  */
+/**
+ * 新增记录
+ */
+const handleAdd = () => {
+  // 权限检查
+  if (!canAdd.value) {
+    ElMessage.warning('您没有新增出版异常记录的权限')
+    return
+  }
+  
+  isEdit.value = false
+  currentEditId.value = null
+  resetFormData()
+  
+  // 清空所有文件相关列表
+  fileList.value = []
+  tempUploadedFiles.value = []
+  originalFiles.value = []
+  removedFiles.value = []
+  
+  dialogVisible.value = true
+}
+
+
+
+/**
+ * 双击记录显示详情对话框
+ * @param {Object} row - 表格行数据
+ */
+const handleRowDoubleClick = (row) => {
+  handleView(row)
+}
+
+/**
+ * 删除记录
+ */
+const handleDelete = async (row) => {
+  // 权限检查
+  if (!canDelete.value) {
+    ElMessage.warning('您没有删除出版异常记录的权限')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除这条记录吗？`,
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const response = await apiService.delete(`/publishing-exceptions/${row.id}`, {
+      data: { deleted_by: currentUser.value }
+    })
+    
+    if (response.data.success) {
+      ElMessage.success('删除成功')
+      fetchData()
+      // 数据变更后更新统计信息
+      fetchStatistics()
+    } else {
+      ElMessage.error(response.data.message || '删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除失败:', error)
+      ElMessage.error('删除失败')
+    }
+  }
+}
+
+/**
+ * 提交表单
+ */
+const handleSubmit = async () => {
+  try {
+    // 表单验证，如果验证失败会抛出异常
+    await formRef.value.validate()
+    
+    submitLoading.value = true
+    
+    // 获取新上传的文件信息，过滤掉服务器路径的图片
+    let uploadedFileInfo = []
+    if (tempUploadedFiles.value && tempUploadedFiles.value.length > 0) {
+      // 过滤掉来自服务器的图片（路径包含uploads/或以http开头）
+      uploadedFileInfo = tempUploadedFiles.value.filter(file => {
+        const isServerPath = file.path && (
+          file.path.includes('uploads/') || 
+          file.path.includes('uploads\\') ||
+          (file.url && file.url.startsWith('http'))
+        )
+        if (isServerPath) {
+          return false
+        }
+        return true
+      })
+    }
+    
+    // 处理图片路径信息 - 合并原有文件和新增文件
+    let finalFileList = []
+    
+    if (isEdit.value) {
+      // 编辑模式：合并原有文件（排除被删除的）和新增文件
+      // 1. 添加未被删除的原有文件
+      const remainingOriginalFiles = originalFiles.value.filter(originalFile => 
+        !removedFiles.value.some(removedFile => removedFile.filename === originalFile.filename)
+      )
+      finalFileList = [...remainingOriginalFiles]
+      
+      // 2. 添加新上传的文件
+      if (uploadedFileInfo.length > 0) {
+        finalFileList = [...finalFileList, ...uploadedFileInfo]
+      }
+    } else {
+      // 新增模式：只有新上传的文件
+      finalFileList = uploadedFileInfo
+    }
+    
+    // 保存最终的文件列表
+    if (finalFileList.length > 0) {
+      formData.image_path = JSON.stringify(finalFileList)
+    } else {
+      formData.image_path = ''
+    }
+    
+    const submitData = {
+      ...formData,
+      created_by: isEdit.value ? undefined : currentUser.value,
+      updated_by: isEdit.value ? currentUser.value : undefined,
+      // 在编辑模式下传递被删除的文件信息给后端
+      removedFiles: isEdit.value ? removedFiles.value : []
+    }
+    
+    let response
+    if (isEdit.value) {
+      response = await apiService.put(`/publishing-exceptions/${currentEditId.value}`, submitData)
+    } else {
+      response = await apiService.post('/publishing-exceptions', submitData)
+    }
+    
+    if (response.data.success) {
+      ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
+      dialogVisible.value = false
+      fetchData()
+      // 数据变更后更新统计信息
+      fetchStatistics()
+    } else {
+      ElMessage.error(response.data.message || '操作失败')
+    }
+  } catch (error) {
+    console.error('提交失败:', error)
+    
+    // Element Plus表单验证失败时，会直接抛出包含字段验证错误的对象
+    if (error && typeof error === 'object') {
+      // 检查是否是表单验证错误（直接包含字段名的对象）
+      const errorKeys = Object.keys(error)
+      if (errorKeys.length > 0) {
+        // 检查第一个键对应的值是否是数组（验证错误的特征）
+        const firstKey = errorKeys[0]
+        const firstValue = error[firstKey]
+        
+        if (Array.isArray(firstValue) && firstValue.length > 0) {
+          // 这是表单验证错误，提取第一个错误字段的提示信息
+          const firstErrorMessage = firstValue[0]?.message || '字段验证失败'
+          ElMessage.error(`${firstErrorMessage}`)
+          return // 直接返回，不继续执行后续逻辑
+        }
+      }
+      
+      // 检查是否有message属性（其他类型的错误）
+      if (error.message) {
+        ElMessage.error('请检查并完善必填项信息')
+        return
+      }
+    }
+    
+    // 如果不是表单验证错误，则可能是网络错误或其他错误
+    ElMessage.error('操作失败，请重试')
+  } finally {
+    submitLoading.value = false
+  }
+}
+
+
+
+/**
+ * 重置表单数据
+ */
+const resetFormData = () => {
+  Object.keys(formData).forEach(key => {
+    if (key === 'work_order_number') {
+      formData[key] = 'GD' // 保持工单号默认值
+    } else if (key === 'responsible_unit') {
+      formData[key] = '设计部' // 保持责任单位默认值
+    } else if (typeof formData[key] === 'number') {
+      formData[key] = null
+    } else {
+      formData[key] = ''
+    }
+  })
+  
+  // 重置工单号后缀
+  workOrderSuffix.value = ''
+  
+  // 清空临时文件列表
+  tempUploadedFiles.value = []
+  
+  // 设置默认登记日期为今天
+  formData.registration_date = new Date().toISOString().split('T')[0]
+  // 设置默认责任单位为设计部
+  formData.responsible_unit = '设计部'
+}
+
+/**
+ * 自定义上传处理
+ */
+const handleCustomUpload = (file) => {
+  return new Promise((resolve, reject) => {
+    const uploadFormData = new FormData()
+    uploadFormData.append('file', file)
+    
+    // 使用fetch进行上传
+    fetch(publishingExceptionUploadAction.value, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${userStore.token || localStorage.getItem('token')}`
+      },
+      body: uploadFormData
+    })
+    .then(response => {
+      // 检查响应状态
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      // 检查响应内容类型
+      const contentType = response.headers.get('content-type')
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('服务器返回的不是JSON格式')
+      }
+      
+      return response.json()
+    })
+    .then(data => {
+      if (data.success) {
+        // 使用新的fileInfo对象格式，如果不存在则使用旧格式兼容
+        let fileInfo
+        
+        if (data.fileInfo) {
+          // 新格式：使用完整的文件信息对象
+          fileInfo = {
+            id: data.fileInfo.id,
+            name: file.name,
+            originalName: data.fileInfo.originalName,
+            filename: data.fileInfo.filename,
+            relativePath: data.fileInfo.relativePath,
+            accessUrl: data.fileInfo.accessUrl,
+            fullUrl: data.fileInfo.fullUrl,
+            fileSize: data.fileInfo.fileSize,
+            mimeType: data.fileInfo.mimeType,
+            uploadTime: data.fileInfo.uploadTime,
+            fileType: data.fileInfo.fileType,
+            category: data.fileInfo.category,
+            // 兼容旧的字段名
+            url: data.fileInfo.accessUrl,
+            path: data.fileInfo.relativePath,
+            size: data.fileInfo.fileSize
+          }
+        } else {
+          // 旧格式兼容
+          fileInfo = {
+            name: file.name,
+            url: getImageUrl(data.data?.filename || data.filename, true), // 新上传的文件使用防缓存机制
+            path: data.data?.path || `uploads/site-images/publishing-exception/${data.data?.filename || data.filename}`,
+            filename: data.data?.filename || data.filename,
+            originalname: data.data?.originalname || data.originalName,
+            size: data.data?.size || data.size
+          }
+        }
+        
+        // 保存到临时文件列表
+        tempUploadedFiles.value.push(fileInfo)
+        
+        // 返回文件信息给组件
+        resolve(fileInfo)
+      } else {
+        reject(data.message || '图片上传失败')
+      }
+    })
+    .catch(error => {
+      console.error('上传失败:', error)
+      reject(error.message || '图片上传失败')
+    })
+  })
+}
+
+/**
+ * 文件删除处理
+ */
+const handleFileRemove = (deletedFiles) => {
+  deletedFiles.forEach((deletedFile) => {
+    // 获取删除文件的关键信息
+    const deletedFileName = deletedFile.name || deletedFile.originalName
+    const deletedFileFilename = deletedFile.filename
+    const deletedFileUrl = deletedFile.url
+    
+    // 创建文件匹配函数
+    const isFileMatch = (file) => {
+      const fileName = file.name || file.originalName
+      const fileFilename = file.filename
+      const fileUrl = file.url
+      
+      // 优先使用filename匹配，其次使用name，最后使用url
+      if (fileFilename && deletedFileFilename) {
+        return fileFilename === deletedFileFilename
+      }
+      if (fileName && deletedFileName) {
+        return fileName === deletedFileName
+      }
+      if (fileUrl && deletedFileUrl) {
+        return fileUrl === deletedFileUrl
+      }
+      return false
+    }
+    
+    // 从 fileList 中移除
+    const fileListIndex = fileList.value.findIndex(isFileMatch)
+    if (fileListIndex > -1) {
+      fileList.value.splice(fileListIndex, 1)
+    }
+    
+    // 从临时文件列表中移除
+    const tempIndex = tempUploadedFiles.value.findIndex(isFileMatch)
+    if (tempIndex > -1) {
+      tempUploadedFiles.value.splice(tempIndex, 1)
+    }
+    
+    // 如果是原始文件，添加到删除列表中
+    const originalIndex = originalFiles.value.findIndex(isFileMatch)
+    if (originalIndex > -1) {
+      const removedFile = originalFiles.value[originalIndex]
+      removedFiles.value.push(removedFile)
+      originalFiles.value.splice(originalIndex, 1)
+    }
+  })
+}
+
+/**
+ * 解析图片路径，支持新的JSON格式和旧的字符串格式
+ */
+const getImageList = (imagePath) => {
+  if (!imagePath) return []
+  
+  try {
+    // 尝试解析JSON格式（新格式）
+    const imageArray = JSON.parse(imagePath)
+    if (Array.isArray(imageArray)) {
+      return imageArray.map(imageInfo => ({
+        ...imageInfo,
+        url: getImageUrl(imageInfo.filename, false) // 强制重新生成URL，确保环境适配
+      }))
+    }
+  } catch (e) {
+    // 如果解析失败，说明是旧格式（字符串）
+  }
+  
+  // 旧格式兼容：直接是文件名字符串
+  if (typeof imagePath === 'string' && imagePath.trim()) {
+    return [{
+      filename: imagePath,
+      originalName: imagePath,
+      url: getImageUrl(imagePath, false), // 查看详情时不添加时间戳
+      path: `uploads/site-images/publishing-exception/${imagePath}`
+    }]
+  }
+  
+  return []
+}
+
+/**
+ * 获取部门列表数据
+ */
+const fetchDepartments = async () => {
+  try {
+    const response = await apiService.get('/departments')
+    // 获取部门列表数据用于下拉选择器
+    if (response.data.success) {
+      departmentList.value = response.data.data
+    } else {
+      ElMessage.error('获取部门列表失败')
+    }
+  } catch (error) {
+    ElMessage.error('获取部门列表失败')
+  }
+}
+
+/**
+ * 获取产品名称列表数据
+ */
+const fetchProductNames = async () => {
+  try {
+    // 确保apiService已初始化
+    await apiService.initialize()
+    const response = await apiService.get('/publishing-exceptions/product-names')
+    if (response.data.success) {
+      productNameList.value = response.data.data
+    } else {
+      ElMessage.error('获取产品名称列表失败')
+    }
+  } catch (error) {
+    console.error('获取产品名称列表失败:', error)
+    ElMessage.error('获取产品名称列表失败')
+  }
+}
+
+/**
+ * 刷新数据
+ */
+const refreshData = () => {
+  fetchData()
+  // 每次刷新都更新统计数据，确保左侧统计卡片实时更新
+  fetchStatistics()
+}
+
 // 导出选项状态
 const exportDialogVisible = ref(false)
 const includeImages = ref(true)
@@ -1410,125 +1973,7 @@ const handleCurrentChange = (page) => {
   fetchData()
 }
 
-/**
- * 提交表单
- */
-const handleSubmit = async () => {
-  try {
-    // 表单验证，如果验证失败会抛出异常
-    await formRef.value.validate()
-    
-    submitLoading.value = true
-    
-    // 获取新上传的文件信息，过滤掉服务器路径的图片
-    let uploadedFileInfo = []
-    if (tempUploadedFiles.value && tempUploadedFiles.value.length > 0) {
-      // 过滤掉来自服务器的图片（路径包含uploads/或以http开头）
-      uploadedFileInfo = tempUploadedFiles.value.filter(file => {
-        const isServerPath = file.path && (
-          file.path.includes('uploads/') || 
-          file.path.includes('uploads\\') ||
-          (file.url && file.url.startsWith('http'))
-        )
-        if (isServerPath) {
-          // 过滤服务器路径图片
-          return false
-        }
-        return true
-      })
-      // 过滤后的新上传文件
-    }
-    
-    // 处理图片路径信息 - 合并原有文件和新增文件
-    let finalFileList = []
-    
-    if (isEdit.value) {
-      // 编辑模式：合并原有文件（排除被删除的）和新增文件
-      // 1. 添加未被删除的原有文件
-      const remainingOriginalFiles = originalFiles.value.filter(originalFile => 
-        !removedFiles.value.some(removedFile => removedFile.filename === originalFile.filename)
-      )
-      finalFileList = [...remainingOriginalFiles]
-      
-      // 2. 添加新上传的文件
-      if (uploadedFileInfo.length > 0) {
-        finalFileList = [...finalFileList, ...uploadedFileInfo]
-      }
-      
-      // 编辑模式文件统计
-    } else {
-      // 新增模式：只有新上传的文件
-      finalFileList = uploadedFileInfo
-      // 新增模式文件统计
-    }
-    
-    // 保存最终的文件列表
-    if (finalFileList.length > 0) {
-      formData.image_path = JSON.stringify(finalFileList)
-      // 保存文件信息到image_path
-    } else {
-      formData.image_path = ''
-      // 无文件，清空image_path
-    }
-    
-    const submitData = {
-      ...formData,
-      created_by: isEdit.value ? undefined : currentUser.value,
-      updated_by: isEdit.value ? currentUser.value : undefined,
-      // 在编辑模式下传递被删除的文件信息给后端
-      removedFiles: isEdit.value ? removedFiles.value : []
-    }
-    
-    let response
-    if (isEdit.value) {
-      response = await apiService.put(`/publishing-exceptions/${currentEditId.value}`, submitData)
-    } else {
-      response = await apiService.post('/publishing-exceptions', submitData)
-    }
-    
-    if (response.data.success) {
-      ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
-      dialogVisible.value = false
-      fetchData()
-      // 数据变更后更新统计信息
-      fetchStatistics()
-    } else {
-      ElMessage.error(response.data.message || '操作失败')
-    }
-  } catch (error) {
-    console.error('提交失败:', error)
-    
-    // Element Plus表单验证失败时，会直接抛出包含字段验证错误的对象
-    // 错误对象的结构是：{字段名: [错误对象数组], ...}
-    if (error && typeof error === 'object') {
-      // 检查是否是表单验证错误（直接包含字段名的对象）
-      const errorKeys = Object.keys(error)
-      if (errorKeys.length > 0) {
-        // 检查第一个键对应的值是否是数组（验证错误的特征）
-        const firstKey = errorKeys[0]
-        const firstValue = error[firstKey]
-        
-        if (Array.isArray(firstValue) && firstValue.length > 0) {
-          // 这是表单验证错误，提取第一个错误字段的提示信息
-          const firstErrorMessage = firstValue[0]?.message || '字段验证失败'
-          ElMessage.error(`${firstErrorMessage}`)
-          return // 直接返回，不继续执行后续逻辑
-        }
-      }
-      
-      // 检查是否有message属性（其他类型的错误）
-      if (error.message) {
-        ElMessage.error('请检查并完善必填项信息')
-        return
-      }
-    }
-    
-    // 如果不是表单验证错误，则可能是网络错误或其他错误
-    ElMessage.error('操作失败，请重试')
-  } finally {
-    submitLoading.value = false
-  }
-}
+
 
 /**
  * 关闭对话框
@@ -1566,127 +2011,6 @@ const handleDialogKeydown = (event) => {
   }
 }
 
-/**
- * 重置表单数据
- */
-const resetFormData = () => {
-  Object.keys(formData).forEach(key => {
-    if (key === 'work_order_number') {
-      formData[key] = 'GD' // 保持工单号默认值
-    } else if (key === 'responsible_unit') {
-      formData[key] = '设计部' // 保持责任单位默认值
-    } else if (typeof formData[key] === 'number') {
-      formData[key] = null
-    } else {
-      formData[key] = ''
-    }
-  })
-  
-  // 重置工单号后缀
-  workOrderSuffix.value = ''
-  
-  // 清空临时文件列表
-  tempUploadedFiles.value = []
-  
-  // 设置默认登记日期为今天
-  formData.registration_date = new Date().toISOString().split('T')[0]
-  // 设置默认责任单位为设计部
-  formData.responsible_unit = '设计部'
-}
-
-/**
- * 刷新数据
- */
-const refreshData = () => {
-  fetchData()
-  // 每次刷新都更新统计数据，确保左侧统计卡片实时更新
-  fetchStatistics()
-}
-
-/**
- * 自定义上传处理
- */
-const handleCustomUpload = (file) => {
-  return new Promise((resolve, reject) => {
-    const uploadFormData = new FormData()
-    uploadFormData.append('file', file)
-    
-    // 使用fetch进行上传
-    fetch(publishingExceptionUploadAction.value, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${userStore.token || localStorage.getItem('token')}`
-      },
-      body: uploadFormData
-    })
-    .then(response => {
-      // 检查响应状态
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      // 检查响应内容类型
-      const contentType = response.headers.get('content-type')
-      if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('服务器返回的不是JSON格式')
-      }
-      
-      return response.json()
-    })
-    .then(data => {
-      if (data.success) {
-        // 使用新的fileInfo对象格式，如果不存在则使用旧格式兼容
-        let fileInfo
-        
-        if (data.fileInfo) {
-          // 新格式：使用完整的文件信息对象
-          fileInfo = {
-            id: data.fileInfo.id,
-            name: file.name,
-            originalName: data.fileInfo.originalName,
-            filename: data.fileInfo.filename,
-            relativePath: data.fileInfo.relativePath,
-            accessUrl: data.fileInfo.accessUrl,
-            fullUrl: data.fileInfo.fullUrl,
-            fileSize: data.fileInfo.fileSize,
-            mimeType: data.fileInfo.mimeType,
-            uploadTime: data.fileInfo.uploadTime,
-            fileType: data.fileInfo.fileType,
-            category: data.fileInfo.category,
-            // 兼容旧的字段名
-            url: data.fileInfo.accessUrl,
-            path: data.fileInfo.relativePath,
-            size: data.fileInfo.fileSize
-          }
-        } else {
-          // 旧格式兼容
-          fileInfo = {
-            name: file.name,
-            url: getImageUrl(data.data?.filename || data.filename, true), // 新上传的文件使用防缓存机制
-            path: data.data?.path || `uploads/site-images/publishing-exception/${data.data?.filename || data.filename}`,
-            filename: data.data?.filename || data.filename,
-            originalname: data.data?.originalname || data.originalName,
-            size: data.data?.size || data.size
-          }
-        }
-        
-        // 保存到临时文件列表
-        tempUploadedFiles.value.push(fileInfo)
-        
-        // 文件上传成功，保存到临时列表
-        
-        // 返回文件信息给组件
-        resolve(fileInfo)
-      } else {
-        reject(data.message || '图片上传失败')
-      }
-    })
-    .catch(error => {
-      console.error('上传失败:', error)
-      reject(error.message || '图片上传失败')
-    })
-  })
-}
 
 /**
  * 文件列表变化处理
@@ -1710,67 +2034,6 @@ const handleFileChange = (files) => {
 /**
  * 文件删除处理
  */
-/**
- * 处理文件删除
- * @param {Array} deletedFiles - 被删除的文件列表
- */
-const handleFileRemove = (deletedFiles) => {
-  // 处理文件删除
-  
-  deletedFiles.forEach((deletedFile) => {
-    // 处理删除文件
-    
-    // 获取删除文件的关键信息
-    const deletedFileName = deletedFile.name || deletedFile.originalName
-    const deletedFileFilename = deletedFile.filename
-    const deletedFileUrl = deletedFile.url
-    
-    // 创建文件匹配函数
-    const isFileMatch = (file) => {
-      const fileName = file.name || file.originalName
-      const fileFilename = file.filename
-      const fileUrl = file.url
-      
-      // 优先使用filename匹配，其次使用name，最后使用url
-      if (fileFilename && deletedFileFilename) {
-        return fileFilename === deletedFileFilename
-      }
-      if (fileName && deletedFileName) {
-        return fileName === deletedFileName
-      }
-      if (fileUrl && deletedFileUrl) {
-        return fileUrl === deletedFileUrl
-      }
-      return false
-    }
-    
-    // 从 fileList 中移除
-    const fileListIndex = fileList.value.findIndex(isFileMatch)
-    if (fileListIndex > -1) {
-      fileList.value.splice(fileListIndex, 1)
-      // 从fileList中删除文件
-    }
-    
-    // 从临时文件列表中移除
-    const tempIndex = tempUploadedFiles.value.findIndex(isFileMatch)
-    if (tempIndex > -1) {
-      tempUploadedFiles.value.splice(tempIndex, 1)
-      // 从临时文件列表中删除文件
-    }
-    
-    // 如果是原始文件，添加到删除列表中
-    const originalIndex = originalFiles.value.findIndex(isFileMatch)
-    if (originalIndex > -1) {
-      const removedFile = originalFiles.value[originalIndex]
-      removedFiles.value.push(removedFile)
-      originalFiles.value.splice(originalIndex, 1)
-      // 从原始文件列表中删除文件，添加到删除列表
-    }
-  })
-  
-  // 删除完成
-}
-
 /**
  * 上传前检查
  */
@@ -1827,38 +2090,7 @@ const getImageUrl = (imagePath, preventCache = false) => {
   return url
 }
 
-/**
- * 解析图片路径，支持新的JSON格式和旧的字符串格式
- */
-const getImageList = (imagePath) => {
-  if (!imagePath) return []
-  
-  try {
-    // 尝试解析JSON格式（新格式）
-    const imageArray = JSON.parse(imagePath)
-    if (Array.isArray(imageArray)) {
-      return imageArray.map(imageInfo => ({
-        ...imageInfo,
-        url: getImageUrl(imageInfo.filename, false) // 强制重新生成URL，确保环境适配
-      }))
-    }
-  } catch (e) {
-    // 如果解析失败，说明是旧格式（字符串）
-    // 使用旧格式图片路径
-  }
-  
-  // 旧格式兼容：直接是文件名字符串
-  if (typeof imagePath === 'string' && imagePath.trim()) {
-    return [{
-      filename: imagePath,
-      originalName: imagePath,
-      url: getImageUrl(imagePath, false), // 查看详情时不添加时间戳
-      path: `uploads/site-images/publishing-exception/${imagePath}`
-    }]
-  }
-  
-  return []
-}
+
 
 /**
  * 格式化文件大小
