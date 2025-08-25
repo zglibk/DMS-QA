@@ -16,7 +16,7 @@
           <el-icon v-if="menu.Icon">
             <component :is="getIconComponent(menu.Icon)" />
           </el-icon>
-          <span v-show="!collapsed">{{ menu.Name }}</span>
+          <span>{{ menu.Name }}</span>
         </template>
         
         <!-- 二级菜单 -->
@@ -27,7 +27,7 @@
               <el-icon v-if="subMenu.Icon">
                 <component :is="getIconComponent(subMenu.Icon)" />
               </el-icon>
-              <span v-show="!collapsed">{{ subMenu.Name }}</span>
+              <span>{{ subMenu.Name }}</span>
             </template>
             
             <!-- 三级菜单项 -->
@@ -39,7 +39,7 @@
               <el-icon v-if="thirdMenu.Icon">
                 <component :is="getIconComponent(thirdMenu.Icon)" />
               </el-icon>
-              <span v-show="!collapsed">{{ thirdMenu.Name }}</span>
+              <span>{{ thirdMenu.Name }}</span>
             </el-menu-item>
           </el-sub-menu>
           
@@ -48,7 +48,7 @@
             <el-icon v-if="subMenu.Icon">
               <component :is="getIconComponent(subMenu.Icon)" />
             </el-icon>
-            <span v-show="!collapsed">{{ subMenu.Name }}</span>
+            <span>{{ subMenu.Name }}</span>
           </el-menu-item>
         </template>
       </el-sub-menu>
@@ -58,7 +58,7 @@
         <el-icon v-if="menu.Icon">
           <component :is="getIconComponent(menu.Icon)" />
         </el-icon>
-        <span v-show="!collapsed">{{ menu.Name }}</span>
+        <span>{{ menu.Name }}</span>
       </el-menu-item>
     </template>
   </el-menu>
