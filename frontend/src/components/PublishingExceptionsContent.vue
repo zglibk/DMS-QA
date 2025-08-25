@@ -1274,12 +1274,18 @@ const includeImages = ref(true)
  * 导出数据功能 - 显示导出选项对话框
  */
 const handleExport = () => {
+  console.log('handleExport 被调用')
+  console.log('canExport.value:', canExport.value)
+  console.log('permissions:', permissions)
+  
   // 权限检查
   if (!canExport.value) {
+    console.log('权限检查失败，无导出权限')
     ElMessage.warning('您没有导出出版异常数据的权限')
     return
   }
   
+  console.log('权限检查通过，显示导出对话框')
   exportDialogVisible.value = true
 }
 
@@ -2140,8 +2146,8 @@ onUnmounted(() => {
 .publishing-exceptions-content {
   padding: 20px;
   background-color: #f5f5f5;
-  min-height: calc(100vh - 60px);
-  overflow-y: auto;
+  height: auto;
+  overflow: visible;
 }
 
 /* 顶部统计卡片样式 */
