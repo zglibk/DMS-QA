@@ -85,7 +85,14 @@
     <el-card class="search-card" shadow="never">
       <el-form :model="searchForm" :inline="true" class="search-form">
         <el-form-item label="证书编号">
-          <el-input v-model="searchForm.certificateNo" placeholder="请输入证书编号" clearable style="width: 150px;" />
+          <el-input 
+            v-model="searchForm.certificateNo" 
+            placeholder="请输入证书编号" 
+            clearable 
+            @blur="handleAutoSearch"
+            @clear="handleAutoSearch"
+            style="width: 150px;" 
+          />
         </el-form-item>
         <el-form-item label="客户编号">
           <el-input 
@@ -93,17 +100,40 @@
             placeholder="客户编号" 
             clearable 
             @input="handleCustomerNoInput('search')"
+            @blur="handleAutoSearch"
+            @clear="handleAutoSearch"
             style="width: 100px;"
           />
         </el-form-item>
         <el-form-item label="工单号">
-          <el-input v-model="searchForm.workOrderNo" placeholder="请输入工单号" clearable style="width: 130px;" />
+          <el-input 
+            v-model="searchForm.workOrderNo" 
+            placeholder="请输入工单号" 
+            clearable 
+            @input="handleWorkOrderNoInput('search')"
+            @blur="handleAutoSearch"
+            @clear="handleAutoSearch"
+            style="width: 130px;" 
+          />
         </el-form-item>
         <el-form-item label="产品编号">
-          <el-input v-model="searchForm.productNo" placeholder="请输入产品编号" clearable />
+          <el-input 
+            v-model="searchForm.productNo" 
+            placeholder="请输入产品编号" 
+            clearable 
+            @blur="handleAutoSearch"
+            @clear="handleAutoSearch"
+          />
         </el-form-item>
         <el-form-item label="样板状态">
-          <el-select v-model="searchForm.sampleStatus" placeholder="请选择样板状态" clearable style="width: 100px;">
+          <el-select 
+            v-model="searchForm.sampleStatus" 
+            placeholder="请选择样板状态" 
+            clearable 
+            @change="handleAutoSearch"
+            @clear="handleAutoSearch"
+            style="width: 100px;"
+          >
             <el-option label="正常使用" value="正常使用" />
             <el-option label="待更新" value="待更新" />
             <el-option label="待作废" value="待作废" />
@@ -118,7 +148,10 @@
             start-placeholder="开始日期"
             end-placeholder="结束日期"
             format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD" style="max-width: 250px;"
+            value-format="YYYY-MM-DD"
+            @change="handleAutoSearch"
+            @clear="handleAutoSearch"
+            style="max-width: 250px;"
           />
         </el-form-item>
         <el-form-item>
@@ -260,7 +293,11 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="工单号" prop="workOrderNo">
-              <el-input v-model="formData.workOrderNo" placeholder="请输入工单号" />
+              <el-input 
+                v-model="formData.workOrderNo" 
+                placeholder="请输入工单号" 
+                @input="handleWorkOrderNoInput('form')"
+              />
             </el-form-item>
           </el-col>
         </el-row>
@@ -1412,6 +1449,31 @@ function handleCustomerNoInput(type) {
     // 新增/编辑表单中的客户编号自动转大写
     formData.customerNo = formData.customerNo.toUpperCase()
   }
+}
+
+/**
+ * 处理工单号输入自动大写
+ * @param {string} type - 输入类型：'search' 或 'form'
+ */
+function handleWorkOrderNoInput(type) {
+  if (type === 'search') {
+    // 搜索表单中的工单号自动转大写
+    searchForm.workOrderNo = searchForm.workOrderNo.toUpperCase()
+  } else if (type === 'form') {
+    // 新增/编辑表单中的工单号自动转大写
+    formData.workOrderNo = formData.workOrderNo.toUpperCase()
+  }
+}
+
+/**
+ * 自动触发查询
+ * 当输入框失去焦点、清空内容或下拉选择时自动执行查询
+ */
+function handleAutoSearch() {
+  // 延迟执行查询，避免频繁触发
+  setTimeout(() => {
+    handleSearch()
+  }, 100)
 }
 
 /**
