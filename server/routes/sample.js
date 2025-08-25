@@ -90,6 +90,8 @@ router.get('/list', authenticateToken, async (req, res) => {
     const { 
       page = 1, 
       pageSize = 10, 
+      certificateNo,
+      customerNo,
       workOrderNo, 
       productNo, 
       sampleStatus,
@@ -101,6 +103,14 @@ router.get('/list', authenticateToken, async (req, res) => {
     let parameters = {};
 
     // 构建查询条件
+    if (certificateNo) {
+      whereConditions.push('CertificateNo LIKE @certificateNo');
+      parameters.certificateNo = `%${certificateNo}%`;
+    }
+    if (customerNo) {
+      whereConditions.push('CustomerNo LIKE @customerNo');
+      parameters.customerNo = `%${customerNo}%`;
+    }
     if (workOrderNo) {
       whereConditions.push('WorkOrderNo LIKE @workOrderNo');
       parameters.workOrderNo = `%${workOrderNo}%`;

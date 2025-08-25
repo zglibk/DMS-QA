@@ -1306,9 +1306,51 @@ router.get('/statistics/summary', async (req, res) => {
       .input('trendYear', sql.Int, trendYear);
     const costTrendResult = await costTrendRequest.query(costTrendQuery);
 
+    // 总记录数统计（基于筛选条件）
+    const totalRecordsQuery = `
+      SELECT COUNT(*) as total_records
+      FROM publishing_exceptions 
+      WHERE ${whereClause}
+    `;
+    
+    const totalRecordsRequest = pool.request();
+    filterParams.forEach(param => {
+      totalRecordsRequest.input(param.name, param.type, param.value);
+    });
+    const totalRecordsResult = await totalRecordsRequest.query(totalRecordsQuery);
+    
+    // 总损失金额统计（基于筛选条件）
+    const totalAmountQuery = `
+      SELECT SUM(ISNULL(amount, 0)) as total_amount
+      FROM publishing_exceptions 
+      WHERE ${whereClause}
+    `;
+    
+    const totalAmountRequest = pool.request();
+    filterParams.forEach(param => {
+      totalAmountRequest.input(param.name, param.type, param.value);
+    });
+    const totalAmountResult = await totalAmountRequest.query(totalAmountQuery);
+    
+    // 本月损失金额统计（始终只统计当前月份）
+    const currentMonthAmountQuery = `
+      SELECT SUM(ISNULL(amount, 0)) as current_month_amount
+      FROM publishing_exceptions 
+      WHERE ${monthlyNewWhereConditions.join(' AND ')}
+    `;
+    
+    const currentMonthAmountRequest = pool.request();
+    monthlyNewParams.forEach(param => {
+      currentMonthAmountRequest.input(param.name, param.type, param.value);
+    });
+    const currentMonthAmountResult = await currentMonthAmountRequest.query(currentMonthAmountQuery);
+
     res.json({
       success: true,
       data: {
+        totalRecords: totalRecordsResult.recordset[0].total_records || 0,
+        totalAmount: totalAmountResult.recordset[0].total_amount || 0,
+        currentMonthAmount: currentMonthAmountResult.recordset[0].current_month_amount || 0,
         monthly_new: monthlyNewResult.recordset[0].monthly_new_count || 0,
         cost_loss: costLossResult.recordset[0].cost_loss_amount || 0,
         byErrorType: errorTypeResult.recordset || [],

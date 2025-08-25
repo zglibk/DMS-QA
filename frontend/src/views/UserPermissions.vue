@@ -514,7 +514,7 @@ const searchForm = reactive({
   userId: null,
   menuId: null,
   permissionType: '',
-  status: '1'
+  status: '' // 默认显示所有状态的权限
 })
 
 // 分页信息
@@ -786,7 +786,7 @@ const resetSearch = () => {
     userId: null,
     menuId: null,
     permissionType: '',
-    status: '1'
+    status: '' // 重置时也显示所有状态的权限
   })
   permissions.value = []
   pagination.page = 1

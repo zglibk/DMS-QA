@@ -261,6 +261,7 @@ router.get('/', authenticateToken, async (req, res) => {
 router.get('/user-menus', authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id
+    const username = req.user?.username
     if (!userId) {
       return res.status(401).json({
         success: false,
@@ -269,36 +270,93 @@ router.get('/user-menus', authenticateToken, async (req, res) => {
     }
 
     const result = await executeQuery(async (pool) => {
-      // 查询用户角色权限菜单
-      // 这里简化处理，实际应该根据用户角色权限来过滤菜单
-      const queryResult = await pool.request()
-        .input('userId', sql.Int, userId)
-        .query(`
-          SELECT DISTINCT
-            m.ID,
-            m.MenuName as Name,
-            m.MenuCode as Code,
-            m.ParentID,
-            m.MenuType as Type,
-            m.Icon,
-            CASE 
-              WHEN m.Path LIKE '/admin/%' THEN m.Path
-              WHEN m.Path = '/' THEN '/admin/dashboard'
-              ELSE '/admin' + m.Path
-            END as Path,
-            m.Component,
-            m.Permission,
-            m.SortOrder,
-            m.Status
-          FROM Menus m
-          LEFT JOIN RoleMenus rm ON m.ID = rm.MenuID
-          LEFT JOIN UserRoles ur ON rm.RoleID = ur.RoleID
-          WHERE m.Status = 1 
-            AND m.Visible = 1
-            AND m.MenuType IN ('catalog', 'menu')
-            AND (ur.UserID = @userId OR m.Permission IS NULL OR m.Permission = '')
-          ORDER BY m.SortOrder ASC, m.ID ASC
-        `)
+      let queryResult
+      
+      // 对admin用户只使用角色权限，对其他用户同时考虑角色权限和用户权限
+      if (username === 'admin') {
+        // admin用户：只通过角色权限获取菜单
+        queryResult = await pool.request()
+          .input('userId', sql.Int, userId)
+          .query(`
+            SELECT DISTINCT
+              m.ID,
+              m.MenuName as Name,
+              m.MenuCode as Code,
+              m.ParentID,
+              m.MenuType as Type,
+              m.Icon,
+              CASE 
+                WHEN m.Path LIKE '/admin/%' THEN m.Path
+                WHEN m.Path = '/' THEN '/admin/dashboard'
+                ELSE '/admin' + m.Path
+              END as Path,
+              m.Component,
+              m.Permission,
+              m.SortOrder,
+              m.Status
+            FROM Menus m
+            INNER JOIN RoleMenus rm ON m.ID = rm.MenuID
+            INNER JOIN UserRoles ur ON rm.RoleID = ur.RoleID AND ur.UserID = @userId
+            WHERE m.Status = 1 
+              AND m.Visible = 1
+              AND m.MenuType IN ('catalog', 'menu')
+            ORDER BY m.SortOrder ASC, m.ID ASC
+          `)
+      } else {
+        // 其他用户：同时考虑角色权限和用户权限
+        queryResult = await pool.request()
+          .input('userId', sql.Int, userId)
+          .query(`
+            SELECT DISTINCT
+              m.ID,
+              m.MenuName as Name,
+              m.MenuCode as Code,
+              m.ParentID,
+              m.MenuType as Type,
+              m.Icon,
+              CASE 
+                WHEN m.Path LIKE '/admin/%' THEN m.Path
+                WHEN m.Path = '/' THEN '/admin/dashboard'
+                ELSE '/admin' + m.Path
+              END as Path,
+              m.Component,
+              m.Permission,
+              m.SortOrder,
+              m.Status
+            FROM Menus m
+            WHERE m.Status = 1 
+              AND m.Visible = 1
+              AND m.MenuType IN ('catalog', 'menu')
+              AND (
+                -- 通过角色权限获得的菜单
+                EXISTS (
+                  SELECT 1 FROM RoleMenus rm 
+                  INNER JOIN UserRoles ur ON rm.RoleID = ur.RoleID 
+                  WHERE rm.MenuID = m.ID AND ur.UserID = @userId
+                )
+                OR
+                -- 通过用户权限获得的菜单（允许访问且未过期，且权限级别为menu，且状态有效）
+                EXISTS (
+                  SELECT 1 FROM UserPermissions up 
+                  WHERE up.UserID = @userId 
+                    AND up.MenuID = m.ID 
+                    AND up.PermissionLevel = 'menu'
+                    AND up.Status = 1
+                    AND (up.ExpiresAt IS NULL OR up.ExpiresAt > GETDATE())
+                )
+              )
+              -- 排除被用户权限明确拒绝的菜单（且状态有效）
+              AND NOT EXISTS (
+                SELECT 1 FROM UserPermissions up 
+                WHERE up.UserID = @userId 
+                  AND up.MenuID = m.ID 
+                  AND up.PermissionLevel = 'deny'
+                  AND up.Status = 1
+                  AND (up.ExpiresAt IS NULL OR up.ExpiresAt > GETDATE())
+              )
+            ORDER BY m.SortOrder ASC, m.ID ASC
+          `)
+      }
       
       // 构建树形结构
       const menuMap = new Map()
@@ -733,6 +791,11 @@ router.get('/options/list', async (req, res) => {
 })
 
 // 默认菜单数据（当数据库查询失败时的后备方案）
+/**
+ * 获取默认菜单列表
+ * 当数据库查询失败或用户没有任何菜单权限时的后备方案
+ * 只包含基础的、对所有后台用户开放的菜单
+ */
 function getDefaultMenus() {
   return [
     {
@@ -743,211 +806,9 @@ function getDefaultMenus() {
       Icon: 'HomeFilled',
       Type: 'menu',
       children: []
-    },
-    {
-      ID: 2,
-      Name: '供应商管理',
-      Code: 'supplier',
-      Path: '/admin/supplier',
-      Icon: 'OfficeBuilding',
-      Type: 'menu',
-      children: [
-        {
-          ID: 21,
-          Name: '供应商列表',
-          Code: 'supplier-list',
-          Path: '/admin/supplier/list',
-          Icon: 'List',
-          Type: 'menu',
-          children: []
-        },
-        {
-          ID: 22,
-          Name: '材料价格',
-          Code: 'material-price',
-          Path: '/admin/supplier/material-price',
-          Icon: 'Money',
-          Type: 'menu',
-          children: []
-        }
-      ]
-    },
-    {
-      ID: 3,
-      Name: '用户管理',
-      Code: 'user',
-      Path: '/admin/user',
-      Icon: 'User',
-      Type: 'menu',
-      children: [
-        {
-          ID: 31,
-          Name: '用户列表',
-          Code: 'user-list',
-          Path: '/admin/user/list',
-          Icon: 'Grid',
-          Type: 'menu',
-          children: []
-        },
-        {
-          ID: 32,
-          Name: '人员管理',
-          Code: 'person-management',
-          Path: '/admin/person-management',
-          Icon: 'Avatar',
-          Type: 'menu',
-          children: []
-        }
-      ]
-    },
-    {
-      ID: 4,
-      Name: '返工管理',
-      Code: 'rework-management',
-      Path: '/admin/rework-management',
-      Icon: 'Tools',
-      Type: 'menu',
-      children: []
-    },
-    {
-      ID: 5,
-      Name: '质量管理',
-      Code: 'quality',
-      Path: '/admin/quality',
-      Icon: 'DocumentChecked',
-      Type: 'menu',
-      children: [
-        {
-          ID: 51,
-          Name: '投诉管理',
-          Code: 'complaint-management',
-          Path: '/admin/quality/complaint',
-          Icon: 'Warning',
-          Type: 'menu',
-          children: [
-            {
-              ID: 511,
-              Name: '内部投诉',
-              Code: 'internal-complaint',
-              Path: '/admin/quality/complaint/internal',
-              Icon: 'User',
-              Type: 'menu',
-              children: []
-            },
-            {
-              ID: 512,
-              Name: '客户投诉',
-              Code: 'customer-complaint',
-              Path: '/admin/quality/complaint/customer',
-              Icon: 'Phone',
-              Type: 'menu',
-              children: []
-            }
-          ]
-        },
-        {
-          ID: 52,
-          Name: '返工管理',
-          Code: 'quality-rework-management',
-          Path: '/admin/quality/rework',
-          Icon: 'Refresh',
-          Type: 'menu',
-          children: []
-        },
-        {
-          ID: 53,
-          Name: '人员管理',
-          Code: 'quality-person-management',
-          Path: '/admin/quality/person',
-          Icon: 'Avatar',
-          Type: 'menu',
-          children: []
-        },
-        {
-          ID: 54,
-          Name: '质量异常数据导入',
-          Code: 'data-management',
-          Path: '/admin/quality/data-management',
-          Icon: 'Upload',
-          Type: 'menu',
-          children: []
-        }
-      ]
-    },
-    {
-      ID: 6,
-      Name: '权限管理',
-      Code: 'permission',
-      Path: '/admin/permission',
-      Icon: 'Setting',
-      Type: 'menu',
-      children: [
-        {
-          ID: 61,
-          Name: '部门管理',
-          Code: 'department-management',
-          Path: '/admin/department-management',
-          Icon: 'OfficeBuilding',
-          Type: 'menu',
-          children: []
-        },
-        {
-          ID: 62,
-          Name: '岗位管理',
-          Code: 'position-management',
-          Path: '/admin/position-management',
-          Icon: 'Briefcase',
-          Type: 'menu',
-          children: []
-        },
-        {
-          ID: 63,
-          Name: '角色管理',
-          Code: 'role-management',
-          Path: '/admin/role-management',
-          Icon: 'UserFilled',
-          Type: 'menu',
-          children: []
-        },
-        {
-          ID: 64,
-          Name: '菜单管理',
-          Code: 'menu-management',
-          Path: '/admin/menu-management',
-          Icon: 'Menu',
-          Type: 'menu',
-          children: []
-        }
-      ]
-    },
-    {
-      ID: 7,
-      Name: '设置',
-      Code: 'settings',
-      Path: '/admin/settings',
-      Icon: 'Tools',
-      Type: 'menu',
-      children: [
-        {
-          ID: 71,
-          Name: '系统配置',
-          Code: 'system-config',
-          Path: '/admin/system-config',
-          Icon: 'Setting',
-          Type: 'menu',
-          children: []
-        },
-        {
-          ID: 72,
-          Name: '主页卡片配置',
-          Code: 'home-card-config',
-          Path: '/admin/home-card-config',
-          Icon: 'Grid',
-          Type: 'menu',
-          children: []
-        }
-      ]
     }
+    // 注意：移除了用户管理、供应商管理等需要特定权限的菜单
+    // 这些菜单应该通过数据库权限控制，而不是在默认菜单中提供
   ]
 }
 

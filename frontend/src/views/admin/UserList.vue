@@ -1290,6 +1290,7 @@ const addUserRules = {
   ],
   Role: [{ required: true, message: '请选择角色', trigger: 'change' }],
   Department: [{ required: true, message: '请选择部门', trigger: 'change' }],
+  DepartmentID: [{ required: false, message: '请选择部门ID', trigger: 'change' }],
   RealName: [
     { required: true, message: '请输入真实姓名', trigger: 'blur' },
     { min: 2, max: 10, message: '姓名长度在 2 到 10 个字符', trigger: 'blur' }
@@ -1298,6 +1299,7 @@ const addUserRules = {
   Phone: [
     { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
   ],
+  PositionID: [{ required: false, message: '请选择职位', trigger: 'change' }],
   Gender: [{ required: false, message: '请选择性别', trigger: 'change' }],
   Birthday: [{ required: false, message: '请选择生日', trigger: 'change' }],
   Address: [
@@ -1374,8 +1376,22 @@ const refreshData = async () => {
  * 直接将头像base64数据保存到数据库中
  */
 const submitAddUser = () => {
-  addUserRef.value.validate(async valid => {
-    if (!valid) return
+  addUserRef.value.validate(async (valid, fields) => {
+    if (!valid) {
+      // 获取第一个验证失败的字段错误信息
+      if (fields) {
+        const firstFieldKey = Object.keys(fields)[0]
+        const firstFieldErrors = fields[firstFieldKey]
+        if (firstFieldErrors && firstFieldErrors.length > 0) {
+          ElMessage.error(firstFieldErrors[0].message)
+        } else {
+          ElMessage.error('请填写所有必填项')
+        }
+      } else {
+        ElMessage.error('请填写所有必填项')
+      }
+      return
+    }
     
     submitLoading.value = true
     try {
@@ -1438,7 +1454,7 @@ const submitAddUser = () => {
         ElMessage.error(res.data.message || (isEdit.value ? '修改失败' : '添加失败'))
       }
     } catch (error) {
-      console.error('操作失败:', error)
+      console.error('用户操作失败:', error)
       ElMessage.error('操作失败，请重试')
     } finally {
       submitLoading.value = false

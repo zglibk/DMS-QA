@@ -736,10 +736,8 @@ const permissions = reactive({
 // 检查权限的异步方法
 const checkPermissions = async () => {
   try {
-    console.log('开始权限检查...')
     // 检查是否有管理员角色
     const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
-    console.log('管理员角色检查:', hasAdminRole)
     
     if (hasAdminRole) {
       // 管理员拥有所有权限
@@ -747,10 +745,8 @@ const checkPermissions = async () => {
       permissions.canEdit = true
       permissions.canDelete = true
       permissions.canExport = true
-      console.log('管理员权限设置完成:', permissions)
     } else {
       // 使用异步权限检查（支持用户级权限优先级）
-      console.log('开始异步权限检查...')
       const [addPerm, editPerm, deletePerm, exportPerm] = await Promise.all([
         userStore.hasActionPermissionAsync('quality:publishing:add'),
         userStore.hasActionPermissionAsync('quality:publishing:edit'),
@@ -758,16 +754,12 @@ const checkPermissions = async () => {
         userStore.hasActionPermissionAsync('quality:publishing:export')
       ])
       
-      console.log('权限检查结果:', { addPerm, editPerm, deletePerm, exportPerm })
-      
       permissions.canAdd = addPerm
       permissions.canEdit = editPerm
       permissions.canDelete = deletePerm
       permissions.canExport = exportPerm
-      console.log('权限设置完成:', permissions)
     }
   } catch (error) {
-    console.error('权限检查失败:', error)
     // 权限检查失败时，回退到角色权限
     const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
     permissions.canAdd = hasAdminRole

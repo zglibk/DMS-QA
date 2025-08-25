@@ -139,8 +139,23 @@ const goAdmin = async () => {
   const hasAdminActionPermission = userStore.hasActionPermission('admin:dashboard:view') ||
                                    userStore.hasActionPermission('admin:access')
   
-  // 如果用户有任何 /admin 路由权限或操作权限，则允许进入后台
-  if (hasAnyAdminRoutePermission || hasAdminActionPermission) {
+  // 检查用户是否有任何后台菜单或按钮权限
+  // 包括但不限于：质量管理、出版异常、样品承认书等后台功能权限
+  const hasAnyBackendPermission = (userStore.user?.permissions?.menus || []).some(menu => {
+    // 检查菜单权限中是否包含后台相关权限
+    const permission = menu.Permission || ''
+    return permission.includes('quality:') ||     // 质量管理相关权限
+           permission.includes('admin:') ||       // 管理员权限
+           permission.includes('sample:') ||      // 样品管理权限
+           permission.includes('publishing:') ||  // 出版相关权限
+           permission.includes('exception:') ||   // 异常管理权限
+           permission.includes('work-plan:') ||   // 工作计划权限
+           permission.includes('system:') ||      // 系统管理权限
+           menu.path?.startsWith('/admin')        // 或者菜单路径以/admin开头
+  })
+  
+  // 如果用户有任何后台相关权限，则允许进入后台
+  if (hasAnyAdminRoutePermission || hasAdminActionPermission || hasAnyBackendPermission) {
     router.push('/admin/dashboard')
   } else {
     ElMessage.error('您没有后台访问权限，请联系管理员')

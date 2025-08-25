@@ -668,7 +668,7 @@ router.post('/add-user', authenticateToken, async (req, res) => {
 // 更新用户信息（管理员功能）
 router.put('/update-user', authenticateToken, async (req, res) => {
   const { Username, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
-  if (!Username || !Department || !RealName || !Phone) {
+  if (!Username || !Department || !RealName) {
     return res.json({ success: false, message: '请填写所有必填项' });
   }
   try {

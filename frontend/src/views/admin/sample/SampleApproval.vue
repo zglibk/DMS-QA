@@ -85,13 +85,19 @@
     <el-card class="search-card" shadow="never">
       <el-form :model="searchForm" :inline="true" class="search-form">
         <el-form-item label="证书编号">
-          <el-input v-model="searchForm.certificateNo" placeholder="请输入证书编号" clearable />
+          <el-input v-model="searchForm.certificateNo" placeholder="请输入证书编号" clearable style="width: 150px;" />
         </el-form-item>
         <el-form-item label="客户编号">
-          <el-input v-model="searchForm.customerNo" placeholder="请输入客户编号" clearable />
+          <el-input 
+            v-model="searchForm.customerNo" 
+            placeholder="客户编号" 
+            clearable 
+            @input="handleCustomerNoInput('search')"
+            style="width: 100px;"
+          />
         </el-form-item>
         <el-form-item label="工单号">
-          <el-input v-model="searchForm.workOrderNo" placeholder="请输入工单号" clearable />
+          <el-input v-model="searchForm.workOrderNo" placeholder="请输入工单号" clearable style="width: 130px;" />
         </el-form-item>
         <el-form-item label="产品编号">
           <el-input v-model="searchForm.productNo" placeholder="请输入产品编号" clearable />
@@ -112,7 +118,7 @@
             start-placeholder="开始日期"
             end-placeholder="结束日期"
             format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
+            value-format="YYYY-MM-DD" style="max-width: 250px;"
           />
         </el-form-item>
         <el-form-item>
@@ -126,18 +132,18 @@
     <el-card class="toolbar-card" shadow="never">
       <div class="toolbar">
         <div class="action-section">
-          <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
-            新增样品承认书
-          </el-button>
-          <el-button type="success" @click="handleExportList">
-            <el-icon><Download /></el-icon>
-            导出清单
-          </el-button>
-          <el-button type="danger" @click="handleBatchDelete" :disabled="selectedRows.length === 0">
-            <el-icon><Close /></el-icon>
-            批量删除
-          </el-button>
+          <el-button type="primary" @click="handleAdd" :disabled="!canAdd">
+          <el-icon><Plus /></el-icon>
+          新增样品承认书
+        </el-button>
+        <el-button type="success" @click="handleExportList" :disabled="!canExport">
+          <el-icon><Download /></el-icon>
+          导出清单
+        </el-button>
+        <el-button type="danger" @click="handleBatchDelete" :disabled="!canDelete || selectedRows.length === 0">
+          <el-icon><Delete /></el-icon>
+          批量删除
+        </el-button>
         </div>
       </div>
     </el-card>
@@ -152,10 +158,10 @@
         border
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="certificateNo" label="样板编号" width="150" fixed="left" align="center" header-align="center" />
-        <el-table-column prop="customerNo" label="客户编号" width="120" align="center" header-align="center" />
+        <el-table-column prop="certificateNo" label="样板编号" width="120" fixed="left" align="center" header-align="center" />
+        <el-table-column prop="customerNo" label="客户编号" width="100" align="center" header-align="center" />
         <el-table-column prop="workOrderNo" label="工单号" width="120" align="center" header-align="center" />
-        <el-table-column prop="productNo" label="产品编号" width="120" align="center" header-align="center" />
+        <el-table-column prop="productNo" label="产品编号" width="160" align="center" header-align="center" class-name="no-wrap-column" />
         <el-table-column prop="productName" label="品名" width="200" show-overflow-tooltip />
         <el-table-column prop="productSpec" label="产品规格" width="150" align="center" header-align="center" show-overflow-tooltip />
         <el-table-column label="产品图纸" width="100" align="center" header-align="center">
@@ -195,11 +201,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="expiryDate" label="到期日期" width="120" align="center" header-align="center" />
-        <el-table-column label="操作" width="180" fixed="right" align="center" header-align="center">
+        <el-table-column label="操作" width="160" fixed="right" align="center" header-align="center">
           <template #default="scope">
-            <el-button type="primary" link @click="handleEdit(scope.row)">编辑</el-button>
+            <el-button type="primary" link @click="handleEdit(scope.row)" :disabled="!canEdit">编辑</el-button>
             <el-button type="success" link @click="handleView(scope.row)">查看</el-button>
-            <el-button type="danger" link @click="handleDelete(scope.row)">删除</el-button>
+            <el-button type="danger" link @click="handleDelete(scope.row)" :disabled="!canDelete">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -245,7 +251,11 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="客户编号" prop="customerNo">
-              <el-input v-model="formData.customerNo" placeholder="请输入客户编号" />
+              <el-input 
+                v-model="formData.customerNo" 
+                placeholder="请输入客户编号" 
+                @input="handleCustomerNoInput('form')"
+              />
             </el-form-item>
           </el-col>
           <el-col :span="8">
@@ -590,8 +600,71 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Document, Check, Clock, Close, Plus, Download, CircleClose, SuccessFilled } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { useUserStore } from '@/store/user'
 // ExcelJS 将在需要时动态导入
 // 导出相关库将在需要时动态导入
+
+// 用户信息
+const userStore = useUserStore()
+const currentUser = computed(() => userStore.user?.Username || '系统')
+
+// 权限状态管理
+const permissions = reactive({
+  canAdd: false,
+  canEdit: false,
+  canDelete: false,
+  canExport: false
+})
+
+// 检查权限的异步方法
+const checkPermissions = async () => {
+  try {
+    console.log('开始权限检查...')
+    // 检查是否有管理员角色
+    const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
+    console.log('管理员角色检查:', hasAdminRole)
+    
+    if (hasAdminRole) {
+      // 管理员拥有所有权限
+      permissions.canAdd = true
+      permissions.canEdit = true
+      permissions.canDelete = true
+      permissions.canExport = true
+      console.log('管理员权限设置完成:', permissions)
+    } else {
+      // 使用异步权限检查（支持用户级权限优先级）
+      console.log('开始异步权限检查...')
+      const [addPerm, editPerm, deletePerm, exportPerm] = await Promise.all([
+        userStore.hasActionPermissionAsync('sample:add'),
+        userStore.hasActionPermissionAsync('sample:edit'),
+        userStore.hasActionPermissionAsync('sample:delete'),
+        userStore.hasActionPermissionAsync('sample:export')
+      ])
+      
+      console.log('权限检查结果:', { addPerm, editPerm, deletePerm, exportPerm })
+      
+      permissions.canAdd = addPerm
+      permissions.canEdit = editPerm
+      permissions.canDelete = deletePerm
+      permissions.canExport = exportPerm
+      console.log('权限设置完成:', permissions)
+    }
+  } catch (error) {
+    console.error('权限检查失败:', error)
+    // 权限检查失败时，回退到角色权限
+    const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员') || userStore.hasRole('质量经理'))
+    permissions.canAdd = hasAdminRole
+    permissions.canEdit = hasAdminRole
+    permissions.canDelete = hasAdminRole
+    permissions.canExport = hasAdminRole
+  }
+}
+
+// 兼容性computed属性（保持向后兼容）
+const canAdd = computed(() => permissions.canAdd)
+const canEdit = computed(() => permissions.canEdit)
+const canDelete = computed(() => permissions.canDelete)
+const canExport = computed(() => permissions.canExport)
 
 // 响应式数据
 const loading = ref(false)
@@ -838,6 +911,12 @@ function handleReset() {
  * 新增处理
  */
 async function handleAdd() {
+  // 权限检查
+  if (!canAdd.value) {
+    ElMessage.error('您没有新增样品承认书的权限')
+    return
+  }
+  
   resetForm()
   formData.createDate = new Date().toISOString().split('T')[0]
   
@@ -866,6 +945,12 @@ async function handleAdd() {
  * 编辑处理
  */
 function handleEdit(row) {
+  // 权限检查
+  if (!canEdit.value) {
+    ElMessage.error('您没有编辑样品承认书的权限')
+    return
+  }
+  
   resetForm()
   Object.assign(formData, { ...row })
   
@@ -892,6 +977,12 @@ function handleView(row) {
  * 删除处理
  */
 async function handleDelete(row) {
+  // 权限检查
+  if (!canDelete.value) {
+    ElMessage.error('您没有删除样品承认书的权限')
+    return
+  }
+  
   try {
     await ElMessageBox.confirm(
       `确定要删除样板编号为 ${row.certificateNo} 的样板承认书吗？`,
@@ -923,6 +1014,12 @@ async function handleDelete(row) {
  * 导出处理
  */
 function handleExport(row) {
+  // 权限检查
+  if (!canExport.value) {
+    ElMessage.error('您没有导出样品承认书的权限')
+    return
+  }
+  
   // 实现单个导出逻辑
   ElMessage.info('导出功能待实现')
 }
@@ -932,6 +1029,12 @@ function handleExport(row) {
  * 使用XLSX库生成Excel文件，参考返工管理模块的成功实现
  */
 async function handleExportList() {
+  // 权限检查
+  if (!canExport.value) {
+    ElMessage.error('您没有导出样品承认书清单的权限')
+    return
+  }
+  
   try {
     // 导出前询问用户确认
     const confirmResult = await ElMessageBox.confirm(
@@ -1137,6 +1240,12 @@ async function handleExportList() {
  * 批量删除处理
  */
 async function handleBatchDelete() {
+  // 权限检查
+  if (!canDelete.value) {
+    ElMessage.error('您没有批量删除样品承认书的权限')
+    return
+  }
+  
   if (selectedRows.value.length === 0) {
     ElMessage.warning('请选择要删除的数据')
     return
@@ -1292,8 +1401,19 @@ function handleDialogClose() {
 }
 
 /**
- * 表单提交处理
+ * 处理客户编号输入自动大写
+ * @param {string} type - 输入类型：'search' 或 'form'
  */
+function handleCustomerNoInput(type) {
+  if (type === 'search') {
+    // 搜索表单中的客户编号自动转大写
+    searchForm.customerNo = searchForm.customerNo.toUpperCase()
+  } else if (type === 'form') {
+    // 新增/编辑表单中的客户编号自动转大写
+    formData.customerNo = formData.customerNo.toUpperCase()
+  }
+}
+
 /**
  * 表单提交处理
  */
@@ -1357,7 +1477,11 @@ async function handleSubmit() {
 }
 
 // 组件挂载时加载数据
-onMounted(() => {
+onMounted(async () => {
+  // 首先进行权限检查
+  await checkPermissions()
+  
+  // 然后加载页面数据
   loadTableData()
   loadPersonList()
   loadDepartmentTree()
@@ -1856,5 +1980,23 @@ onMounted(() => {
 /* 分割线样式优化 */
 .sample-form + .el-divider {
   margin: 12px 0 8px 0;
+}
+
+/* 产品编号列禁止换行 */
+:deep(.no-wrap-column .cell) {
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 禁用按钮样式 */
+.el-button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.el-button.is-link:disabled {
+  color: #c0c4cc !important;
+  cursor: not-allowed;
 }
 </style>
