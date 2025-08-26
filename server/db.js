@@ -74,10 +74,14 @@ let cachedDynamicConfig = null;  // 缓存的配置对象
 let configCacheTime = 0;         // 缓存时间戳
 const CONFIG_CACHE_DURATION = 60000; // 缓存有效期（1分钟）
 
+// 用于配置查询的独立连接池
+let configPool = null;
+
 /**
  * 获取动态数据库配置
- *
- * 功能：从DbConfig表获取当前有效的数据库配置
+ * 
+ * 从DbConfig表中获取当前有效的数据库连接配置。
+ * 该函数实现了配置缓存机制，避免频繁查询数据库。
  *
  * 工作流程：
  * 1. 检查缓存是否有效
@@ -99,13 +103,22 @@ async function getDynamicConfig() {
     return cachedDynamicConfig;
   }
 
-  let pool = null;
   try {
-    // 使用默认配置连接数据库
-    pool = await sql.connect(config);
+    // 使用独立的配置连接池，避免与全局连接池冲突
+    if (!configPool || !configPool.connected) {
+      if (configPool) {
+        try {
+          await configPool.close();
+        } catch (closeErr) {
+          console.log('关闭配置连接池失败:', closeErr.message);
+        }
+      }
+      configPool = new sql.ConnectionPool(config);
+      await configPool.connect();
+    }
 
     // 查询当前有效的数据库配置
-    const result = await pool.request()
+    const result = await configPool.request()
       .query(`
         SELECT TOP 1
           Host, DatabaseName, DbUser, DbPassword,
@@ -166,15 +179,6 @@ async function getDynamicConfig() {
       return cachedDynamicConfig;
     }
     return config; // 出错时返回默认配置
-  } finally {
-    // 确保连接池被正确关闭
-    if (pool) {
-      try {
-        await pool.close();
-      } catch (closeErr) {
-        console.log('关闭数据库连接池失败:', closeErr.message);
-      }
-    }
   }
 }
 
@@ -190,20 +194,25 @@ async function getConnection() {
     // 检查是否需要重新创建连接池（配置变化时）
     const configChanged = !poolConfig || JSON.stringify(poolConfig) !== JSON.stringify(dynamicConfig);
 
-    if (!globalPool || configChanged || !globalPool.connected) {
-      // 如果有旧的连接池，先关闭它
+    // 检查连接池是否需要重建
+    const needsRebuild = !globalPool || configChanged || 
+                        (!globalPool.connected && !globalPool.connecting);
+
+    if (needsRebuild) {
+      // 如果有旧的连接池，先安全关闭它
       if (globalPool) {
         try {
-          // 只有在连接池已连接或连接中时才关闭
           if (globalPool.connected || globalPool.connecting) {
             await globalPool.close();
           }
         } catch (err) {
           console.log('关闭旧连接池失败:', err.message);
         }
+        globalPool = null;
       }
 
       // 创建新的连接池
+      console.log('创建新的数据库连接池...');
       globalPool = new sql.ConnectionPool(dynamicConfig);
       poolConfig = { ...dynamicConfig };
 
@@ -211,16 +220,24 @@ async function getConnection() {
       globalPool.on('error', (err) => {
         console.error('连接池错误:', err);
         globalPool = null; // 重置连接池，下次重新创建
+        poolConfig = null;
       });
 
       // 连接到数据库
       await globalPool.connect();
+      console.log('数据库连接池创建成功');
+    }
+
+    // 最终检查连接池状态
+    if (!globalPool || !globalPool.connected) {
+      throw new Error('连接池未正确连接');
     }
 
     return globalPool;
   } catch (error) {
     console.error('数据库连接失败:', error);
     globalPool = null; // 重置连接池
+    poolConfig = null;
     throw error;
   }
 }

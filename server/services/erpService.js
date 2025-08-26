@@ -1,4 +1,5 @@
 const axios = require('axios');
+const erpConfigLoader = require('../utils/erpConfigLoader');
 
 /**
  * 迅越ERP系统服务类
@@ -6,12 +7,100 @@ const axios = require('axios');
  */
 class ErpService {
     constructor() {
-        // ERP系统基础配置
-        this.baseUrl = 'http://192.168.1.168:99';
-        this.appId = 'xybfc6ae9da4484e95b27e71ab6c6623b4';
-        this.appSecret = 'e020c4d79c7a49e3a7b1ab4b6749a1f6';
+        // ERP系统基础配置（将从数据库动态加载）
+        this.baseUrl = null;
+        this.appId = null;
+        this.appSecret = null;
         this.token = null;
         this.tokenExpireTime = null;
+        this.configLoaded = false;
+        this.configLoadingPromise = null; // 用于防止并发加载
+    }
+
+    /**
+     * 加载ERP配置
+     * 从erp_config表中动态获取配置信息
+     */
+    async loadConfig() {
+        // 如果配置已加载，直接返回
+        if (this.configLoaded) {
+            return;
+        }
+
+        // 如果正在加载中，等待加载完成
+        if (this.configLoadingPromise) {
+            await this.configLoadingPromise;
+            return;
+        }
+
+        // 开始加载配置
+        this.configLoadingPromise = this._doLoadConfig();
+        
+        try {
+            await this.configLoadingPromise;
+        } finally {
+            this.configLoadingPromise = null;
+        }
+    }
+
+    /**
+     * 实际执行配置加载的私有方法
+     */
+    async _doLoadConfig() {
+        try {
+            console.log('正在加载ERP配置...');
+            const config = await erpConfigLoader.getErpConnectionConfig();
+            
+            // 检查配置是否完整，如果不完整则使用默认配置
+            if (!config.baseUrl || !config.appId || !config.appSecret) {
+                console.warn('数据库配置不完整，使用默认配置');
+                this.baseUrl = 'http://192.168.1.168:99';
+                this.appId = 'xybfc6ae9da4484e95b27e71ab6c6623b4';
+                this.appSecret = 'e020c4d79c7a49e3a7b1ab4b6749a1f6';
+            } else {
+                this.baseUrl = config.baseUrl;
+                this.appId = config.appId;
+                this.appSecret = config.appSecret;
+            }
+            
+            this.configLoaded = true;
+            
+            console.log('ERP配置加载成功:', {
+                baseUrl: this.baseUrl,
+                appId: this.appId ? this.appId.substring(0, 8) + '...' : null
+            });
+        } catch (error) {
+            console.error('加载ERP配置失败:', error.message);
+            // 使用默认配置作为备选
+            this.baseUrl = 'http://192.168.1.168:99';
+            this.appId = 'xybfc6ae9da4484e95b27e71ab6c6623b4';
+            this.appSecret = 'e020c4d79c7a49e3a7b1ab4b6749a1f6';
+            this.configLoaded = true;
+            console.log('使用默认ERP配置');
+        }
+    }
+
+    /**
+     * 重新加载ERP配置
+     * 强制从数据库重新获取配置信息
+     */
+    async reloadConfig() {
+        try {
+            console.log('重新加载ERP配置...');
+            this.configLoaded = false;
+            this.configLoadingPromise = null; // 重置加载状态
+            // 清除token缓存，因为配置可能已更改
+            this.token = null;
+            this.tokenExpireTime = null;
+            // 清除配置加载器的缓存
+            erpConfigLoader.clearCache();
+            // 重新加载配置
+            await this.loadConfig();
+            console.log('ERP配置重新加载完成');
+        } catch (error) {
+            console.error('重新加载ERP配置失败:', error.message);
+            throw error;
+        }
     }
 
     /**
@@ -21,6 +110,9 @@ class ErpService {
      */
     async getToken() {
         try {
+            // 确保配置已加载
+            await this.loadConfig();
+            
             // 检查token是否仍然有效
             if (this.token && this.tokenExpireTime && Date.now() < this.tokenExpireTime) {
                 console.log('使用缓存的token');
@@ -90,6 +182,9 @@ class ErpService {
      */
     async makeRequest(endpoint, method = 'GET', data = null, params = {}) {
         try {
+            // 确保配置已加载
+            await this.loadConfig();
+            
             // 获取有效token
             const token = await this.getToken();
             

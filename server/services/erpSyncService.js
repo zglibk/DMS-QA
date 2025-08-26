@@ -1,6 +1,7 @@
 const cron = require('node-cron');
 const erpService = require('./erpService');
 const db = require('../db');
+const erpConfigLoader = require('../utils/erpConfigLoader');
 
 /**
  * ERP数据同步服务
@@ -11,18 +12,19 @@ class ErpSyncService {
         this.isRunning = false;
         this.syncTasks = new Map(); // 存储定时任务
         this.syncConfig = {
-            enabled: true,
+            enabled: false,
             interval: '0 */1 * * *', // 默认每小时执行一次
             syncTypes: ['production', 'delivery'],
             timeRange: 24 // 同步最近24小时的数据
         };
         this.lastSyncResults = [];
+        this.configLoaded = false;
     }
 
     /**
      * 启动ERP数据同步服务
      */
-    start() {
+    async start() {
         if (this.isRunning) {
             console.log('ERP同步服务已在运行中');
             return;
@@ -31,8 +33,8 @@ class ErpSyncService {
         console.log('启动ERP数据同步服务...');
         this.isRunning = true;
 
-        // 加载同步配置
-        this.loadSyncConfig();
+        // 确保配置已加载
+        await this.loadSyncConfig();
 
         // 启动定时任务
         this.startScheduledSync();
@@ -64,15 +66,65 @@ class ErpSyncService {
 
     /**
      * 加载同步配置
-     * 从数据库或配置文件中加载同步设置
+     * 从数据库中获取ERP同步相关配置
      */
     async loadSyncConfig() {
         try {
-            // 这里可以从数据库中加载配置
-            // 暂时使用默认配置
-            console.log('加载ERP同步配置:', this.syncConfig);
+            if (this.configLoaded) {
+                return;
+            }
+
+            console.log('正在加载ERP同步配置...');
+            // 从配置加载器获取同步配置
+            const syncConfig = await erpConfigLoader.getErpSyncConfig();
+            
+            if (syncConfig) {
+                this.syncConfig = {
+                    enabled: syncConfig.enabled || false,
+                    interval: syncConfig.interval || 30000,
+                    syncTypes: syncConfig.syncTypes || ['production', 'delivery'],
+                    timeRange: syncConfig.timeRange || {
+                        start: '00:00',
+                        end: '23:59'
+                    }
+                };
+                this.configLoaded = true;
+                console.log('成功加载ERP同步配置:', this.syncConfig);
+            } else {
+                console.log('未找到同步配置，使用默认配置:', this.syncConfig);
+                this.configLoaded = true;
+            }
         } catch (error) {
             console.error('加载同步配置失败:', error.message);
+            console.log('将使用默认配置:', this.syncConfig);
+            this.configLoaded = true;
+        }
+    }
+
+    /**
+     * 重新加载同步配置
+     * 强制从数据库重新获取同步配置信息
+     */
+    async reloadConfig() {
+        try {
+            console.log('重新加载ERP同步配置...');
+            this.configLoaded = false;
+            // 清除配置加载器的缓存
+            erpConfigLoader.clearCache();
+            // 重新加载配置
+            await this.loadSyncConfig();
+            
+            // 如果同步服务正在运行，需要重启以应用新配置
+            if (this.isRunning) {
+                console.log('重启同步服务以应用新配置...');
+                await this.stop();
+                await this.start();
+            }
+            
+            console.log('ERP同步配置重新加载完成');
+        } catch (error) {
+            console.error('重新加载ERP同步配置失败:', error.message);
+            throw error;
         }
     }
 
