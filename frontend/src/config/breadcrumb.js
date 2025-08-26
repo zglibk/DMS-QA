@@ -402,6 +402,12 @@ export const breadcrumbConfig = {
     icon: 'SetUp'
   },
 
+  // ERP管理
+  '/admin/system/erp': {
+    title: 'ERP对接管理',
+    icon: 'Connection'
+  },
+
   // 供应商管理
   '/admin/supplier/list': {
     title: '供应商管理',

@@ -45,4 +45,75 @@ html {
     font-size: 14px; /* 移动端基础字体大小 */
   }
 }
+
+/**
+ * 表格和表单英文字体设置
+ * 为所有表格和表单元素设置英文字体族
+ */
+
+/* Element Plus 表格字体设置 */
+.el-table,
+.el-table th,
+.el-table td,
+.el-table-column,
+.el-table__header,
+.el-table__body,
+.el-table__row,
+.el-table__cell {
+  font-family: 'Segoe UI', 'Roboto', 'Arial', 'Helvetica Neue', sans-serif !important;
+}
+
+/* Element Plus 表单字体设置 */
+.el-form,
+.el-form-item,
+.el-form-item__label,
+.el-form-item__content,
+.el-input,
+.el-input__inner,
+.el-textarea,
+.el-textarea__inner,
+.el-select,
+.el-select-dropdown,
+.el-option,
+.el-date-picker,
+.el-time-picker,
+.el-cascader,
+.el-radio,
+.el-radio__label,
+.el-checkbox,
+.el-checkbox__label,
+.el-switch,
+.el-slider,
+.el-rate,
+.el-upload,
+.el-dialog,
+.el-dialog__header,
+.el-dialog__body,
+.el-dialog__footer {
+  font-family: 'Segoe UI', 'Roboto', 'Arial', 'Helvetica Neue', sans-serif !important;
+}
+
+/* 原生HTML表格和表单字体设置 */
+table,
+th,
+td,
+form,
+input,
+textarea,
+select,
+option,
+label,
+fieldset,
+legend {
+  font-family: 'Segoe UI', 'Roboto', 'Arial', 'Helvetica Neue', sans-serif !important;
+}
+
+/* 确保所有对话框内容使用英文字体 */
+.el-dialog .el-table,
+.el-dialog .el-form,
+.el-dialog .el-input,
+.el-dialog .el-select,
+.el-dialog .el-textarea {
+  font-family: 'Segoe UI', 'Roboto', 'Arial', 'Helvetica Neue', sans-serif !important;
+}
 </style>

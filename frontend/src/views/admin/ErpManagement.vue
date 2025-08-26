@@ -2,7 +2,7 @@
   <div class="erp-management">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2>ERP管理</h2>
+      <h2>ERP 对接管理</h2>
       <p class="page-description">管理ERP系统配置和同步日志</p>
     </div>
 
@@ -14,7 +14,7 @@
           @click="activeTab = 'config'"
         >
           <el-icon><Setting /></el-icon>
-          配置管理
+          对接管理
         </el-button>
         <el-button 
           :type="activeTab === 'logs' ? 'primary' : 'default'"
@@ -31,9 +31,9 @@
       <el-card>
         <template #header>
           <div class="card-header">
-            <span>ERP配置管理</span>
+            <span>ERP 对接参数</span>
             <div class="header-actions">
-              <el-button type="primary" @click="handleAddConfig">
+              <el-button v-if="canAdd" type="primary" @click="handleAddConfig">
                 <el-icon><Plus /></el-icon>
                 <span style="margin-left: 4px;">新增配置</span>
               </el-button>
@@ -54,7 +54,11 @@
           style="width: 100%"
         >
           <el-table-column prop="config_key" label="配置键" width="200" align="left" header-align="center" />
-          <el-table-column prop="config_value" label="配置值" min-width="200" align="left" header-align="center" />
+          <el-table-column prop="config_value" label="配置值" min-width="200" align="left" header-align="center">
+            <template #default="{ row }">
+              {{ formatConfigValue(row.config_key, row.config_value) }}
+            </template>
+          </el-table-column>
           <el-table-column prop="description" label="描述" min-width="250" align="left" header-align="center" />
           <el-table-column prop="created_at" label="创建时间" width="180" align="center" header-align="center">
             <template #default="{ row }">
@@ -69,11 +73,11 @@
           <el-table-column label="操作" width="150" fixed="right" align="center" header-align="center">
             <template #default="{ row }">
               <div class="action-buttons">
-                <el-button type="primary" size="small" @click="handleEditConfig(row)">
+                <el-button v-if="canEdit" type="primary" size="small" @click="handleEditConfig(row)">
                   <el-icon><Edit /></el-icon>
                   <span style="margin-left: 4px;">编辑</span>
                 </el-button>
-                <el-button type="danger" size="small" @click="handleDeleteConfig(row)">
+                <el-button v-if="canDelete" type="danger" size="small" @click="handleDeleteConfig(row)">
                   <el-icon><Delete /></el-icon>
                   <span style="margin-left: 4px;">删除</span>
                 </el-button>
@@ -104,7 +108,7 @@
           <div class="card-header">
             <span>ERP同步日志</span>
             <div class="header-actions">
-              <el-button type="primary" @click="handleManualSync" :loading="syncLoading">
+              <el-button v-if="canSync" type="primary" @click="handleManualSync" :loading="syncLoading">
                 <el-icon><Refresh /></el-icon>
                 <span style="margin-left: 4px;">手动同步</span>
               </el-button>
@@ -112,7 +116,7 @@
                 <el-icon><Refresh /></el-icon>
                 <span style="margin-left: 4px;">刷新日志</span>
               </el-button>
-              <el-button type="warning" @click="handleClearLogs">
+              <el-button v-if="canClearLogs" type="warning" @click="handleClearLogs">
                 <el-icon><Delete /></el-icon>
                 <span style="margin-left: 4px;">清理日志</span>
               </el-button>
@@ -124,14 +128,14 @@
         <div class="search-section">
           <el-form :model="logSearchForm" inline>
             <el-form-item label="同步类型">
-              <el-select v-model="logSearchForm.sync_type" placeholder="请选择同步类型" clearable>
+              <el-select v-model="logSearchForm.sync_type" placeholder="请选择同步类型" clearable style="width: 120px;">
                 <el-option label="生产数据" value="production" />
                 <el-option label="交付数据" value="delivery" />
                 <el-option label="质量指标" value="quality" />
               </el-select>
             </el-form-item>
             <el-form-item label="同步状态">
-              <el-select v-model="logSearchForm.status" placeholder="请选择状态" clearable>
+              <el-select v-model="logSearchForm.status" placeholder="请选择状态" clearable style="width: 110px;">
                 <el-option label="成功" value="success" />
                 <el-option label="失败" value="failed" />
                 <el-option label="进行中" value="running" />
@@ -286,10 +290,11 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Setting, Document, Plus, Refresh, Edit, Delete, Search, View } from '@element-plus/icons-vue'
 import api from '@/api'
+import { useUserStore } from '@/store/user'
 
 export default {
   name: 'ErpManagement',
@@ -304,6 +309,66 @@ export default {
     View
   },
   setup() {
+    // 用户store
+    const userStore = useUserStore()
+    
+    // 权限状态管理
+    const permissions = reactive({
+      canAdd: false,
+      canEdit: false,
+      canDelete: false,
+      canSync: false,
+      canClearLogs: false
+    })
+    
+    // 检查权限的方法
+    const checkPermissions = async () => {
+      try {
+        // 检查是否有管理员角色
+        const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员'))
+        
+        if (hasAdminRole) {
+          // 管理员拥有所有权限
+          permissions.canAdd = true
+          permissions.canEdit = true
+          permissions.canDelete = true
+          permissions.canSync = true
+          permissions.canClearLogs = true
+        } else {
+          // 使用异步权限检查
+          const [addPerm, editPerm, deletePerm, syncPerm, clearLogsPerm] = await Promise.all([
+            userStore.hasActionPermissionAsync('erp:config:add'),
+            userStore.hasActionPermissionAsync('erp:config:edit'),
+            userStore.hasActionPermissionAsync('erp:config:delete'),
+            userStore.hasActionPermissionAsync('erp:sync:manual'),
+            userStore.hasActionPermissionAsync('erp:logs:clear')
+          ])
+          
+          permissions.canAdd = addPerm
+          permissions.canEdit = editPerm
+          permissions.canDelete = deletePerm
+          permissions.canSync = syncPerm
+          permissions.canClearLogs = clearLogsPerm
+        }
+      } catch (error) {
+        console.error('权限检查失败:', error)
+        // 权限检查失败时，回退到角色权限
+        const hasAdminRole = userStore.hasRole && (userStore.hasRole('admin') || userStore.hasRole('系统管理员'))
+        permissions.canAdd = hasAdminRole
+        permissions.canEdit = hasAdminRole
+        permissions.canDelete = hasAdminRole
+        permissions.canSync = hasAdminRole
+        permissions.canClearLogs = hasAdminRole
+      }
+    }
+    
+    // 兼容性computed属性
+    const canAdd = computed(() => permissions.canAdd)
+    const canEdit = computed(() => permissions.canEdit)
+    const canDelete = computed(() => permissions.canDelete)
+    const canSync = computed(() => permissions.canSync)
+    const canClearLogs = computed(() => permissions.canClearLogs)
+    
     // 响应式数据
     const activeTab = ref('config')
     const configLoading = ref(false)
@@ -362,7 +427,14 @@ export default {
      */
     const formatDateTime = (dateTime) => {
       if (!dateTime) return '-'
-      return new Date(dateTime).toLocaleString('zh-CN')
+      const date = new Date(dateTime)
+      const year = date.getFullYear()
+      const month = String(date.getMonth() + 1).padStart(2, '0')
+      const day = String(date.getDate()).padStart(2, '0')
+      const hours = String(date.getHours()).padStart(2, '0')
+      const minutes = String(date.getMinutes()).padStart(2, '0')
+      const seconds = String(date.getSeconds()).padStart(2, '0')
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
     }
     
     /**
@@ -696,8 +768,25 @@ export default {
       }
     }
     
+    /**
+     * 格式化配置值显示
+     * 对敏感配置（erp_app_id和erp_app_secret）使用星号显示
+     * @param {string} configKey - 配置键
+     * @param {string} configValue - 配置值
+     * @returns {string} 格式化后的配置值
+     */
+    const formatConfigValue = (configKey, configValue) => {
+      // 如果是敏感配置，用星号显示
+      if (configKey === 'erp_app_id' || configKey === 'erp_app_secret') {
+        return configValue ? '***' + configValue.slice(-4) : ''
+      }
+      // 其他配置正常显示
+      return configValue || ''
+    }
+    
     // 组件挂载时加载数据
-    onMounted(() => {
+    onMounted(async () => {
+      await checkPermissions()
       loadConfigs()
       loadSyncLogs()
     })
@@ -727,8 +816,16 @@ export default {
       logDetailDialogVisible,
       logDetail,
       
+      // 权限相关
+      canAdd,
+      canEdit,
+      canDelete,
+      canSync,
+      canClearLogs,
+      
       // 方法
       formatDateTime,
+      formatConfigValue,
       getSyncTypeTagType,
       getSyncTypeText,
       getStatusTagType,
@@ -801,6 +898,19 @@ export default {
 .config-section,
 .logs-section {
   margin-top: 20px;
+}
+
+/* 表格样式 */
+:deep(.el-table .el-table__header-wrapper .el-table__header th) {
+  background-color: #f5f7fa !important;
+  color: #606266 !important;
+  font-weight: 600 !important;
+}
+
+:deep(.el-table th.el-table__cell) {
+  background-color: #f5f7fa !important;
+  color: #606266 !important;
+  font-weight: 600 !important;
 }
 
 /* 表格内容禁止换行 */
