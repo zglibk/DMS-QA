@@ -552,11 +552,25 @@
                       <el-button :icon="Search" @click="handleSimpleSearch" />
                     </template>
                   </el-input>
-                  <el-button type="primary" @click="showComplaintDialog = true" style="margin-left: 12px;" class="add-complaint-btn">
+                  <el-button 
+                    type="primary" 
+                    @click="showComplaintDialog = true" 
+                    style="margin-left: 12px;" 
+                    class="add-complaint-btn"
+                    :loading="permissionLoading"
+                    :disabled="!permissions.canAdd"
+                  >
                     <el-icon style="margin-right: 6px;"><DocumentCopy /></el-icon>
                     新增投诉
                   </el-button>
-                  <el-button type="success" @click="showExportDialog = true" style="margin-left: 8px;" class="export-btn">
+                  <el-button 
+                    type="success" 
+                    @click="showExportDialog = true" 
+                    style="margin-left: 8px;" 
+                    class="export-btn"
+                    :loading="permissionLoading"
+                    :disabled="!permissions.canExport"
+                  >
                     <el-icon style="margin-right: 6px;"><Download /></el-icon>
                     导出Excel
                   </el-button>
@@ -714,9 +728,33 @@
                 </template>
                 <template #default="scope">
                   <div class="action-buttons">
-                    <el-button text :icon="View" @click="viewDetail(scope.row)" title="查看详情" class="action-btn" />
-                    <el-button text :icon="Edit" @click="editRecord(scope.row)" title="修改记录" class="action-btn" />
-                    <el-button text :icon="Delete" @click="deleteRecord(scope.row)" title="删除记录" class="action-btn danger-btn" />
+                    <el-button 
+                      text 
+                      :icon="View" 
+                      @click="viewDetail(scope.row)" 
+                      title="查看详情" 
+                      class="action-btn" 
+                      :loading="permissionLoading"
+                      :disabled="!permissions.canView"
+                    />
+                    <el-button 
+                      text 
+                      :icon="Edit" 
+                      @click="editRecord(scope.row)" 
+                      title="修改记录" 
+                      class="action-btn" 
+                      :loading="permissionLoading"
+                      :disabled="!permissions.canEdit"
+                    />
+                    <el-button 
+                      text 
+                      :icon="Delete" 
+                      @click="deleteRecord(scope.row)" 
+                      title="删除记录" 
+                      class="action-btn danger-btn" 
+                      :loading="permissionLoading"
+                      :disabled="!permissions.canDelete"
+                    />
                   </div>
                 </template>
               </el-table-column>
@@ -1268,6 +1306,20 @@ import { saveAs } from 'file-saver'
 
 const router = useRouter()
 
+// 用户权限管理
+const userStore = useUserStore()
+const { user } = storeToRefs(userStore)
+
+// 权限检查状态
+const permissionLoading = ref(true)
+const permissions = reactive({
+  canAdd: false,
+  canEdit: false,
+  canDelete: false,
+  canView: false,
+  canExport: false
+})
+
 // 网站配置
 const { siteConfig, loadSiteConfig } = useSiteConfig()
 const tableData = ref([])
@@ -1480,6 +1532,53 @@ const selectDefaultFields = async () => {
     activeSelectionButton.value = ''
   }, 2000)
 }
+
+/**
+ * 检查用户权限
+ * 根据用户角色和权限配置检查各种操作权限
+ */
+const checkPermissions = async () => {
+  try {
+    permissionLoading.value = true
+    
+    // 检查各种操作权限
+    const permissionChecks = [
+      { key: 'canAdd', permission: 'complaint:internal:add' },
+      { key: 'canEdit', permission: 'complaint:internal:edit' },
+      { key: 'canDelete', permission: 'complaint:internal:delete' },
+      { key: 'canView', permission: 'complaint:internal:view' },
+      { key: 'canExport', permission: 'complaint:internal:export' }
+    ]
+    
+    // 并行检查所有权限
+    const results = await Promise.all(
+      permissionChecks.map(async ({ key, permission }) => {
+        try {
+          const hasPermission = await userStore.hasActionPermissionAsync(permission)
+          return { key, hasPermission }
+        } catch (error) {
+          console.warn(`权限检查失败 ${permission}:`, error)
+          // 权限检查失败时，默认为无权限
+          return { key, hasPermission: false }
+        }
+      })
+    )
+    
+    // 更新权限状态
+    results.forEach(({ key, hasPermission }) => {
+      permissions[key] = hasPermission
+    })
+    
+    console.log('内部投诉权限检查结果:', permissions)
+    
+  } catch (error) {
+    console.error('权限检查失败:', error)
+    ElMessage.error('权限检查失败，请刷新页面重试')
+  } finally {
+    permissionLoading.value = false
+  }
+}
+
 const statUnits = ref([])
 
 // 质量统计数据
@@ -1571,9 +1670,6 @@ const chartOptions = ref({
   workshops: [],
   defectiveItems: []
 })
-
-const userStore = useUserStore()
-const { user } = storeToRefs(userStore)
 
 const fetchProfile = async () => {
   const token = localStorage.getItem('token')
@@ -4182,6 +4278,7 @@ onMounted(() => {
   fetchOptions() // 获取下拉选项
   fetchExportFields() // 获取导出字段信息
   loadSiteConfig() // 加载网站配置
+  checkPermissions() // 检查用户权限
 
   // 初始化轮播图响应式
   updateCardsPerPage()
@@ -7375,5 +7472,50 @@ body.el-popup-parent--hidden {
     flex-direction: row;
     justify-content: center;
   }
+}
+
+/* 禁用按钮样式 */
+.el-button:disabled {
+  opacity: 0.5 !important;
+  cursor: not-allowed !important;
+  background-color: #f5f7fa !important;
+  border-color: #d4d0d0 !important;
+  color: #8a8b8d !important;
+}
+
+.el-button--primary:disabled {
+  background-color: #91c6fc !important;
+  border-color: #92c9ff !important;
+  color: #ffffff !important;
+}
+
+.el-button--success:disabled {
+  background-color: #aee694 !important;
+  border-color: #b3e19d !important;
+  color: #ffffff !important;
+}
+
+.el-button--danger:disabled {
+  background-color: #f0a4a4 !important;
+  border-color: #eea8a8 !important;
+  color: #ffffff !important;
+}
+
+/* 文本按钮禁用样式 */
+.el-button--text:disabled {
+  background-color: transparent !important;
+  color: #9fa3ac !important;
+  opacity: 0.4 !important;
+}
+
+/* 操作按钮禁用时的特殊样式 */
+.action-btn:disabled {
+  opacity: 0.3 !important;
+  cursor: not-allowed !important;
+}
+
+.danger-btn:disabled {
+  color: #ee8585 !important;
+  opacity: 0.4 !important;
 }
 </style>
