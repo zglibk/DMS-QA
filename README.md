@@ -1,8 +1,8 @@
 # DMS-QA 质量管理系统
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
-[![Version](https://img.shields.io/badge/Version-v2.2.0-green.svg)](https://gitee.com/lbk168/dms-qa)
-[![Status](https://img.shields.io/badge/Status-开发中-orange.svg)](https://gitee.com/lbk168/dms-qa)
+[![Version](https://img.shields.io/badge/Version-v2.2.2-green.svg)](https://gitee.com/lbk168/dms-qa)
+[![Status](https://img.shields.io/badge/Status-稳定版本-brightgreen.svg)](https://gitee.com/lbk168/dms-qa)
 
 ## 项目简介
 
@@ -145,19 +145,35 @@ DMS-QA/                                    # 质量管理系统根目录
     ├── scripts/                           # 后端脚本目录
     │   ├── DEPLOYMENT_SUMMARY.md          # 部署总结文档
     │   ├── README.md                      # 脚本说明文档
+    │   ├── add-complaint-type-field.sql   # 添加投诉类型字段SQL
+    │   ├── add-complaint-type-foreign-key.sql # 添加投诉类型外键SQL
     │   ├── add-development-menus.js       # 添加开发菜单脚本
     │   ├── add-development-menus.sql      # 添加开发菜单SQL
+    │   ├── add-error-type-field.sql       # 添加错误类型字段SQL
+    │   ├── add-isdeleted-field.sql        # 添加删除标记字段SQL
+    │   ├── add-publishing-exceptions-menu.js # 添加出版异常菜单脚本
+    │   ├── add-publishing-exceptions-menu.sql # 添加出版异常菜单SQL
+    │   ├── add-quality-cost-fields.sql    # 添加质量成本字段SQL
+    │   ├── add-quality-targets-menu.sql   # 添加质量目标菜单SQL
     │   ├── add-supplier-complaints-menu.sql # 添加供应商投诉菜单SQL
-    │   ├── add-supplier-complaints-new-fields.sql # 供应商投诉新字段SQL
+    │   ├── add-target-year-field.sql      # 添加目标年份字段SQL
+    │   ├── add-user-permission-menu.sql   # 添加用户权限菜单SQL
     │   ├── add-work-plan-menus.sql        # 添加工作计划菜单SQL
     │   ├── check-environment.ps1          # 环境检查PowerShell脚本
-    │   ├── create-supplier-complaints-table.sql # 创建供应商投诉表SQL
+    │   ├── check-menu-paths.js            # 检查菜单路径脚本
+    │   ├── check-quality-cost-menus.js    # 检查质量成本菜单脚本
+    │   ├── create-quality-targets-table.sql # 创建质量目标表SQL
+    │   ├── execute-add-error-type.js      # 执行添加错误类型脚本
     │   ├── execute-add-fields.js          # 执行添加字段脚本
+    │   ├── execute-add-foreign-key.js     # 执行添加外键脚本
+    │   ├── execute-add-isdeleted.js       # 执行添加删除标记脚本
     │   ├── fix-attachment-paths-v2.js     # 修复附件路径脚本v2
     │   ├── fix-attachment-paths.js        # 修复附件路径脚本
     │   ├── fix_null_bit_fields.js         # 修复空位字段脚本
     │   ├── fix_null_bit_fields.sql        # 修复空位字段SQL
     │   ├── health-monitor.ps1             # 健康监控PowerShell脚本
+    │   ├── init-publishing-exceptions.js  # 初始化出版异常脚本
+    │   ├── init-user-permissions-data.sql # 初始化用户权限数据SQL
     │   ├── init-work-plan-menus.js        # 初始化工作计划菜单脚本
     │   ├── init-work-plan-tables.sql      # 初始化工作计划表SQL
     │   ├── install-all-services.ps1       # 安装所有服务PowerShell脚本
@@ -166,16 +182,19 @@ DMS-QA/                                    # 质量管理系统根目录
     │   ├── install-nssm.ps1               # 安装NSSM服务管理器脚本
     │   ├── install-services-english.ps1   # 安装服务脚本(英文版)
     │   ├── run-init-tables.js             # 运行初始化表脚本
-    │   ├── service-manager.ps1            # 服务管理PowerShell脚本
-    │   ├── update-responsible-person-field.js # 更新责任人字段脚本
-    │   └── update-responsible-person-to-initiator.sql # 更新责任人为发起人SQL
+    │   └── service-manager.ps1            # 服务管理PowerShell脚本
     ├── services/                          # 服务层目录
     │   └── fileCopyService.js             # 文件复制服务
     ├── templates/                         # 模板文件目录
     │   └── complaint_template.xlsx        # 投诉模板Excel文件
+    ├── templates/                         # 模板文件目录
+    │   └── complaint_template.xlsx        # 投诉模板Excel文件
+    ├── test-db.js                         # 数据库连接测试脚本
+    ├── unused-scripts-cleanup-list.md     # 未使用脚本清理清单
     ├── uploads/                           # 文件上传目录
     │   ├── .gitkeep                       # Git保持目录文件
     │   ├── attachments/                   # 附件存储目录
+    │   ├── customer-complaint/            # 客户投诉文件目录
     │   └── site-images/                   # 站点图片存储目录
     └── 质量等级数据库说明.md               # 质量等级数据库说明文档
 ```
@@ -183,6 +202,17 @@ DMS-QA/                                    # 质量管理系统根目录
 ## 功能特性
 
 > 🔄 **持续更新**: 系统功能持续迭代中，新特性和优化不断加入。
+
+### v2.2.2 新增功能 ✨ (2025-01-16)
+- 🔐 **权限控制优化** - 内部投诉页面按钮权限控制从隐藏/显示模式改为启用/禁用模式，提升用户体验
+- 🎨 **按钮样式增强** - 为禁用状态的按钮添加自定义CSS样式，使禁用状态更加直观明显
+- 🚀 **自动推送脚本** - 完善Git多仓库自动推送功能，支持智能提交信息生成
+- 🧹 **项目结构优化** - 清理未使用的测试脚本，保持项目结构整洁
+
+### v2.2.2 问题修复 🔧 (2025-01-16)
+- 🔘 **按钮权限显示** - 修复按钮权限控制逻辑，无权限时显示为禁用状态而非隐藏
+- 🎨 **禁用按钮样式** - 解决禁用按钮样式无变化的问题，添加灰色样式和透明度效果
+- 📁 **脚本文件管理** - 整理和备份未使用的测试脚本文件
 
 ### v2.2.1 新增功能 ✨ (2025-01-15)
 - 🔐 **验证码安全增强** - 优化验证码过期检查逻辑，添加详细日志记录，提升登录安全性
