@@ -59,6 +59,9 @@ const supplierComplaintsRouter = require('./routes/supplierComplaints'); // 供�
 const qualityTargetsRouter = require('./routes/quality-targets'); // 质量目标管理路由
 const publishingExceptionsRouter = require('./routes/publishingExceptions'); // 出版异常管理路由
 const userPermissionsRouter = require('./routes/userPermissions'); // 用户权限管理路由
+const erpRouter = require('./routes/erp');                     // ERP系统集成路由
+const erpConfigRouter = require('./routes/erpConfig');         // ERP配置管理路由
+const erpSyncService = require('./services/erpSyncService');
 
 /**
  * 创建Express应用实例
@@ -169,6 +172,8 @@ app.use('/api/supplier-complaints', supplierComplaintsRouter);
 app.use('/api/quality-targets', qualityTargetsRouter);
 app.use('/api/publishing-exceptions', publishingExceptionsRouter);
 app.use('/api/user-permissions', userPermissionsRouter);
+app.use('/api/erp', erpRouter);
+app.use('/api/erp-config', erpConfigRouter);
 
 /**
  * 静态文件服务配置
@@ -256,6 +261,12 @@ app.listen(3001, '0.0.0.0', () => {
   console.log('文件服务器IP:', process.env.FILE_SERVER_IP || 'localhost');
   console.log('文件服务器端口:', process.env.FILE_SERVER_PORT || '8080');
   console.log('========================');
+  
+  // 启动ERP数据同步服务
+  setTimeout(() => {
+    erpSyncService.start();
+    console.log('ERP数据同步服务已启动');
+  }, 5000); // 延迟5秒启动，确保数据库连接已建立
 }).on('error', (error) => {
   console.error('服务器启动错误:', error);
   // 在生产环境中，可能需要退出进程或重试

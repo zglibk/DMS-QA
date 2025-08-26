@@ -734,7 +734,6 @@ router.get('/cost-statistics', async (req, res) => {
         WHERE ${whereClause}
         GROUP BY ${periodFormat}, CustomerCode
         ORDER BY SUM(TotalQualityCost) DESC
-        OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY
       `;
       
       const statisticsResult = await request.query(statisticsQuery);
