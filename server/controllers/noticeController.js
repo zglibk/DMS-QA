@@ -6,7 +6,7 @@
  */
 
 const sql = require('mssql');
-const { poolPromise } = require('../config/database');
+const { getConnection } = require('../config/database');
 const moment = require('moment');
 
 /**
@@ -16,7 +16,7 @@ const moment = require('moment');
  */
 const getNoticeList = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const { limit = 10, type = 'all', timeRange } = req.query;
         
         let whereClause = 'WHERE IsActive = 1';
@@ -98,7 +98,7 @@ const getNoticeList = async (req, res) => {
  */
 const getNoticeById = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const { id } = req.params;
         
         // 查询通知详情
@@ -159,7 +159,7 @@ const getNoticeById = async (req, res) => {
  */
 const createNotice = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const { title, content, type = 'notice', priority = 'normal' } = req.body;
         const userId = req.user?.id || 1; // 临时使用默认用户ID
         
@@ -209,7 +209,7 @@ const createNotice = async (req, res) => {
  */
 const updateNotice = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const { id } = req.params;
         const { title, content, type, priority } = req.body;
         
@@ -265,7 +265,7 @@ const updateNotice = async (req, res) => {
  */
 const deleteNotice = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const { id } = req.params;
         
         // 软删除通知公告

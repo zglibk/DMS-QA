@@ -6,7 +6,7 @@
  */
 
 const sql = require('mssql');
-const { poolPromise } = require('../config/database');
+const { getConnection } = require('../config/database');
 const ExcelJS = require('exceljs');
 const moment = require('moment');
 
@@ -21,7 +21,7 @@ const moment = require('moment');
  */
 const getDashboardData = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const userId = req.user?.id || 1; // 临时使用默认用户ID
         const { timeRange } = req.query; // 获取时间范围参数
         
@@ -263,7 +263,7 @@ const getDashboardData = async (req, res) => {
  */
 const getTodoList = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const userId = req.user?.id || 1; // 临时使用默认用户ID
         const { limit = 10, timeRange } = req.query;
         
@@ -324,7 +324,7 @@ const getTodoList = async (req, res) => {
  */
 const getRecentLogs = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const userId = req.user?.id || 1; // 临时使用默认用户ID
         const { limit = 10, timeRange } = req.query;
         
@@ -403,7 +403,7 @@ const getRecentLogs = async (req, res) => {
  */
 const getPlanList = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const {
             page = 1,
             pageSize = 20,
@@ -582,7 +582,7 @@ const getPlanList = async (req, res) => {
  */
 const getPlanById = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const { id } = req.params;
         
         const query = `
@@ -679,7 +679,7 @@ const getPlanById = async (req, res) => {
  */
 const createPlan = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const userId = req.user?.id || 1; // 默认用户ID为1，用于测试
         const {
             title,
@@ -810,7 +810,7 @@ const createPlan = async (req, res) => {
  */
 const updatePlan = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const { id } = req.params;
         const {
             title,
@@ -999,7 +999,7 @@ const updatePlan = async (req, res) => {
  */
 const deletePlan = async (req, res) => {
     try {
-        const pool = await poolPromise;
+        const pool = await getConnection();
         const { id } = req.params;
         
         // 开始事务处理
@@ -1104,7 +1104,7 @@ module.exports = {
             }
             
             console.log('获取数据库连接...');
-            const pool = await poolPromise;
+            const pool = await getConnection();
             console.log('数据库连接成功');
             
             // 开始事务处理
@@ -1187,7 +1187,7 @@ module.exports = {
      */
     updatePlanStatus: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             const { status } = req.body;
             
@@ -1242,7 +1242,7 @@ module.exports = {
      */
     updatePlanProgress: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             const { progress, description } = req.body;
             
@@ -1333,7 +1333,7 @@ module.exports = {
      */
     exportPlans: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const {
                 status = '',
                 priority = '',
@@ -1456,7 +1456,7 @@ module.exports = {
      */
     getLogList: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const {
                 page = 1,
                 pageSize = 20,
@@ -1573,7 +1573,7 @@ module.exports = {
      */
     getLogById: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             
             if (!id) {
@@ -1639,7 +1639,7 @@ module.exports = {
      */
     createLog: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const {
                 PlanID,
                 LogDate,
@@ -1710,7 +1710,7 @@ module.exports = {
      */
     updateLog: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             const {
                 LogDate,
@@ -1775,7 +1775,7 @@ module.exports = {
      */
     deleteLog: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             
             if (!id) {
@@ -1813,7 +1813,7 @@ module.exports = {
      */
     batchDeleteLogs: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { ids } = req.body;
             
             if (!ids || !Array.isArray(ids) || ids.length === 0) {
@@ -1855,7 +1855,7 @@ module.exports = {
      */
     exportLogs: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const {
                 planId = '',
                 userId = '',
@@ -2107,7 +2107,7 @@ module.exports = {
      */
     getAllMilestones: async (req, res) => {
         try {
-            const pool = await poolPromise;            
+            const pool = await getConnection();            
             const query = `
                 SELECT 
                     pm.ID,
@@ -2149,7 +2149,7 @@ module.exports = {
      */
     getPlanMilestones: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { planId } = req.params;
             
             if (!planId) {
@@ -2200,7 +2200,7 @@ module.exports = {
      */
     createMilestone: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { planId } = req.params;
             const { title, description, targetDate } = req.body;
             const creatorID = req.user.id; // 从认证中间件获取用户ID
@@ -2264,7 +2264,7 @@ module.exports = {
      */
     updateMilestoneStatus: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             const { isCompleted } = req.body;
             
@@ -2313,7 +2313,7 @@ module.exports = {
      */
     deleteMilestone: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             
             if (!id) {
@@ -2351,7 +2351,7 @@ module.exports = {
      */
     updateMilestone: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             const { title, description, targetDate } = req.body;
             
@@ -2411,7 +2411,7 @@ module.exports = {
      */
     getTemplateList: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const {
                 page = 1,
                 pageSize = 20,
@@ -2551,7 +2551,7 @@ module.exports = {
      */
     getTemplateById: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             
             const query = `
@@ -2629,7 +2629,7 @@ module.exports = {
     createTemplate: async (req, res) => {
         try {
             console.log('创建模板请求数据:', req.body);
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const {
                 TemplateName,
                 Description,
@@ -2736,7 +2736,7 @@ module.exports = {
      */
     updateTemplate: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             
             // 首先检查并添加缺失的字段
@@ -2919,7 +2919,7 @@ module.exports = {
      */
     deleteTemplate: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id } = req.params;
             
             // 检查模板是否存在
@@ -2997,7 +2997,7 @@ module.exports = {
             }
             
             console.log('获取数据库连接...');
-            const pool = await poolPromise;
+            const pool = await getConnection();
             console.log('数据库连接成功');
             
             // 构建删除查询
@@ -3065,7 +3065,7 @@ module.exports = {
      */
     exportTemplates: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const {
                 keyword = '',
                 category = '',
@@ -3205,7 +3205,7 @@ module.exports = {
      */
     getStatisticsOverview: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { startDate, endDate } = req.query;
             
             let dateCondition = '';
@@ -3273,7 +3273,7 @@ module.exports = {
      */
     getCompletionRateStats: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { period = 'month' } = req.query; // month, quarter, year
             
             let dateFormat, groupBy;
@@ -3331,7 +3331,7 @@ module.exports = {
      */
     getWorkloadStats: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             
             // 按工作类型统计
             const typeStatsQuery = `
@@ -3415,7 +3415,7 @@ module.exports = {
      */
     getDepartmentStats: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             
             const query = `
                 SELECT 
@@ -3465,7 +3465,7 @@ module.exports = {
      */
     exportStatistics: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { startDate, endDate } = req.query;
             
             let dateCondition = '';
@@ -3548,7 +3548,7 @@ module.exports = {
      */
     getWorkTypes: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             
             const query = `
                 SELECT 
@@ -3586,7 +3586,7 @@ module.exports = {
      */
     getAssignableUsers: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             
             const query = `
                 SELECT 
@@ -3626,7 +3626,7 @@ module.exports = {
      */
     getDepartments: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             
             const query = `
                 SELECT 
@@ -3668,7 +3668,7 @@ module.exports = {
      */
     searchPlans: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const {
                 keyword = '',
                 status = '',
@@ -3821,7 +3821,7 @@ module.exports = {
      */
     getPlanProgressHistory: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { id: planId } = req.params;
             
             if (!planId) {
@@ -3872,7 +3872,7 @@ module.exports = {
      */
     getUserStats: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { startDate, endDate } = req.query;
             
             let dateCondition = '';
@@ -3928,7 +3928,7 @@ module.exports = {
      */
     getTypeStats: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { startDate, endDate } = req.query;
             
             let dateCondition = '';
@@ -3982,7 +3982,7 @@ module.exports = {
      */
     getTrendStats: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { period = 'week', startDate, endDate } = req.query;
             
             let dateFormat, groupBy, dateRange;
@@ -4054,7 +4054,7 @@ module.exports = {
      */
     getStatusStats: async (req, res) => {
         try {
-            const pool = await poolPromise;
+            const pool = await getConnection();
             const { startDate, endDate } = req.query;
             
             let dateCondition = '';

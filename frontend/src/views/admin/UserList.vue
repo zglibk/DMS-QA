@@ -43,7 +43,9 @@
             <el-button type="primary" :icon="Plus" @click="showAddUser=true" class="primary-btn">
               新增用户
             </el-button>
-            <el-button :icon="Refresh" @click="refreshData" circle class="refresh-btn" />
+            <el-button :icon="Refresh" @click="refreshData" circle style="width: 100px;" type="warning" plain>
+              刷新
+            </el-button>
           </div>
         </el-col>
         
@@ -2958,12 +2960,6 @@ const getUserIdTagStyle = (userId) => {
 
 .export-btn {
   background: #67c23a;
-  border: none;
-  color: white;
-}
-
-.refresh-btn {
-  background: #909399;
   border: none;
   color: white;
 }
