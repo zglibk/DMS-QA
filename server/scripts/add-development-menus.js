@@ -77,7 +77,7 @@ async function addDevelopmentMenus() {
         .input('menuCode', sql.NVarChar(50), 'structure-components')
         .input('menuName', sql.NVarChar(50), '结构组件')
         .input('menuType', sql.NVarChar(10), 'menu')
-        .input('icon', sql.NVarChar(50), 'Grid')
+        .input('icon', sql.NVarChar(50), 'Cpu')
         .input('path', sql.NVarChar(200), '/development/structure-components')
         .input('component', sql.NVarChar(200), 'development/StructureComponents')
         .input('permission', sql.NVarChar(100), 'development:structure:view')

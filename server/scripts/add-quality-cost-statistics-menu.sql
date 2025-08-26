@@ -15,7 +15,7 @@ BEGIN
         [MenuCode], [MenuName], [MenuType], [Icon], [Path], [Permission], 
         [SortOrder], [Visible], [Status], [Description]
     ) VALUES (
-        'copq', N'成本损失', 'menu', 'Operation', '/copq', 'copq:view', 
+        'copq', N'成本损失', 'menu', 'Money', '/copq', 'copq:view', 
         30, 1, 1, N'质量成本损失管理模块'
     );
     PRINT N'✅ 成本损失主菜单添加成功';
@@ -45,7 +45,7 @@ BEGIN
         [ParentID], [MenuCode], [MenuName], [MenuType], [Icon], [Path], 
         [Component], [Permission], [SortOrder], [Visible], [Status], [Description]
     ) VALUES (
-        @CopqMenuId, 'quality-cost-statistics', N'质量成本统计', 'menu', 'DataAnalysis', 
+        @CopqMenuId, 'quality-cost-statistics', N'质量成本统计', 'menu', 'PieChart', 
         '/copq/quality-cost-statistics', 'copq/quality-cost-statistics/index', 
         'copq:statistics:view', 20, 1, 1, N'质量成本损失统计分析'
     );

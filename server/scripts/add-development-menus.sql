@@ -55,7 +55,7 @@ INSERT INTO [dbo].[Menus] (
     'structure-components', 
     N'结构组件', 
     'menu', 
-    'Grid', 
+    'Cpu', 
     '/development/structure-components', 
     'development/StructureComponents',
     'development:structure:view', 

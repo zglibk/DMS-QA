@@ -17,7 +17,7 @@ BEGIN
         [ParentID], [MenuCode], [MenuName], [MenuType], [Icon], [Path], 
         [Component], [Permission], [SortOrder], [Visible], [Status], [Description]
     ) VALUES (
-        NULL, 'permission', N'权限管理', 'menu', 'Setting', '/admin/permission', 
+        NULL, 'permission', N'权限管理', 'menu', 'Lock', '/admin/permission', 
         NULL, 'permission:view', 60, 1, 1, N'系统权限管理模块'
     );
     
@@ -36,7 +36,7 @@ BEGIN
         [ParentID], [MenuCode], [MenuName], [MenuType], [Icon], [Path], 
         [Component], [Permission], [SortOrder], [Visible], [Status], [Description]
     ) VALUES (
-        @PermissionParentId, 'user-permission-management', N'用户权限管理', 'menu', 'User', '/admin/user-permissions', 
+        @PermissionParentId, 'user-permission-management', N'用户权限管理', 'menu', 'Key', '/admin/user-permissions', 
         'UserPermissions', 'user-permission:view', 65, 1, 1, N'管理用户的个人权限配置'
     );
     

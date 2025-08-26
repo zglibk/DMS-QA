@@ -26,7 +26,7 @@ BEGIN
         [MenuCode], [MenuName], [MenuType], [Icon], [Path], 
         [Permission], [SortOrder], [Visible], [Status], [Description]
     ) VALUES (
-        'supplier-management', N'供应商管理', 'menu', 'OfficeBuilding', '/admin/supplier', 
+        'supplier-management', N'供应商管理', 'menu', 'Van', '/admin/supplier', 
         'supplier:view', 20, 1, 1, N'供应商管理模块，包含供应商信息、评估、投诉等功能'
     );
     
@@ -47,7 +47,7 @@ BEGIN
         [ParentID], [MenuCode], [MenuName], [MenuType], [Icon], [Path], 
         [Component], [Permission], [SortOrder], [Visible], [Status], [Description]
     ) VALUES (
-        @SupplierMenuId, 'supplier-complaints', N'供应商投诉管理', 'menu', 'Warning', '/admin/supplier/complaints', 
+        @SupplierMenuId, 'supplier-complaints', N'供应商投诉管理', 'menu', 'ChatLineSquare', '/admin/supplier/complaints', 
         'supplier/SupplierComplaints', 'supplier:complaints:view', 90, 1, 1, 
         N'供应商投诉管理，包含投诉记录、处理流程、改善验证、索赔等功能'
     );

@@ -35,37 +35,37 @@ export const breadcrumbConfig = {
   // 供应商基础信息
   '/admin/supplier/basic-info': {
     title: '供应商基础信息',
-    icon: 'Document'
+    icon: 'InfoFilled'
   },
 
   // 原材料供应商
   '/admin/supplier/materials': {
     title: '原材料供应商',
-    icon: 'Box'
+    icon: 'Package'
   },
 
   // 仪器供应商
   '/admin/supplier/equipment': {
     title: '仪器供应商',
-    icon: 'Tools'
+    icon: 'Platform'
   },
 
   // 供应商质量评估
   '/admin/supplier/quality': {
     title: '供应商质量评估',
-    icon: 'Medal'
+    icon: 'Star'
   },
 
   // 供应商绩效管理
   '/admin/supplier/performance': {
     title: '供应商绩效管理',
-    icon: 'TrendCharts'
+    icon: 'Promotion'
   },
 
   // 供应商合同管理
   '/admin/supplier/contracts': {
     title: '供应商合同管理',
-    icon: 'Files'
+    icon: 'Document'
   },
 
   // 合格供应商清单
@@ -89,19 +89,19 @@ export const breadcrumbConfig = {
   // 质量目标统计分析
   '/admin/quality/targets/analysis': {
     title: '目标统计分析',
-    icon: 'DataAnalysis'
+    icon: 'TrendCharts'
   },
 
   // 供应商审核
   '/admin/supplier/audit': {
     title: '供应商审核',
-    icon: 'View'
+    icon: 'Search'
   },
 
   // 出厂检验报告
   '/admin/supplier/inspection-reports': {
     title: '出厂检验报告',
-    icon: 'Document'
+    icon: 'DocumentChecked'
   },
   '/admin/supplier/annual-audit-plan': {
     title: '年度审核计划',
@@ -109,23 +109,23 @@ export const breadcrumbConfig = {
   },
   '/admin/supplier/audit-reports': {
     title: '审核报告管理',
-    icon: 'Files'
+    icon: 'FolderOpened'
   },
 
   // 供应商投诉管理
   '/admin/supplier/complaints': {
     title: '供应商投诉管理',
-    icon: 'Warning'
+    icon: 'Comment'
   },
 
   // 样版管理
   '/admin/sample': {
     title: '样版管理',
-    icon: 'Document'
+    icon: 'Collection'
   },
   '/admin/sample/approval': {
     title: '样品承认书',
-    icon: 'Document'
+    icon: 'DocumentCopy'
   },
   '/admin/sample/color-card': {
     title: '内部色卡',
@@ -141,19 +141,19 @@ export const breadcrumbConfig = {
   // 用户列表
   '/admin/user/list': {
     title: '用户列表',
-    icon: 'Grid'
+    icon: 'Users'
   },
 
   // 人员管理
   '/admin/person-management': {
     title: '人员管理',
-    icon: 'Avatar'
+    icon: 'People'
   },
 
   // 返工管理
   '/admin/rework-management': {
     title: '返工管理',
-    icon: 'Tools'
+    icon: 'RefreshRight'
   },
 
   // 权限管理
@@ -177,7 +177,7 @@ export const breadcrumbConfig = {
   // 角色管理
   '/admin/role-management': {
     title: '角色管理',
-    icon: 'UserFilled'
+    icon: 'UserGroup'
   },
 
   // 菜单管理
@@ -189,13 +189,13 @@ export const breadcrumbConfig = {
   // 角色列表
   '/admin/role-list': {
     title: '角色列表',
-    icon: 'User'
+    icon: 'List'
   },
 
   // 权限列表
   '/admin/permission-list': {
     title: '权限列表',
-    icon: 'Grid'
+    icon: 'Key'
   },
 
   // 设置
@@ -207,13 +207,13 @@ export const breadcrumbConfig = {
   // 数据管理
   '/admin/data-management': {
     title: '数据管理',
-    icon: 'Upload'
+    icon: 'Database'
   },
 
   // 路径格式分析
   '/admin/path-analysis': {
     title: '路径格式分析',
-    icon: 'FolderOpened'
+    icon: 'Connection'
   },
 
   // 文件拷贝测试
@@ -225,7 +225,7 @@ export const breadcrumbConfig = {
   // 系统配置
   '/admin/system-config': {
     title: '系统配置',
-    icon: 'Setting'
+    icon: 'SetUp'
   },
 
   // 主页卡片配置
@@ -237,19 +237,19 @@ export const breadcrumbConfig = {
   // 用户中心
   '/admin/profile': {
     title: '用户中心',
-    icon: 'User'
+    icon: 'UserFilled'
   },
 
   // 质量管理
   '/admin/quality': {
     title: '质量管理',
-    icon: 'Document'
+    icon: 'Medal'
   },
 
   // 质量指标
   '/admin/quality/metrics': {
     title: '质量指标',
-    icon: 'DataAnalysis'
+    icon: 'Odometer'
   },
 
   // 质量异常数据导入
@@ -261,25 +261,25 @@ export const breadcrumbConfig = {
   // 质量报告
   '/admin/quality/reports': {
     title: '质量报告',
-    icon: 'Document'
+    icon: 'Notebook'
   },
 
   // 投诉管理
   '/admin/complaint': {
     title: '投诉管理',
-    icon: 'Warning'
+    icon: 'MessageBox'
   },
 
   // 质量管理 - 投诉管理
   '/admin/quality/complaint': {
     title: '投诉管理',
-    icon: 'Warning'
+    icon: 'WarningFilled'
   },
 
   // 内部投诉
   '/admin/quality/complaint/internal': {
     title: '内部投诉',
-    icon: 'User'
+    icon: 'ChatDotRound'
   },
 
   // 客户投诉
@@ -291,13 +291,13 @@ export const breadcrumbConfig = {
   // 投诉列表
   '/admin/complaint/list': {
     title: '投诉列表',
-    icon: 'List'
+    icon: 'ChatLineSquare'
   },
 
   // 投诉分析
   '/admin/complaint/analysis': {
     title: '投诉分析',
-    icon: 'DataAnalysis'
+    icon: 'PieChart'
   },
 
   // 材料管理
@@ -309,19 +309,19 @@ export const breadcrumbConfig = {
   // 材料列表
   '/admin/material/list': {
     title: '材料列表',
-    icon: 'List'
+    icon: 'Grid'
   },
 
   // 材料价格
   '/admin/material/price': {
     title: '材料价格',
-    icon: 'Money'
+    icon: 'PriceTag'
   },
 
   // 生产管理
   '/admin/production': {
     title: '生产管理',
-    icon: 'Tools'
+    icon: 'Operation'
   },
 
   // 质量成本损失
@@ -333,67 +333,79 @@ export const breadcrumbConfig = {
   // 质量成本损失 - 物料单价
   '/admin/copq/material-price': {
     title: '物料单价',
-    icon: 'Money'
+    icon: 'Coin'
   },
 
   // 质量成本统计
   '/admin/copq/cost-statistics': {
     title: '质量成本统计',
-    icon: 'DataAnalysis'
+    icon: 'Histogram'
   },
 
   // 质量成本统计（数据库菜单路径）
   '/admin/copq/quality-cost-statistics': {
     title: '质量成本统计',
-    icon: 'DataAnalysis'
+    icon: 'TrendCharts'
   },
 
   // 系统管理
   '/admin/system': {
     title: '系统管理',
-    icon: 'Setting'
+    icon: 'Tools'
   },
 
   // 系统管理 - 用户管理
   '/admin/system/user': {
     title: '用户管理',
-    icon: 'User'
+    icon: 'Management'
   },
 
   // 系统管理 - 角色管理
   '/admin/system/role': {
     title: '角色管理',
-    icon: 'UserFilled'
+    icon: 'SetUp'
   },
 
   // 系统管理 - 菜单管理
   '/admin/system/menu': {
     title: '菜单管理',
-    icon: 'Menu'
+    icon: 'Operation'
   },
 
   // 系统管理 - 部门管理
   '/admin/system/department': {
     title: '部门管理',
-    icon: 'OfficeBuilding'
+    icon: 'Coordinate'
   },
 
   // 系统管理 - 岗位管理
   '/admin/system/position': {
     title: '岗位管理',
-    icon: 'Briefcase'
+    icon: 'Suitcase'
+  },
+
+  // 系统管理 - 用户权限管理
+  '/admin/system/user-permissions': {
+    title: '用户权限管理',
+    icon: 'Key'
+  },
+
+  // 用户权限管理（独立路径）
+  '/admin/user-permissions': {
+    title: '用户权限管理',
+    icon: 'Key'
   },
 
   // 系统配置
   '/admin/system/config': {
     title: '系统配置',
-    icon: 'Setting'
+    icon: 'SetUp'
   },
 
   // 供应商管理
   '/admin/supplier/list': {
     title: '供应商管理',
-    icon: 'Briefcase'
+    icon: 'Shop'
   },
 
   // 二次开发
@@ -405,7 +417,7 @@ export const breadcrumbConfig = {
   // 二次开发 - 结构组件
   '/admin/development/structure-components': {
     title: '结构组件',
-    icon: 'Grid'
+    icon: 'Cpu'
   },
 
   // 工作计划管理
@@ -429,7 +441,7 @@ export const breadcrumbConfig = {
   // 计划详情
   '/admin/work-plan/plans/detail': {
     title: '计划详情',
-    icon: 'Document'
+    icon: 'View'
   },
 
   // 工作日志
@@ -441,7 +453,7 @@ export const breadcrumbConfig = {
   // 日志详情
   '/admin/work-plan/logs/detail': {
     title: '日志详情',
-    icon: 'Document'
+    icon: 'Reading'
   },
 
   // 进度跟踪
@@ -465,7 +477,7 @@ export const breadcrumbConfig = {
   // 统计分析
   '/admin/work-plan/statistics': {
     title: '统计分析',
-    icon: 'DataAnalysis'
+    icon: 'DataBoard'
   },
 
   // 出版异常管理
@@ -676,17 +688,17 @@ function findPatternConfig(currentPath, pathSegments, currentIndex) {
       if (basePath.includes('/plans')) {
         return {
           title: '计划详情',
-          icon: 'Document'
+          icon: 'View'
         }
       } else if (basePath.includes('/logs')) {
         return {
           title: '日志详情',
-          icon: 'Document'
+          icon: 'Reading'
         }
       } else if (basePath.includes('/templates')) {
         return {
           title: '模板详情',
-          icon: 'Document'
+          icon: 'Files'
         }
       }
     }
