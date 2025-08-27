@@ -3,7 +3,7 @@
     <!-- 页面标题和操作按钮 -->
     <div class="page-header">
       <div class="header-left">
-        <h2>通知公告管理</h2>
+        <h2>通知公告</h2>
         <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="unread-badge">
           <el-icon><Bell /></el-icon>
         </el-badge>
