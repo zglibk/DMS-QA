@@ -245,6 +245,38 @@ const customerComplaintUpload = multer({
   }
 });
 
+// 配置multer存储 - 通知图片专用
+const noticeImageStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    // 通知图片存储目录
+    const noticeImagesDir = path.join(uploadDir, 'notice-images');
+    
+    // 确保通知图片目录存在
+    if (!fs.existsSync(noticeImagesDir)) {
+      fs.mkdirSync(noticeImagesDir, { recursive: true });
+    }
+    
+    cb(null, noticeImagesDir);
+  },
+  filename: function (req, file, cb) {
+    // 生成唯一文件名：notice-时间戳-随机字符串.扩展名
+    const timestamp = Date.now();
+    const randomStr = Math.random().toString(36).substring(2, 8);
+    const extension = path.extname(file.originalname);
+    
+    cb(null, `notice-${timestamp}-${randomStr}${extension}`);
+  }
+});
+
+// 创建multer实例 - 通知图片专用
+const noticeImageUpload = multer({
+  storage: noticeImageStorage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024, // 5MB限制
+  }
+});
+
 // 创建multer实例 - 自定义路径投诉附件
 const customPathAttachmentUpload = multer({
   storage: customPathAttachmentStorage,
@@ -697,6 +729,65 @@ router.post('/rework-attachment', customPathAttachmentUpload.single('file'), (re
     res.status(500).json({
       success: false,
       message: error.message || '返工记录附件上传失败'
+    });
+  }
+});
+
+// 通知图片上传接口
+router.post('/notice-image', noticeImageUpload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: '请选择要上传的图片'
+      });
+    }
+
+    // 处理原始文件名的编码问题
+    let correctedOriginalName;
+    try {
+      // 尝试解码文件名，处理中文字符编码问题
+      correctedOriginalName = Buffer.from(req.file.originalname, 'latin1').toString('utf8');
+    } catch (error) {
+      // 如果解码失败，使用原始文件名
+      correctedOriginalName = req.file.originalname;
+    }
+
+    // 构建完整的文件信息对象
+    const fileInfo = {
+      id: `notice_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+      originalName: correctedOriginalName,
+      filename: req.file.filename,
+      relativePath: `notice-images/${req.file.filename}`,
+      accessUrl: `/files/notice-images/${req.file.filename}`,
+      fullUrl: `${req.protocol}://${req.get('host')}:8080/files/notice-images/${req.file.filename}`,
+      fileSize: req.file.size,
+      mimeType: req.file.mimetype,
+      uploadTime: new Date().toISOString(),
+      fileType: 'image',
+      category: 'notice'
+    };
+
+    console.log('通知图片上传成功:', fileInfo);
+
+    res.json({
+      success: true,
+      message: '通知图片上传成功',
+      fileInfo: fileInfo,
+      // 保持向后兼容
+      url: fileInfo.accessUrl,
+      data: {
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        path: req.file.path,
+        size: req.file.size
+      }
+    });
+  } catch (error) {
+    console.error('通知图片上传失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '通知图片上传失败'
     });
   }
 });

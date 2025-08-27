@@ -139,30 +139,45 @@
 
         <!-- 通知公告 -->
         <div class="notice-section">
-          <h3 class="section-title">通知公告</h3>
+          <div class="section-header">
+            <h3 class="section-title">通知公告</h3>
+            <el-badge :value="unreadCount" :hidden="unreadCount === 0" class="unread-badge">
+              <el-icon><Bell /></el-icon>
+            </el-badge>
+          </div>
           <el-card class="notice-card">
             <div class="notice-list">
               <div 
                 v-for="notice in notices" 
-                :key="notice.id" 
+                :key="notice.ID" 
                 class="notice-item"
                 @click="viewNotice(notice)"
               >
                 <div class="notice-header">
-                  <span class="notice-title">{{ notice.title }}</span>
+                  <div class="notice-title-wrapper">
+                    <el-badge :is-dot="!notice.IsRead" :hidden="notice.IsRead" type="danger" class="read-indicator">
+                      <span :class="{ 'notice-title': true, 'unread': !notice.IsRead }">{{ notice.Title }}</span>
+                    </el-badge>
+                    <el-tag v-if="notice.IsSticky" type="warning" size="small" class="sticky-tag">
+                      置顶
+                    </el-tag>
+                  </div>
                   <el-tag 
-                    :type="notice.type === 'urgent' ? 'danger' : notice.type === 'important' ? 'warning' : 'info'" 
+                    :type="getNoticeTypeTag(notice.Type)" 
                     size="small"
                   >
-                    {{ notice.typeLabel }}
+                    {{ getNoticeTypeLabel(notice.Type) }}
                   </el-tag>
                 </div>
-                <div class="notice-content">{{ notice.content }}</div>
-                <div class="notice-time">{{ notice.time }}</div>
+                <div class="notice-content">{{ notice.Content }}</div>
+                <div class="notice-time">{{ formatNoticeTime(notice.PublishDate) }}</div>
               </div>
             </div>
             <div class="notice-more">
-              <el-button :link="true" @click="navigateTo('/admin/system/notices')">查看更多</el-button>
+              <el-button :link="true" @click="navigateTo('/admin/system/notices')">
+                查看更多
+                <el-badge v-if="unreadCount > 0" :value="unreadCount" class="more-badge" />
+              </el-button>
             </div>
           </el-card>
         </div>
@@ -220,8 +235,10 @@ import {
   DataAnalysis, 
   Medal, 
   Money, 
-  Setting 
+  Setting,
+  Bell 
 } from '@element-plus/icons-vue'
+import api from '@/utils/api'
 
 // 路由和用户状态
 const router = useRouter()
@@ -496,40 +513,8 @@ const systemStats = ref([
 ])
 
 // 通知公告数据
-const notices = ref([
-  {
-    id: 1,
-    title: '系统维护通知',
-    content: '系统将于本周六凌晨2:00-4:00进行例行维护，请提前保存数据。',
-    type: 'important',
-    typeLabel: '重要',
-    time: '2024-01-15 09:30'
-  },
-  {
-    id: 2,
-    title: '新功能上线',
-    content: '质量数据批量导入功能已上线，支持Excel格式文件导入。',
-    type: 'info',
-    typeLabel: '通知',
-    time: '2024-01-14 14:20'
-  },
-  {
-    id: 3,
-    title: '安全提醒',
-    content: '请定期更换密码，确保账户安全。建议使用强密码组合。',
-    type: 'urgent',
-    typeLabel: '紧急',
-    time: '2024-01-13 16:45'
-  },
-  {
-    id: 4,
-    title: '培训通知',
-    content: '质量管理系统操作培训将于下周三下午2点在会议室举行。',
-    type: 'info',
-    typeLabel: '通知',
-    time: '2024-01-12 11:15'
-  }
-])
+const notices = ref([])
+const unreadCount = ref(0)
 
 /**
  * 导航到指定路径
@@ -540,16 +525,103 @@ const navigateTo = (path) => {
 }
 
 /**
+ * 获取通知列表
+ */
+const getNoticeList = async () => {
+  try {
+    const response = await api.get('/notice', {
+      params: {
+        page: 1,
+        size: 5, // 首页只显示5条
+        readStatus: '' // 显示所有通知
+      }
+    })
+    if (response.data.success) {
+      notices.value = response.data.data || []
+    }
+  } catch (error) {
+    console.error('获取通知列表失败:', error)
+  }
+}
+
+/**
+ * 获取未读通知数量
+ */
+const getUnreadCount = async () => {
+  try {
+    const response = await api.get('/notice/unread/count')
+    if (response.data.success) {
+      unreadCount.value = response.data.data || 0
+    }
+  } catch (error) {
+    console.error('获取未读数量失败:', error)
+  }
+}
+
+/**
  * 查看通知详情
  * @param {Object} notice - 通知对象
  */
-const viewNotice = (notice) => {
-  ElMessage({
-    message: `查看通知：${notice.title}`,
-    type: 'info',
-    duration: 2000
+const viewNotice = async (notice) => {
+  try {
+    // 如果是未读通知，先标记为已读
+    if (!notice.IsRead) {
+      await api.post(`/notice/${notice.ID}/read`)
+      // 更新本地状态
+      notice.IsRead = true
+      await getUnreadCount()
+    }
+    
+    // 跳转到通知管理页面查看详情
+    navigateTo('/admin/system/notices')
+  } catch (error) {
+    console.error('查看通知失败:', error)
+    ElMessage.error('查看通知失败')
+  }
+}
+
+/**
+ * 获取通知类型标签样式
+ * @param {string} type - 通知类型
+ * @returns {string} 标签样式
+ */
+const getNoticeTypeTag = (type) => {
+  const typeMap = {
+    'system': 'info',
+    'important': 'danger',
+    'general': 'success'
+  }
+  return typeMap[type] || 'info'
+}
+
+/**
+ * 获取通知类型标签文本
+ * @param {string} type - 通知类型
+ * @returns {string} 标签文本
+ */
+const getNoticeTypeLabel = (type) => {
+  const typeMap = {
+    'system': '系统通知',
+    'important': '重要公告',
+    'general': '一般通知'
+  }
+  return typeMap[type] || type
+}
+
+/**
+ * 格式化通知时间
+ * @param {string} dateStr - 日期字符串
+ * @returns {string} 格式化后的时间
+ */
+const formatNoticeTime = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
   })
-  // 这里可以添加打开通知详情的逻辑
 }
 
 /**
@@ -682,8 +754,18 @@ const handleMouseLeave = () => {
 
 // 组件挂载时的初始化
 onMounted(() => {
+  // 获取通知数据
+  getNoticeList()
+  getUnreadCount()
+  
   // 每30秒更新一次用户登录记录数据
   setInterval(updateSystemStats, 30000)
+  
+  // 每分钟更新一次通知数据
+  setInterval(() => {
+    getNoticeList()
+    getUnreadCount()
+  }, 60000)
   
   // 延迟启动滚动，确保表格已渲染
   setTimeout(() => {
@@ -916,6 +998,18 @@ onBeforeUnmount(() => {
 }
 
 /* 通知公告样式 */
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.unread-badge {
+  font-size: 18px;
+  color: #409eff;
+}
+
 .notice-card {
   border-radius: 8px;
   border: none;
@@ -952,6 +1046,19 @@ onBeforeUnmount(() => {
   margin-bottom: 4px;
 }
 
+.notice-title-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  margin-right: 10px;
+}
+
+.read-indicator {
+  display: inline-flex;
+  align-items: center;
+}
+
 .notice-title {
   font-size: 0.85rem;
   font-weight: 600;
@@ -960,6 +1067,16 @@ onBeforeUnmount(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  transition: color 0.3s;
+}
+
+.notice-title.unread {
+  font-weight: 700;
+  color: #303133;
+}
+
+.sticky-tag {
+  margin-left: 8px;
 }
 
 .notice-content {
@@ -982,6 +1099,11 @@ onBeforeUnmount(() => {
   text-align: center;
   padding: 8px;
   border-top: 1px solid #f0f0f0;
+  position: relative;
+}
+
+.more-badge {
+  margin-left: 8px;
 }
 
 /* 系统信息样式 */

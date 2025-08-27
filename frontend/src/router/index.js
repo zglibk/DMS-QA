@@ -256,6 +256,11 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
+        path: 'system/notices',
+        component: () => import('../views/admin/NoticeManagement.vue'), // 通知公告管理页面
+        meta: { requiresAuth: true }
+      },
+      {
         path: 'system/user-permissions',
         component: () => import('../views/UserPermissions.vue'), // 用户权限管理页面
         meta: { requiresAuth: true }

@@ -203,16 +203,26 @@
                 <el-col :span="21">
                   <div class="notice-content">
                     <div class="notice-scroll" ref="noticeScrollRef">
-                      <div class="notice-item" v-for="(notice, index) in noticeList" :key="index">
-                        <div class="notice-dot"></div>
-                          <div class="notice-info">
-                            <div class="notice-header">
-                              <div class="notice-text">{{ notice.Title }}</div>
-                              <div class="notice-time">{{ notice.PublishDate }}</div>
+                      <div 
+                        class="notice-item" 
+                        v-for="(notice, index) in noticeList" 
+                        :key="index"
+                        :class="{ 'unread': !notice.IsRead }"
+                        @click="viewNoticeFromDashboard(notice)"
+                      >
+                        <div class="notice-dot" :class="{ 'unread': !notice.IsRead }"></div>
+                        <div class="notice-info">
+                          <div class="notice-header">
+                            <div class="notice-text-wrapper">
+                              <div class="notice-text" :class="{ 'unread': !notice.IsRead }">{{ notice.Title }}</div>
+                              <el-tag v-if="notice.IsSticky" type="warning" size="small" class="sticky-tag">置顶</el-tag>
+                              <el-tag :type="getNoticeTypeTag(notice.Type)" size="small" class="type-tag">{{ getNoticeTypeLabel(notice.Type) }}</el-tag>
                             </div>
-                            <div class="notice-content">{{ notice.Content }}</div>
+                            <div class="notice-time">{{ formatNoticeTime(notice.PublishDate) }}</div>
                           </div>
+                          <div class="notice-content">{{ notice.Content }}</div>
                         </div>
+                      </div>
                     </div>
                   </div>
               </el-col>
@@ -845,7 +855,9 @@ const getRecentLogs = async (timeRange = null) => {
 const getNoticeList = async (timeRange = null) => {
   try {
     const params = {
-      limit: 5
+      page: 1,
+      size: 5, // 限制显示5条
+      readStatus: '' // 显示所有通知
     }
     if (timeRange) {
       params.timeRange = timeRange
@@ -861,6 +873,113 @@ const getNoticeList = async (timeRange = null) => {
     // 保持空数组，不使用模拟数据
     noticeList.value = []
   }
+}
+
+/**
+ * 获取未读通知数量
+ */
+const getUnreadNoticeCount = async () => {
+  try {
+    const response = await api.get('/notice/unread/count')
+    if (response.data.success) {
+      // 这里可以用于更新全局未读数量状态
+      return response.data.data || 0
+    }
+  } catch (error) {
+    console.error('获取未读通知数量失败:', error)
+    return 0
+  }
+}
+
+/**
+ * 查看通知详情（从工作台）
+ * @param {Object} notice - 通知对象
+ */
+const viewNoticeFromDashboard = async (notice) => {
+  try {
+    // 如果是未读通知，先标记为已读
+    if (!notice.IsRead) {
+      await api.post(`/notice/${notice.ID}/read`)
+      // 更新本地状态
+      notice.IsRead = true
+    }
+    
+    // 可以在这里添加显示通知详情的逻辑
+    // 或者跳转到通知管理页面
+    ElMessage({
+      message: `查看通知：${notice.Title}`,
+      type: 'info',
+      duration: 2000
+    })
+  } catch (error) {
+    console.error('查看通知失败:', error)
+    ElMessage.error('查看通知失败')
+  }
+}
+
+/**
+ * 获取通知类型标签样式
+ * @param {string} type - 通知类型
+ * @returns {string} 标签类型
+ */
+const getNoticeTypeTag = (type) => {
+  const typeMap = {
+    'system': 'info',
+    'announcement': 'success', 
+    'urgent': 'danger',
+    'maintenance': 'warning'
+  }
+  return typeMap[type] || 'info'
+}
+
+/**
+ * 获取通知类型标签文本
+ * @param {string} type - 通知类型
+ * @returns {string} 标签文本
+ */
+const getNoticeTypeLabel = (type) => {
+  const labelMap = {
+    'system': '系统',
+    'announcement': '公告',
+    'urgent': '紧急',
+    'maintenance': '维护'
+  }
+  return labelMap[type] || '通知'
+}
+
+/**
+ * 格式化通知时间
+ * @param {string} dateStr - 日期字符串
+ * @returns {string} 格式化后的时间
+ */
+const formatNoticeTime = (dateStr) => {
+  if (!dateStr) return ''
+  
+  const date = new Date(dateStr)
+  const now = new Date()
+  const diff = now - date
+  
+  // 小于1分钟
+  if (diff < 60000) {
+    return '刚刚'
+  }
+  // 小于1小时
+  if (diff < 3600000) {
+    return `${Math.floor(diff / 60000)}分钟前`
+  }
+  // 小于1天
+  if (diff < 86400000) {
+    return `${Math.floor(diff / 3600000)}小时前`
+  }
+  // 小于7天
+  if (diff < 604800000) {
+    return `${Math.floor(diff / 86400000)}天前`
+  }
+  // 超过7天显示具体日期
+  return date.toLocaleDateString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit'
+  })
 }
 
 /**
@@ -885,13 +1004,27 @@ const initBarChart = () => {
  * 更新ECharts柱状图数据
  */
 const updateBarChart = () => {
-  if (!barChart || !dashboardData.value.planStats) return
+  // 严格的数据验证
+  if (!barChart) {
+    return   // barChart实例不存在，跳过更新
+  }
+  
+  if (!dashboardData.value || !dashboardData.value.planStats) {
+    return  // dashboardData.planStats不存在，跳过图表更新
+  }
   
   const stats = dashboardData.value.planStats
+  
+  // 确保所有数值都是有效的数字
+  const safeValue = (val) => {
+    const num = Number(val)
+    return isNaN(num) ? 0 : num
+  }
+  
   const data = [
     {
       name: '进行中',
-      value: stats.inProgressPlans || 0,
+      value: safeValue(stats.inProgressPlans),
       itemStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
           { offset: 0, color: '#4A90E2' },
@@ -901,7 +1034,7 @@ const updateBarChart = () => {
     },
     {
        name: '已完成',
-       value: stats.completedPlans || 0,
+       value: safeValue(stats.completedPlans),
        itemStyle: {
          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
            { offset: 0, color: '#67C23A' },
@@ -911,7 +1044,7 @@ const updateBarChart = () => {
      },
     {
       name: '已逾期',
-      value: stats.overduePlans || 0,
+      value: safeValue(stats.overduePlans),
       itemStyle: {
         color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
           { offset: 0, color: '#D0021B' },
@@ -921,77 +1054,95 @@ const updateBarChart = () => {
     }
   ]
   
-  const option = {
-    grid: {
-      left: '0%',
-      right: '0%',
-      top: '20%',
-      bottom: '25%'
-    },
-    xAxis: {
-      type: 'category',
-      data: data.map(item => item.name),
-      axisLine: {
-        show: true,
-        lineStyle: {
-          color: '#e0e0e0'
-        }
-      },
-      axisTick: {
-        show: false
-      },
-      axisLabel: {
-        color: '#666',
-        fontSize: 12
-      },
-      splitLine: {
-        show: true,
-        lineStyle: {
-          color: '#e0e0e0',
-          type: 'dashed',
-          width: 1
-        }
-      }
-    },
-    yAxis: {
-      type: 'value',
-      show: true,
-      axisLine: {
-        show: false
-      },
-      axisTick: {
-        show: false
-      },
-      axisLabel: {
-        show: false
-      },
-      splitLine: {
-        show: false
-      }
-    },
-    series: [{
-      type: 'bar',
-      data: data,
-      barWidth: '40%',
-      label: {
-        show: true,
-        position: 'top',
-        formatter: '{c}项',
-        color: '#333',
-        fontFamily: 'Microsoft YaHei, Arial, sans-serif',
-        fontSize: 12,
-        fontWeight: 'normal'
-      },
-      emphasis: {
-        itemStyle: {
-          shadowBlur: 10,
-          shadowColor: 'rgba(0, 0, 0, 0.3)'
-        }
-      }
-    }]
+  // 验证数据完整性
+  const hasValidData = data.every(item => 
+    item.name && 
+    typeof item.value === 'number' && 
+    !isNaN(item.value) &&
+    item.itemStyle
+  )
+  
+  if (!hasValidData) {
+    console.error('❌ ECharts数据验证失败，跳过更新')
+    return
   }
   
-  barChart.setOption(option)
+  try {
+    const option = {
+      grid: {
+        left: '0%',
+        right: '0%',
+        top: '20%',
+        bottom: '25%'
+      },
+      xAxis: {
+        type: 'category',
+        data: data.map(item => item.name),
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#e0e0e0'
+          }
+        },
+        axisTick: {
+          show: false
+        },
+        axisLabel: {
+          color: '#666',
+          fontSize: 12
+        },
+        splitLine: {
+          show: true,
+          lineStyle: {
+            color: '#e0e0e0',
+            type: 'dashed',
+            width: 1
+          }
+        }
+      },
+      yAxis: {
+        type: 'value',
+        show: true,
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        },
+        axisLabel: {
+          show: false
+        },
+        splitLine: {
+          show: false
+        }
+      },
+      series: [{
+        type: 'bar',
+        data: data,
+        barWidth: '40%',
+        label: {
+          show: true,
+          position: 'top',
+          formatter: '{c}项',
+          color: '#333',
+          fontFamily: 'Microsoft YaHei, Arial, sans-serif',
+          fontSize: 12,
+          fontWeight: 'normal'
+        },
+        emphasis: {
+          itemStyle: {
+            shadowBlur: 10,
+            shadowColor: 'rgba(0, 0, 0, 0.3)'
+          }
+        }
+      }]
+    }
+    
+    barChart.setOption(option, true) // 使用notMerge=true确保完全替换
+    console.log('✅ ECharts图表更新成功')
+  } catch (error) {
+    console.error('❌ ECharts setOption失败:', error)
+  }
 }
 
 /**
@@ -2576,11 +2727,21 @@ onUnmounted(() => {
   transition: all 0.2s ease;
   flex-shrink: 0;
   min-width: 300px;
+  cursor: pointer;
 }
 
 .notice-item:hover {
   background: rgba(64, 158, 255, 0.1);
   border-radius: 6px;
+}
+
+.notice-item.unread {
+  background: rgba(255, 193, 7, 0.05);
+  border-left: 3px solid #ffc107;
+}
+
+.notice-item.unread:hover {
+  background: rgba(255, 193, 7, 0.15);
 }
 
 .notice-dot {
@@ -2590,6 +2751,11 @@ onUnmounted(() => {
   border-radius: 50%;
   flex-shrink: 0;
   margin-top: 6px;
+}
+
+.notice-dot.unread {
+  background: #ffc107;
+  box-shadow: 0 0 6px rgba(255, 193, 7, 0.5);
 }
 
 .notice-info {
@@ -2602,7 +2768,15 @@ onUnmounted(() => {
 .notice-header {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   margin-bottom: 4px;
+}
+
+.notice-text-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
 }
 
 .notice-text {
@@ -2610,6 +2784,19 @@ onUnmounted(() => {
   color: #2c3e50;
   line-height: 1.5;
   font-weight: 500;
+}
+
+.notice-text.unread {
+  font-weight: 600;
+  color: #1a1a1a;
+}
+
+.sticky-tag {
+  margin-left: 4px;
+}
+
+.type-tag {
+  margin-left: 4px;
 }
 
 .notice-content {

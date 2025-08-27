@@ -116,4 +116,16 @@ legend {
 .el-dialog .el-textarea {
   font-family: 'Segoe UI', 'Roboto', 'Arial', 'Helvetica Neue', sans-serif !important;
 }
+
+/* 全局TinyMCE z-index终极解决方案 - 确保在任何情况下都显示在最上层 */
+.tox,
+.tox-tinymce,
+.tox-editor-container,
+.tox-editor-header,
+.tox-toolbar,
+.tox-toolbar__group,
+.tox-menubar,
+.tox-statusbar {
+  z-index: 100000 !important;
+} 
 </style>

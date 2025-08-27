@@ -12,10 +12,6 @@ const { authenticateToken, checkPermission } = require('../middleware/auth');
 
 // 添加请求日志中间件
 router.use((req, res, next) => {
-  // console.log(`=== Notice路由收到请求 ===`)
-  // console.log(`方法: ${req.method}`)
-  // console.log(`路径: ${req.path}`)
-  // console.log(`完整URL: ${req.originalUrl}`)
   next()
 })
 
@@ -43,7 +39,7 @@ router.get('/:id', noticeController.getNoticeById);
  */
 router.post('/', 
     authenticateToken, 
-    // checkPermission('notice:add'),
+    checkPermission('notice:add'),
     noticeController.createNotice
 );
 
@@ -54,7 +50,7 @@ router.post('/',
  */
 router.put('/:id', 
     authenticateToken, 
-    // checkPermission('notice:edit'),
+    checkPermission('notice:edit'),
     noticeController.updateNotice
 );
 
@@ -65,8 +61,39 @@ router.put('/:id',
  */
 router.delete('/:id', 
     authenticateToken, 
-    // checkPermission('notice:delete'),
+    checkPermission('notice:delete'),
     noticeController.deleteNotice
 );
+
+// =====================================================
+// 通知阅读状态管理路由
+// =====================================================
+
+/**
+ * 获取未读通知数量
+ * GET /api/notice/unread/count
+ */
+router.get('/unread/count', noticeController.getUnreadCount);
+
+/**
+ * 批量标记为已读
+ * POST /api/notice/batch/read
+ * 请求体：{ noticeIds?: number[] } - 可选，不提供则标记所有未读
+ */
+router.post('/batch/read', noticeController.markAllAsRead);
+
+
+
+/**
+ * 标记通知为已读
+ * POST /api/notice/:id/read
+ */
+router.post('/:id/read', noticeController.markAsRead);
+
+/**
+ * 确认阅读通知（用于重要通知）
+ * POST /api/notice/:id/confirm
+ */
+router.post('/:id/confirm', noticeController.confirmRead);
 
 module.exports = router;
