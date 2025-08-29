@@ -29,7 +29,7 @@
           <el-icon><User /></el-icon>
         </template>
       </el-avatar>
-      <span class="username" @click="goProfile">{{ user?.Username || '用户' }}</span>
+      <span class="username" @click="goProfile">{{ userStore.getUserDisplayName() }}</span>
       <el-dropdown>
         <span class="el-dropdown-link">
           <el-icon><ArrowDown /></el-icon>

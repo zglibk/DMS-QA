@@ -490,6 +490,15 @@ export const useUserStore = defineStore('user', {
     },
 
     /**
+     * 获取用户显示名称
+     * 功能：优先显示用户姓名，没有姓名时显示用户名
+     * @returns {string} 用户显示名称
+     */
+    getUserDisplayName() {
+      return this.user?.RealName || this.user?.realName || this.user?.Username || this.user?.username || '用户'
+    },
+
+    /**
      * 获取未读通知数量
      * 功能：从后端API获取当前用户的未读通知数量并更新全局状态
      */
