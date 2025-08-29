@@ -25,110 +25,22 @@
               <component :is="isFullscreen ? Aim : FullScreen" />
             </el-icon>
           </span>
-          <el-dropdown ref="notificationDropdown" trigger="click" placement="bottom-end">
-            <div class="notification-bell">
-              <el-icon class="bell-icon"><BellFilled /></el-icon>
-              <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
-            </div>
-            <template #dropdown>
-              <div class="notify-dropdown-card">
-                <!-- 固定标题栏 -->
-                <div class="notify-header">
-                  <div class="notify-title">未读消息</div>
-                </div>
-                
-                <!-- 可滚动消息区域 -->
-                <div class="notify-content">
-                  <el-timeline v-if="notifyList.length > 0">
-                    <el-timeline-item v-for="(msg, idx) in notifyList" :key="msg.id" :timestamp="msg.time" :color="msg.color">
-                      <div class="notify-item" @click="handleNoticeClick(msg)" style="cursor: pointer;">
-                        <span class="notify-msg-title">{{ msg.title }}</span>
-                        <div class="notify-msg-content">{{ msg.content }}</div>
-                      </div>
-                    </el-timeline-item>
-                  </el-timeline>
-                  <div v-else class="no-notifications">
-                    <el-empty description="暂无未读通知" :image-size="80" />
-                  </div>
-                </div>
-                
-                <!-- 固定底部栏 -->
-                <div class="notify-footer">
-                  <el-divider style="margin: 8px 0;" />
-                  <el-button :link="true" style="width:100%;color:#409EFF;" @click="goToNotices">查看更多</el-button>
-                </div>
-              </div>
-            </template>
-          </el-dropdown>
-          <el-dropdown trigger="click" placement="bottom-end">
-            <span class="user-dropdown-trigger">
-              <el-avatar :size="36" :src="user.Avatar" style="background:#eee;">
-                <template v-if="!user.Avatar">
-                  <el-icon><User /></el-icon>
-                </template>
-              </el-avatar>
-            </span>
-            <template #dropdown>
-              <el-card class="user-dropdown-card">
-                <div class="user-info">
-                  <el-avatar :size="48" :src="user.Avatar" style="background:#eee;">
-                    <template v-if="!user.Avatar">
-                      <el-icon><User /></el-icon>
-                    </template>
-                  </el-avatar>
-                  <div class="user-meta">
-                    <div class="user-name">{{ user.realName || user.username || 'Super' }}</div>
-                    <div class="user-role">{{ userStore.userRoleNames.join(', ') || '普通用户' }}</div>
-                    <div class="user-dept" v-if="user.departmentName">{{ user.departmentName }}</div>
-                  </div>
-                </div>
-                <el-divider style="margin: 8px 0;" />
-                <el-menu class="user-menu" mode="vertical" :default-active="''">
-                  <el-menu-item index="profile" @click="goProfile"><el-icon><User /></el-icon> 个人中心</el-menu-item>
-                  <el-menu-item index="home" @click="goHome"><el-icon><HomeFilled /></el-icon> 回到前台</el-menu-item>
-                  <el-menu-item index="docs" @click="goDocs"><el-icon><Document /></el-icon> 使用文档</el-menu-item>
-                  <el-menu-item index="lock" disabled><el-icon><Lock /></el-icon> 锁定屏幕</el-menu-item>
-                </el-menu>
-                <el-divider style="margin: 8px 0;" />
-                <el-button type="default" class="logout-btn" @click="logout" style="width:100%;">退出登录</el-button>
-              </el-card>
-            </template>
-          </el-dropdown>
+          <!-- 通知铃铛组件 -->
+          <AdminNotificationBell class="admin-notification-bell" />
+          <!-- 用户下拉菜单组件 -->
+          <UserDropdown 
+            :avatar-size="36"
+            :show-username="false"
+            :show-user-info="true"
+            :show-fullscreen-toggle="true"
+            avatar-click-action="profile"
+            username-click-action="profile"
+          />
           <el-dialog v-model="showProfile" title="个人中心" width="800px" top="8vh" destroy-on-close>
             <Profile />
           </el-dialog>
           
-          <!-- 消息详情对话框 -->
-          <el-dialog 
-            v-model="showNoticeDetail" 
-            title="通知详情" 
-            width="600px" 
-            top="10vh" 
-            destroy-on-close
-            @close="handleNoticeDetailClose"
-          >
-            <div v-if="currentNotice" class="notice-detail">
-              <div class="notice-header">
-                <h3 class="notice-title">{{ currentNotice.title }}</h3>
-                <div class="notice-meta">
-                  <el-tag 
-                    :type="currentNotice.priority === 'high' ? 'danger' : currentNotice.priority === 'medium' ? 'warning' : 'info'"
-                    size="small"
-                  >
-                    {{ currentNotice.priority === 'high' ? '高优先级' : currentNotice.priority === 'medium' ? '中优先级' : '普通' }}
-                  </el-tag>
-                  <span class="notice-time">发布时间：{{ formatTimeAgo(currentNotice.publishDate) }}</span>
-                </div>
-              </div>
-              <el-divider />
-              <div class="notice-content" v-html="currentNotice.fullContent"></div>
-            </div>
-            <template #footer>
-              <span class="dialog-footer">
-                <el-button @click="handleNoticeDetailClose" type="primary">我知道了</el-button>
-              </span>
-            </template>
-          </el-dialog>
+
         </div>
       </el-header>
       <!-- 内容区 -->
@@ -142,13 +54,15 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument, List, Money, Avatar, Briefcase, UserFilled, Menu } from '@element-plus/icons-vue'
+import { HomeFilled, OfficeBuilding, User, Fold, Expand, Grid, Document, Lock, BellFilled, FullScreen, Aim, Setting, Tools, Upload, FolderOpened, CopyDocument, List, Money, Avatar, Briefcase, UserFilled, Menu, ArrowDown, ArrowUp } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import Profile from '../Profile.vue'
 import { useSiteConfig } from '../../composables/useSiteConfig'
 import DynamicBreadcrumb from '../../components/common/DynamicBreadcrumb.vue'
 import DynamicMenu from '../../components/common/DynamicMenu.vue'
+import UserDropdown from '../../components/common/UserDropdown.vue'
+import AdminNotificationBell from '../../components/common/AdminNotificationBell.vue'
 import { ElMessage } from 'element-plus'
 import api from '../../api'
 
@@ -162,7 +76,6 @@ const { siteConfig } = useSiteConfig()
 
 const collapsed = ref(false)
 const dynamicMenuRef = ref(null)
-const notificationDropdown = ref(null)
 // 移除activeMenu计算属性以避免与路由变化的循环依赖
 // const activeMenu = computed(() => {
 //   if (route.path.startsWith('/admin/user')) return '/admin/user/list'
@@ -181,150 +94,7 @@ const pageTitle = computed(() => {
 
 const showProfile = ref(false)
 
-// 使用全局store中的未读通知数量
-const unreadCount = computed(() => userStore.unreadNoticeCount)
-
-const notifyList = ref([])
-
-// 消息详情对话框相关状态
-const showNoticeDetail = ref(false)
-const currentNotice = ref(null)
-
-/**
- * 获取未读通知数量
- * 功能：从后端API获取当前用户的未读通知数量
- */
-const getUnreadCount = async () => {
-  await userStore.fetchUnreadNoticeCount()
-}
-
-/**
- * 格式化时间为中文显示
- * 功能：将时间转换为中文的相对时间显示（如：3分钟前、2小时前、1天前等）
- */
-const formatTimeAgo = (dateStr) => {
-  if (!dateStr) return ''
-  
-  const now = new Date()
-  const date = new Date(dateStr)
-  const diff = now - date
-  
-  const seconds = Math.floor(diff / 1000)
-  const minutes = Math.floor(seconds / 60)
-  const hours = Math.floor(minutes / 60)
-  const days = Math.floor(hours / 24)
-  const months = Math.floor(days / 30)
-  const years = Math.floor(days / 365)
-  
-  if (seconds < 60) {
-    return '刚刚'
-  } else if (minutes < 60) {
-    return `${minutes}分钟前`
-  } else if (hours < 24) {
-    return `${hours}小时前`
-  } else if (days < 30) {
-    return `${days}天前`
-  } else if (months < 12) {
-    return `${months}个月前`
-  } else {
-    return `${years}年前`
-  }
-}
-
-/**
- * 获取未读通知列表
- * 功能：从后端API获取当前用户的未读通知列表
- */
-const getUnreadNotices = async () => {
-  try {
-    const response = await api.get('/api/notice', {
-      params: {
-        readStatus: 'unread',
-        size: 10,
-        page: 1
-      }
-    })
-    if (response.data.success) {
-      notifyList.value = response.data.data.map(notice => ({
-        id: notice.ID,
-        title: notice.Title,
-        content: notice.Content?.substring(0, 50) + (notice.Content?.length > 50 ? '...' : ''),
-        fullContent: notice.Content, // 保存完整内容用于详情显示
-        time: formatTimeAgo(notice.PublishDate),
-        publishDate: notice.PublishDate, // 保存原始发布时间
-        type: notice.Type,
-        priority: notice.Priority,
-        color: getNoticeTypeColor(notice.Type, notice.Priority)
-      }))
-    }
-  } catch (error) {
-    console.error('获取未读通知列表失败:', error)
-  }
-}
-
-/**
- * 根据通知类型和优先级获取颜色
- * 功能：为不同类型和优先级的通知分配不同的颜色
- */
-const getNoticeTypeColor = (type, priority) => {
-  // 优先级颜色映射
-  if (priority === 'high') return '#F56C6C'
-  if (priority === 'medium') return '#E6A23C'
-  
-  // 类型颜色映射
-  const typeColorMap = {
-    'system': '#409EFF',
-    'announcement': '#67C23A',
-    'urgent': '#F56C6C',
-    'maintenance': '#E6A23C',
-    'update': '#67C23A'
-  }
-  return typeColorMap[type] || '#409EFF'
-}
-
-/**
- * 标记通知为已读
- * 功能：将指定通知标记为已读状态
- */
-const markNoticeAsRead = async (noticeId) => {
-  try {
-    const response = await api.post(`/api/notice/${noticeId}/read`)
-    if (response.data.success) {
-      // 减少全局未读数量
-      userStore.decreaseUnreadNoticeCount(1)
-      // 重新获取未读通知列表
-      await getUnreadNotices()
-    }
-  } catch (error) {
-    console.error('标记通知已读失败:', error)
-    ElMessage.error('标记通知已读失败')
-  }
-}
-
-/**
- * 处理通知点击事件
- * 功能：点击通知时显示详情对话框
- */
-const handleNoticeClick = (notice) => {
-  currentNotice.value = notice
-  showNoticeDetail.value = true
-  // 关闭通知下拉菜单
-  if (notificationDropdown.value) {
-    notificationDropdown.value.handleClose()
-  }
-}
-
-/**
- * 处理消息详情对话框关闭事件
- * 功能：用户关闭详情对话框后，将该消息标记为已读
- */
-const handleNoticeDetailClose = async () => {
-  if (currentNotice.value) {
-    await markNoticeAsRead(currentNotice.value.id)
-    currentNotice.value = null
-  }
-  showNoticeDetail.value = false
-}
+// 移除用户下拉菜单显示状态（已迁移到UserDropdown组件）
 
 const logout = () => {
   userStore.clearUser()
@@ -347,18 +117,9 @@ const goHome = () => {
   router.push('/')
 }
 
-/**
- * 跳转到通知管理页面
- * 功能：点击查看更多按钮时跳转到系统通知管理页面，并手动关闭下拉菜单
- */
-const goToNotices = () => {
-  // 手动关闭下拉菜单
-  if (notificationDropdown.value) {
-    notificationDropdown.value.handleClose()
-  }
-  // 跳转到通知管理页面
-  router.push('/admin/system/notices')
-}
+
+
+// 移除用户下拉菜单相关方法（已迁移到UserDropdown组件）
 
 const isFullscreen = ref(false)
 const toggleFullscreen = () => {
@@ -391,9 +152,6 @@ onMounted(async () => {
     // 初始化用户信息和基础数据
     await userStore.fetchProfile()
     await userStore.initializeBaseData()
-    // 获取未读通知数量和列表
-    await getUnreadCount()
-    await getUnreadNotices()
   } catch (error) {
     console.error('初始化失败:', error)
     ElMessage.error('初始化失败，请重新登录')
@@ -480,11 +238,23 @@ onMounted(async () => {
   display: flex;
   align-items: center;
 }
+
+.dropdown-arrow {
+  margin-left: 0.5rem;
+  transition: transform 0.3s ease;
+  color: #909399;
+}
+
+.dropdown-arrow:hover {
+  color: #409EFF;
+}
 .user-dropdown-card {
-  min-width: 22rem;
+  min-width: 18rem;
+  max-width: 22rem;
+  width: max-content;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
   border-radius: 16px;
-  padding: 1.5rem 0 1rem 0;
+  padding: 0.5rem 0 0.4rem 0;
   background: #ffffff;
   border: 1px solid rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(20px);
@@ -513,13 +283,26 @@ onMounted(async () => {
   margin-bottom: 2px;
 }
 .user-role {
-  font-size: 0.875rem;
-  color: #409EFF;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.role-tag {
+  font-size: 0.7rem;
   font-weight: 500;
-  padding: 2px 8px;
-  background: rgba(64, 158, 255, 0.1);
-  border-radius: 12px;
-  display: inline-block;
+  font-family: 'Arial', 'Helvetica', sans-serif;
+  border-radius: 8px;
+  padding: 2px 6px;
+  border: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  transition: all 0.2s ease;
+}
+
+.role-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
 }
 .user-dept {
   font-size: 0.8rem;
@@ -574,15 +357,18 @@ onMounted(async () => {
   box-shadow: none;
 }
 .logout-btn {
-  margin: 0.5rem 1rem 0.5rem 1rem;
+  margin: 1rem auto 0.25rem auto;
   border-radius: 10px;
   color: #ffffff;
   background: #F56C6C;
   border: none;
   height: 2.5rem;
+  width: calc(100% - 3rem);
   font-weight: 500;
   transition: all 0.3s ease;
   box-shadow: 0 4px 12px rgba(245, 108, 108, 0.3);
+  display: block;
+  text-align: center;
 }
 .logout-btn:hover {
   transform: translateY(-2px);
@@ -602,8 +388,8 @@ onMounted(async () => {
   }
 }
 
-/* 隐藏下拉箭头 */
-:deep(.el-popper__arrow) {
+/* 隐藏通知下拉的箭头，保留用户下拉的箭头 */
+.notify-dropdown :deep(.el-popper__arrow) {
   display: none !important;
 }
 .admin-main {
@@ -653,128 +439,35 @@ onMounted(async () => {
   background: #009587 !important;
   color: #fff !important;
 }
-/* 通知铃铛样式 */
-.notification-bell {
-  position: relative;
-  display: inline-block;
-  margin-right: 15px;
-  cursor: pointer;
-  padding: 8px;
-  border-radius: 6px;
-  transition: all 0.3s ease;
-}
-
-.notification-bell:hover {
-  background-color: #f5f7fa;
-}
-
-.bell-icon {
-  font-size: 20px;
-  color: #409EFF;
-  transition: color 0.3s ease;
-}
-
-.notification-bell:hover .bell-icon {
-  color: #67C23A;
-}
-
-.notification-badge {
-  position: absolute;
-  top: -2px;
-  right: -2px;
-  background: #F56C6C;
-  color: white;
-  font-size: 10px;
-  font-weight: 500;
-  min-width: 18px;
-  height: 18px;
-  line-height: 18px;
-  text-align: center;
-  border-radius: 9px;
-  padding: 0 4px;
-  box-sizing: border-box;
-  transform: scale(0.9);
-  animation: badge-pulse 2s infinite;
-}
-
-@keyframes badge-pulse {
-  0%, 100% {
-    transform: scale(0.9);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-}
-
-/* 通知下拉卡片样式 */
-.notify-dropdown-card {
-  min-width: 320px;
-  max-width: 400px;
-  height: 450px;
+/* 用户下拉触发器样式 */
+.user-dropdown-trigger {
   display: flex;
-  flex-direction: column;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
-  border-radius: 12px;
-  background: #ffffff;
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  overflow: hidden;
-}
-
-/* 固定标题栏 */
-.notify-header {
-  flex-shrink: 0;
-  padding: 16px 16px 0 16px;
-  background: #ffffff;
-  border-bottom: 1px solid #f0f0f0;
-}
-
-.notify-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
-  text-align: center;
-}
-
-/* 可滚动消息区域 */
-.notify-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 0 24px;
-}
-
-/* 固定底部栏 */
-.notify-footer {
-  flex-shrink: 0;
-  padding: 0 16px 16px 16px;
-  background: #ffffff;
-  border-top: 1px solid #f0f0f0;
-}
-
-.notify-item {
-  padding: 8px;
+  align-items: center;
+  cursor: pointer;
+  padding: 4px 8px;
   border-radius: 6px;
   transition: background-color 0.2s ease;
 }
 
-.notify-item:hover {
+.user-dropdown-trigger:hover {
   background-color: #f5f7fa;
 }
 
-.notify-msg-title {
-  font-weight: 600;
-  color: #303133;
-  margin-bottom: 4px;
+.dropdown-arrow {
+  margin-left: 6px;
+  font-size: 14px;
+  color: #909399;
+  transition: color 0.2s ease, transform 0.2s ease;
 }
 
-.notify-msg-content {
-  font-size: 0.875rem;
-  color: #606266;
-  line-height: 1.4;
+.user-dropdown-trigger:hover .dropdown-arrow {
+  color: #409EFF;
+  transform: translateY(1px);
 }
 
-.no-notifications {
-  padding: 20px;
-  text-align: center;
+/* 管理员通知铃铛组件样式 */
+.admin-notification-bell {
+  margin-right: 15px;
 }
 .fullscreen-icon-wrap {
   margin-right: 18px;
@@ -988,6 +681,17 @@ onMounted(async () => {
   .logo-img { width: 1.5rem; height: 1.5rem; }
   .logo-text { font-size: 0.9rem; }
   .admin-main { padding: 0.5rem; }
+  
+  .user-dropdown-card {
+    min-width: 16rem;
+    max-width: 18rem;
+  }
+  
+  .notify-dropdown-card {
+    min-width: 260px;
+    max-width: 320px;
+    height: 400px;
+  }
   
   .notice-detail {
     padding: 0 8px;

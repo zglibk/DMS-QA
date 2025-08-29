@@ -88,14 +88,14 @@ export const useUserStore = defineStore('user', {
 
   getters: {
     // 获取用户的所有角色ID
-    userRoleIds: (state) => (state.user?.roles || []).map(role => role.id),
+    userRoleIds: (state) => (state.user?.roles || []).map(role => role.ID || role.id),
 
     // 获取用户的所有角色名称
-    userRoleNames: (state) => (state.user?.roles || []).map(role => role.name),
+    userRoleNames: (state) => (state.user?.roles || []).map(role => role.Name || role.name),
 
     // 检查用户是否有特定角色
     hasRole: (state) => (roleName) => {
-      return (state.user?.roles || []).some(role => role.name === roleName)
+      return (state.user?.roles || []).some(role => (role.Name || role.name) === roleName)
     },
 
     // 检查用户是否有特定菜单权限
@@ -146,7 +146,10 @@ export const useUserStore = defineStore('user', {
 
     // 检查是否为管理员
     isAdmin: (state) => {
-      return (state.user?.roles || []).some(role => role.name === 'admin' || role.name === '系统管理员')
+      return (state.user?.roles || []).some(role => 
+        (role.Name || role.name) === 'admin' || 
+        (role.Name || role.name) === '系统管理员'
+      )
     },
 
     // 通用权限检查方法

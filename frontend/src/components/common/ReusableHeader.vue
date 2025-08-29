@@ -18,29 +18,20 @@
     </div>
     <!-- 右侧用户区 -->
     <div class="header-right">  
-      <el-button type="primary" text class="admin-btn" @click="goAdmin">登录后台</el-button>
       <!-- 通知铃铛组件 -->
       <AdminNotificationBell 
         v-if="userStore.token" 
         class="notification-component"
       />
-      <el-avatar :size="32" :src="user.Avatar" class="avatar-icon" @click="goProfile">
-        <template v-if="!user.Avatar">
-          <el-icon><User /></el-icon>
-        </template>
-      </el-avatar>
-      <span class="username" @click="goProfile">{{ userStore.getUserDisplayName() }}</span>
-      <el-dropdown>
-        <span class="el-dropdown-link">
-          <el-icon><ArrowDown /></el-icon>
-        </span>
-        <template #dropdown>
-          <el-dropdown-menu>
-            <el-dropdown-item @click="goProfile">个人中心</el-dropdown-item>
-            <el-dropdown-item divided @click="logout">退出登录</el-dropdown-item>
-          </el-dropdown-menu>
-        </template>
-      </el-dropdown>
+      <!-- 用户下拉菜单组件 -->
+      <UserDropdown 
+        :avatar-size="32"
+        :show-username="true"
+        :show-user-info="false"
+        :show-fullscreen-toggle="false"
+        avatar-click-action="profile"
+        username-click-action="profile"
+      />
     </div>
   </div>
 </template>
@@ -54,6 +45,7 @@ import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import { useSiteConfig } from '../../composables/useSiteConfig'
 import AdminNotificationBell from './AdminNotificationBell.vue'
+import UserDropdown from './UserDropdown.vue'
 
 // 路由和用户状态
 const router = useRouter()
@@ -110,63 +102,7 @@ const goProfile = () => {
   }
 }
 
-const logout = () => {
-  userStore.clearUser()
-  router.push('/login')
-}
-
-/**
- * 进入后台管理页面
- * 基于菜单权限系统进行权限验证
- */
-const goAdmin = async () => {
-  // 检查用户是否已登录
-  if (!userStore.token) {
-    ElMessage.error('请先登录')
-    router.push('/login')
-    return
-  }
-
-  // 检查是否已有用户信息，如果没有则获取
-  if (!userStore.user || !userStore.user.id) {
-    try {
-      await userStore.fetchProfile()
-    } catch (error) {
-      ElMessage.error('获取用户信息失败，请重新登录')
-      return
-    }
-  }
-
-  // 基于菜单权限系统进行权限验证
-  // 使用正则表达式检查用户是否有任何 /admin 路由下的权限
-  const hasAnyAdminRoutePermission = userStore.hasAnyAdminPermission
-  
-  // 检查用户是否有后台管理相关的操作权限
-  const hasAdminActionPermission = userStore.hasActionPermission('admin:dashboard:view') ||
-                                   userStore.hasActionPermission('admin:access')
-  
-  // 检查用户是否有任何后台菜单或按钮权限
-  // 包括但不限于：质量管理、出版异常、样品承认书等后台功能权限
-  const hasAnyBackendPermission = (userStore.user?.permissions?.menus || []).some(menu => {
-    // 检查菜单权限中是否包含后台相关权限
-    const permission = menu.Permission || ''
-    return permission.includes('quality:') ||     // 质量管理相关权限
-           permission.includes('admin:') ||       // 管理员权限
-           permission.includes('sample:') ||      // 样品管理权限
-           permission.includes('publishing:') ||  // 出版相关权限
-           permission.includes('exception:') ||   // 异常管理权限
-           permission.includes('work-plan:') ||   // 工作计划权限
-           permission.includes('system:') ||      // 系统管理权限
-           menu.path?.startsWith('/admin')        // 或者菜单路径以/admin开头
-  })
-  
-  // 如果用户有任何后台相关权限，则允许进入后台
-  if (hasAnyAdminRoutePermission || hasAdminActionPermission || hasAnyBackendPermission) {
-    router.push('/admin/dashboard')
-  } else {
-    ElMessage.error('您没有后台访问权限，请联系管理员')
-  }
-}
+// logout方法和goAdmin方法已迁移到UserDropdown组件
 
 const handleLogoError = (event) => {
   event.target.src = '/logo.png'
@@ -333,102 +269,7 @@ const handleLogoError = (event) => {
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
 }
 
-.avatar-icon {
-  background: #e6f0ff;
-  color: #1677ff;
-  cursor: pointer;
-}
-
-.username {
-  font-size: 15px;
-  color: #333;
-  margin-left: 4px;
-  cursor: pointer;
-}
-
-.el-dropdown-link {
-  cursor: pointer;
-  color: #606266;
-  display: flex;
-  align-items: center;
-  padding: 8px;
-  border-radius: 6px;
-  transition: all 0.3s ease;
-}
-
-.el-dropdown-link:hover {
-  background-color: #f5f7fa;
-  color: #409EFF;
-  transform: translateY(-1px);
-}
-
-/* 下拉菜单美化样式 */
-:deep(.el-dropdown-menu) {
-  border: none;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-  padding: 8px;
-  min-width: 200px;
-  background: #ffffff;
-  backdrop-filter: blur(10px);
-  animation: dropdownFadeIn 0.3s ease-out;
-}
-
-:deep(.el-dropdown-menu__item) {
-  border-radius: 8px;
-  margin: 2px 0;
-  padding: 12px 16px;
-  font-size: 14px;
-  color: #606266;
-  transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
-}
-
-:deep(.el-dropdown-menu__item:hover) {
-  background: #f5f7fa;
-  color: #409EFF;
-  transform: translateX(4px);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
-}
-
-:deep(.el-dropdown-menu__item.is-divided) {
-  border-top: 1px solid #f0f0f0;
-  margin-top: 8px;
-  padding-top: 16px;
-}
-
-:deep(.el-dropdown-menu__item.is-divided::before) {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 16px;
-  right: 16px;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, #e4e7ed, transparent);
-}
-
-/* 下拉菜单动画 */
-@keyframes dropdownFadeIn {
-  0% {
-    opacity: 0;
-    transform: translateY(-10px) scale(0.95);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-}
-
-/* 下拉箭头美化 */
-:deep(.el-popper__arrow) {
-  display: none;
-}
-
-/* 为下拉菜单添加毛玻璃效果 */
-:deep(.el-popper) {
-  backdrop-filter: blur(10px);
-}
+/* 用户相关样式已迁移到UserDropdown组件 */
 
 /* 响应式设计 */
 @media (max-width: 768px) {
@@ -446,8 +287,6 @@ const handleLogoError = (event) => {
     gap: 0.375rem;
   }
   
-  .username {
-    display: none;
-  }
+  /* 用户名响应式隐藏已迁移到UserDropdown组件 */
 }
 </style>
