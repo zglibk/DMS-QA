@@ -642,7 +642,6 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Search, Plus, Delete, Download, View, Edit, Refresh, Filter, Picture, Check, DocumentAdd, Close, InfoFilled, Money
 } from '@element-plus/icons-vue'
-import AppHeader from '@/components/common/AppHeader.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
 import FileUpload from '@/components/FileUpload.vue'
 import ImagePreview from '@/components/ImagePreview.vue'

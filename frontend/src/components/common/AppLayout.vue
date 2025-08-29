@@ -1,7 +1,7 @@
 <template>
   <div class="app-layout">
     <!-- 顶部导航栏 -->
-    <AppHeader />
+    <ReusableHeader />
     
     <!-- 主要内容区域 -->
     <div class="main-content scrollable-content">
@@ -14,7 +14,7 @@
 </template>
 
 <script setup>
-import AppHeader from './AppHeader.vue'
+import ReusableHeader from './ReusableHeader.vue'
 import AppFooter from './AppFooter.vue'
 </script>
 
@@ -44,16 +44,16 @@ import AppFooter from './AppFooter.vue'
   flex: 1;
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 0 2%; /* 减少左右padding，使用更小的百分比 */
+  padding: 0; /* 移除左右padding，让滚动条贴到浏览器边缘 */
   box-sizing: border-box;
   height: calc(100vh - 7.5rem); /* 精确计算可用高度 */
 }
 
 /* 内容区域样式 */
 .scrollable-content > * {
-  max-width: 96%; /* 增加最大宽度，减少两侧空白 */
+  /* max-width: 96%; 保持内容最大宽度 */
   margin: 0 auto;
-  padding: 20px;
+  padding: 20px 2%; /* 给内容添加左右内边距，而不是给容器 */
 }
 
 /* 全局样式重置 */

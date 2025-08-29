@@ -32,6 +32,8 @@ export const useUserStore = defineStore('user', {
     return {
       // 用户认证token
       token: localStorage.getItem('token') || null,
+      // 未读通知数量
+      unreadNoticeCount: 0,
     user: restoredUser || {
       id: null,
       username: '',
@@ -485,6 +487,48 @@ export const useUserStore = defineStore('user', {
     getRoleName(roleId) {
       const role = this.roles.find(r => r.id === roleId)
       return role ? role.name : ''
+    },
+
+    /**
+     * 获取未读通知数量
+     * 功能：从后端API获取当前用户的未读通知数量并更新全局状态
+     */
+    async fetchUnreadNoticeCount() {
+      try {
+        const response = await apiService.get('/notice/unread/count')
+        if (response.data.success) {
+          this.unreadNoticeCount = response.data.data?.unreadCount || 0
+        }
+        return this.unreadNoticeCount
+      } catch (error) {
+        console.error('获取未读通知数量失败:', error)
+        this.unreadNoticeCount = 0
+        return 0
+      }
+    },
+
+    /**
+     * 更新未读通知数量
+     * 功能：手动设置未读通知数量（用于实时更新）
+     */
+    setUnreadNoticeCount(count) {
+      this.unreadNoticeCount = count || 0
+    },
+
+    /**
+     * 减少未读通知数量
+     * 功能：当标记通知为已读时调用
+     */
+    decreaseUnreadNoticeCount(count = 1) {
+      this.unreadNoticeCount = Math.max(0, this.unreadNoticeCount - count)
+    },
+
+    /**
+     * 清零未读通知数量
+     * 功能：当全部标记为已读时调用
+     */
+    clearUnreadNoticeCount() {
+      this.unreadNoticeCount = 0
     }
   }
 })

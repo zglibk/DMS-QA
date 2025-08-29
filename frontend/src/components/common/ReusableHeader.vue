@@ -19,6 +19,11 @@
     <!-- 右侧用户区 -->
     <div class="header-right">  
       <el-button type="primary" text class="admin-btn" @click="goAdmin">登录后台</el-button>
+      <!-- 通知铃铛组件 -->
+      <AdminNotificationBell 
+        v-if="userStore.token" 
+        class="notification-component"
+      />
       <el-avatar :size="32" :src="user.Avatar" class="avatar-icon" @click="goProfile">
         <template v-if="!user.Avatar">
           <el-icon><User /></el-icon>
@@ -48,6 +53,7 @@ import { ElMessage } from 'element-plus'
 import { useUserStore } from '../../store/user'
 import { storeToRefs } from 'pinia'
 import { useSiteConfig } from '../../composables/useSiteConfig'
+import AdminNotificationBell from './AdminNotificationBell.vue'
 
 // 路由和用户状态
 const router = useRouter()
@@ -165,6 +171,8 @@ const goAdmin = async () => {
 const handleLogoError = (event) => {
   event.target.src = '/logo.png'
 }
+
+
 </script>
 
 <style scoped>
@@ -291,6 +299,38 @@ const handleLogoError = (event) => {
 
 .admin-btn {
   margin-right: 0.625rem;
+}
+
+.notification-component {
+  margin-right: 0.5rem;
+}
+
+/* 前台通知铃铛样式调整 */
+.notification-component :deep(.notification-bell) {
+  background: rgba(64, 158, 255, 0.1);
+  color: #409EFF;
+  border: 1px solid rgba(64, 158, 255, 0.2);
+}
+
+.notification-component :deep(.notification-bell:hover) {
+  background: rgba(64, 158, 255, 0.15);
+  color: #409EFF;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
+}
+
+/* AdminNotificationBell 组件样式适配 */
+.notification-component :deep(.admin-notification-bell) {
+  background: rgba(64, 158, 255, 0.1);
+  color: #409EFF;
+  border: 1px solid rgba(64, 158, 255, 0.2);
+}
+
+.notification-component :deep(.admin-notification-bell:hover) {
+  background: rgba(64, 158, 255, 0.15);
+  color: #409EFF;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
 }
 
 .avatar-icon {

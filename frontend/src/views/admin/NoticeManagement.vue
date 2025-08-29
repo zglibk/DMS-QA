@@ -699,15 +699,8 @@ const getNoticeList = async () => {
  * 获取未读通知数量
  */
 const getUnreadCount = async () => {
-  try {
-    const response = await api.get('/notice/unread/count')
-    if (response.data.success) {
-      // 修复：正确提取unreadCount数值
-      unreadCount.value = response.data.data?.unreadCount || 0
-    }
-  } catch (error) {
-    console.error('获取未读数量失败:', error)
-  }
+  await userStore.fetchUnreadNoticeCount()
+  unreadCount.value = userStore.unreadNoticeCount
 }
 
 /**
@@ -719,6 +712,8 @@ const markAsReadInternal = async (noticeId) => {
     const response = await api.post(`/notice/${noticeId}/read`)
     if (response.data.success) {
       await getNoticeList()
+      // 减少全局未读数量
+      userStore.decreaseUnreadNoticeCount(1)
       await getUnreadCount()
     }
   } catch (error) {
@@ -765,6 +760,8 @@ const markAsRead = async (noticeId) => {
     if (response.data.success) {
       ElMessage.success('已标记为已读')
       await getNoticeList()
+      // 减少全局未读数量
+      userStore.decreaseUnreadNoticeCount(1)
       await getUnreadCount()
     }
   } catch (error) {
@@ -810,6 +807,8 @@ const markAllAsRead = async () => {
     if (response.data.success) {
       ElMessage.success('已全部标记为已读')
       await getNoticeList()
+      // 清零全局未读数量
+      userStore.clearUnreadNoticeCount()
       await getUnreadCount()
     }
   } catch (error) {
@@ -866,6 +865,10 @@ const deleteNotice = async (notice) => {
     if (response.data.success) {
       ElMessage.success('删除成功')
       await getNoticeList()
+      // 如果删除的是未读通知，减少全局未读数量
+      if (!notice.IsRead) {
+        userStore.decreaseUnreadNoticeCount(1)
+      }
       await getUnreadCount()
     }
   } catch (error) {

@@ -26,6 +26,23 @@ router.use((req, res, next) => {
  */
 router.get('/', noticeController.getNoticeList);
 
+// =====================================================
+// 通知阅读状态管理路由（需要放在 /:id 之前）
+// =====================================================
+
+/**
+ * 获取未读通知数量
+ * GET /api/notice/unread/count
+ */
+router.get('/unread/count', noticeController.getUnreadCount);
+
+/**
+ * 批量标记为已读
+ * POST /api/notice/batch/read
+ * 请求体：{ noticeIds?: number[] } - 可选，不提供则标记所有未读
+ */
+router.post('/batch/read', noticeController.markAllAsRead);
+
 /**
  * 获取通知公告详情
  * GET /api/notice/:id
@@ -64,24 +81,6 @@ router.delete('/:id',
     checkPermission('notice:delete'),
     noticeController.deleteNotice
 );
-
-// =====================================================
-// 通知阅读状态管理路由
-// =====================================================
-
-/**
- * 获取未读通知数量
- * GET /api/notice/unread/count
- */
-router.get('/unread/count', noticeController.getUnreadCount);
-
-/**
- * 批量标记为已读
- * POST /api/notice/batch/read
- * 请求体：{ noticeIds?: number[] } - 可选，不提供则标记所有未读
- */
-router.post('/batch/read', noticeController.markAllAsRead);
-
 
 
 /**

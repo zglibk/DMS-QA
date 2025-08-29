@@ -1,7 +1,7 @@
 <template>
-  <div class="common-layout">
-    <AppHeader />
-    <el-container>
+  <AppLayout>
+    <div class="common-layout">
+      <el-container>
       <el-aside width="200px">
         <!-- 数据统计卡片 -->
         <el-card class="stat-card sidebar-stat-card sidebar-stat-card-blue" shadow="hover" style="margin-bottom: 15px;">
@@ -30,8 +30,6 @@
       </el-aside>
       
       <el-main>
-
-        
         <!-- 筛选卡片 -->
         <el-card class="filter-card" shadow="hover">
           <template #header>
@@ -692,7 +690,8 @@
     </el-dialog>
     
     <AppFooter />
-  </div>
+    </div>
+  </AppLayout>
 </template>
 
 <script setup>
@@ -712,7 +711,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Search, Plus, Delete, Download, View, Edit, Refresh, Filter, Picture, Check, DocumentAdd, Close, InfoFilled, Money
 } from '@element-plus/icons-vue'
-import AppHeader from '@/components/common/AppHeader.vue'
+import AppLayout from '@/components/common/AppLayout.vue'
 import AppFooter from '@/components/common/AppFooter.vue'
 import FileUpload from '@/components/FileUpload.vue'
 import ImagePreview from '@/components/ImagePreview.vue'
@@ -2512,7 +2511,9 @@ onUnmounted(() => {
   flex-direction: column;
   overflow: visible; /* 改为可见，确保分页显示 */
   min-height: 0; /* 解决flex容器高度问题 */
-  padding-top: 90px; /* 为导航栏留出空间 */
+  padding-top: 20px; /* 减少顶部间距 */
+  max-width: 100%; /* 确保不超出视口宽度 */
+  box-sizing: border-box; /* 包含padding在内的盒模型 */
 }
 
 .el-main {
@@ -3070,6 +3071,28 @@ onUnmounted(() => {
   border: 5px solid transparent;
   border-top-color: #f56c6c;
   z-index: 1000;
+}
+
+/* 容器布局样式 */
+.el-container {
+  width: 100%;
+  max-width: 100%;
+  overflow: visible;
+  display: flex;
+  flex-direction: row;
+  box-sizing: border-box;
+}
+
+.el-aside {
+  flex-shrink: 0; /* 防止sidebar被压缩 */
+  overflow: visible;
+}
+
+.el-main {
+  flex: 1;
+  min-width: 0; /* 允许主内容区域收缩 */
+  overflow: visible;
+  box-sizing: border-box;
 }
 
 /* 响应式设计 */
