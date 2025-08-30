@@ -10,6 +10,28 @@ const { getConnection } = require('../config/database');
 const moment = require('moment');
 
 /**
+ * 清理内容中的头尾P标签
+ * @param {string} content - 原始内容
+ * @returns {string} 清理后的内容
+ */
+const cleanPTags = (content) => {
+    if (!content || typeof content !== 'string') {
+        return content;
+    }
+    
+    // 移除开头和结尾的P标签，但保留中间的P标签
+    let cleaned = content.trim();
+    
+    // 移除开头的<p>标签（包括带属性的）
+    cleaned = cleaned.replace(/^<p[^>]*>/i, '');
+    
+    // 移除结尾的</p>标签
+    cleaned = cleaned.replace(/<\/p>$/i, '');
+    
+    return cleaned.trim();
+};
+
+/**
  * 获取通知公告列表（支持已读未读状态）
  * @param {Object} req - 请求对象
  * @param {Object} res - 响应对象
@@ -282,7 +304,7 @@ const createNotice = async (req, res) => {
         
         const result = await pool.request()
             .input('title', sql.NVarChar, title)
-            .input('content', sql.NVarChar, content)
+            .input('content', sql.NVarChar, cleanPTags(content))
             .input('type', sql.NVarChar, type)
             .input('priority', sql.NVarChar, priority)
             .input('createdBy', sql.Int, userId)
@@ -348,7 +370,7 @@ const updateNotice = async (req, res) => {
         const result = await pool.request()
             .input('id', sql.Int, parseInt(id))
             .input('title', sql.NVarChar, Title)
-            .input('content', sql.NVarChar, Content)
+            .input('content', sql.NVarChar, cleanPTags(Content))
             .input('type', sql.NVarChar, Type || 'general')
             .input('priority', sql.NVarChar, Priority || 'medium')
             .input('expiryDate', sql.DateTime, ExpiryDate ? new Date(ExpiryDate) : null)

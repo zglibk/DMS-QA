@@ -230,6 +230,13 @@ export const defaultConfig = {
   remove_script_host: false,
   relative_urls: false,
   
+  // P标签处理配置 - 解决内容头尾部自动添加P标签的问题
+  forced_root_block: '', // 不强制添加根块元素（P标签）
+  force_p_newlines: false, // 不强制在换行时添加P标签
+  remove_trailing_brs: true, // 移除尾部的br标签
+  element_format: 'html', // 使用HTML格式而不是XHTML
+  entity_encoding: 'raw', // 使用原始编码，不转换特殊字符
+  
   // 代码高亮配置
   codesample_languages: [
     { text: 'HTML/XML', value: 'markup' },
