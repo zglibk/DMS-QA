@@ -257,6 +257,49 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 })
 
+// 获取所有操作代码选项
+router.get('/action-codes', async (req, res) => {
+  try {
+    const pool = await getConnection()
+    const result = await pool.request()
+      .query(`
+        SELECT DISTINCT Permission 
+        FROM Menus 
+        WHERE Permission IS NOT NULL AND Permission != ''
+      `)
+    
+    // 从Permission字段中提取操作代码
+    const actionCodes = new Set()
+    result.recordset.forEach(row => {
+      const permission = row.Permission
+      if (permission && permission.includes(':')) {
+        const parts = permission.split(':')
+        const actionCode = parts[parts.length - 1] // 取最后一部分作为操作代码
+        if (actionCode) {
+          actionCodes.add(actionCode)
+        }
+      }
+    })
+    
+    // 转换为前端需要的格式
+    const options = Array.from(actionCodes).map(code => ({
+      label: getActionLabel(code),
+      value: code
+    }))
+    
+    res.json({
+      success: true,
+      data: options
+    })
+  } catch (error) {
+    console.error('获取操作代码失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取操作代码失败'
+    })
+  }
+})
+
 // 获取用户权限菜单
 router.get('/user-menus', authenticateToken, async (req, res) => {
   try {
@@ -410,6 +453,8 @@ router.get('/user-menus', authenticateToken, async (req, res) => {
     })
   }
 })
+
+
 
 // 根据ID获取菜单详情
 router.get('/:id', async (req, res) => {
@@ -810,6 +855,47 @@ function getDefaultMenus() {
     // 注意：移除了用户管理、供应商管理等需要特定权限的菜单
     // 这些菜单应该通过数据库权限控制，而不是在默认菜单中提供
   ]
+}
+
+
+
+/**
+ * 根据操作代码获取中文标签
+ * @param {string} actionCode - 操作代码
+ * @returns {string} 中文标签
+ */
+function getActionLabel(actionCode) {
+  const labelMap = {
+    'view': '查看',
+    'add': '新增',
+    'edit': '编辑',
+    'delete': '删除',
+    'export': '导出',
+    'import': '导入',
+    'audit': '审核',
+    'manage': '管理',
+    'upload': '上传',
+    'download': '下载',
+    'approve': '审批',
+    'reject': '拒绝',
+    'submit': '提交',
+    'cancel': '取消',
+    'update': '更新',
+    'create': '创建',
+    'list': '列表',
+    'detail': '详情',
+    'filter': '筛选',
+    'clear': '清空',
+    'manual': '手动同步',
+    'mark-all-read': '全部标记已读',
+    'mark-read': '标记已读',
+    'statistics': '统计',
+    'close': '关闭',
+    'process': '处理投诉',
+    'grant': '用户授权'
+  }
+  
+  return labelMap[actionCode] || actionCode
 }
 
 module.exports = router

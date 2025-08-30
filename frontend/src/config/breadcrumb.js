@@ -408,6 +408,12 @@ export const breadcrumbConfig = {
     icon: 'Connection'
   },
 
+  // 系统管理 - 通知管理
+  '/admin/system/notices': {
+    title: '通知管理',
+    icon: 'Bell'
+  },
+
   // 供应商管理
   '/admin/supplier/list': {
     title: '供应商管理',
@@ -496,6 +502,12 @@ export const breadcrumbConfig = {
   '/admin/quality/publishing-exceptions': {
     title: '出版异常',
     icon: 'DocumentRemove'
+  },
+
+  // 消息通知管理
+  '/admin/notice-management': {
+    title: '消息通知管理',
+    icon: 'Bell'
   },
 
   // 出版异常页面（兼容不同路径）

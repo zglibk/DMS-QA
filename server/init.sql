@@ -1882,7 +1882,8 @@ CREATE TABLE [dbo].[Notices] (
     -- 管理字段
     [CreatedBy] INT NOT NULL,                              -- 创建人ID（关联User表）
     [IsActive] BIT NOT NULL DEFAULT 1,                     -- 是否有效（软删除标记）
-    [ViewCount] INT NOT NULL DEFAULT 0                     -- 浏览次数统计
+    [ViewCount] INT NOT NULL DEFAULT 0,                   -- 浏览次数统计
+    [ImagePath] NVARCHAR(MAX) NULL                         -- 通知图片路径
 );
 
 -- 创建性能优化索引
@@ -1915,6 +1916,7 @@ EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'创建时间',
 EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'更新时间', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'UpdatedAt';
 EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'是否有效（软删除标记）', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'IsActive';
 EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'浏览次数', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'ViewCount';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'通知图片路径', @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'Notices', @level2type = N'COLUMN', @level2name = N'ImagePath';
 
 -- 插入通知公告示例数据
 INSERT INTO [dbo].[Notices] ([Title], [Content], [Type], [Priority], [CreatedBy]) VALUES

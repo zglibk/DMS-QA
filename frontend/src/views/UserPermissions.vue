@@ -262,14 +262,12 @@
             placeholder="请选择操作"
             style="width: 100%"
           >
-            <el-option label="查看" value="view" />
-            <el-option label="新增" value="add" />
-            <el-option label="编辑" value="edit" />
-            <el-option label="删除" value="delete" />
-            <el-option label="导出" value="export" />
-            <el-option label="导入" value="import" />
-            <el-option label="审核" value="audit" />
-            <el-option label="管理" value="manage" />
+            <el-option
+              v-for="option in actionCodeOptions"
+              :key="option.value"
+              :label="option.label"
+              :value="option.value"
+            />
           </el-select>
         </el-form-item>
         
@@ -508,6 +506,7 @@ const restoreLoading = ref(false)
 const permissions = ref([])
 const userOptions = ref([])
 const menuOptions = ref([])
+const actionCodeOptions = ref([]) // 动态加载的操作代码选项
 
 // 搜索表单
 const searchForm = reactive({
@@ -735,6 +734,21 @@ const loadMenuOptions = async () => {
   } catch (error) {
     console.error('加载菜单失败:', error)
     ElMessage.error('加载菜单失败')
+  }
+}
+
+/**
+ * 加载操作代码选项
+ */
+const loadActionCodeOptions = async () => {
+  try {
+    const response = await api.get('/menus/action-codes')
+    if (response.data.success) {
+      actionCodeOptions.value = response.data.data || []
+    }
+  } catch (error) {
+    console.error('加载操作代码失败:', error)
+    ElMessage.error('加载操作代码失败')
   }
 }
 
@@ -1076,6 +1090,7 @@ const cleanupExpiredPermissions = async () => {
 onMounted(() => {
   loadMenuOptions()
   loadInitialUsers()
+  loadActionCodeOptions() // 加载操作代码选项
   // 初始化时加载权限列表（如果没有选择用户会显示空列表）
   loadPermissions()
 })

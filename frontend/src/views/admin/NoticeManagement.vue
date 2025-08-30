@@ -10,17 +10,16 @@
       </div>
       <div class="header-right">
         <el-button 
-          v-if="permissions.canAdd" 
           type="primary" 
           @click="openCreateDialog"
+          :disabled="!permissions.canAdd"
         >
           <el-icon><Plus /></el-icon>
           发布通知
         </el-button>
         <el-button 
-          v-if="permissions.canMarkAllRead" 
           @click="markAllAsRead" 
-          :disabled="unreadCount === 0" 
+          :disabled="unreadCount === 0 || !permissions.canMarkAllRead" 
           type="warning" 
           plain
         >
@@ -184,29 +183,30 @@
         <el-table-column label="操作" width="240" fixed="right" align="center" header-align="center">
           <template #default="{ row }">
             <el-button 
-              v-if="permissions.canEdit" 
               type="warning" 
               size="small" 
               @click="editNotice(row)"
               :icon="Edit"
+              :disabled="!permissions.canEdit"
             >
               编辑
             </el-button>
             <el-button 
-              v-if="permissions.canDelete" 
               type="danger" 
               size="small" 
               @click="deleteNotice(row)"
               :icon="Delete"
+              :disabled="!permissions.canDelete"
             >
               删除
             </el-button>
             <el-button 
-              v-if="!row.IsRead && permissions.canMarkRead" 
+              v-if="!row.IsRead" 
               type="success" 
               size="small" 
               @click="markAsRead(row.ID)"
               :icon="Check"
+              :disabled="!permissions.canMarkRead"
             >
               已读
             </el-button>
@@ -445,12 +445,12 @@ const checkPermissions = async () => {
       permissions.canMarkRead = true
       permissions.canMarkAllRead = true
     } else {
-      // 使用异步权限检查方法，权限标识与数据库MenuCode保持一致
-      permissions.canAdd = await userStore.hasActionPermissionAsync('notice-add')
-      permissions.canEdit = await userStore.hasActionPermissionAsync('notice-edit')
-      permissions.canDelete = await userStore.hasActionPermissionAsync('notice-delete')
-      permissions.canMarkRead = await userStore.hasActionPermissionAsync('notice-mark-read')
-      permissions.canMarkAllRead = await userStore.hasActionPermissionAsync('notice-mark-all-read')
+      // 使用异步权限检查方法，权限标识与数据库Permission字段保持一致
+      permissions.canAdd = await userStore.hasActionPermissionAsync('notice:add')
+      permissions.canEdit = await userStore.hasActionPermissionAsync('notice:edit')
+      permissions.canDelete = await userStore.hasActionPermissionAsync('notice:delete')
+      permissions.canMarkRead = await userStore.hasActionPermissionAsync('notice:mark-read')
+      permissions.canMarkAllRead = await userStore.hasActionPermissionAsync('notice:mark-all-read')
     }
     
     console.log('权限检查结果:', permissions)
