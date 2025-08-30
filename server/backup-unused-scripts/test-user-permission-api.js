@@ -4,7 +4,7 @@
  */
 
 const axios = require('axios');
-const { sql, getDynamicConfig } = require('./db');
+const { sql, getDynamicConfig } = require('../db');
 
 /**
  * 测试用户权限获取API
@@ -17,110 +17,135 @@ async function testUserPermissionAPI() {
     const pool = await sql.connect(await getDynamicConfig());
     console.log('数据库连接成功');
     
-    // 1. 查找测试用户wxq
-    console.log('\n1. 查找测试用户wxq:');
+    // 1. 查找测试用户hhl和zsx
+    console.log('\n1. 查找测试用户hhl和zsx:');
     const userResult = await pool.request()
-      .input('Username', sql.NVarChar, 'wxq')
-      .query('SELECT ID, Username, RealName FROM [User] WHERE Username = @Username');
+      .query('SELECT ID, Username, RealName FROM [User] WHERE Username IN (\'hhl\', \'zsx\') ORDER BY Username');
     
     if (userResult.recordset.length === 0) {
-      console.log('❌ 未找到用户wxq');
+      console.log('❌ 未找到用户hhl或zsx');
       return;
     }
     
-    const user = userResult.recordset[0];
-    console.log(`✅ 找到用户: ${user.RealName} (${user.Username})`);
+    const users = userResult.recordset;
+    console.log(`✅ 找到${users.length}个用户:`);
+    users.forEach(user => {
+      console.log(`  - ${user.RealName} (${user.Username})`);
+    });
     
-    // 2. 直接查询数据库中的完整权限
-    console.log('\n2. 查询数据库中的完整权限:');
-    const dbPermissionResult = await pool.request()
-      .input('UserId', sql.Int, user.ID)
-      .query(`
-        SELECT 
-          MenuID,
-          MenuName,
-          MenuCode,
-          Permission,
-          PermissionSource,
-          PermissionType,
-          HasPermission
-        FROM [V_UserCompletePermissions]
-        WHERE UserID = @UserId AND Permission = 'quality:publishing:add'
-      `);
-    
-    console.log('数据库权限查询结果:');
-    if (dbPermissionResult.recordset.length > 0) {
-      dbPermissionResult.recordset.forEach(perm => {
-        console.log(`  - ${perm.MenuName}: ${perm.Permission}`);
-        console.log(`    来源: ${perm.PermissionSource}, 类型: ${perm.PermissionType}, 有权限: ${perm.HasPermission}`);
-      });
-    } else {
-      console.log('  ❌ 未找到quality:publishing:add权限');
+    // 2. 循环检查每个用户的权限
+    for (const user of users) {
+      console.log(`\n=== 检查用户 ${user.Username} 的权限 ===`);
+      
+      // 查询数据库中的admin相关权限
+      console.log('\n2.1 查询数据库中的admin相关权限:');
+      const dbPermissionResult = await pool.request()
+        .input('UserId', sql.Int, user.ID)
+        .query(`
+          SELECT DISTINCT
+            v.MenuID,
+            v.MenuName,
+            v.MenuCode,
+            v.Path,
+            v.Permission,
+            v.PermissionSource,
+            v.PermissionType,
+            v.HasPermission
+          FROM [V_UserCompletePermissions] v
+          INNER JOIN [Menus] m ON v.MenuID = m.ID
+          WHERE v.UserID = @UserId 
+            AND (v.Path LIKE '/admin%' OR v.Permission LIKE '%admin%')
+          ORDER BY v.Path
+        `);
+      
+      console.log('数据库admin权限查询结果:');
+      if (dbPermissionResult.recordset.length > 0) {
+        dbPermissionResult.recordset.forEach(perm => {
+          console.log(`  - ${perm.MenuName} (${perm.MenuCode})`);
+          console.log(`    路径: ${perm.Path || '无'}`);
+          console.log(`    权限: ${perm.Permission}`);
+          console.log(`    来源: ${perm.PermissionSource}, 有权限: ${perm.HasPermission}`);
+        });
+      } else {
+        console.log('  ❌ 未找到admin相关权限');
+      }
     }
     
-    // 3. 获取验证码
-    console.log('\n3. 获取验证码:');
-    const captchaResponse = await axios.get('http://localhost:3001/api/auth/captcha');
-    const { captchaId, captcha } = captchaResponse.data;
-    console.log(`✅ 获取验证码成功: ${captcha}`);
-    
-    // 4. 模拟登录获取token
-    console.log('\n4. 模拟登录获取token:');
-    try {
-      const loginResponse = await axios.post('http://localhost:3001/api/auth/login', {
-        username: 'wxq',
-        password: '123456', // 请根据实际密码修改
-        captcha: captcha,
-        captchaId: captchaId
-      });
+    // 3. 测试每个用户的API权限
+    for (const user of users) {
+      console.log(`\n=== 测试用户 ${user.Username} 的API权限 ===`);
       
-      if (!loginResponse.data.token) {
-        console.log('❌ 登录失败，无法获取token');
-        console.log('响应:', loginResponse.data);
-        return;
-      }
-      
-      const token = loginResponse.data.token;
-      console.log('✅ 登录成功，获取到token');
-      
-      // 4. 测试权限获取API
-      console.log('\n4. 测试权限获取API:');
-      const permissionResponse = await axios.get(
-        `http://localhost:3001/api/auth/user/${user.ID}/roles-permissions`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        }
-      );
-      
-      if (permissionResponse.data.success) {
-        const { roles, permissions } = permissionResponse.data.data;
-        console.log(`✅ API调用成功`);
-        console.log(`角色数量: ${roles.length}`);
-        console.log(`权限数量: ${permissions.length}`);
+      try {
+        // 获取验证码
+        console.log('\n3.1 获取验证码:');
+        const captchaResponse = await axios.get('http://localhost:3001/api/auth/captcha');
+        const { captchaId, captcha } = captchaResponse.data;
+        console.log(`✅ 获取验证码成功: ${captcha}`);
         
-        // 查找quality:publishing:add权限
-        const targetPermission = permissions.find(p => p.Permission === 'quality:publishing:add');
-        if (targetPermission) {
-          console.log('\n✅ 找到quality:publishing:add权限:');
-          console.log(`  菜单名称: ${targetPermission.name}`);
-          console.log(`  权限代码: ${targetPermission.Permission}`);
-          console.log(`  权限来源: ${targetPermission.PermissionSource || '未知'}`);
-          console.log(`  权限类型: ${targetPermission.PermissionType || '未知'}`);
-        } else {
-          console.log('\n❌ 未找到quality:publishing:add权限');
-          console.log('所有权限:');
-          permissions.forEach(p => {
-            console.log(`  - ${p.name}: ${p.Permission}`);
-          });
+        // 模拟登录获取token
+        console.log('\n3.2 模拟登录获取token:');
+        const loginResponse = await axios.post('http://localhost:3001/api/auth/login', {
+          username: user.Username,
+          password: '123456', // 请根据实际密码修改
+          captcha: captcha,
+          captchaId: captchaId
+        });
+        
+        if (!loginResponse.data.token) {
+          console.log('❌ 登录失败，无法获取token');
+          console.log('响应:', loginResponse.data);
+          continue;
         }
-      } else {
-        console.log('❌ API调用失败:', permissionResponse.data.message);
+        
+        const token = loginResponse.data.token;
+        console.log('✅ 登录成功，获取到token');
+        
+        // 测试权限获取API
+        console.log('\n3.3 测试权限获取API:');
+        const permissionResponse = await axios.get(
+          `http://localhost:3001/api/auth/user/${user.ID}/roles-permissions`,
+          {
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          }
+        );
+        
+        if (permissionResponse.data.success) {
+          const { roles, permissions } = permissionResponse.data.data;
+          console.log(`✅ API调用成功`);
+          console.log(`角色数量: ${roles.length}`);
+          console.log(`权限数量: ${permissions.length}`);
+          
+          // 查找admin相关权限
+          const adminPermissions = permissions.filter(p => 
+            (p.path && p.path.startsWith('/admin')) || 
+            (p.Permission && p.Permission.includes('admin'))
+          );
+          
+          if (adminPermissions.length > 0) {
+            console.log('\n✅ 找到admin相关权限:');
+            adminPermissions.forEach(perm => {
+              console.log(`  - ${perm.name} (${perm.code})`);
+              console.log(`    路径: ${perm.path || '无'}`);
+              console.log(`    权限: ${perm.Permission}`);
+            });
+          } else {
+            console.log('\n❌ 未找到admin相关权限');
+            console.log('所有权限路径:');
+            permissions.forEach(p => {
+              if (p.path) {
+                console.log(`  - ${p.name}: ${p.path}`);
+              }
+            });
+          }
+        } else {
+          console.log('❌ API调用失败:', permissionResponse.data.message);
+        }
+        
+      } catch (error) {
+        console.log(`❌ 用户 ${user.Username} 测试失败:`, error.response?.data || error.message);
       }
-      
-    } catch (loginError) {
-      console.log('❌ 登录或API调用失败:', loginError.response?.data || loginError.message);
     }
     
     await pool.close();
