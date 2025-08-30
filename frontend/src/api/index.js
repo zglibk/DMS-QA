@@ -4,6 +4,7 @@
  */
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/store/user'
 
 // 创建 axios 实例
 const api = axios.create({
@@ -45,7 +46,13 @@ api.interceptors.response.use(
       switch (status) {
         case 401:
           ElMessage.error('未授权，请重新登录')
-          // 可以在这里处理登录跳转
+          // 清除token和用户数据
+          localStorage.removeItem('token')
+          // 清除Pinia中的用户数据
+          const userStore = useUserStore()
+          userStore.clearUser()
+          // 跳转到登录页
+          window.location.href = '/login'
           break
         case 403:
           ElMessage.error('权限不足')

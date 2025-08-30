@@ -1,6 +1,6 @@
 <template>
   <el-dropdown ref="notificationDropdown" trigger="click" placement="bottom-end">
-    <div class="notification-bell">
+    <div class="notification-bell" :class="attrs.class">
       <el-icon class="bell-icon"><BellFilled /></el-icon>
       <span v-if="unreadCount > 0" class="notification-badge">{{ unreadCount > 99 ? '99+' : unreadCount }}</span>
     </div>
@@ -69,12 +69,20 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, useAttrs } from 'vue'
 import { useRouter } from 'vue-router'
 import { BellFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 import { ElMessage } from 'element-plus'
 import api from '../../api'
+
+// 禁用属性自动继承
+defineOptions({
+  inheritAttrs: false
+})
+
+// 获取传入的属性
+const attrs = useAttrs()
 
 const router = useRouter()
 const userStore = useUserStore()

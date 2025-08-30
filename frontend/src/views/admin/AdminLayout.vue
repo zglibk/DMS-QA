@@ -153,9 +153,16 @@ onMounted(async () => {
     await userStore.fetchProfile()
     await userStore.initializeBaseData()
   } catch (error) {
-    console.error('初始化失败:', error)
-    ElMessage.error('初始化失败，请重新登录')
-    logout()
+    console.error('[AdminLayout] 初始化失败:', error)
+    
+    // 只有在认证失败（401错误）时才清空用户数据
+    if (error.response?.status === 401) {
+      ElMessage.error('登录已过期，请重新登录')
+      logout()
+    } else {
+      // 其他错误不清空用户数据，只显示警告
+      ElMessage.warning('部分数据加载失败，但您仍可以继续使用系统')
+    }
   }
 })
 </script>

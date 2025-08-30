@@ -27,6 +27,7 @@
   "_dependencies_comment": "生产环境依赖包",
   "dependencies": {
     "@tinymce/tinymce-vue": "^4.0.7",
+    "@vueuse/core": "^13.8.0",
     "axios": "^1.0.0",
     "cropperjs": "^1.6.1",
     "echarts": "^5.4.3",
@@ -35,7 +36,8 @@
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "mime-types": "^3.0.1",
-    "pinia": "^2.1.7",
+    "pinia": "^3.0.3",
+    "pinia-plugin-persistedstate": "^4.5.0",
     "sortablejs": "^1.15.6",
     "tinymce": "^5.1.2",
     "vue": "^3.0.0",

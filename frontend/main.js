@@ -26,6 +26,8 @@ import 'element-plus/dist/index.css'
 import zhCn from 'element-plus/dist/locale/zh-cn.mjs'
 // 导入状态管理库
 import { createPinia } from 'pinia'
+// 导入Pinia持久化插件
+import { createPersistedState } from 'pinia-plugin-persistedstate'
 // 导入路由配置
 import router from './src/router/index.js'
 // 导入HTTP请求库
@@ -40,8 +42,17 @@ const app = createApp(App)
 
 // 配置Element Plus UI组件库，使用中文本地化
 app.use(ElementPlus, { locale: zhCn })
+
+// 创建Pinia实例并配置持久化插件
+const pinia = createPinia()
+pinia.use(createPersistedState({
+  // 配置持久化选项
+  storage: localStorage, // 使用localStorage存储
+  auto: true // 自动持久化所有store
+}))
+
 // 安装Pinia状态管理插件
-app.use(createPinia())
+app.use(pinia)
 // 安装Vue Router路由插件
 app.use(router)
 
@@ -113,12 +124,56 @@ const initApp = async () => {
     // 3. 加载网站配置
     const { loadSiteConfig } = useSiteConfig();
     await loadSiteConfig();
+    
+    // 4. 在开发环境下添加用户状态全局监听器
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const { useUserStore } = await import('./src/store/user.js');
+        const { watch } = await import('vue');
+        const userStore = useUserStore();
+        
+        // 只监听用户ID变化，避免深度监听导致的响应式循环
+        watch(
+          () => userStore.user?.id,
+          (newUserId, oldUserId) => {
+            // 如果用户ID发生变化，记录详细信息
+            if (newUserId !== oldUserId) {
+              console.log('🔄 全局用户状态监听 - 用户ID变化:', {
+                时间: new Date().toLocaleTimeString(),
+                旧用户ID: oldUserId,
+                新用户ID: newUserId,
+                旧用户ID类型: typeof oldUserId,
+                新用户ID类型: typeof newUserId,
+                权限菜单数量: userStore.user?.permissions?.menus?.length || 0,
+                token存在: !!userStore.token
+              });
+            }
+          },
+          { immediate: false }
+        );
+        
+        // 用户状态全局监听器已启动
+      } catch (error) {
+        console.warn('用户状态监听器启动失败:', error);
+      }
+    }
+    
+    // 启动数据完整性监控（开发环境）
+    if (process.env.NODE_ENV === 'development') {
+      try {
+        const { useUserStore } = await import('./src/store/user.js');
+        const userStore = useUserStore();
+        userStore.startDataIntegrityMonitor();
+      } catch (error) {
+        console.warn('数据完整性监控启动失败:', error);
+      }
+    }
   } catch (error) {
     // 配置加载失败不影响应用启动
     console.warn('应用初始化过程中出现警告:', error);
   }
 
-  // 4. 将Vue应用挂载到id为'app'的DOM元素
+  // 5. 将Vue应用挂载到id为'app'的DOM元素
   app.mount('#app');
 };
 

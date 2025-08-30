@@ -33,7 +33,7 @@ class ApiService {
     try {
       // 直接使用vite配置的代理路径，与main.js保持一致
       const apiUrl = '/api'
-      console.log('🔧 ApiService初始化，使用vite代理路径:', apiUrl)
+      // ApiService初始化，使用vite代理路径
       this.currentBaseURL = apiUrl
 
       // 创建axios实例

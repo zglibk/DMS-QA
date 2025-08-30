@@ -62,6 +62,8 @@ const routes = [
     component: () => import('../views/Profile.vue')
   },
 
+
+
   // 管理后台路由（嵌套路由结构）
   {
     path: '/admin',
@@ -372,7 +374,9 @@ const routes = [
         path: 'menu-management',
         component: () => import('../views/admin/MenuManagement.vue'),
         meta: { requiresAuth: true }
-      }
+      },
+
+
     ]
   }
 ]
@@ -428,10 +432,48 @@ router.beforeEach(async (to, from, next) => {
       // 智能检查用户信息完整性
       const hasBasicInfo = userStore.user && userStore.user.id &&
                           (userStore.user.username || userStore.user.Username)
+      const hasCompletePermissions = userStore.user && userStore.user.permissions && 
+                                    userStore.user.permissions.menus && 
+                                    userStore.user.permissions.menus.length > 0
       const hasFromLocalStorage = localStorage.getItem('user-info')
 
-      if (!hasBasicInfo && !hasFromLocalStorage) {
-        await userStore.fetchProfile()
+      // 如果没有基本信息或权限信息不完整，则获取用户资料
+      // 添加额外检查：避免在UserDropdown组件挂载时重复调用
+      const shouldFetchProfile = (!hasBasicInfo || !hasCompletePermissions) && 
+                                !userStore._isFetchingProfile
+      
+      if (shouldFetchProfile) {
+        // 设置标志防止重复调用
+        userStore._isFetchingProfile = true
+        if (process.env.NODE_ENV === 'development') {
+          console.log('=== Router守卫：需要获取用户资料 ===', {
+            hasBasicInfo,
+            hasCompletePermissions,
+            hasFromLocalStorage: !!hasFromLocalStorage,
+            当前用户ID: userStore.user?.id,
+            菜单权限数量: userStore.user?.permissions?.menus?.length || 0
+          });
+        }
+        try {
+          await userStore.fetchProfile()
+          
+          // 验证获取后的权限数据
+          if (process.env.NODE_ENV === 'development') {
+            console.log('=== Router守卫：获取用户资料后 ===', {
+              用户ID: userStore.user?.id,
+              角色数量: userStore.user?.roles?.length || 0,
+              菜单权限数量: userStore.user?.permissions?.menus?.length || 0
+            });
+          }
+        } finally {
+          // 清除标志
+          userStore._isFetchingProfile = false
+        }
+      } else if (process.env.NODE_ENV === 'development') {
+        console.log('=== Router守卫：用户信息完整，跳过API调用 ===', {
+          用户ID: userStore.user.id,
+          菜单权限数量: userStore.user.permissions.menus.length
+        });
       }
       
       // 暂时允许所有已登录用户访问后台

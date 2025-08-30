@@ -108,7 +108,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -167,19 +167,26 @@ const isFullscreen = ref(false)
 
 // 计算属性
 const isInAdmin = computed(() => route.path.startsWith('/admin'))
+
+/**
+ * 检查用户是否具有管理员权限
+ * 判断条件：系统管理员 || adminPermissionCount > 0
+ * 修复：避免在计算属性中进行可能触发响应式更新的操作
+ */
 const hasAdminPermission = computed(() => {
-  // 检查用户是否为系统管理员
-  const isAdmin = userStore.isAdmin
+  // 基础数据检查 - 简化逻辑，避免复杂的调试输出
+  if (!userStore.user?.id) {
+    return false;
+  }
   
-  // 检查用户是否有任何后台路由权限
-  const hasAnyAdmin = userStore.hasAnyAdminPermission
+  // 判断条件：系统管理员 || adminPermissionCount > 0
+  const isSystemAdmin = userStore.isAdmin;
+  const hasAdminMenus = userStore.adminPermissionCount > 0;
   
-  // 检查用户是否有特定的后台访问权限
-  const hasDashboard = userStore.hasActionPermission('admin:dashboard:view')
-  const hasAccess = userStore.hasActionPermission('admin:access')
+  // 满足任一条件即可：系统管理员 || 有Admin权限
+  const result = isSystemAdmin || hasAdminMenus;
   
-  // 满足任一条件即可显示"登录后台"菜单项
-  return isAdmin || hasAnyAdmin || hasDashboard || hasAccess
+  return result;
 })
 
 /**
@@ -238,13 +245,9 @@ const goHome = () => {
 
 /**
  * 跳转到后台管理
+ * 修复：简化权限检查逻辑，避免重复验证
  */
 const goAdmin = async () => {
-  // 如果没有后台权限，则不执行跳转
-  if (!hasAdminPermission.value) {
-    return
-  }
-
   // 检查用户是否已登录
   if (!userStore.token) {
     ElMessage.error('请先登录')
@@ -262,7 +265,7 @@ const goAdmin = async () => {
     }
   }
 
-  // 权限验证
+  // 权限验证 - 只检查一次
   if (hasAdminPermission.value) {
     router.push('/admin/dashboard')
   } else {
@@ -346,13 +349,85 @@ const getRoleTagType = (roleName, index) => {
   return tagTypes[index % tagTypes.length]
 }
 
+/**
+ * 查看用户状态变化历史（调试用）
+ * 在浏览器控制台中调用 window.showUserStateHistory() 查看完整时间线
+ */
+const showUserStateHistory = () => {
+  const history = userStore.getUserStateHistory()
+  console.log('📊 用户状态变化时间线 (共' + history.length + '条记录):')
+  console.log('=' .repeat(80))
+  
+  history.forEach((record, index) => {
+    console.log(`${index + 1}. [${record.时间}] ${record.操作}`)
+    console.log('   详情:', record.详情)
+    console.log('   时间戳:', new Date(record.时间戳).toLocaleString())
+    console.log('-'.repeat(60))
+  })
+  
+  console.log('💡 提示: 这个时间线记录了所有用户数据变化，包括clearUser调用')
+  console.log('💡 如需实时监控，请在控制台输入: window.showUserStateHistory()')
+  
+  return history
+}
+
+// 将方法暴露到全局，方便调试
+if (typeof window !== 'undefined') {
+  window.showUserStateHistory = showUserStateHistory
+  window.userStore = userStore
+  // 调试工具已加载
+}
+
 // 生命周期钩子
 onMounted(() => {
   document.addEventListener('fullscreenchange', handleFullscreenChange)
+  
+  // 记录组件挂载时的用户状态
+  userStore._recordUserStateChange('UserDropdown组件挂载', {
+    当前路径: route.path,
+    是否在后台: isInAdmin.value,
+    用户ID: userStore.user?.id,
+    token存在: !!userStore.token,
+    权限菜单数量: userStore.user?.permissions?.menus?.length || 0,
+    用户对象完整性: {
+      用户对象存在: !!userStore.user,
+      用户名存在: !!(userStore.user?.username || userStore.user?.Username),
+      权限对象存在: !!userStore.user?.permissions,
+      菜单权限存在: !!userStore.user?.permissions?.menus
+    }
+  })
+  
+  // 监听用户ID变化（避免在监听器中调用store方法导致响应式循环）
+  watch(() => userStore.user?.id, (newId, oldId) => {
+    // 用户ID变化处理逻辑
+  }, { immediate: false })
+  
+  // 监听用户对象引用变化（浅层监听）
+  watch(() => userStore.user, (newUser, oldUser) => {
+    // 用户对象变化处理逻辑
+  }, { immediate: false })
+  
+  window.addEventListener('storage', handleStorageChange)
 })
+
+// 监听localStorage变化的处理函数
+const handleStorageChange = (e) => {
+  if (e.key === 'user-store') {
+    userStore._recordUserStateChange('localStorage变化检测', {
+      变化时间: new Date().toLocaleTimeString(),
+      旧值长度: e.oldValue?.length || 0,
+      新值长度: e.newValue?.length || 0,
+      当前路径: route.path,
+      存储事件类型: e.type
+    })
+  }
+}
 
 onUnmounted(() => {
   document.removeEventListener('fullscreenchange', handleFullscreenChange)
+  
+  // 清理localStorage监听器
+  window.removeEventListener('storage', handleStorageChange)
 })
 </script>
 
@@ -395,16 +470,23 @@ onUnmounted(() => {
   padding: 4px;
   border-radius: 4px;
   transition: all 0.3s ease;
+  outline: none; /* 移除获得焦点时的黑色边框 */
 }
 
 .dropdown-trigger:hover {
   background-color: #f5f7fa;
 }
 
+.dropdown-trigger:focus {
+  outline: none; /* 确保焦点状态下也没有边框 */
+  background-color: transparent; /* 移除焦点时的灰色背景 */
+}
+
 .dropdown-arrow {
   color: #606266;
   transition: all 0.3s ease;
   font-size: 14px;
+  outline: none; /* 移除图标获得焦点时的黑色边框 */
 }
 
 .dropdown-arrow-up {

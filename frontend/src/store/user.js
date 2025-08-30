@@ -14,66 +14,100 @@
  */
 
 import { defineStore } from 'pinia'
+import { useStorage } from '@vueuse/core'
 import apiService from '../services/apiService.js'
+
+// 在store外部定义useStorage实例，确保它们在整个应用生命周期中保持一致
+const persistentUserId = useStorage('user-id', null, localStorage)
+const persistentToken = useStorage('user-token', null, localStorage)
+const persistentUserData = useStorage('user-data', null, localStorage)
+
+// 定义默认用户对象结构
+const defaultUser = {
+  id: null,
+  username: '',
+  Username: '', // 兼容后端字段
+  realName: '',
+  RealName: '', // 兼容后端字段
+  email: '',
+  Email: '', // 兼容后端字段
+  phone: '',
+  Phone: '', // 兼容后端字段
+  gender: '',
+  Gender: '', // 兼容后端字段
+  birthday: null,
+  Birthday: null, // 兼容后端字段
+  address: '',
+  Address: '', // 兼容后端字段
+  Avatar: '',
+  status: 1,
+  Status: 1, // 兼容后端字段
+  lastLoginTime: null, // 最后登录时间
+  // 部门信息
+  departmentId: null,
+  DepartmentID: null, // 兼容后端字段
+  departmentName: '',
+  DepartmentName: '', // 兼容后端字段
+  // 岗位信息
+  positionId: null,
+  PositionID: null, // 兼容后端字段
+  positionName: '',
+  PositionName: '', // 兼容后端字段
+  CreatedAt: null, // 后端字段
+  // 角色信息（支持多角色）
+  roles: [],
+  // 权限信息
+  permissions: {
+    menus: [], // 用户可访问的菜单列表
+    departments: [], // 用户可管理的部门列表
+    actions: [] // 用户可执行的操作权限
+  }
+}
 
 export const useUserStore = defineStore('user', {
   state: () => {
-    // 从localStorage恢复用户信息
-    const savedUser = localStorage.getItem('user-info')
-    let restoredUser = null
-
-    try {
-      restoredUser = savedUser ? JSON.parse(savedUser) : null
-      // 静默恢复用户信息，减少调试输出
-    } catch (error) {
-      localStorage.removeItem('user-info')
-    }
-
     return {
-      // 用户认证token
-      token: localStorage.getItem('token') || null,
+      // 用户认证token - 从useStorage获取初始值
+      token: persistentToken.value,
       // 未读通知数量
       unreadNoticeCount: 0,
-    user: restoredUser || {
-      id: null,
-      username: '',
-      Username: '', // 兼容后端字段
-      realName: '',
-      RealName: '', // 兼容后端字段
-      email: '',
-      Email: '', // 兼容后端字段
-      phone: '',
-      Phone: '', // 兼容后端字段
-      gender: '',
-      Gender: '', // 兼容后端字段
-      birthday: null,
-      Birthday: null, // 兼容后端字段
-      address: '',
-      Address: '', // 兼容后端字段
-      Avatar: '',
-      status: 1,
-      Status: 1, // 兼容后端字段
-      lastLoginTime: null, // 最后登录时间
-      // 部门信息
-      departmentId: null,
-      DepartmentID: null, // 兼容后端字段
-      departmentName: '',
-      DepartmentName: '', // 兼容后端字段
-      // 岗位信息
-      positionId: null,
-      PositionID: null, // 兼容后端字段
-      positionName: '',
-      PositionName: '', // 兼容后端字段
-      CreatedAt: null, // 后端字段
-      // 角色信息（支持多角色）
-      roles: [],
-      // 权限信息
-      permissions: {
-        menus: [], // 用户可访问的菜单列表
-        departments: [], // 用户可管理的部门列表
-        actions: [] // 用户可执行的操作权限
+    // 用户信息 - 使用Proxy来监控修改
+    user: process.env.NODE_ENV === 'development' ? (() => {
+      // 创建用户对象的Proxy包装函数
+      const createUserProxy = (userData) => {
+        return new Proxy(userData, {
+          set(target, property, value, receiver) {
+            const oldValue = target[property]
+            
+            // 防止设置无效的用户ID，但允许从null/undefined恢复为有效数字
+            if (property === 'id') {
+              // 如果新值是有效数字，允许设置
+              if (typeof value === 'number' && value > 0) {
+                // 允许设置有效的用户ID
+              } else if (value === null || value === undefined) {
+                // 允许清空用户ID（登出时）
+              } else {
+                console.warn('阻止设置无效的用户ID:', value)
+                return false // 阻止设置
+              }
+            }
+            
+            const result = Reflect.set(target, property, value, receiver)
+            
+            // 用户ID已修改
+            
+            return result
+          },
+          get(target, property, receiver) {
+            const value = Reflect.get(target, property, receiver)
+            // 用户ID访问记录
+            return value
+          }
+        })
       }
-    },
+      
+      return createUserProxy({ ...defaultUser })
+    })() : { ...defaultUser },
     // 缓存的基础数据
     departments: [],
     positions: [],
@@ -82,8 +116,214 @@ export const useUserStore = defineStore('user', {
 
     // 性能优化：缓存相关
     lastFetchTime: 0, // 最后获取用户信息的时间戳
-    fetchCacheDuration: 5 * 60 * 1000 // 5分钟缓存时间
+    fetchCacheDuration: 5 * 60 * 1000, // 5分钟缓存时间
+    
+    // 调试相关
+     _lastPermissionLogTime: 0, // 最后一次权限检查日志输出时间
+     _userStateHistory: [], // 用户状态变化历史记录
+     
+     // 并发控制标志
+     _isUpdating: false,
+     _isFetchingProfile: false, // 是否正在获取用户资料
+     _updateQueue: []
     }
+  },
+
+   // 添加全局状态监听器（仅在开发环境）
+   ...(process.env.NODE_ENV === 'development' ? {
+     $onAction: ({ name, store, args, after, onError }) => {
+       // Store Action记录
+       
+       after((result) => {
+         // Store Action完成
+       })
+       
+       onError((error) => {
+         console.error(`Store Action错误: ${name}`, error.message)
+       })
+     }
+   } : {}),
+
+   // Pinia持久化配置 - 增强版配置，处理并发和序列化问题
+   persist: {
+    key: 'user-store',
+    storage: localStorage,
+    paths: ['token', 'user', 'unreadNoticeCount'],
+    // 自定义序列化器，处理特殊对象和并发问题
+    serializer: {
+      serialize: (state) => {
+        try {
+          // 并发控制：如果正在更新，跳过序列化
+          if (state._isUpdating) {
+            return localStorage.getItem('user-store') || '{}'
+          }
+          
+          // 清理不需要持久化的字段
+          const cleanState = {
+            token: state.token,
+            user: state.user ? {
+              // 确保所有属性都被正确复制，无论是否为Proxy
+              id: state.user.id,
+              username: state.user.username,
+              Username: state.user.Username,
+              realName: state.user.realName,
+              RealName: state.user.RealName,
+              email: state.user.email,
+              Email: state.user.Email,
+              phone: state.user.phone,
+              Phone: state.user.Phone,
+              gender: state.user.gender,
+              Gender: state.user.Gender,
+              birthday: state.user.birthday,
+              Birthday: state.user.Birthday,
+              address: state.user.address,
+              Address: state.user.Address,
+              Avatar: state.user.Avatar,
+              status: state.user.status,
+              Status: state.user.Status,
+              lastLoginTime: state.user.lastLoginTime,
+              departmentId: state.user.departmentId,
+              DepartmentID: state.user.DepartmentID,
+              departmentName: state.user.departmentName,
+              DepartmentName: state.user.DepartmentName,
+              DeptName: state.user.DeptName,
+              positionId: state.user.positionId,
+              PositionID: state.user.PositionID,
+              positionName: state.user.positionName,
+              PositionName: state.user.PositionName,
+              CreatedAt: state.user.CreatedAt,
+              roles: state.user.roles || [],
+              permissions: state.user.permissions || { menus: [], departments: [], actions: [] }
+            } : null,
+            unreadNoticeCount: state.unreadNoticeCount
+          }
+          
+          // 数据完整性检查
+          if (cleanState.user && !cleanState.user.id && state.user?.id) {
+            cleanState.user.id = state.user.id
+          }
+          
+          return JSON.stringify(cleanState)
+        } catch (error) {
+          console.error('序列化失败:', error)
+          return localStorage.getItem('user-store') || '{}'
+        }
+      },
+      deserialize: (value) => {
+        try {
+          const parsed = JSON.parse(value)
+          
+          // 数据完整性验证
+          if (parsed.user) {
+            // 确保权限对象结构完整
+            if (!parsed.user.permissions) {
+              parsed.user.permissions = { menus: [], departments: [], actions: [] }
+            }
+            if (!parsed.user.roles) {
+              parsed.user.roles = []
+            }
+            
+            // 确保用户ID是有效的数字
+            if (parsed.user.id !== null && parsed.user.id !== undefined) {
+              parsed.user.id = Number(parsed.user.id)
+              if (isNaN(parsed.user.id) || parsed.user.id <= 0) {
+                console.warn('反序列化时发现无效的用户ID:', parsed.user.id)
+                // 不要重置为null，保持原值或从localStorage重新获取
+                const rawData = localStorage.getItem('user-store')
+                if (rawData) {
+                  try {
+                    const rawParsed = JSON.parse(rawData)
+                    if (rawParsed.user?.id && Number(rawParsed.user.id) > 0) {
+                      parsed.user.id = Number(rawParsed.user.id)
+                    }
+                  } catch (e) {
+                    console.error('从原始数据恢复用户ID失败:', e)
+                  }
+                }
+              }
+            }
+          }
+          
+          return parsed
+         } catch (error) {
+           console.error('反序列化失败:', error)
+           // 反序列化失败时，尝试从localStorage获取原始数据
+           const rawData = localStorage.getItem('user-store')
+           if (rawData) {
+             try {
+               const rawParsed = JSON.parse(rawData)
+               if (rawParsed.user?.id && Number(rawParsed.user.id) > 0) {
+                 return {
+                   token: rawParsed.token || null,
+                   user: {
+                     ...rawParsed.user,
+                     id: Number(rawParsed.user.id),
+                     permissions: rawParsed.user.permissions || { menus: [], departments: [], actions: [] },
+                     roles: rawParsed.user.roles || []
+                   },
+                   unreadNoticeCount: rawParsed.unreadNoticeCount || 0
+                 }
+               }
+             } catch (e) {
+               console.error('从原始数据恢复失败:', e)
+             }
+           }
+           
+           // 最后的兜底方案：返回空状态但不覆盖现有数据
+           return null
+         }
+      }
+    },
+    beforeRestore: (context) => {
+      // 准备恢复数据
+    },
+    afterRestore: (context) => {
+       const state = context.store.$state
+       
+       // 数据完整性验证和修复
+       if (state.user && !state.user.id) {
+         // 尝试从localStorage原始数据中恢复
+         try {
+           const rawData = localStorage.getItem('user-store')
+           if (rawData) {
+             const parsed = JSON.parse(rawData)
+             if (parsed.user && parsed.user.id && typeof parsed.user.id === 'number' && parsed.user.id > 0) {
+               // 创建恢复的用户对象
+               const recoveredUser = {
+                 ...state.user,
+                 ...parsed.user,
+                 permissions: parsed.user.permissions || state.user.permissions || {
+                   menus: [],
+                   departments: [],
+                   actions: []
+                 }
+               }
+               
+               // 逐个属性更新，避免直接替换整个对象引用
+               Object.keys(recoveredUser).forEach(key => {
+                 if (key === 'permissions') {
+                   // 权限数据需要深度合并
+                   if (!state.user.permissions) {
+                     state.user.permissions = { menus: [], departments: [], actions: [] }
+                   }
+                   if (recoveredUser.permissions) {
+                     Object.assign(state.user.permissions, recoveredUser.permissions)
+                   }
+                 } else {
+                   // 只更新有效的属性值，避免设置undefined
+                   const value = recoveredUser[key]
+                   if (value !== undefined && value !== null) {
+                     state.user[key] = value
+                   }
+                 }
+               })
+             }
+           }
+         } catch (error) {
+           console.error('从localStorage恢复数据失败:', error)
+         }
+       }
+     }
   },
 
   getters: {
@@ -107,6 +347,17 @@ export const useUserStore = defineStore('user', {
     hasActionPermission: (state) => (action) => {
       // 从菜单权限中提取Permission字段进行匹配
       const menus = state.user?.permissions?.menus || []
+      
+      // 调试输出（开发环境）
+      if (process.env.NODE_ENV === 'development') {
+        const matchingMenus = menus.filter(menu => menu.Permission === action)
+        console.log(`hasActionPermission("${action}"):`, {
+          result: matchingMenus.length > 0,
+          matchingMenus,
+          totalMenus: menus.length
+        })
+      }
+      
       return menus.some(menu => menu.Permission === action)
     },
 
@@ -146,6 +397,12 @@ export const useUserStore = defineStore('user', {
 
     // 检查是否为管理员
     isAdmin: (state) => {
+      // 检查用户名是否为 admin
+      if (state.user?.username === 'admin' || state.user?.Username === 'admin') {
+        return true;
+      }
+      
+      // 检查角色是否为管理员
       return (state.user?.roles || []).some(role => 
         (role.Name || role.name) === 'admin' || 
         (role.Name || role.name) === '系统管理员'
@@ -183,12 +440,32 @@ export const useUserStore = defineStore('user', {
       })
     },
 
-    // 检查用户是否有任何 /admin 路由下的权限（使用正则表达式）
+    // 获取用户Admin/System权限数量
+    adminPermissionCount: (state) => {
+      const adminRouteRegex = /^\/admin(\/.*)?$/
+      const systemRouteRegex = /^\/system(\/.*)?$/
+      const menus = state.user?.permissions?.menus || []
+      
+      // 统计admin或system路径的权限数量
+      const adminMenus = menus.filter(menu => {
+        const path = menu.Path || menu.path; // 兼容大小写字段名
+        return path && (adminRouteRegex.test(path) || systemRouteRegex.test(path));
+      });
+      
+      return adminMenus.length;
+    },
+
+    // 检查用户是否有任何 /admin 路由下的权限（基于权限数量）
     hasAnyAdminPermission: (state) => {
       const adminRouteRegex = /^\/admin(\/.*)?$/
-      return (state.user?.permissions?.menus || []).some(menu => 
-        menu.path && adminRouteRegex.test(menu.path)
-      )
+      const systemRouteRegex = /^\/system(\/.*)?$/
+      const menus = state.user?.permissions?.menus || []
+      
+      // 直接检查是否有admin或system路径的权限，避免循环引用
+      return menus.some(menu => {
+        const path = menu.Path || menu.path; // 兼容大小写字段名
+        return path && (adminRouteRegex.test(path) || systemRouteRegex.test(path));
+      });
     }
   },
 
@@ -218,20 +495,33 @@ export const useUserStore = defineStore('user', {
           return { success: true, data: this.user }
         }
 
-        // 如果从localStorage恢复了完整的用户信息，也跳过API调用
-        if (!forceRefresh && hasUsername && this.user.roles && this.user.roles.length > 0) {
+        // 如果从localStorage恢复了完整的用户信息（包括权限），也跳过API调用
+        const hasCompletePermissions = this.user.roles && this.user.roles.length > 0 && 
+                                      this.user.permissions && this.user.permissions.menus && 
+                                      this.user.permissions.menus.length > 0
+        
+        if (!forceRefresh && hasUsername && hasCompletePermissions) {
+
           this.lastFetchTime = Date.now() // 更新缓存时间
           return { success: true, data: this.user }
         }
+        
+
 
         const response = await apiService.get('/auth/profile')
 
         if (response.data.success) {
           const userData = response.data.data
           
+
+          
           // 设置基本用户信息 - 使用setUser方法确保响应式更新
+          // 排除权限字段，避免覆盖已获取的权限数据
+          // 保留当前的权限和角色数据，只更新基本信息
+          const currentPermissions = this.user?.permissions || { menus: [], departments: [], actions: [] }
+          const currentRoles = this.user?.roles || []
+          
           const newUserData = {
-            ...this.user,
             id: userData.ID,
             username: userData.Username, // 将后端的Username映射到前端的username
             Username: userData.Username, // 保留原字段以兼容现有代码
@@ -261,11 +551,20 @@ export const useUserStore = defineStore('user', {
             CreatedAt: userData.CreatedAt
           }
           
-          // 使用setUser方法确保响应式更新
-          this.setUser(newUserData)
-          
-          // 获取用户角色和权限信息
+          // 先获取用户角色和权限信息
           await this.fetchUserRolesAndPermissions(userData.ID)
+          
+          // 然后设置基本用户信息，保留已获取的权限数据
+          // 合并当前权限数据和新的基本信息
+          const finalUserData = {
+            ...newUserData,
+            permissions: this.user?.permissions || currentPermissions,
+            roles: this.user?.roles || currentRoles
+          }
+          
+          this.setUser(finalUserData)
+          
+          // 权限信息已更新，pinia-plugin-persistedstate 会自动持久化
 
           // 更新缓存时间
           this.lastFetchTime = Date.now()
@@ -282,9 +581,19 @@ export const useUserStore = defineStore('user', {
      */
     async fetchUserRolesAndPermissions(userId = null) {
       try {
+
+        
         // 使用传入的userId或当前用户ID，确保ID存在
         const targetUserId = userId || this.user.id
+        
+
+        
         if (!targetUserId) {
+          console.log('⚠️ fetchUserRolesAndPermissions - 用户ID不存在:', {
+            传入的userId: userId,
+            当前用户ID: this.user?.id
+          })
+          
           // 设置默认权限结构
           this.user.roles = []
           this.user.permissions = {
@@ -295,23 +604,26 @@ export const useUserStore = defineStore('user', {
           return
         }
 
+
+        
         const response = await apiService.get(`/auth/user/${targetUserId}/roles-permissions`)
+        
+
         if (response.data.success) {
           const data = response.data.data
+          
+
           
           this.user.roles = data.roles || []
           this.user.permissions = {
             menus: data.menus || data.permissions || [],
             departments: data.departments || [],
             actions: data.actions || []
-          }      
-
-          // 保存更新后的用户信息（包含权限）到localStorage
-          try {
-            localStorage.setItem('user-info', JSON.stringify(this.user))
-          } catch (error) {
-            // 静默处理保存失败
           }
+          
+
+
+          // 权限数据已更新，pinia-plugin-persistedstate 会自动持久化
         }
       } catch (error) {
         console.error('获取用户权限失败:', error)
@@ -323,12 +635,24 @@ export const useUserStore = defineStore('user', {
           return
         }
         
-        // 对于其他错误，设置默认权限，避免影响用户体验
-        this.user.roles = []
-        this.user.permissions = {
-          menus: [],
-          departments: [],
-          actions: []
+        // 对于其他错误，保持现有权限数据不变，避免清空已有权限
+        // 只在权限数据完全不存在时才设置默认值
+        if (!this.user.roles) {
+          this.user.roles = []
+        }
+        if (!this.user.permissions) {
+          this.user.permissions = {
+            menus: [],
+            departments: [],
+            actions: []
+          }
+        }
+        
+        if (process.env.NODE_ENV === 'development') {
+          console.log('权限获取失败，保持现有权限数据:', {
+            角色数量: this.user.roles?.length || 0,
+            菜单权限数量: this.user.permissions?.menus?.length || 0
+          });
         }
       }
     },
@@ -403,16 +727,73 @@ export const useUserStore = defineStore('user', {
       }
     },
 
-    // 手动设置用户信息
+    // 手动设置用户信息（增强并发控制）
     setUser(userData) {
-      // 完全替换user对象以确保响应式更新
-      this.user = { ...this.user, ...userData }
-
-      // 保存用户信息到localStorage以支持页面刷新后恢复
+      const currentTime = new Date().toLocaleTimeString()
+      
+      // 并发控制：防止同时更新
+      if (this._isUpdating) {
+        this._updateQueue.push(() => this.setUser(userData))
+        return
+      }
+      
+      this._isUpdating = true
+      
       try {
-        localStorage.setItem('user-info', JSON.stringify(this.user))
-      } catch (error) {
-        // 静默处理保存失败
+      // 保护权限数据，避免被意外清空
+      const currentPermissions = this.user.permissions || {
+        menus: [],
+        departments: [],
+        actions: []
+      }
+      
+      // 如果传入的userData包含permissions，则使用新的权限数据
+      // 否则保留当前的权限数据
+      const newPermissions = userData.permissions || currentPermissions
+      
+
+      
+      // 数据完整性验证 - 确保关键字段不为undefined
+      const safeUserData = {
+        ...this.user,
+        ...userData,
+        permissions: newPermissions
+      }
+      
+      // 关键字段保护 - 防止undefined值覆盖有效数据
+      if (userData.id === undefined && this.user?.id !== undefined) {
+        safeUserData.id = this.user.id
+      }
+      
+      if (userData.username === undefined && this.user?.username !== undefined) {
+        safeUserData.username = this.user.username
+      }
+      
+      // 使用useStorage自动同步到localStorage
+      persistentUserData.value = safeUserData
+      
+      // 同时更新用户ID的独立存储
+      if (safeUserData && safeUserData.id) {
+        persistentUserId.value = safeUserData.id
+      }
+      
+
+      
+      // 直接设置用户数据，避免Proxy导致的响应式问题
+      this.user = safeUserData
+      
+      // 检查设置后的用户数据完整性
+      this._checkUserDataIntegrity('setUser调用后')
+      
+      } finally {
+        // 释放并发锁
+        this._isUpdating = false
+        
+        // 处理队列中的更新
+        if (this._updateQueue.length > 0) {
+          const nextUpdate = this._updateQueue.shift()
+          setTimeout(nextUpdate, 0)
+        }
       }
     },
 
@@ -423,7 +804,10 @@ export const useUserStore = defineStore('user', {
 
     // 设置token
     setToken(token) {
+      // 使用useStorage自动同步到localStorage
+      persistentToken.value = token
       this.token = token
+      // 同时保存到localStorage以供API请求使用
       if (token) {
         localStorage.setItem('token', token)
       } else {
@@ -433,43 +817,64 @@ export const useUserStore = defineStore('user', {
 
     // 清除用户信息（登出时使用）
     clearUser() {
-      this.token = null
-      localStorage.removeItem('token')
-      localStorage.removeItem('user-info') // 清除用户信息缓存
-      this.user = {
-        id: null,
-        username: '',
-        Username: '',
-        realName: '',
-        RealName: '',
-        email: '',
-        Email: '',
-        phone: '',
-        Phone: '',
-        gender: '',
-        Gender: '',
-        birthday: null,
-        Birthday: null,
-        address: '',
-        Address: '',
-        Avatar: '',
-        status: 1,
-        Status: 1,
-        lastLoginTime: null,
-        departmentId: null,
-        DepartmentID: null,
-        departmentName: '',
-        DepartmentName: '',
-        positionId: null,
-        PositionID: null,
-        positionName: '',
-        PositionName: '',
-        CreatedAt: null,
-        roles: [],
-        permissions: {
-          menus: [],
-          departments: [],
-          actions: []
+      const currentTime = new Date().toLocaleTimeString()
+      const callStack = new Error().stack
+      
+      // 并发控制：防止同时更新
+      if (this._isUpdating) {
+        this._updateQueue.push(() => this.clearUser())
+        return
+      }
+      
+      this._isUpdating = true
+      
+      try {
+        // 分析调用来源（简化日志，避免响应式循环）
+        const stackLines = callStack.split('\n')
+        const callerLine = stackLines.find(line => 
+          line.includes('.vue') || 
+          line.includes('router') || 
+          line.includes('interceptor') ||
+          line.includes('apiService')
+        )
+        if (callerLine) {
+          // clearUser调用来源记录
+        }
+        
+        // 开始清除用户数据
+        
+        // 使用useStorage清除持久化数据
+        persistentUserData.value = null
+        persistentToken.value = null
+        persistentUserId.value = null
+        
+        this.token = null
+        
+        // 直接重置用户数据，避免Proxy导致的响应式问题
+        this.user = {
+          id: null,
+          username: '',
+          roles: [],
+          permissions: {
+            menus: [],
+            departments: [],
+            actions: []
+          }
+        }
+        
+        this.unreadNoticeCount = 0
+        
+        // 清除localStorage中的token
+        localStorage.removeItem('token')
+        
+      } finally {
+        // 释放并发锁
+        this._isUpdating = false
+        
+        // 处理队列中的更新
+        if (this._updateQueue.length > 0) {
+          const nextUpdate = this._updateQueue.shift()
+          setTimeout(nextUpdate, 0)
         }
       }
     },
@@ -541,7 +946,122 @@ export const useUserStore = defineStore('user', {
      */
     clearUnreadNoticeCount() {
       this.unreadNoticeCount = 0
-    }
+    },
+
+    /**
+     * 记录用户状态变化历史（调试用）
+     * @param {string} action - 操作类型
+     * @param {object} details - 详细信息
+     */
+    _recordUserStateChange(action, details) {
+      const record = {
+        时间: new Date().toLocaleTimeString(),
+        操作: action,
+        详情: details,
+        时间戳: Date.now()
+      }
+      
+      this._userStateHistory.push(record)
+      
+      // 只保留最近50条记录
+      if (this._userStateHistory.length > 50) {
+        this._userStateHistory.shift()
+      }
+      
+      // 记录用户状态变化
+    },
+
+    /**
+     * 检查用户数据完整性的方法
+     * @param {string} context - 检查上下文
+     */
+    _checkUserDataIntegrity(context = '') {
+      // 检查用户数据完整性
+      const hasUser = !!this.user
+      const hasUserId = !!(this.user?.id)
+      const hasPermissions = !!this.user?.permissions
+      
+      return {
+        hasUser,
+        hasUserId,
+        hasPermissions
+      }
+    },
+
+    /**
+     * 获取用户状态变化历史（调试用）
+     */
+    getUserStateHistory() {
+      return this._userStateHistory
+    },
+
+    /**
+     * 启动数据完整性监控（开发环境）
+     */
+    startDataIntegrityMonitor() {
+      if (process.env.NODE_ENV !== 'development') return
+      
+      // 每30秒检查一次数据完整性
+      const checkInterval = setInterval(() => {
+        this._checkUserDataIntegrity('定期检查')
+        
+        // 如果发现数据异常，尝试修复
+        if (this.user && !this.user.id && this.token) {
+          try {
+            const rawData = localStorage.getItem('user-store')
+            if (rawData) {
+              const parsed = JSON.parse(rawData)
+              if (parsed.user && parsed.user.id) {
+                // 避免直接替换用户对象，而是更新属性以防止触发响应式监听器
+                const recoveredData = parsed.user
+                
+                // 只更新有效的用户ID
+                if (recoveredData.id && typeof recoveredData.id === 'number') {
+                  this.user.id = recoveredData.id
+                }
+                
+                // 恢复其他用户属性（如果存在且有效）
+                if (recoveredData.username) this.user.username = recoveredData.username
+                if (recoveredData.Username) this.user.Username = recoveredData.Username
+                if (recoveredData.realName) this.user.realName = recoveredData.realName
+                if (recoveredData.RealName) this.user.RealName = recoveredData.RealName
+                
+                // 恢复权限数据
+                if (recoveredData.permissions) {
+                  this.user.permissions = {
+                    menus: recoveredData.permissions.menus || [],
+                    departments: recoveredData.permissions.departments || [],
+                    actions: recoveredData.permissions.actions || []
+                  }
+                }
+                
+                // 恢复角色数据
+                if (recoveredData.roles && Array.isArray(recoveredData.roles)) {
+                  this.user.roles = recoveredData.roles
+                }
+              }
+            }
+          } catch (error) {
+            console.error('定期检查中恢复数据失败:', error)
+          }
+        }
+      }, 30000) // 30秒检查一次
+      
+      // 保存定时器引用以便清理
+      this._integrityCheckTimer = checkInterval
+    },
+
+    /**
+     * 停止数据完整性监控
+     */
+    stopDataIntegrityMonitor() {
+      if (this._integrityCheckTimer) {
+        clearInterval(this._integrityCheckTimer)
+        this._integrityCheckTimer = null
+      }
+    },
+
+
   }
 })
 

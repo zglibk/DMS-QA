@@ -1569,7 +1569,7 @@ const checkPermissions = async () => {
       permissions[key] = hasPermission
     })
     
-    console.log('内部投诉权限检查结果:', permissions)
+
     
   } catch (error) {
     console.error('权限检查失败:', error)
@@ -1671,13 +1671,20 @@ const chartOptions = ref({
   defectiveItems: []
 })
 
+/**
+ * 获取用户资料
+ * 使用userStore的fetchProfile方法，确保用户状态正确管理
+ */
 const fetchProfile = async () => {
-  const token = localStorage.getItem('token')
-  const res = await axios.get('/auth/profile', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  if (res.data.success) {
-    user.value = res.data.data
+  try {
+    await userStore.fetchProfile()
+  } catch (error) {
+    console.error('获取用户资料失败:', error)
+    // 如果获取失败，可能是token过期，重定向到登录页
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token')
+      window.location.href = '/login'
+    }
   }
 }
 

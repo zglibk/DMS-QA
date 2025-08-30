@@ -7,6 +7,7 @@
 
 import axios from 'axios'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/store/user'
 
 // 创建axios实例
 const api = axios.create({
@@ -46,8 +47,11 @@ api.interceptors.response.use(
       switch (error.response.status) {
         case 401:
           ElMessage.error('未授权，请重新登录')
-          // 清除token并跳转到登录页
+          // 清除token和用户数据
           localStorage.removeItem('token')
+          // 清除Pinia中的用户数据
+          const userStore = useUserStore()
+          userStore.clearUser()
           window.location.href = '/login'
           break
         case 403:

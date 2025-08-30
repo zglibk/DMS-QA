@@ -264,13 +264,20 @@ const login = async () => {
           captchaText: form.value.captchaText
         }
         const res = await axios.post('/auth/login', loginData)
+        
         // 设置token到store和localStorage
         userStore.setToken(res.data.token)
+        
         // 直接使用登录接口返回的用户信息，包括最后登录时间
         if (res.data.user) {
           userStore.setUser(res.data.user)
         }
-        await userStore.fetchProfile()
+        
+        // 强制刷新用户资料和权限信息，确保权限数据被正确获取和持久化
+        await userStore.fetchProfile(true) // 传入true强制刷新
+        
+
+        
         ElMessage.success('登录成功')
         router.push('/')
       } catch (e) {
