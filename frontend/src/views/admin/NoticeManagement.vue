@@ -477,6 +477,7 @@ const currentNotice = ref(null)
 const noticeFormRef = ref(null)
 const editFormRef = ref(null)
 const isEditing = ref(false)
+const originalImagePath = ref([]) // 编辑模式下的原始图片信息
 
 // TinyMCE 编辑器相关
 const createTinymceId = ref(`tinymce-create-${Date.now()}`)
@@ -644,10 +645,52 @@ const getInitOptions = (editorRef, isCreate = true) => {
       editor.on('init', () => {
         initSetup(editor, isCreate)
       })
+      
+      // 监听图片插入事件，防止自动换行
+      editor.on('NodeChange', (e) => {
+        // 查找所有图片元素并设置为inline-block
+        const images = editor.getBody().querySelectorAll('img')
+        images.forEach(img => {
+          if (img.style.display === 'block' || !img.style.display) {
+            img.style.display = 'inline-block'
+            img.style.verticalAlign = 'middle'
+          }
+        })
+        
+        // 在编辑模式下，检查是否有新的base64图片被插入
+        if (!isCreate && isEditing.value) {
+          const content = editor.getContent()
+          const base64Images = content.match(/<img[^>]+src="data:image\/[^;]+;base64,[^"]+"[^>]*>/g) || []
+          
+          // 如果发现新的base64图片，说明用户可能替换了图片，需要清理对应的原始图片信息
+          if (base64Images.length > 0) {
+            console.log('🔄 [图片替换检测] 发现新的base64图片，可能存在图片替换')
+            updateOriginalImagePathFromContent(content)
+          }
+        }
+      })
+      
+      // 监听粘贴事件，处理粘贴的图片
+      editor.on('paste', (e) => {
+        setTimeout(() => {
+          const images = editor.getBody().querySelectorAll('img')
+          images.forEach(img => {
+            img.style.display = 'inline-block'
+            img.style.verticalAlign = 'middle'
+          })
+        }, 100)
+      })
+      
       // 监听编辑器内容变化，实现双向数据绑定
       editor.on('change keyup undo redo input paste blur focus', () => {
         const content = editor.getContent()
         noticeForm.Content = content
+        
+        // 在编辑模式下，实时更新原始图片信息
+        if (!isCreate && isEditing.value) {
+          updateOriginalImagePathFromContent(content)
+        }
+        
         // 手动触发表单验证
         nextTick(() => {
           // 根据当前打开的对话框和编辑器类型触发相应的表单验证
@@ -657,6 +700,14 @@ const getInitOptions = (editorRef, isCreate = true) => {
             editFormRef.value.validateField('Content')
           }
         })
+      })
+      
+      // 监听图片删除事件
+      editor.on('NodeChange', (e) => {
+        if (!isCreate && isEditing.value) {
+          // 检查是否有图片被删除
+          checkForDeletedImages(editor)
+        }
       })
     }
   }
@@ -722,6 +773,154 @@ const markAsReadInternal = async (noticeId) => {
 }
 
 /**
+ * 根据当前环境动态生成图片URL
+ * @param {string} imageUrl - 原始图片URL
+ * @returns {string} 适配当前环境的图片URL
+ */
+const getAdaptedImageUrl = (imageUrl) => {
+  console.log('🔍 [图片URL适配] 原始URL:', imageUrl)
+  
+  if (!imageUrl) {
+    console.warn('⚠️ [图片URL适配] 原始URL为空')
+    return ''
+  }
+  
+  // 如果已经是相对路径或本地路径，直接返回
+  if (imageUrl.startsWith('/files/') || imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
+    console.log('📁 [图片URL适配] 相对路径，直接返回:', imageUrl)
+    return imageUrl
+  }
+  
+  // 根据当前页面的hostname判断环境
+  const hostname = window.location.hostname
+  const protocol = window.location.protocol
+  console.log('🌐 [图片URL适配] 当前环境:', { hostname, protocol })
+  
+  // 如果是完整URL，需要根据环境进行转换
+  if (imageUrl.startsWith('http')) {
+    // 提取文件名部分
+    const urlParts = imageUrl.split('/')
+    const filename = urlParts[urlParts.length - 1]
+    console.log('📄 [图片URL适配] 提取的文件名:', filename)
+    
+    let adaptedUrl
+    // 构建适配当前环境的URL
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      // 开发环境：使用本地文件服务器
+      adaptedUrl = `/files/notice-images/${filename}`
+      console.log('🔧 [图片URL适配] 开发环境URL:', adaptedUrl)
+    } else {
+      // 生产环境：使用Nginx文件服务器端口8080
+      adaptedUrl = `${protocol}//${hostname}:8080/files/notice-images/${filename}`
+      console.log('🏭 [图片URL适配] 生产环境URL:', adaptedUrl)
+    }
+    
+    return adaptedUrl
+  }
+  
+  // 其他情况直接返回原URL
+  console.log('🔄 [图片URL适配] 其他情况，直接返回:', imageUrl)
+  return imageUrl
+}
+
+/**
+ * 将图片插入到通知内容中
+ * @param {string} content - 原始内容
+ * @param {Array} imagePath - 图片路径信息数组
+ * @returns {string} 插入图片后的内容
+ */
+const insertImagesIntoContent = (content, imagePath) => {
+  console.log('🖼️ [图片插入] 开始处理图片插入')
+  console.log('📝 [图片插入] 原始内容长度:', content ? content.length : 0)
+  console.log('📷 [图片插入] 图片数组:', imagePath)
+  
+  if (!imagePath || !Array.isArray(imagePath) || imagePath.length === 0) {
+    console.log('❌ [图片插入] 没有图片需要插入')
+    return content
+  }
+  
+  let processedContent = content || ''
+  
+  // 首先，找到内容中所有现有的img标签
+  const existingImgRegex = /<img[^>]*src="[^"]*"[^>]*>/gi
+  const existingImages = processedContent.match(existingImgRegex) || []
+  
+  console.log('🔍 [图片插入] 发现现有图片标签数量:', existingImages.length)
+  console.log('🔍 [图片插入] 现有图片标签:', existingImages)
+  
+  // 遍历图片信息，替换对应位置的图片
+  imagePath.forEach((imageInfo, index) => {
+    console.log(`🔍 [图片插入] 处理第${index + 1}张图片:`, imageInfo)
+    
+    if (imageInfo.url) {
+      // 获取适配当前环境的图片URL
+      const adaptedUrl = getAdaptedImageUrl(imageInfo.url)
+      
+      // 构建图片样式，优先使用保存的尺寸信息
+      let imageStyle = 'display: inline-block; margin: 5px 0; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);'
+      
+      // 如果有保存的原始样式，先使用原始样式作为基础
+      if (imageInfo.originalStyle) {
+        imageStyle = imageInfo.originalStyle
+        console.log(`🎨 [图片样式] 使用原始样式作为基础: ${imageStyle}`)
+        
+        // 但是要更新其中的width和height值，使用ImagePath中保存的最新尺寸
+        if (imageInfo.width || imageInfo.height) {
+          // 移除原样式中的width和height
+          imageStyle = imageStyle.replace(/width:\s*[^;]+;?/gi, '').replace(/height:\s*[^;]+;?/gi, '')
+          
+          // 添加最新的尺寸信息
+          const widthStyle = imageInfo.width ? `width: ${imageInfo.width}${imageInfo.width.includes('px') || imageInfo.width.includes('%') ? '' : 'px'};` : ''
+          const heightStyle = imageInfo.height ? `height: ${imageInfo.height}${imageInfo.height.includes('px') || imageInfo.height.includes('%') || imageInfo.height === 'auto' ? '' : 'px'};` : ''
+          imageStyle = `${widthStyle} ${heightStyle} ${imageStyle}`.trim()
+          console.log(`📏 [图片尺寸] 更新样式中的尺寸 - 宽度: ${imageInfo.width}, 高度: ${imageInfo.height}`)
+        }
+      } else {
+        // 如果没有原始样式，构建新样式
+        if (imageInfo.width || imageInfo.height) {
+          const widthStyle = imageInfo.width ? `width: ${imageInfo.width}${imageInfo.width.includes('px') || imageInfo.width.includes('%') ? '' : 'px'};` : ''
+          const heightStyle = imageInfo.height ? `height: ${imageInfo.height}${imageInfo.height.includes('px') || imageInfo.height.includes('%') || imageInfo.height === 'auto' ? '' : 'px'};` : ''
+          imageStyle = `${widthStyle} ${heightStyle} ${imageStyle}`.trim()
+          console.log(`📏 [图片尺寸] 使用保存的尺寸 - 宽度: ${imageInfo.width}, 高度: ${imageInfo.height}`)
+        } else {
+          // 默认样式：响应式图片
+          imageStyle = `max-width: 100%; height: auto; ${imageStyle}`
+          console.log(`📐 [图片尺寸] 使用默认响应式样式`)
+        }
+      }
+      
+      // 创建新的图片HTML标签，使用保存的尺寸信息
+      const newImgTag = `<img src="${adaptedUrl}" alt="${imageInfo.alt || ''}" style="${imageStyle}" onerror="console.error('❌ [图片加载失败] URL: ${adaptedUrl}'); this.style.border='2px solid red'; this.alt='图片加载失败';" onload="console.log('✅ [图片加载成功] URL: ${adaptedUrl}');" />`
+      
+      // 如果有对应位置的现有图片，则替换它
+      if (index < existingImages.length) {
+        const oldImgTag = existingImages[index]
+        processedContent = processedContent.replace(oldImgTag, newImgTag)
+        console.log(`✅ [图片插入] 第${index + 1}张图片已替换现有图片，URL: ${adaptedUrl}`)
+        console.log(`🔄 [图片插入] 替换前: ${oldImgTag.substring(0, 100)}...`)
+        console.log(`🔄 [图片插入] 替换后: ${newImgTag.substring(0, 100)}...`)
+      } else {
+        // 如果没有对应的现有图片，则根据position插入
+        if (imageInfo.position === 0 || !imageInfo.position) {
+          // 插入到内容开头
+          processedContent = newImgTag + ' ' + processedContent
+          console.log(`✅ [图片插入] 第${index + 1}张图片已插入到开头，URL: ${adaptedUrl}`)
+        } else {
+          // 插入到内容末尾
+          processedContent += ' ' + newImgTag
+          console.log(`✅ [图片插入] 第${index + 1}张图片已插入到末尾，URL: ${adaptedUrl}`)
+        }
+      }
+    } else {
+      console.warn(`⚠️ [图片插入] 第${index + 1}张图片信息无效:`, imageInfo)
+    }
+  })
+  
+  console.log('🎯 [图片插入] 处理完成，最终内容长度:', processedContent.length)
+  return processedContent
+}
+
+/**
  * 查看通知详情
  * @param {Object} notice - 通知对象
  */
@@ -729,7 +928,14 @@ const viewNotice = async (notice) => {
   try {
     const response = await api.get(`/notice/${notice.ID}`)
     if (response.data.success) {
-      currentNotice.value = response.data.data
+      const noticeData = response.data.data
+      
+      // 处理图片插入
+      if (noticeData.imagePath && Array.isArray(noticeData.imagePath)) {
+        noticeData.Content = insertImagesIntoContent(noticeData.Content, noticeData.imagePath)
+      }
+      
+      currentNotice.value = noticeData
       showDetailDialog.value = true
       
       // 如果是未读通知，自动标记为已读（不显示确认对话框）
@@ -823,26 +1029,50 @@ const markAllAsRead = async () => {
  * 编辑通知
  * @param {Object} notice - 通知对象
  */
-const editNotice = (notice) => {
-  isEditing.value = true
-  Object.assign(noticeForm, {
-    ID: notice.ID,
-    Title: notice.Title,
-    Content: notice.Content,
-    Type: notice.Type,
-    Priority: notice.Priority,
-    ExpiryDate: notice.ExpiryDate,
-    IsSticky: notice.IsSticky,
-    RequireConfirmation: notice.RequireConfirmation
-  })
-  showEditDialog.value = true
-  
-  // 等待对话框渲染完成后初始化编辑器
-  nextTick(() => {
-    setTimeout(() => {
-      initEditEditor()
-    }, 100)
-  })
+const editNotice = async (notice) => {
+  try {
+    isEditing.value = true
+    
+    // 获取完整的通知详情，包括图片信息
+    const response = await api.get(`/notice/${notice.ID}`)
+    if (response.data.success) {
+      const noticeData = response.data.data
+      
+      // 处理图片插入到内容中
+      let contentWithImages = noticeData.Content
+      if (noticeData.imagePath && Array.isArray(noticeData.imagePath)) {
+        contentWithImages = insertImagesIntoContent(noticeData.Content, noticeData.imagePath)
+      }
+      
+      // 保存原始图片信息，用于编辑时的图片数据处理
+      originalImagePath.value = noticeData.imagePath || []
+      console.log('📷 [编辑通知] 保存原始图片信息:', originalImagePath.value)
+      
+      // 设置表单数据
+      Object.assign(noticeForm, {
+        ID: noticeData.ID,
+        Title: noticeData.Title,
+        Content: contentWithImages,
+        Type: noticeData.Type,
+        Priority: noticeData.Priority,
+        ExpiryDate: noticeData.ExpiryDate,
+        IsSticky: noticeData.IsSticky,
+        RequireConfirmation: noticeData.RequireConfirmation
+      })
+      
+      showEditDialog.value = true
+      
+      // 等待对话框渲染完成后初始化编辑器
+      nextTick(() => {
+        setTimeout(() => {
+          initEditEditor()
+        }, 100)
+      })
+    }
+  } catch (error) {
+    console.error('获取通知详情失败:', error)
+    ElMessage.error('获取通知详情失败')
+  }
 }
 
 /**
@@ -884,23 +1114,118 @@ const deleteNotice = async (notice) => {
 /**
  * 处理内容中的base64图片上传
  * @param {string} content - 富文本内容
- * @returns {string} 处理后的内容
+ * @param {Array} existingImagePath - 已存在的图片信息数组（编辑模式下使用）
+ * @returns {Object} 包含处理后的内容和图片信息数组的对象
  */
-const processContentImages = async (content) => {
-  if (!content) return content
+const processContentImages = async (content, existingImagePath = []) => {
+  if (!content) return { content, imagePath: [] }
+  
+  // 匹配所有图片标签（包括base64和服务器图片）
+  const allImageRegex = /<img[^>]+src="[^"]+"[^>]*>/g
+  const allImages = content.match(allImageRegex) || []
   
   // 匹配所有base64格式的图片
   const base64ImageRegex = /<img[^>]+src="data:image\/[^;]+;base64,[^"]+"[^>]*>/g
-  const base64Images = content.match(base64ImageRegex)
-  
-  if (!base64Images || base64Images.length === 0) {
-    return content // 没有base64图片，直接返回
-  }
+  const base64Images = content.match(base64ImageRegex) || []
   
   let processedContent = content
+  const imagePath = [] // 存储图片信息数组
+  
+  // 首先处理已存在的服务器图片
+  for (const imgTag of allImages) {
+    const srcMatch = imgTag.match(/src="([^"]+)"/)
+    if (!srcMatch) continue
+    
+    const src = srcMatch[1]
+    
+    // 如果不是base64图片，说明是已存在的服务器图片
+    if (!src.startsWith('data:image/')) {
+      // 查找对应的已存在图片信息，使用更精确的匹配逻辑
+      const existingImage = existingImagePath.find(img => {
+        // 精确匹配完整URL
+        if (img.fullUrl === src || img.url === src) {
+          return true
+        }
+        // 匹配文件名（但要确保是同一张图片）
+        if (img.fileName && src.includes(img.fileName)) {
+          // 额外检查：确保路径也匹配，避免同名文件的误匹配
+          return src.includes('notice-images') || src.includes(img.fileName)
+        }
+        return false
+      })
+      
+      // 提取当前图片标签的尺寸和样式信息
+      const altMatch = imgTag.match(/alt="([^"]*)"/)  
+      const altText = altMatch ? altMatch[1] : ''
+      const widthMatch = imgTag.match(/width="([^"]*)"/)  
+      const heightMatch = imgTag.match(/height="([^"]*)"/)  
+      const styleMatch = imgTag.match(/style="([^"]*)"/)  
+      
+      let width = null
+      let height = null
+      
+      // 从width/height属性中提取尺寸
+      if (widthMatch) width = widthMatch[1]
+      if (heightMatch) height = heightMatch[1]
+      
+      // 如果没有width/height属性，尝试从style中提取
+      if (!width || !height) {
+        if (styleMatch) {
+          const style = styleMatch[1]
+          const widthStyleMatch = style.match(/width:\s*([^;]+)/)
+          const heightStyleMatch = style.match(/height:\s*([^;]+)/)
+          
+          if (widthStyleMatch && !width) width = widthStyleMatch[1].trim()
+          if (heightStyleMatch && !height) height = heightStyleMatch[1].trim()
+        }
+      }
+      
+      if (existingImage) {
+        // 更新已存在图片的尺寸信息（使用当前编辑器中的尺寸）
+        const updatedImageInfo = {
+          ...existingImage,
+          alt: altText || existingImage.alt,
+          width: width || existingImage.width, // 优先使用当前尺寸
+          height: height || existingImage.height, // 优先使用当前尺寸
+          originalStyle: styleMatch ? styleMatch[1] : existingImage.originalStyle, // 优先使用当前样式
+          position: imagePath.length
+        }
+        imagePath.push(updatedImageInfo)
+        console.log('📷 [图片处理] 更新已存在图片尺寸信息:', updatedImageInfo)
+      } else {
+        // 如果找不到对应的图片信息，创建基本信息
+        const imageInfo = {
+          id: `existing_${Date.now()}_${Math.random()}`,
+          originalName: src.split('/').pop() || 'unknown.png',
+          fileName: src.split('/').pop() || '',
+          filePath: src,
+          fullUrl: src,
+          url: src,
+          alt: altText,
+          size: 0,
+          mimeType: 'image/png',
+          uploadTime: new Date().toISOString(),
+          position: imagePath.length,
+          width: width, // 保存当前尺寸
+          height: height, // 保存当前尺寸
+          originalStyle: styleMatch ? styleMatch[1] : null // 保存当前样式
+        }
+        
+        imagePath.push(imageInfo)
+        console.log('📷 [图片处理] 创建已存在图片信息:', imageInfo)
+      }
+    }
+  }
+  
+  // 如果没有base64图片，直接返回
+  if (base64Images.length === 0) {
+    console.log('🎯 [图片处理] 没有新增base64图片，返回已存在图片信息')
+    return { content: processedContent, imagePath }
+  }
   
   // 逐个上传base64图片
-  for (const imgTag of base64Images) {
+  for (let i = 0; i < base64Images.length; i++) {
+    const imgTag = base64Images[i]
     try {
       // 提取base64数据
       const srcMatch = imgTag.match(/src="(data:image\/[^;]+;base64,[^"]+)"/)
@@ -908,13 +1233,41 @@ const processContentImages = async (content) => {
       
       const base64Data = srcMatch[1]
       
+      // 提取alt属性
+      const altMatch = imgTag.match(/alt="([^"]*)"/)
+      const altText = altMatch ? altMatch[1] : ''
+      
+      // 提取图片的width和height属性
+      const widthMatch = imgTag.match(/width="([^"]*)"/)
+      const heightMatch = imgTag.match(/height="([^"]*)"/)
+      const styleMatch = imgTag.match(/style="([^"]*)"/)
+      
+      let width = null
+      let height = null
+      
+      // 从width/height属性中提取尺寸
+      if (widthMatch) width = widthMatch[1]
+      if (heightMatch) height = heightMatch[1]
+      
+      // 如果没有width/height属性，尝试从style中提取
+      if (!width || !height) {
+        if (styleMatch) {
+          const style = styleMatch[1]
+          const widthStyleMatch = style.match(/width:\s*([^;]+)/)
+          const heightStyleMatch = style.match(/height:\s*([^;]+)/)
+          
+          if (widthStyleMatch && !width) width = widthStyleMatch[1].trim()
+          if (heightStyleMatch && !height) height = heightStyleMatch[1].trim()
+        }
+      }
+      
       // 将base64转换为Blob
       const response = await fetch(base64Data)
       const blob = await response.blob()
       
       // 创建FormData上传图片
       const formData = new FormData()
-      formData.append('file', blob, `image_${Date.now()}.png`)
+      formData.append('file', blob, `image_${Date.now()}_${i}.png`)
       
       // 确保apiService已初始化
       await apiService.initialize()
@@ -940,6 +1293,27 @@ const processContentImages = async (content) => {
         const imageUrl = result.fileInfo?.fullUrl || result.url
         const newImgTag = imgTag.replace(/src="[^"]+"/, `src="${imageUrl}"`)
         processedContent = processedContent.replace(imgTag, newImgTag)
+        
+        // 收集图片信息到imagePath数组
+        const imageInfo = {
+          id: `image_${Date.now()}_${i}`,
+          originalName: result.fileInfo?.originalName || `image_${i}.png`,
+          fileName: result.fileInfo?.filename || '',
+          filePath: result.fileInfo?.relativePath || '',
+          fullUrl: imageUrl,
+          url: imageUrl, // 兼容字段
+          alt: altText,
+          size: result.fileInfo?.fileSize || blob.size,
+          mimeType: result.fileInfo?.mimeType || blob.type,
+          uploadTime: new Date().toISOString(),
+          position: i, // 图片在内容中的位置
+          width: width, // 图片宽度
+          height: height, // 图片高度
+          originalStyle: styleMatch ? styleMatch[1] : null // 原始样式
+        }
+        
+        imagePath.push(imageInfo)
+        console.log('📷 [图片处理] 收集图片信息:', imageInfo)
       }
     } catch (error) {
       console.error('图片上传失败:', error)
@@ -947,7 +1321,136 @@ const processContentImages = async (content) => {
     }
   }
   
-  return processedContent
+  console.log('🎯 [图片处理] 最终收集到的图片信息数组:', imagePath)
+  console.log('📊 [图片处理] 统计: 已存在图片', imagePath.filter(img => !img.id.startsWith('image_')).length, '张，新增图片', imagePath.filter(img => img.id.startsWith('image_')).length, '张')
+  return { content: processedContent, imagePath }
+}
+
+/**
+ * 根据编辑器内容实时更新原始图片信息
+ * @param {string} content - 编辑器当前内容
+ */
+const updateOriginalImagePathFromContent = (content) => {
+  if (!content || !originalImagePath.value || originalImagePath.value.length === 0) {
+    return
+  }
+  
+  // 提取当前内容中的所有图片URL
+  const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g
+  const currentImageUrls = []
+  let match
+  
+  while ((match = imgRegex.exec(content)) !== null) {
+    currentImageUrls.push(match[1])
+  }
+  
+  // 过滤出仍然存在于内容中的图片信息
+  const remainingImages = originalImagePath.value.filter(imageInfo => {
+    return currentImageUrls.some(url => {
+      // 精确匹配完整URL
+      if (url === imageInfo.fullUrl || url === imageInfo.url) {
+        return true
+      }
+      // 匹配文件名，但要确保不是base64图片
+      if (!url.startsWith('data:image/') && imageInfo.fileName && url.includes(imageInfo.fileName)) {
+        // 额外检查：确保路径也匹配，避免误匹配
+        return url.includes('notice-images')
+      }
+      return false
+    })
+  })
+  
+  // 如果图片数量发生变化，更新原始图片信息
+  if (remainingImages.length !== originalImagePath.value.length) {
+    originalImagePath.value = remainingImages
+    console.log('📷 [实时更新] 原始图片信息已更新，剩余图片数量:', remainingImages.length)
+  }
+}
+
+/**
+ * 检查并处理被删除的图片
+ * @param {Editor} editor - TinyMCE 编辑器实例
+ */
+const checkForDeletedImages = async (editor) => {
+  if (!originalImagePath.value || originalImagePath.value.length === 0) {
+    return
+  }
+  
+  const content = editor.getContent()
+  
+  // 提取当前内容中的所有图片URL
+  const currentImages = []
+  const imgRegex = /<img[^>]+src="([^"]+)"[^>]*>/g
+  let match
+  
+  while ((match = imgRegex.exec(content)) !== null) {
+    const src = match[1]
+    // 只处理服务器图片，忽略base64图片
+    if (!src.startsWith('data:image/')) {
+      currentImages.push(src)
+    }
+  }
+  
+  // 找出被删除的图片
+  const deletedImages = originalImagePath.value.filter(img => {
+    // 检查图片是否还存在于当前内容中
+    const stillExists = currentImages.some(currentSrc => {
+      return currentSrc.includes(img.fileName) || 
+             currentSrc === img.fullUrl || 
+             currentSrc === img.url
+    })
+    return !stillExists
+  })
+  
+  // 如果有图片被删除，调用后端API删除
+  if (deletedImages.length > 0) {
+    console.log('🗑️ [图片删除] 检测到被删除的图片:', deletedImages)
+    
+    for (const deletedImage of deletedImages) {
+      try {
+        await deleteImageFromServer(deletedImage)
+      } catch (error) {
+        console.error('删除图片失败:', error)
+        // 继续删除其他图片，不中断流程
+      }
+    }
+  }
+}
+
+/**
+ * 调用后端API删除图片
+ * @param {Object} imageInfo - 图片信息对象
+ */
+const deleteImageFromServer = async (imageInfo) => {
+  try {
+    const noticeId = noticeForm.ID
+    const fileName = imageInfo.fileName
+    
+    if (!noticeId || !fileName) {
+      console.warn('删除图片失败：缺少必要参数', { noticeId, fileName })
+      return
+    }
+    
+    const response = await fetch(`/api/notice/${noticeId}/image/${fileName}`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${userStore.token}`
+      }
+    })
+    
+    const result = await response.json()
+    
+    if (result.success) {
+      console.log('✅ [图片删除] 成功删除图片:', fileName)
+      // 从原始图片信息中移除已删除的图片
+      originalImagePath.value = originalImagePath.value.filter(img => img.fileName !== fileName)
+    } else {
+      console.error('❌ [图片删除] 删除图片失败:', result.message)
+    }
+  } catch (error) {
+    console.error('❌ [图片删除] 删除图片时发生错误:', error)
+  }
 }
 
 /**
@@ -965,11 +1468,21 @@ const saveNotice = async () => {
     submitting.value = true
     
     // 处理内容中的base64图片，上传并替换为服务器URL
-    const processedContent = await processContentImages(noticeForm.Content)
+    // 在编辑模式下，传递原有的图片信息
+    const existingImages = isEditing.value ? originalImagePath.value : []
+    console.log('📷 [保存通知] 编辑模式:', isEditing.value, '原有图片数量:', existingImages.length)
+    const { content: processedContent, imagePath } = await processContentImages(noticeForm.Content, existingImages)
     const submitData = {
       ...noticeForm,
-      Content: processedContent
+      Content: processedContent,
+      imagePath: imagePath // 添加图片信息数组
     }
+    
+    console.log('📤 [保存通知] 提交数据:', {
+      ...submitData,
+      Content: `${submitData.Content?.substring(0, 100)}...`, // 只显示内容前100字符
+      imagePath: submitData.imagePath
+    })
     
     const url = isEditing.value ? `/notice/${noticeForm.ID}` : '/notice'
     const method = isEditing.value ? 'put' : 'post'
@@ -1010,7 +1523,7 @@ const createNotice = async () => {
     submitting.value = true
     
     // 处理内容中的base64图片，上传并替换为服务器URL
-    const processedContent = await processContentImages(noticeForm.Content)
+    const { content: processedContent, imagePath } = await processContentImages(noticeForm.Content)
     
     // 转换字段名为后端期望的格式（小写）
     const submitData = {
@@ -1020,8 +1533,15 @@ const createNotice = async () => {
       priority: noticeForm.Priority,
       expiryDate: noticeForm.ExpiryDate,
       isSticky: noticeForm.IsSticky,
-      requireConfirmation: noticeForm.RequireConfirmation
+      requireConfirmation: noticeForm.RequireConfirmation,
+      imagePath: imagePath // 添加图片信息数组
     }
+    
+    console.log('📤 [创建通知] 提交数据:', {
+      ...submitData,
+      content: `${submitData.content?.substring(0, 100)}...`, // 只显示内容前100字符
+      imagePath: submitData.imagePath
+    })
     
     const response = await api.post('/notice', submitData)
     if (response.data.success) {
@@ -1088,6 +1608,7 @@ const resetNoticeForm = () => {
     RequireConfirmation: false
   })
   isEditing.value = false
+  originalImagePath.value = [] // 清空原始图片信息
   noticeFormRef.value?.resetFields()
   editFormRef.value?.resetFields()
 }

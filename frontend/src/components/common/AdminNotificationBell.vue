@@ -17,7 +17,7 @@
             <el-timeline-item v-for="(msg, idx) in notifyList" :key="msg.id" :timestamp="msg.time" :color="msg.color">
               <div class="notify-item" @click="handleNoticeClick(msg)" style="cursor: pointer;">
                 <span class="notify-msg-title">{{ msg.title }}</span>
-                <div class="notify-msg-content">{{ msg.content }}</div>
+                <div class="notify-msg-content">{{ stripHtmlTags(msg.content) }}</div>
               </div>
             </el-timeline-item>
           </el-timeline>
@@ -139,6 +139,19 @@ const formatTimeAgo = (dateStr) => {
 }
 
 /**
+ * 清理HTML标签，只保留纯文本内容
+ * 功能：移除HTML标签，保留纯文本用于预览显示
+ */
+const stripHtmlTags = (html) => {
+  if (!html) return ''
+  // 创建一个临时div元素来解析HTML
+  const tempDiv = document.createElement('div')
+  tempDiv.innerHTML = html
+  // 获取纯文本内容
+  return tempDiv.textContent || tempDiv.innerText || ''
+}
+
+/**
  * 获取未读通知列表
  * 功能：从后端API获取当前用户的未读通知列表
  */
@@ -152,17 +165,21 @@ const getUnreadNotices = async () => {
       }
     })
     if (response.data.success) {
-      notifyList.value = response.data.data.map(notice => ({
-        id: notice.ID,
-        title: notice.Title,
-        content: notice.Content?.substring(0, 50) + (notice.Content?.length > 50 ? '...' : ''),
-        fullContent: notice.Content, // 保存完整内容用于详情显示
-        time: formatTimeAgo(notice.PublishDate),
-        publishDate: notice.PublishDate, // 保存原始发布时间
-        type: notice.Type,
-        priority: notice.Priority,
-        color: getNoticeTypeColor(notice.Type, notice.Priority)
-      }))
+      notifyList.value = response.data.data.map(notice => {
+        // 清理HTML标签，获取纯文本内容
+        const plainTextContent = stripHtmlTags(notice.Content || '')
+        return {
+          id: notice.ID,
+          title: notice.Title,
+          content: plainTextContent.substring(0, 50) + (plainTextContent.length > 50 ? '...' : ''),
+          fullContent: notice.Content, // 保存完整内容用于详情显示
+          time: formatTimeAgo(notice.PublishDate),
+          publishDate: notice.PublishDate, // 保存原始发布时间
+          type: notice.Type,
+          priority: notice.Priority,
+          color: getNoticeTypeColor(notice.Type, notice.Priority)
+        }
+      })
     }
   } catch (error) {
     console.error('获取未读通知列表失败:', error)
@@ -209,15 +226,188 @@ const markNoticeAsRead = async (noticeId) => {
 }
 
 /**
- * 处理通知点击事件
- * 功能：点击通知时显示详情对话框
+ * 将图片插入到通知内容中
+ * @param {string} content - 原始内容
+ * @param {Array} imagePath - 图片路径信息数组
+ * @returns {string} 插入图片后的内容
  */
-const handleNoticeClick = (notice) => {
-  currentNotice.value = notice
-  showNoticeDetail.value = true
-  // 关闭通知下拉菜单
-  if (notificationDropdown.value) {
-    notificationDropdown.value.handleClose()
+/**
+ * 根据当前环境动态生成图片URL
+ * @param {string} imageUrl - 原始图片URL
+ * @returns {string} 适配当前环境的图片URL
+ */
+const getAdaptedImageUrl = (imageUrl) => {
+  console.log('🔍 [图片URL适配] 原始URL:', imageUrl)
+  
+  if (!imageUrl) {
+    console.warn('⚠️ [图片URL适配] 原始URL为空')
+    return ''
+  }
+  
+  // 如果已经是相对路径或本地路径，直接返回
+  if (imageUrl.startsWith('/files/') || imageUrl.startsWith('data:') || imageUrl.startsWith('blob:')) {
+    console.log('📁 [图片URL适配] 相对路径，直接返回:', imageUrl)
+    return imageUrl
+  }
+  
+  // 根据当前页面的hostname判断环境
+  const hostname = window.location.hostname
+  const protocol = window.location.protocol
+  console.log('🌐 [图片URL适配] 当前环境:', { hostname, protocol })
+  
+  // 如果是完整URL，需要根据环境进行转换
+  if (imageUrl.startsWith('http')) {
+    // 提取文件名部分
+    const urlParts = imageUrl.split('/')
+    const filename = urlParts[urlParts.length - 1]
+    console.log('📄 [图片URL适配] 提取的文件名:', filename)
+    
+    let adaptedUrl
+    // 构建适配当前环境的URL
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      // 开发环境：使用本地文件服务器
+      adaptedUrl = `/files/notice-images/${filename}`
+      console.log('🔧 [图片URL适配] 开发环境URL:', adaptedUrl)
+    } else {
+      // 生产环境：使用Nginx文件服务器端口8080
+      adaptedUrl = `${protocol}//${hostname}:8080/files/notice-images/${filename}`
+      console.log('🏭 [图片URL适配] 生产环境URL:', adaptedUrl)
+    }
+    
+    return adaptedUrl
+  }
+  
+  // 其他情况直接返回原URL
+  console.log('🔄 [图片URL适配] 其他情况，直接返回:', imageUrl)
+  return imageUrl
+}
+
+const insertImagesIntoContent = (content, imagePath) => {
+  console.log('🖼️ [图片插入] 开始处理图片插入')
+  console.log('📝 [图片插入] 原始内容长度:', content ? content.length : 0)
+  console.log('📷 [图片插入] 图片数组:', imagePath)
+  
+  if (!imagePath || !Array.isArray(imagePath) || imagePath.length === 0) {
+    console.log('❌ [图片插入] 没有图片需要插入')
+    return content
+  }
+  
+  let processedContent = content || ''
+  
+  // 首先，找到内容中所有现有的img标签
+  const existingImgRegex = /<img[^>]*src="[^"]*"[^>]*>/gi
+  const existingImages = processedContent.match(existingImgRegex) || []
+  
+  console.log('🔍 [图片插入] 发现现有图片标签数量:', existingImages.length)
+  console.log('🔍 [图片插入] 现有图片标签:', existingImages)
+  
+  // 遍历图片信息，替换对应位置的图片
+  imagePath.forEach((imageInfo, index) => {
+    console.log(`🔍 [图片插入] 处理第${index + 1}张图片:`, imageInfo)
+    
+    if (imageInfo.url) {
+      // 获取适配当前环境的图片URL
+      const adaptedUrl = getAdaptedImageUrl(imageInfo.url)
+      
+      // 构建图片样式，优先使用保存的尺寸信息
+      let imageStyle = 'display: inline-block; margin: 5px 0; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);'
+      
+      // 如果有保存的原始样式，先使用原始样式作为基础
+      if (imageInfo.originalStyle) {
+        imageStyle = imageInfo.originalStyle
+        console.log(`🎨 [图片样式] 使用原始样式作为基础: ${imageStyle}`)
+        
+        // 但是要更新其中的width和height值，使用ImagePath中保存的最新尺寸
+        if (imageInfo.width || imageInfo.height) {
+          // 移除原样式中的width和height
+          imageStyle = imageStyle.replace(/width:\s*[^;]+;?/gi, '').replace(/height:\s*[^;]+;?/gi, '')
+          
+          // 添加最新的尺寸信息
+          const widthStyle = imageInfo.width ? `width: ${imageInfo.width}${imageInfo.width.includes('px') || imageInfo.width.includes('%') ? '' : 'px'};` : ''
+          const heightStyle = imageInfo.height ? `height: ${imageInfo.height}${imageInfo.height.includes('px') || imageInfo.height.includes('%') || imageInfo.height === 'auto' ? '' : 'px'};` : ''
+          imageStyle = `${widthStyle} ${heightStyle} ${imageStyle}`.trim()
+          console.log(`📏 [图片尺寸] 更新样式中的尺寸 - 宽度: ${imageInfo.width}, 高度: ${imageInfo.height}`)
+        }
+      } else {
+        // 如果没有原始样式，构建新样式
+        if (imageInfo.width || imageInfo.height) {
+          const widthStyle = imageInfo.width ? `width: ${imageInfo.width}${imageInfo.width.includes('px') || imageInfo.width.includes('%') ? '' : 'px'};` : ''
+          const heightStyle = imageInfo.height ? `height: ${imageInfo.height}${imageInfo.height.includes('px') || imageInfo.height.includes('%') || imageInfo.height === 'auto' ? '' : 'px'};` : ''
+          imageStyle = `${widthStyle} ${heightStyle} ${imageStyle}`.trim()
+          console.log(`📏 [图片尺寸] 使用保存的尺寸 - 宽度: ${imageInfo.width}, 高度: ${imageInfo.height}`)
+        } else {
+          // 默认样式：响应式图片
+          imageStyle = `max-width: 100%; height: auto; ${imageStyle}`
+          console.log(`📐 [图片尺寸] 使用默认响应式样式`)
+        }
+      }
+      
+      // 创建新的图片HTML标签，使用保存的尺寸信息
+      const newImgTag = `<img src="${adaptedUrl}" alt="${imageInfo.alt || ''}" style="${imageStyle}" onerror="console.error('❌ [图片加载失败] URL: ${adaptedUrl}'); this.style.border='2px solid red'; this.alt='图片加载失败';" onload="console.log('✅ [图片加载成功] URL: ${adaptedUrl}');" />`
+      
+      // 如果有对应位置的现有图片，则替换它
+      if (index < existingImages.length) {
+        const oldImgTag = existingImages[index]
+        processedContent = processedContent.replace(oldImgTag, newImgTag)
+        console.log(`✅ [图片插入] 第${index + 1}张图片已替换现有图片，URL: ${adaptedUrl}`)
+        console.log(`🔄 [图片插入] 替换前: ${oldImgTag.substring(0, 100)}...`)
+        console.log(`🔄 [图片插入] 替换后: ${newImgTag.substring(0, 100)}...`)
+      } else {
+        // 如果没有对应的现有图片，则根据position插入
+        if (imageInfo.position === 0 || !imageInfo.position) {
+          // 插入到内容开头
+          processedContent = newImgTag + '<br/>' + processedContent
+          console.log(`✅ [图片插入] 第${index + 1}张图片已插入到开头，URL: ${adaptedUrl}`)
+        } else {
+          // 插入到内容末尾
+          processedContent += '<br/>' + newImgTag
+          console.log(`✅ [图片插入] 第${index + 1}张图片已插入到末尾，URL: ${adaptedUrl}`)
+        }
+      }
+    } else {
+      console.warn(`⚠️ [图片插入] 第${index + 1}张图片信息无效:`, imageInfo)
+    }
+  })
+  
+  console.log('🎯 [图片插入] 处理完成，最终内容长度:', processedContent.length)
+  return processedContent
+}
+
+/**
+ * 处理通知点击事件
+ * 功能：点击通知时获取完整详情并显示详情对话框
+ */
+const handleNoticeClick = async (notice) => {
+  try {
+    // 关闭通知下拉菜单
+    if (notificationDropdown.value) {
+      notificationDropdown.value.handleClose()
+    }
+    
+    // 获取完整的通知详情
+    const response = await api.get(`/api/notice/${notice.id}`)
+    if (response.data.success) {
+      const noticeData = response.data.data
+      
+      // 处理图片插入
+      if (noticeData.imagePath && Array.isArray(noticeData.imagePath)) {
+        noticeData.Content = insertImagesIntoContent(noticeData.Content, noticeData.imagePath)
+      }
+      
+      // 设置详情数据，保持与原有格式兼容
+      currentNotice.value = {
+        id: noticeData.ID,
+        title: noticeData.Title,
+        fullContent: noticeData.Content,
+        priority: noticeData.Priority,
+        publishDate: noticeData.PublishDate
+      }
+      
+      showNoticeDetail.value = true
+    }
+  } catch (error) {
+    console.error('获取通知详情失败:', error)
+    ElMessage.error('获取通知详情失败')
   }
 }
 
@@ -566,10 +756,11 @@ onUnmounted(() => {
 }
 
 :deep(.el-dialog__header) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #409EFF;
   color: white;
-  padding: 20px 24px;
+  padding: 20px 24px 24px 24px;
   border-bottom: none;
+  margin-bottom: 16px;
 }
 
 :deep(.el-dialog__title) {

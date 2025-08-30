@@ -2098,64 +2098,42 @@ const getImageList = (imageData) => {
   
   // 如果已经是数组格式，直接处理
   if (Array.isArray(imageData)) {
-    console.log('✅ 数据是数组格式，长度:', imageData.length)
-    console.log('数组内容:', imageData)
-    
-    const filteredImages = imageData.filter(img => {
-        console.log('检查图片项:', img)
-        const isValid = isValidImageObject(img)
-        console.log('图片项是否有效:', isValid)
-        if (!isValid) {
-          console.log('❌ 无效图片项，原因: 空对象或缺少必要字段')
-        }
-        return isValid
-      })
-    
-    console.log('过滤后的图片数量:', filteredImages.length)
+    const filteredImages = imageData.filter(img => isValidImageObject(img))
     
     const mappedImages = filteredImages.map(imageInfo => ({
       ...imageInfo,
       url: getImageUrl(imageInfo) // 重新生成URL，确保环境适配
     }))
     
-    console.log('最终处理的图片列表:', mappedImages)
     return mappedImages
   }
   
   try {
-    console.log('🔄 尝试解析JSON格式')
     // 尝试解析JSON格式（新格式）
     const imageArray = JSON.parse(imageData)
-    console.log('JSON解析结果:', imageArray)
-    console.log('解析后是否为数组:', Array.isArray(imageArray))
     
     if (Array.isArray(imageArray)) {
-        console.log('✅ JSON解析成功，数组长度:', imageArray.length)
         return imageArray.filter(img => isValidImageObject(img)).map(imageInfo => ({
           ...imageInfo,
           url: getImageUrl(imageInfo) // 重新生成URL，确保环境适配
         }))
       }
   } catch (e) {
-    console.log('❌ JSON解析失败:', e.message)
     // 如果解析失败，说明是旧格式（字符串）
     // 继续处理旧格式
   }
   
   // 旧格式兼容：直接是文件名字符串
   if (typeof imageData === 'string' && imageData.trim()) {
-    console.log('✅ 处理字符串格式:', imageData)
     const result = [{
       filename: imageData,
       originalName: imageData,
       url: getImageUrl({ filename: imageData }),
       path: `customer-complaint/${imageData}`
     }]
-    console.log('字符串格式处理结果:', result)
     return result
   }
   
-  console.log('❌ 无法处理的数据格式，返回空数组')
   return []
 }
 

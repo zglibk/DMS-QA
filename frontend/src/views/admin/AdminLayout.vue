@@ -652,10 +652,11 @@ onMounted(async () => {
 }
 
 :deep(.el-dialog__header) {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #409EFF;
   color: white;
-  padding: 20px 24px;
+  padding: 20px 24px 24px 24px;
   border-bottom: none;
+  margin-bottom: 16px;
 }
 
 :deep(.el-dialog__title) {

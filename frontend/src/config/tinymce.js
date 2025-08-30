@@ -131,7 +131,7 @@ export const defaultConfig = {
       height: auto !important;
       overflow: visible !important;
     }
-    img { max-width: 100%; display: block; height: auto; }
+    img { max-width: 100%; display: inline-block; height: auto; vertical-align: middle; }
     .img-responsive { max-width: 100%; height: auto; }
     .img-rounded { border-radius: 8px; }
     .img-thumbnail { border: 1px solid #ddd; padding: 4px; border-radius: 4px; max-width: 200px; }
