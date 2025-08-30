@@ -1927,6 +1927,124 @@ INSERT INTO [dbo].[Notices] ([Title], [Content], [Type], [Priority], [CreatedBy]
 PRINT '✅ 通知公告表创建完成，已插入示例数据';
 
 -- =====================================================
+-- 扩充通知公告表字段
+-- 添加通知公告功能增强字段
+-- =====================================================
+
+-- 添加通知过期时间字段
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Notices]') AND name = 'ExpiryDate')
+BEGIN
+    ALTER TABLE [dbo].[Notices] ADD [ExpiryDate] DATETIME NULL;
+    EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'通知过期时间，过期后不再显示', 
+        @level0type = N'SCHEMA', @level0name = N'dbo', 
+        @level1type = N'TABLE', @level1name = N'Notices', 
+        @level2type = N'COLUMN', @level2name = N'ExpiryDate';
+    PRINT '✅ 已添加ExpiryDate字段（通知过期时间）';
+END
+
+-- 添加是否置顶字段
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Notices]') AND name = 'IsSticky')
+BEGIN
+    ALTER TABLE [dbo].[Notices] ADD [IsSticky] BIT NOT NULL DEFAULT 0;
+    EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'是否置顶显示', 
+        @level0type = N'SCHEMA', @level0name = N'dbo', 
+        @level1type = N'TABLE', @level1name = N'Notices', 
+        @level2type = N'COLUMN', @level2name = N'IsSticky';
+    PRINT '✅ 已添加IsSticky字段（是否置顶）';
+END
+
+-- 添加目标用户字段
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Notices]') AND name = 'TargetUsers')
+BEGIN
+    ALTER TABLE [dbo].[Notices] ADD [TargetUsers] NVARCHAR(MAX) NULL;
+    EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'目标用户ID列表（JSON格式），为空表示全员可见', 
+        @level0type = N'SCHEMA', @level0name = N'dbo', 
+        @level1type = N'TABLE', @level1name = N'Notices', 
+        @level2type = N'COLUMN', @level2name = N'TargetUsers';
+    PRINT '✅ 已添加TargetUsers字段（目标用户）';
+END
+
+-- 添加是否需要确认阅读字段
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID(N'[dbo].[Notices]') AND name = 'RequireConfirmation')
+BEGIN
+    ALTER TABLE [dbo].[Notices] ADD [RequireConfirmation] BIT NOT NULL DEFAULT 0;
+    EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'是否需要用户确认阅读', 
+        @level0type = N'SCHEMA', @level0name = N'dbo', 
+        @level1type = N'TABLE', @level1name = N'Notices', 
+        @level2type = N'COLUMN', @level2name = N'RequireConfirmation';
+    PRINT '✅ 已添加RequireConfirmation字段（是否需要确认阅读）';
+END
+
+-- 创建通知公告扩展字段的索引
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Notices]') AND name = 'IX_Notices_ExpiryDate')
+BEGIN
+    CREATE INDEX IX_Notices_ExpiryDate ON [dbo].[Notices] ([ExpiryDate]);
+    PRINT '✅ 已创建ExpiryDate索引';
+END
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Notices]') AND name = 'IX_Notices_IsSticky')
+BEGIN
+    CREATE INDEX IX_Notices_IsSticky ON [dbo].[Notices] ([IsSticky]);
+    PRINT '✅ 已创建IsSticky索引';
+END
+
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE object_id = OBJECT_ID(N'[dbo].[Notices]') AND name = 'IX_Notices_RequireConfirmation')
+BEGIN
+    CREATE INDEX IX_Notices_RequireConfirmation ON [dbo].[Notices] ([RequireConfirmation]);
+    PRINT '✅ 已创建RequireConfirmation索引';
+END
+
+PRINT '✅ 通知公告表字段扩充完成';
+
+-- =====================================================
+-- 用户通知阅读状态表 (NoticeReadStatus)
+-- 功能：跟踪每个用户对每条通知的阅读状态
+-- =====================================================
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[NoticeReadStatus]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[NoticeReadStatus] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,                    -- 主键，自增ID
+        [NoticeID] INT NOT NULL,                               -- 通知ID（关联Notices表）
+        [UserID] INT NOT NULL,                                 -- 用户ID（关联User表）
+        [IsRead] BIT NOT NULL DEFAULT 0,                       -- 是否已读
+        [ReadTime] DATETIME NULL,                              -- 阅读时间
+        [IsConfirmed] BIT NOT NULL DEFAULT 0,                  -- 是否已确认（针对需要确认的通知）
+        [ConfirmTime] DATETIME NULL,                           -- 确认时间
+        [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(),       -- 创建时间
+        [UpdatedAt] DATETIME NULL,                             -- 更新时间
+        
+        -- 创建复合唯一索引，确保每个用户对每条通知只有一条记录
+        CONSTRAINT UQ_NoticeReadStatus_NoticeUser UNIQUE ([NoticeID], [UserID]),
+        
+        -- 外键约束
+        CONSTRAINT FK_NoticeReadStatus_Notice 
+            FOREIGN KEY ([NoticeID]) REFERENCES [dbo].[Notices]([ID]) ON DELETE CASCADE,
+        CONSTRAINT FK_NoticeReadStatus_User 
+            FOREIGN KEY ([UserID]) REFERENCES [dbo].[User]([ID]) ON DELETE CASCADE
+    );
+    
+    -- 创建性能优化索引
+    CREATE INDEX IX_NoticeReadStatus_NoticeID ON [dbo].[NoticeReadStatus] ([NoticeID]);
+    CREATE INDEX IX_NoticeReadStatus_UserID ON [dbo].[NoticeReadStatus] ([UserID]);
+    CREATE INDEX IX_NoticeReadStatus_IsRead ON [dbo].[NoticeReadStatus] ([IsRead]);
+    CREATE INDEX IX_NoticeReadStatus_ReadTime ON [dbo].[NoticeReadStatus] ([ReadTime]);
+    
+    -- 添加表注释
+    EXEC sp_addextendedproperty 
+        @name = N'MS_Description', 
+        @value = N'用户通知阅读状态表，跟踪每个用户对每条通知的阅读和确认状态', 
+        @level0type = N'SCHEMA', @level0name = N'dbo', 
+        @level1type = N'TABLE', @level1name = N'NoticeReadStatus';
+    
+    PRINT '✅ 用户通知阅读状态表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ 用户通知阅读状态表已存在，跳过创建';
+END
+
+-- =====================================================
 -- 创建工作计划相关触发器
 -- 功能：自动更新 UpdatedAt 和 UpdatedBy 字段
 -- =====================================================
@@ -2783,4 +2901,93 @@ PRINT '✅ 用户权限管理触发器创建成功';
 PRINT '✅ 用户权限管理视图创建成功';
 PRINT '✅ 用户权限管理菜单初始化成功';
 PRINT '✅ admin用户权限初始化成功';
+
+-- =====================================================
+-- 添加通知公告管理菜单和权限
+-- =====================================================
+
+-- 添加通知公告管理主菜单
+DECLARE @NoticeManagementMenuID INT;
+DECLARE @AdminUserID INT;
+
+-- 获取admin用户ID
+SELECT @AdminUserID = [ID] FROM [dbo].[User] WHERE [Username] = 'admin';
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Menus] WHERE [Name] = '通知公告管理')
+BEGIN
+    INSERT INTO [dbo].[Menus] ([Name], [Path], [Icon], [ParentID], [SortOrder], [IsActive], [CreatedAt])
+    VALUES ('通知公告管理', '/notice-management', 'bell', NULL, 7, 1, GETDATE());
+    
+    SET @NoticeManagementMenuID = SCOPE_IDENTITY();
+    PRINT '✅ 已添加通知公告管理主菜单';
+END
+ELSE
+BEGIN
+    SELECT @NoticeManagementMenuID = [ID] FROM [dbo].[Menus] WHERE [Name] = '通知公告管理';
+    PRINT '⚠️ 通知公告管理主菜单已存在';
+END
+
+-- 添加通知公告管理操作按钮
+DECLARE @NoticeOperations TABLE (
+    [Name] NVARCHAR(50),
+    [Code] NVARCHAR(50),
+    [Description] NVARCHAR(200)
+);
+
+INSERT INTO @NoticeOperations ([Name], [Code], [Description]) VALUES
+('发布通知', 'notice_create', '创建和发布新的通知公告'),
+('编辑通知', 'notice_edit', '编辑现有的通知公告内容'),
+('删除通知', 'notice_delete', '删除不需要的通知公告'),
+('查看通知', 'notice_view', '查看通知公告列表和详情'),
+('标记已读', 'notice_mark_read', '标记通知为已读状态'),
+('通知统计', 'notice_statistics', '查看通知阅读统计数据');
+
+-- 插入操作按钮
+INSERT INTO [dbo].[Operations] ([MenuID], [Name], [Code], [Description], [SortOrder], [IsActive], [CreatedAt])
+SELECT 
+    @NoticeManagementMenuID,
+    ops.[Name],
+    ops.[Code],
+    ops.[Description],
+    ROW_NUMBER() OVER (ORDER BY ops.[Name]),
+    1,
+    GETDATE()
+FROM @NoticeOperations ops
+WHERE NOT EXISTS (
+    SELECT 1 FROM [dbo].[Operations] 
+    WHERE [MenuID] = @NoticeManagementMenuID AND [Code] = ops.[Code]
+);
+
+PRINT '✅ 已添加通知公告管理操作按钮';
+
+-- 为admin用户授予通知公告管理菜单权限
+IF @AdminUserID IS NOT NULL AND @NoticeManagementMenuID IS NOT NULL
+BEGIN
+    -- 授予菜单访问权限
+    INSERT INTO [dbo].[UserMenuPermissions] ([UserID], [MenuID], [CanAccess], [CreatedAt])
+    SELECT @AdminUserID, @NoticeManagementMenuID, 1, GETDATE()
+    WHERE NOT EXISTS (
+        SELECT 1 FROM [dbo].[UserMenuPermissions] 
+        WHERE [UserID] = @AdminUserID AND [MenuID] = @NoticeManagementMenuID
+    );
+    
+    -- 授予所有操作权限
+    INSERT INTO [dbo].[UserOperationPermissions] ([UserID], [OperationID], [CanAccess], [CreatedAt])
+    SELECT @AdminUserID, [ID], 1, GETDATE()
+    FROM [dbo].[Operations]
+    WHERE [MenuID] = @NoticeManagementMenuID
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[UserOperationPermissions] 
+        WHERE [UserID] = @AdminUserID AND [OperationID] = [Operations].[ID]
+    );
+    
+    PRINT '✅ 已为admin用户授予通知公告管理权限';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ 无法为admin用户授予通知公告管理权限：用户或菜单不存在';
+END
+
+PRINT '✅ 通知公告管理菜单和权限配置完成';
+PRINT '🎉 数据库初始化完成！';
 GO
