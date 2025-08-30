@@ -870,6 +870,8 @@ const deleteNotice = async (notice) => {
         userStore.decreaseUnreadNoticeCount(1)
       }
       await getUnreadCount()
+      // 刷新通知铃铛数据
+      await userStore.refreshNotifications()
     }
   } catch (error) {
     if (error !== 'cancel') {
@@ -980,6 +982,8 @@ const saveNotice = async () => {
       isEditing.value = false
       await getNoticeList()
       await getUnreadCount()
+      // 刷新通知铃铛数据
+      await userStore.refreshNotifications()
     }
   } catch (error) {
     if (error !== false) { // 表单验证失败时不显示错误
@@ -1026,6 +1030,8 @@ const createNotice = async () => {
       resetNoticeForm()
       await getNoticeList()
       await getUnreadCount()
+      // 刷新通知铃铛数据
+      await userStore.refreshNotifications()
     }
   } catch (error) {
     if (error !== false) { // 表单验证失败时不显示错误

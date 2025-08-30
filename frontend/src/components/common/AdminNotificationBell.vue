@@ -69,7 +69,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, useAttrs } from 'vue'
+import { ref, computed, onMounted, onUnmounted, useAttrs } from 'vue'
 import { useRouter } from 'vue-router'
 import { BellFilled } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
@@ -246,15 +246,36 @@ const goToNotices = () => {
   router.push('/admin/system/notices')
 }
 
+/**
+ * 刷新通知数据的处理函数
+ * 功能：响应全局刷新事件，重新获取通知数据
+ */
+const handleRefreshNotifications = async () => {
+  try {
+    await getUnreadCount()
+    await getUnreadNotices()
+  } catch (error) {
+    console.error('刷新通知数据失败:', error)
+  }
+}
+
 // 组件挂载时初始化数据
 onMounted(async () => {
   try {
     // 获取未读通知数量和列表
     await getUnreadCount()
     await getUnreadNotices()
+    
+    // 监听全局刷新通知事件
+    window.addEventListener('refreshNotifications', handleRefreshNotifications)
   } catch (error) {
     console.error('初始化通知数据失败:', error)
   }
+})
+
+// 组件卸载时清理事件监听器
+onUnmounted(() => {
+  window.removeEventListener('refreshNotifications', handleRefreshNotifications)
 })
 </script>
 

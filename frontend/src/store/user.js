@@ -949,6 +949,22 @@ export const useUserStore = defineStore('user', {
     },
 
     /**
+     * 刷新通知数据
+     * 功能：重新获取未读通知数量，用于通知内容更新后的实时刷新
+     */
+    async refreshNotifications() {
+      try {
+        await this.fetchUnreadNoticeCount()
+        // 触发全局事件，通知AdminNotificationBell组件刷新通知列表
+        if (typeof window !== 'undefined' && window.dispatchEvent) {
+          window.dispatchEvent(new CustomEvent('refreshNotifications'))
+        }
+      } catch (error) {
+        console.error('刷新通知数据失败:', error)
+      }
+    },
+
+    /**
      * 记录用户状态变化历史（调试用）
      * @param {string} action - 操作类型
      * @param {object} details - 详细信息
