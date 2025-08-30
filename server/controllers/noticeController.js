@@ -8,6 +8,8 @@
 const sql = require('mssql');
 const { getConnection } = require('../config/database');
 const moment = require('moment');
+const fs = require('fs');
+const path = require('path');
 
 /**
  * 清理内容中的头尾P标签
@@ -127,6 +129,7 @@ const getNoticeList = async (req, res) => {
                     n.IsSticky,
                     n.ExpiryDate,
                     n.RequireConfirmation,
+                    n.ImagePath,
                     ISNULL(nrs.IsRead, 0) as IsRead,
                     nrs.ReadTime,
                     ISNULL(nrs.IsConfirmed, 0) as IsConfirmed,
@@ -146,16 +149,31 @@ const getNoticeList = async (req, res) => {
             .input('userId', sql.Int, userId)
             .query(noticeQuery);
         
-        // 格式化日期
-        const notices = result.recordset.map(notice => ({
-            ...notice,
-            PublishDate: notice.PublishDate ? moment(notice.PublishDate).format('YYYY-MM-DD HH:mm') : null,
-            ExpiryDate: notice.ExpiryDate ? moment(notice.ExpiryDate).format('YYYY-MM-DD HH:mm') : null,
-            ReadTime: notice.ReadTime ? moment(notice.ReadTime).format('YYYY-MM-DD HH:mm') : null,
-            ConfirmTime: notice.ConfirmTime ? moment(notice.ConfirmTime).format('YYYY-MM-DD HH:mm') : null,
-            timeAgo: notice.PublishDate ? moment(notice.PublishDate).fromNow() : null,
-            isExpired: notice.ExpiryDate ? moment().isAfter(moment(notice.ExpiryDate)) : false
-        }));
+        // 格式化日期和处理图片路径
+        const notices = result.recordset.map(notice => {
+            // 解析图片路径信息
+            let imagePath = [];
+            try {
+                imagePath = notice.ImagePath ? JSON.parse(notice.ImagePath) : [];
+            } catch (error) {
+                console.warn('解析ImagePath JSON失败:', error);
+                imagePath = [];
+            }
+            
+            // 删除原始的ImagePath字段
+             const { ImagePath, ...noticeWithoutImagePath } = notice;
+             
+             return {
+                 ...noticeWithoutImagePath,
+                 PublishDate: notice.PublishDate ? moment(notice.PublishDate).format('YYYY-MM-DD HH:mm') : null,
+                 ExpiryDate: notice.ExpiryDate ? moment(notice.ExpiryDate).format('YYYY-MM-DD HH:mm') : null,
+                 ReadTime: notice.ReadTime ? moment(notice.ReadTime).format('YYYY-MM-DD HH:mm') : null,
+                 ConfirmTime: notice.ConfirmTime ? moment(notice.ConfirmTime).format('YYYY-MM-DD HH:mm') : null,
+                 timeAgo: notice.PublishDate ? moment(notice.PublishDate).fromNow() : null,
+                 isExpired: notice.ExpiryDate ? moment().isAfter(moment(notice.ExpiryDate)) : false,
+                 imagePath: imagePath
+             };
+        });
         
         res.json({
             success: true,
@@ -205,6 +223,7 @@ const getNoticeById = async (req, res) => {
                 n.IsSticky,
                 n.ExpiryDate,
                 n.RequireConfirmation,
+                n.ImagePath,
                 ISNULL(nrs.IsRead, 0) as IsRead,
                 nrs.ReadTime,
                 ISNULL(nrs.IsConfirmed, 0) as IsConfirmed,
@@ -253,6 +272,16 @@ const getNoticeById = async (req, res) => {
             notice.ReadTime = moment().format('YYYY-MM-DD HH:mm');
         }
         
+        // 解析图片路径信息
+        try {
+            notice.imagePath = notice.ImagePath ? JSON.parse(notice.ImagePath) : [];
+        } catch (error) {
+            console.warn('解析ImagePath JSON失败:', error);
+            notice.imagePath = [];
+        }
+        // 删除原始的ImagePath字段，使用解析后的imagePath
+        delete notice.ImagePath;
+        
         // 格式化日期
         notice.PublishDate = notice.PublishDate ? moment(notice.PublishDate).format('YYYY-MM-DD HH:mm') : null;
         notice.ExpiryDate = notice.ExpiryDate ? moment(notice.ExpiryDate).format('YYYY-MM-DD HH:mm') : null;
@@ -295,10 +324,14 @@ const createNotice = async (req, res) => {
             });
         }
         
+        // 处理图片路径信息
+        const { imagePath } = req.body;
+        const imagePathJson = imagePath ? JSON.stringify(imagePath) : null;
+        
         // 插入通知公告
         const insertQuery = `
-            INSERT INTO Notices (Title, Content, Type, Priority, CreatedBy, IsActive, ViewCount)
-            VALUES (@title, @content, @type, @priority, @createdBy, 1, 0);
+            INSERT INTO Notices (Title, Content, Type, Priority, CreatedBy, IsActive, ViewCount, ImagePath)
+            VALUES (@title, @content, @type, @priority, @createdBy, 1, 0, @imagePath);
             SELECT SCOPE_IDENTITY() as ID;
         `;
         
@@ -308,6 +341,7 @@ const createNotice = async (req, res) => {
             .input('type', sql.NVarChar, type)
             .input('priority', sql.NVarChar, priority)
             .input('createdBy', sql.Int, userId)
+            .input('imagePath', sql.NVarChar, imagePathJson)
             .query(insertQuery);
         
         res.json({
@@ -342,7 +376,8 @@ const updateNotice = async (req, res) => {
             Priority, 
             ExpiryDate, 
             IsSticky, 
-            RequireConfirmation 
+            RequireConfirmation,
+            imagePath 
         } = req.body;
         
         // 验证必填字段
@@ -352,6 +387,9 @@ const updateNotice = async (req, res) => {
                 message: '标题和内容为必填项'
             });
         }
+        
+        // 处理图片路径信息
+        const imagePathJson = imagePath ? JSON.stringify(imagePath) : null;
         
         // 更新通知公告
         const updateQuery = `
@@ -363,6 +401,7 @@ const updateNotice = async (req, res) => {
                 ExpiryDate = @expiryDate,
                 IsSticky = @isSticky,
                 RequireConfirmation = @requireConfirmation,
+                ImagePath = @imagePath,
                 UpdatedAt = GETDATE()
             WHERE ID = @id AND IsActive = 1
         `;
@@ -376,6 +415,7 @@ const updateNotice = async (req, res) => {
             .input('expiryDate', sql.DateTime, ExpiryDate ? new Date(ExpiryDate) : null)
             .input('isSticky', sql.Bit, IsSticky || false)
             .input('requireConfirmation', sql.Bit, RequireConfirmation || false)
+            .input('imagePath', sql.NVarChar, imagePathJson)
             .query(updateQuery);
         
         if (result.rowsAffected[0] === 0) {
@@ -727,6 +767,108 @@ const markAllAsRead = async (req, res) => {
 
 
  
+/**
+ * 删除通知中的图片
+ * @param {Object} req - 请求对象
+ * @param {Object} res - 响应对象
+ */
+const deleteNoticeImage = async (req, res) => {
+    try {
+        const pool = await getConnection();
+        const { id, fileName } = req.params;
+        
+        // 获取当前通知的ImagePath信息
+        const getNoticeQuery = `
+            SELECT ImagePath 
+            FROM Notices 
+            WHERE ID = @id AND IsActive = 1
+        `;
+        
+        const noticeResult = await pool.request()
+            .input('id', sql.Int, parseInt(id))
+            .query(getNoticeQuery);
+        
+        if (noticeResult.recordset.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: '通知公告不存在'
+            });
+        }
+        
+        let imagePath = [];
+        try {
+            imagePath = noticeResult.recordset[0].ImagePath ? 
+                JSON.parse(noticeResult.recordset[0].ImagePath) : [];
+        } catch (parseError) {
+            // 解析失败时使用空数组
+            imagePath = [];
+        }
+        
+        // 查找要删除的图片信息
+        const imageToDelete = imagePath.find(img => 
+            img.fileName === fileName || 
+            img.originalName === fileName ||
+            (img.fullUrl && img.fullUrl.includes(fileName))
+        );
+        
+        if (!imageToDelete) {
+            return res.status(404).json({
+                success: false,
+                message: '图片不存在'
+            });
+        }
+        
+        // 从ImagePath数组中移除该图片
+        const updatedImagePath = imagePath.filter(img => 
+            img.fileName !== fileName && 
+            img.originalName !== fileName &&
+            (!img.fullUrl || !img.fullUrl.includes(fileName))
+        );
+        
+        // 更新数据库中的ImagePath字段
+        const updateQuery = `
+            UPDATE Notices 
+            SET ImagePath = @imagePath
+            WHERE ID = @id
+        `;
+        
+        await pool.request()
+            .input('id', sql.Int, parseInt(id))
+            .input('imagePath', sql.NVarChar(sql.MAX), JSON.stringify(updatedImagePath))
+            .query(updateQuery);
+        
+        // 删除物理文件
+        const uploadsDir = path.join(__dirname, '../uploads/notice-images');
+        const filePath = path.join(uploadsDir, fileName);
+        
+        // 检查文件是否存在并删除
+        if (fs.existsSync(filePath)) {
+            try {
+                fs.unlinkSync(filePath);
+            } catch (deleteError) {
+                // 即使文件删除失败，也返回成功，因为数据库已更新
+            }
+        }
+        
+        res.json({
+            success: true,
+            message: '图片删除成功',
+            data: {
+                deletedImage: imageToDelete,
+                remainingImages: updatedImagePath
+            }
+        });
+        
+    } catch (error) {
+        console.error('删除通知图片失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '删除图片失败',
+            error: error.message
+        });
+    }
+};
+
 module.exports = {
     getNoticeList,
     getNoticeById,
@@ -736,5 +878,6 @@ module.exports = {
     markAsRead,
     confirmRead,
     getUnreadCount,
-    markAllAsRead
+    markAllAsRead,
+    deleteNoticeImage
 };

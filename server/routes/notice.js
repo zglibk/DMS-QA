@@ -95,4 +95,15 @@ router.post('/:id/read', noticeController.markAsRead);
  */
 router.post('/:id/confirm', noticeController.confirmRead);
 
+/**
+ * 删除通知中的图片
+ * DELETE /api/notice/:id/image/:fileName
+ * 需要认证和权限
+ */
+router.delete('/:id/image/:fileName', 
+    authenticateToken, 
+    checkPermission('notice:edit'),
+    noticeController.deleteNoticeImage
+);
+
 module.exports = router;

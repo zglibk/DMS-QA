@@ -332,7 +332,7 @@ router.post('/', upload.single('file'), (req, res) => {
     });
 
   } catch (error) {
-    console.error('样品图片上传失败:', error);
+
     res.status(500).json({
       success: false,
       message: '图片上传失败: ' + error.message
@@ -379,7 +379,7 @@ router.post('/image', customerComplaintUpload.single('file'), async (req, res) =
       category: 'customer_complaint'
     };
 
-    console.log('客诉图片上传成功:', fileInfo);
+
 
     res.json({
       success: true,
@@ -395,7 +395,7 @@ router.post('/image', customerComplaintUpload.single('file'), async (req, res) =
       }
     })
   } catch (error) {
-    console.error('客诉图片上传失败:', error)
+
     res.status(500).json({
       success: false,
       message: '图片上传失败'
@@ -471,7 +471,7 @@ router.delete('/site-image/:filename', (req, res) => {
     // 删除文件
     fs.unlinkSync(filePath);
 
-    console.log('网站图片删除成功:', filename);
+
 
     res.json({
       success: true,
@@ -479,7 +479,7 @@ router.delete('/site-image/:filename', (req, res) => {
     });
 
   } catch (error) {
-    console.error('文件删除失败:', error);
+
     res.status(500).json({
       success: false,
       message: '文件删除失败: ' + error.message
@@ -517,7 +517,7 @@ router.get('/site-images', (req, res) => {
     });
 
   } catch (error) {
-    console.error('获取图片列表失败:', error);
+
     res.status(500).json({
       success: false,
       message: '获取图片列表失败: ' + error.message
@@ -615,7 +615,7 @@ router.post('/complaint-attachment', customPathAttachmentUpload.single('file'), 
       try {
         fs.unlinkSync(req.file.path);
       } catch (unlinkError) {
-        console.error('删除临时文件失败:', unlinkError);
+
       }
     }
 
@@ -629,9 +629,7 @@ router.post('/complaint-attachment', customPathAttachmentUpload.single('file'), 
 // 返工记录附件上传
 router.post('/rework-attachment', customPathAttachmentUpload.single('file'), (req, res) => {
   try {
-    console.log('=== 返工记录附件上传开始 ===');
-    console.log('req.body:', req.body);
-    console.log('req.file:', req.file);
+
 
     if (!req.file) {
       return res.status(400).json({
@@ -643,7 +641,7 @@ router.post('/rework-attachment', customPathAttachmentUpload.single('file'), (re
     const file = req.file;
     const { customPath } = req.body;
 
-    console.log('接收到的自定义路径:', customPath);
+
 
     // 如果提供了自定义路径，移动文件到指定位置
     let finalPath = file.path;
@@ -655,22 +653,21 @@ router.post('/rework-attachment', customPathAttachmentUpload.single('file'), (re
       const targetDir = path.join(attachmentDir, customPath);
       const targetPath = path.join(targetDir, file.filename);
 
-      console.log('目标目录:', targetDir);
-      console.log('目标路径:', targetPath);
+
 
       // 确保目标目录存在
       if (!fs.existsSync(targetDir)) {
         fs.mkdirSync(targetDir, { recursive: true });
-        console.log(`创建目录: ${targetDir}`);
+
       }
 
       // 移动文件
       try {
         fs.renameSync(file.path, targetPath);
         finalPath = targetPath;
-        console.log(`文件移动成功: ${file.path} -> ${targetPath}`);
+
       } catch (moveError) {
-        console.error('文件移动失败:', moveError);
+
         // 如果移动失败，尝试复制然后删除原文件
         try {
           fs.copyFileSync(file.path, targetPath);
@@ -754,13 +751,17 @@ router.post('/notice-image', noticeImageUpload.single('file'), async (req, res) 
     }
 
     // 构建完整的文件信息对象
+    // 修复开发环境中URL生成问题：确保文件服务器地址正确
+    const hostname = req.get('host').split(':')[0]; // 提取主机名，去掉端口号
+    const fullUrl = `${req.protocol}://${hostname}:8080/files/notice-images/${req.file.filename}`;
+    
     const fileInfo = {
       id: `notice_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
       originalName: correctedOriginalName,
       filename: req.file.filename,
       relativePath: `notice-images/${req.file.filename}`,
       accessUrl: `/files/notice-images/${req.file.filename}`,
-      fullUrl: `${req.protocol}://${req.get('host')}:8080/files/notice-images/${req.file.filename}`,
+      fullUrl: fullUrl,
       fileSize: req.file.size,
       mimeType: req.file.mimetype,
       uploadTime: new Date().toISOString(),
@@ -768,7 +769,7 @@ router.post('/notice-image', noticeImageUpload.single('file'), async (req, res) 
       category: 'notice'
     };
 
-    console.log('通知图片上传成功:', fileInfo);
+
 
     res.json({
       success: true,
@@ -784,7 +785,7 @@ router.post('/notice-image', noticeImageUpload.single('file'), async (req, res) 
       }
     });
   } catch (error) {
-    console.error('通知图片上传失败:', error);
+
     res.status(500).json({
       success: false,
       message: '通知图片上传失败'

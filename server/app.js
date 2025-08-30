@@ -62,6 +62,7 @@ const userPermissionsRouter = require('./routes/userPermissions'); // 用户权�
 const erpRouter = require('./routes/erp');                     // ERP系统集成路由
 const erpConfigRouter = require('./routes/erpConfig');         // ERP配置管理路由
 const erpSyncService = require('./services/erpSyncService');
+const { startFileServer } = require('./file-server');
 
 /**
  * 创建Express应用实例
@@ -263,6 +264,17 @@ app.listen(3001, '0.0.0.0', () => {
   console.log('文件服务器端口:', process.env.FILE_SERVER_PORT || '8080');
   console.log('========================');
   
+  // 启动文件服务器（开发环境）
+  if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
+    try {
+      startFileServer();
+      console.log('✅ 开发环境文件服务器已启动');
+    } catch (error) {
+      console.error('❌ 文件服务器启动失败:', error.message);
+      console.log('💡 提示: 如果端口8080被占用，请修改.env文件中的FILE_SERVER_PORT配置');
+    }
+  }
+
   // 启动ERP数据同步服务
   setTimeout(() => {
     erpSyncService.start();
