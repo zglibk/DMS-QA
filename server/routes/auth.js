@@ -769,6 +769,124 @@ router.get('/user/:userId/roles-permissions', authenticateToken, async (req, res
   }
 });
 
+// ===================== 刷新用户权限缓存 =====================
+// POST /api/auth/refresh-permissions
+// 参数: userId (可选，不传则刷新当前用户)
+// 清除指定用户的权限缓存，强制重新加载权限数据
+router.post('/refresh-permissions', authenticateToken, async (req, res) => {
+  const { userId } = req.body;
+  const targetUserId = userId || req.user.id; // 如果没有指定userId，则刷新当前用户
+  
+  try {
+    let pool = await sql.connect(await getDynamicConfig());
+    
+    // 验证目标用户是否存在
+    const userResult = await pool.request()
+      .input('UserId', sql.Int, targetUserId)
+      .query('SELECT ID, Username FROM [User] WHERE ID = @UserId AND Status = 1');
+    
+    if (userResult.recordset.length === 0) {
+      return res.status(404).json({ 
+        success: false, 
+        message: '用户不存在或已被禁用' 
+      });
+    }
+    
+    const targetUser = userResult.recordset[0];
+    
+    // 检查权限：只有管理员可以刷新其他用户的权限，普通用户只能刷新自己的权限
+    if (userId && userId !== req.user.id) {
+      // 检查当前用户是否有管理员权限
+      const adminCheckResult = await pool.request()
+        .input('UserId', sql.Int, req.user.id)
+        .query(`
+          SELECT COUNT(*) as count
+          FROM [UserRoles] ur
+          INNER JOIN [Roles] r ON ur.RoleID = r.ID
+          WHERE ur.UserID = @UserId AND r.RoleCode = 'admin' AND r.Status = 1
+        `);
+      
+      if (adminCheckResult.recordset[0].count === 0) {
+        return res.status(403).json({ 
+          success: false, 
+          message: '权限不足，只能刷新自己的权限' 
+        });
+      }
+    }
+    
+    // 记录权限刷新操作
+    await pool.request()
+      .input('UserId', sql.Int, req.user.id)
+      .input('TargetUserId', sql.Int, targetUserId)
+      .input('Action', sql.NVarChar, 'REFRESH_PERMISSIONS')
+      .input('Details', sql.NVarChar, `刷新用户 ${targetUser.Username} 的权限缓存`)
+      .input('IPAddress', sql.NVarChar, req.ip || req.connection.remoteAddress || req.headers['x-forwarded-for'] || 'unknown')
+      .input('UserAgent', sql.NVarChar, req.headers['user-agent'] || 'unknown')
+      .query(`
+        INSERT INTO [SystemLogs] (UserID, Action, Details, IPAddress, UserAgent, CreatedAt)
+        VALUES (@UserId, @Action, @Details, @IPAddress, @UserAgent, GETDATE())
+      `);
+    
+    // 获取刷新后的用户权限数据
+    const permissionsResult = await pool.request()
+      .input('UserId', sql.Int, targetUserId)
+      .query(`
+        SELECT DISTINCT
+          v.MenuID as id,
+          v.MenuName as name,
+          v.MenuCode as code,
+          v.Path as path,
+          m.MenuType as type,
+          m.ParentID as parentId,
+          v.Permission,
+          m.SortOrder,
+          v.PermissionSource,
+          v.PermissionType,
+          v.HasPermission
+        FROM [V_UserCompletePermissions] v
+        INNER JOIN [Menus] m ON v.MenuID = m.ID
+        WHERE v.UserID = @UserId AND v.HasPermission = 1
+        ORDER BY m.SortOrder
+      `);
+    
+    const rolesResult = await pool.request()
+      .input('UserId', sql.Int, targetUserId)
+      .query(`
+        SELECT 
+          r.ID,
+          r.RoleName as Name,
+          r.RoleCode as Code,
+          r.Description
+        FROM [UserRoles] ur
+        INNER JOIN [Roles] r ON ur.RoleID = r.ID
+        WHERE ur.UserID = @UserId AND r.Status = 1
+      `);
+    
+    const permissions = permissionsResult.recordset || [];
+    const roles = rolesResult.recordset || [];
+    
+    res.json({
+      success: true,
+      message: `用户 ${targetUser.Username} 的权限缓存已刷新`,
+      data: {
+        userId: targetUserId,
+        username: targetUser.Username,
+        permissions,
+        roles,
+        menus: permissions, // 兼容前端
+        refreshTime: new Date().toISOString()
+      }
+    });
+    
+  } catch (err) {
+    console.error('刷新用户权限缓存出错:', err);
+    res.status(500).json({ 
+      success: false, 
+      message: '刷新权限缓存失败: ' + err.message 
+    });
+  }
+});
+
 // ===================== 重置用户密码 =====================
 // POST /api/auth/reset-user-password
 // 参数: userID, username, newPassword, notifyMethod

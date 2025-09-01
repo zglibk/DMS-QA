@@ -35,6 +35,8 @@ const cors = require('cors');
 const bodyParser = require('body-parser');
 // 导入路径处理工具
 const path = require('path');
+// 导入日志记录中间件
+const { loggerMiddleware, errorLoggerMiddleware } = require('./middleware/loggerMiddleware');
 
 // 导入各个功能模块的路由
 const complaintRouter = require('./routes/complaint');        // 投诉管理路由
@@ -61,8 +63,10 @@ const publishingExceptionsRouter = require('./routes/publishingExceptions'); // 
 const userPermissionsRouter = require('./routes/userPermissions'); // 用户权限管理路由
 const erpRouter = require('./routes/erp');                     // ERP系统集成路由
 const erpConfigRouter = require('./routes/erpConfig');         // ERP配置管理路由
+const systemLogsRouter = require('./routes/systemLogs');       // 系统日志管理路由
 const erpSyncService = require('./services/erpSyncService');
 const { startFileServer } = require('./file-server');
+const { logCleanupService } = require('./services/logCleanupService');
 
 /**
  * 创建Express应用实例
@@ -86,6 +90,14 @@ app.use(bodyParser.json({limit: '50mb'}));
 
 // 配置URL编码请求体解析，支持表单数据
 app.use(bodyParser.urlencoded({limit: '50mb', extended: true}));
+
+// 配置日志记录中间件
+app.use(loggerMiddleware({
+  excludePaths: ['/health', '/favicon.ico', '/api/test-connection'],
+  logRequestBody: true,
+  logResponseBody: false,
+  maxBodySize: 5000
+}));
 
 /**
  * 请求日志中间件
@@ -175,6 +187,11 @@ app.use('/api/publishing-exceptions', publishingExceptionsRouter);
 app.use('/api/user-permissions', userPermissionsRouter);
 app.use('/api/erp', erpRouter);
 app.use('/api/erp-config', erpConfigRouter);
+app.use('/api/system-logs', systemLogsRouter);
+app.use('/api/log-export', require('./routes/logExport'));
+
+// 错误日志记录中间件（必须在所有路由之后）
+app.use(errorLoggerMiddleware());
 
 /**
  * 静态文件服务配置
@@ -280,6 +297,14 @@ app.listen(3001, '0.0.0.0', () => {
     erpSyncService.start();
     console.log('ERP数据同步服务已启动');
   }, 5000); // 延迟5秒启动，确保数据库连接已建立
+
+  // 启动日志清理服务
+  try {
+    logCleanupService.start();
+    console.log('日志清理服务已启动');
+  } catch (error) {
+    console.error('❌ 启动日志清理服务失败:', error);
+  }
 }).on('error', (error) => {
   console.error('服务器启动错误:', error);
   // 在生产环境中，可能需要退出进程或重试

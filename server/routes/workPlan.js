@@ -1,7 +1,7 @@
 /**
  * 工作计划管理系统 - 路由配置
  * 功能：定义工作计划相关的API路由
- * 版本：v1.0
+ * 版本：v1.1
  * 创建日期：2025-08-05
  */
 
@@ -19,8 +19,8 @@ const { authenticateToken, checkPermission } = require('../middleware/auth');
  * GET /api/work-plan/dashboard
  */
 router.get('/dashboard', 
-    // authenticateToken, 
-    // checkPermission('work-plan:dashboard:view'),
+    authenticateToken, 
+    checkPermission('work-plan:dashboard:view'),
     workPlanController.getDashboardData
 );
 
@@ -29,8 +29,8 @@ router.get('/dashboard',
  * GET /api/work-plan/dashboard/todos
  */
 router.get('/dashboard/todos', 
-    // authenticateToken, 
-    // checkPermission('work-plan:dashboard:view'),
+    authenticateToken, 
+    checkPermission('work-plan:dashboard:view'),
     workPlanController.getTodoList
 );
 
@@ -39,8 +39,8 @@ router.get('/dashboard/todos',
  * GET /api/work-plan/dashboard/recent-logs
  */
 router.get('/dashboard/recent-logs', 
-    // authenticateToken, 
-    // checkPermission('work-plan:dashboard:view'),
+    authenticateToken, 
+    checkPermission('work-plan:dashboard:view'),
     workPlanController.getRecentLogs
 );
 
@@ -54,8 +54,8 @@ router.get('/dashboard/recent-logs',
  * 查询参数：page, pageSize, status, assignedTo, createdBy, keyword, startDate, endDate
  */
 router.get('/plans', 
-    // authenticateToken, 
-    // checkPermission('work-plan:plan:view'),
+    authenticateToken, 
+    checkPermission('work-plan:plan:view'),
     workPlanController.getPlanList
 );
 
@@ -74,8 +74,8 @@ router.get('/plans/:id',
  * POST /api/work-plan/plans
  */
 router.post('/plans', 
-    // authenticateToken, 
-    // checkPermission('work-plan:plan:add'),
+    authenticateToken, 
+    checkPermission('work-plan:plan:add'),
     workPlanController.createPlan
 );
 
@@ -149,8 +149,8 @@ router.get('/plans/export',
  * 查询参数：page, pageSize, planId, userId, logDate, keyword
  */
 router.get('/logs', 
-    // authenticateToken, 
-    // checkPermission('work-plan:log:view'),
+    authenticateToken, 
+    checkPermission('work-plan:log:view'),
     workPlanController.getLogList
 );
 
@@ -223,8 +223,8 @@ router.delete('/logs',
  * GET /api/work-plan/milestones
  */
 router.get('/milestones', 
-    // authenticateToken, 
-    // checkPermission('work-plan:plan:view'),
+    authenticateToken, 
+    checkPermission('work-plan:plan:view'),
     workPlanController.getAllMilestones
 );
 
@@ -233,8 +233,8 @@ router.get('/milestones',
  * GET /api/work-plan/plans/:planId/milestones
  */
 router.get('/plans/:planId/milestones', 
-    // authenticateToken, 
-    // checkPermission('work-plan:plan:view'),
+    authenticateToken, 
+    checkPermission('work-plan:plan:view'),
     workPlanController.getPlanMilestones
 );
 
@@ -243,8 +243,8 @@ router.get('/plans/:planId/milestones',
  * POST /api/work-plan/plans/:planId/milestones
  */
 router.post('/plans/:planId/milestones', 
-    // authenticateToken, 
-    // checkPermission('work-plan:plan:edit'),
+    authenticateToken, 
+    checkPermission('work-plan:plan:edit'),
     workPlanController.createMilestone
 );
 
@@ -253,8 +253,8 @@ router.post('/plans/:planId/milestones',
  * PATCH /api/work-plan/milestones/:id/status
  */
 router.patch('/milestones/:id/status', 
-    // authenticateToken, 
-    // checkPermission('work-plan:plan:edit'),
+    authenticateToken, 
+    checkPermission('work-plan:plan:edit'),
     workPlanController.updateMilestoneStatus
 );
 
@@ -263,8 +263,8 @@ router.patch('/milestones/:id/status',
  * DELETE /api/work-plan/milestones/:id
  */
 router.delete('/milestones/:id', 
-    // authenticateToken, 
-    // checkPermission('work-plan:plan:edit'),
+    authenticateToken, 
+    checkPermission('work-plan:plan:edit'),
     workPlanController.deleteMilestone
 );
 
@@ -273,8 +273,8 @@ router.delete('/milestones/:id',
  * PUT /api/work-plan/milestones/:id
  */
 router.put('/milestones/:id', 
-    // authenticateToken, 
-    // checkPermission('work-plan:milestone:edit'),
+    authenticateToken, 
+    checkPermission('work-plan:milestone:edit'),
     workPlanController.updateMilestone
 );
 
@@ -410,8 +410,8 @@ router.delete('/reminders/:id',
  * 查询参数：startDate, endDate, userId, departmentId
  */
 router.get('/statistics/overview', 
-    // authenticateToken, 
-    // checkPermission('work-plan:statistics:view'),
+    authenticateToken, 
+    checkPermission('work-plan:statistics:view'),
     workPlanController.getStatisticsOverview
 );
 
@@ -421,8 +421,8 @@ router.get('/statistics/overview',
  * 查询参数：startDate, endDate
  */
 router.get('/statistics/users', 
-    // authenticateToken, 
-    // checkPermission('work-plan:statistics:view'),
+    authenticateToken, 
+    checkPermission('work-plan:statistics:view'),
     workPlanController.getUserStats
 );
 
@@ -432,8 +432,8 @@ router.get('/statistics/users',
  * 查询参数：startDate, endDate
  */
 router.get('/statistics/types', 
-    // authenticateToken, 
-    // checkPermission('work-plan:statistics:view'),
+    authenticateToken, 
+    checkPermission('work-plan:statistics:view'),
     workPlanController.getTypeStats
 );
 
@@ -443,8 +443,8 @@ router.get('/statistics/types',
  * 查询参数：period, startDate, endDate
  */
 router.get('/statistics/trend', 
-    // authenticateToken, 
-    // checkPermission('work-plan:statistics:view'),
+    authenticateToken, 
+    checkPermission('work-plan:statistics:view'),
     workPlanController.getTrendStats
 );
 
@@ -454,8 +454,8 @@ router.get('/statistics/trend',
  * 查询参数：startDate, endDate
  */
 router.get('/statistics/status', 
-    // authenticateToken, 
-    // checkPermission('work-plan:statistics:view'),
+    authenticateToken, 
+    checkPermission('work-plan:statistics:view'),
     workPlanController.getStatusStats
 );
 
@@ -465,8 +465,8 @@ router.get('/statistics/status',
  * 查询参数：startDate, endDate
  */
 router.get('/statistics/departments', 
-    // authenticateToken, 
-    // checkPermission('work-plan:statistics:view'),
+    authenticateToken, 
+    checkPermission('work-plan:statistics:view'),
     workPlanController.getDepartmentStats
 );
 

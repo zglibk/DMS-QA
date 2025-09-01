@@ -9,6 +9,187 @@ const sql = require('mssql');
 const { getConnection } = require('../config/database');
 const ExcelJS = require('exceljs');
 const moment = require('moment');
+const { isAdmin } = require('../middleware/auth');
+
+// =====================================================
+// 权限控制辅助函数
+// =====================================================
+
+/**
+ * 获取用户的数据访问权限范围
+ * @param {number} userId - 用户ID
+ * @returns {Promise<Object>} 权限信息对象
+ */
+async function getUserDataScope(userId) {
+    try {
+        const pool = await getConnection();
+        
+        // 查询用户的岗位、部门和角色信息
+        const userInfoQuery = `
+            SELECT DISTINCT
+                u.ID as UserID,
+                u.Username,
+                u.RealName,
+                u.DepartmentID,
+                u.PositionID,
+                d.Name as DepartmentName,
+                p.PositionCode,
+                p.PositionName,
+                p.Level as PositionLevel,
+                r.RoleCode,
+                r.RoleName,
+                r.DataScope
+            FROM [User] u
+            LEFT JOIN Department d ON u.DepartmentID = d.ID
+            LEFT JOIN Positions p ON u.PositionID = p.ID
+            LEFT JOIN UserRoles ur ON u.ID = ur.UserID
+            LEFT JOIN Roles r ON ur.RoleID = r.ID
+            WHERE u.ID = @userId AND u.Status = 1
+        `;
+        
+        const result = await pool.request()
+            .input('userId', sql.Int, userId)
+            .query(userInfoQuery);
+        
+        if (result.recordset.length === 0) {
+            return {
+                scope: 'none',
+                userInfo: null,
+                canViewAll: false,
+                canViewDepartment: false,
+                canViewSelf: true
+            };
+        }
+        
+        const userInfo = result.recordset[0];
+        
+        // 检查是否为管理员
+        const isAdminUser = userInfo.RoleCode === 'admin' || userInfo.Username === 'admin';
+        
+        // 根据岗位和角色确定数据访问范围
+        let scope = 'self'; // 默认只能查看自己的数据
+        let canViewAll = false;
+        let canViewDepartment = false;
+        let canViewSelf = true;
+        
+        if (isAdminUser) {
+            // 管理员可以查看所有数据
+            scope = 'all';
+            canViewAll = true;
+            canViewDepartment = true;
+        } else {
+            // 根据角色的数据权限范围
+            if (userInfo.DataScope === 'all') {
+                scope = 'all';
+                canViewAll = true;
+                canViewDepartment = true;
+            } else if (userInfo.DataScope === 'dept') {
+                scope = 'department';
+                canViewDepartment = true;
+            }
+            
+            // 根据角色名称进一步细化权限（优先级高于岗位）
+            if (userInfo.RoleName) {
+                // 运营副总可以查看所有数据
+                if (userInfo.RoleName.includes('运营副总')) {
+                    scope = 'all';
+                    canViewAll = true;
+                    canViewDepartment = true;
+                }
+                // 生产经理、质量经理可以查看部门相关数据
+                else if (userInfo.RoleName.includes('生产经理') ||
+                         userInfo.RoleName.includes('质量经理')) {
+                    scope = 'department';
+                    canViewDepartment = true;
+                }
+            }
+            
+            // 根据岗位级别和岗位编码进一步细化权限（角色权限的补充）
+            if (userInfo.PositionCode && scope === 'self') {
+                // 总经理可以查看所有数据
+                if (userInfo.PositionCode.includes('CEO') || 
+                    userInfo.PositionCode.includes('GM') || 
+                    userInfo.PositionName.includes('总经理')) {
+                    scope = 'all';
+                    canViewAll = true;
+                    canViewDepartment = true;
+                }
+                // 部门经理/主管可以查看部门数据
+                else if (userInfo.PositionCode.includes('MANAGER') || 
+                         userInfo.PositionCode.includes('SUPERVISOR') ||
+                         userInfo.PositionName.includes('经理') ||
+                         userInfo.PositionName.includes('主管')) {
+                    scope = 'department';
+                    canViewDepartment = true;
+                }
+            }
+        }
+        
+        return {
+            scope,
+            userInfo,
+            canViewAll,
+            canViewDepartment,
+            canViewSelf
+        };
+        
+    } catch (error) {
+        console.error('获取用户数据权限范围失败:', error);
+        return {
+            scope: 'self',
+            userInfo: null,
+            canViewAll: false,
+            canViewDepartment: false,
+            canViewSelf: true
+        };
+    }
+}
+
+/**
+ * 构建基于权限的数据查询条件
+ * @param {Object} dataScope - 数据权限范围信息
+ * @param {string} tableAlias - 表别名（如 'wp' 表示 WorkPlans 表）
+ * @returns {string} SQL WHERE 条件
+ */
+function buildDataScopeCondition(dataScope, tableAlias = 'wp') {
+    if (!dataScope || !dataScope.userInfo || !dataScope.userInfo.UserID) {
+        // 如果没有有效的用户信息，返回一个安全的条件（不显示任何数据）
+        return `AND 1 = 0`;
+    }
+    
+    const { scope, userInfo } = dataScope;
+    
+    switch (scope) {
+        case 'all':
+            // 可以查看所有数据，不添加额外条件
+            return '';
+            
+        case 'department':
+            // 只能查看本部门的数据
+            if (userInfo.DepartmentID) {
+                return `AND (
+                    ${tableAlias}.CreatedBy = ${userInfo.UserID} OR
+                    ${tableAlias}.AssignedTo = ${userInfo.UserID} OR
+                    EXISTS (
+                        SELECT 1 FROM [User] u 
+                        WHERE u.ID = ${tableAlias}.CreatedBy 
+                        AND u.DepartmentID = ${userInfo.DepartmentID}
+                    ) OR
+                    EXISTS (
+                        SELECT 1 FROM [User] u 
+                        WHERE u.ID = ${tableAlias}.AssignedTo 
+                        AND u.DepartmentID = ${userInfo.DepartmentID}
+                    )
+                )`;
+            }
+            return `AND (${tableAlias}.CreatedBy = ${userInfo.UserID} OR ${tableAlias}.AssignedTo = ${userInfo.UserID})`;
+            
+        case 'self':
+        default:
+            // 只能查看自己创建或分配给自己的数据
+            return `AND (${tableAlias}.CreatedBy = ${userInfo.UserID} OR ${tableAlias}.AssignedTo = ${userInfo.UserID})`;
+    }
+}
 
 // =====================================================
 // 工作台相关控制器
@@ -24,6 +205,10 @@ const getDashboardData = async (req, res) => {
         const pool = await getConnection();
         const userId = req.user?.id || 1; // 临时使用默认用户ID
         const { timeRange } = req.query; // 获取时间范围参数
+        
+        // 获取用户的数据访问权限范围
+        const dataScope = await getUserDataScope(userId);
+        const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
         
         // 根据时间范围构建计划统计的日期条件
         let dateCondition = '';
@@ -57,11 +242,10 @@ const getDashboardData = async (req, res) => {
                 SUM(CASE WHEN wp.Status IN ('pending', 'in_progress') AND wp.EndDate < GETDATE() THEN 1 ELSE 0 END) as overduePlans,
                 ISNULL(AVG(CAST(wp.Progress as FLOAT)), 0) as avgProgress
             FROM WorkPlans wp
-            WHERE wp.AssignedTo = @userId ${dateCondition}
+            WHERE 1=1 ${dataScopeCondition} ${dateCondition}
         `;
         
         const planStatsResult = await pool.request()
-            .input('userId', sql.Int, userId)
             .query(planStatsQuery);
         
         // 获取工作日志数量（根据时间范围）
@@ -93,25 +277,23 @@ const getDashboardData = async (req, res) => {
         const logsQuery = `
             SELECT COUNT(*) as logs
             FROM WorkLogs wl
-            WHERE wl.UserID = @userId ${logDateCondition}
+            WHERE 1=1 ${buildDataScopeCondition(dataScope, 'wl').replace('CreatedBy', 'UserID').replace('AssignedTo', 'UserID')} ${logDateCondition}
         `;
         
         const logsResult = await pool.request()
-            .input('userId', sql.Int, userId)
             .query(logsQuery);
         
         // 获取即将到期的计划（7天内）
         const upcomingPlansQuery = `
             SELECT COUNT(*) as upcomingPlans
             FROM WorkPlans wp
-            WHERE wp.AssignedTo = @userId 
+            WHERE 1=1 ${dataScopeCondition}
               AND wp.Status IN ('pending', 'in_progress')
               AND wp.EndDate BETWEEN GETDATE() AND DATEADD(day, 7, GETDATE())
               ${dateCondition}
         `;
         
         const upcomingPlansResult = await pool.request()
-            .input('userId', sql.Int, userId)
             .query(upcomingPlansQuery);
         
         // 根据时间范围计算完成率
@@ -147,11 +329,10 @@ const getDashboardData = async (req, res) => {
                 COUNT(*) as totalPlans,
                 SUM(CASE WHEN wp.Status = 'completed' THEN 1 ELSE 0 END) as completedPlans
             FROM WorkPlans wp
-            WHERE wp.AssignedTo = @userId ${completionDateCondition}
+            WHERE 1=1 ${dataScopeCondition} ${completionDateCondition}
         `;
         
         const completionResult = await pool.request()
-            .input('userId', sql.Int, userId)
             .query(completionQuery);
         
         // 计算任务效率（基于计划完成时间与实际完成时间的比较）
@@ -201,11 +382,10 @@ const getDashboardData = async (req, res) => {
                      ELSE wp.Progress
                  END) as avgEfficiency
             FROM WorkPlans wp
-            WHERE wp.AssignedTo = @userId ${efficiencyDateCondition}
+            WHERE 1=1 ${dataScopeCondition} ${efficiencyDateCondition}
         `;
         
         const taskEfficiencyResult = await pool.request()
-            .input('userId', sql.Int, userId)
             .query(taskEfficiencyQuery);
         
         // 计算完成率百分比
@@ -267,6 +447,10 @@ const getTodoList = async (req, res) => {
         const userId = req.user?.id || 1; // 临时使用默认用户ID
         const { limit = 10, timeRange } = req.query;
         
+        // 获取用户的数据访问权限范围
+        const dataScope = await getUserDataScope(userId);
+        const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
+        
         // 待办事项不受时间范围限制，显示所有未开始或未完成的任务
         let dateCondition = '';
         
@@ -285,6 +469,7 @@ const getTodoList = async (req, res) => {
             FROM WorkPlans wp
             LEFT JOIN WorkTypes wt ON wp.WorkTypeID = wt.ID
             WHERE wp.Status IN ('pending', 'in_progress')
+              ${dataScopeCondition}
               ${dateCondition}
             ORDER BY 
                 CASE wp.Priority 
@@ -328,6 +513,9 @@ const getRecentLogs = async (req, res) => {
         const userId = req.user?.id || 1; // 临时使用默认用户ID
         const { limit = 10, timeRange } = req.query;
         
+        // 获取用户的数据访问权限范围
+        const dataScope = await getUserDataScope(userId);
+        
         // 根据时间范围构建日期条件
         let dateCondition = '';
         if (timeRange) {
@@ -350,6 +538,30 @@ const getRecentLogs = async (req, res) => {
             }
         }
         
+        // 构建工作日志的权限过滤条件
+        let logScopeCondition = '';
+        if (dataScope.scope === 'all') {
+            // 管理员可以查看所有日志
+            logScopeCondition = '';
+        } else if (dataScope.scope === 'department') {
+            // 部门经理可以查看本部门的日志
+            if (dataScope.userInfo?.DepartmentID) {
+                logScopeCondition = `AND (
+                    wl.UserID = ${dataScope.userInfo.UserID} OR
+                    EXISTS (
+                        SELECT 1 FROM [User] u 
+                        WHERE u.ID = wl.UserID 
+                        AND u.DepartmentID = ${dataScope.userInfo.DepartmentID}
+                    )
+                )`;
+            } else {
+                logScopeCondition = `AND wl.UserID = ${dataScope.userInfo?.UserID || userId}`;
+            }
+        } else {
+            // 普通用户只能查看自己的日志
+            logScopeCondition = `AND wl.UserID = ${dataScope.userInfo?.UserID || userId}`;
+        }
+        
         // 查询最近的工作日志
         const logsQuery = `
             SELECT TOP (@limit)
@@ -361,7 +573,7 @@ const getRecentLogs = async (req, res) => {
                 wp.PlanName as PlanTitle
             FROM WorkLogs wl
             LEFT JOIN WorkPlans wp ON wl.PlanID = wp.ID
-            WHERE wl.UserID = @userId ${dateCondition}
+            WHERE 1=1 ${logScopeCondition} ${dateCondition}
             ORDER BY wl.LogDate DESC, wl.CreatedAt DESC
         `;
         
@@ -404,6 +616,7 @@ const getRecentLogs = async (req, res) => {
 const getPlanList = async (req, res) => {
     try {
         const pool = await getConnection();
+        const userId = req.user?.id || 1; // 获取当前用户ID
         const {
             page = 1,
             pageSize = 20,
@@ -418,9 +631,18 @@ const getPlanList = async (req, res) => {
         
         const offset = (page - 1) * pageSize;
         
+        // 获取用户的数据访问权限范围
+        const dataScope = await getUserDataScope(userId);
+        
         // 构建查询条件
-        let whereConditions = [];
+        let whereConditions = ['1=1'];
         const params = {};
+        
+        // 添加权限控制条件
+        const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
+        if (dataScopeCondition) {
+            whereConditions.push(dataScopeCondition.replace('AND ', ''));
+        }
         
         if (status) {
             if (status.includes(',')) {
@@ -468,7 +690,7 @@ const getPlanList = async (req, res) => {
             params.endDate = endDate;
         }
         
-        const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
+        const whereClause = 'WHERE ' + whereConditions.join(' AND ');
         
         // 查询总数
         const countQuery = `
@@ -704,6 +926,37 @@ const createPlan = async (req, res) => {
             });
         }
         
+        // 获取用户权限范围
+        const dataScope = await getUserDataScope(userId);
+        
+        // 权限验证：检查是否有权限为指定负责人创建计划
+        if (dataScope.scope === 'personal' && assigneeId !== userId) {
+            return res.status(403).json({
+                success: false,
+                message: '您只能为自己创建工作计划'
+            });
+        }
+        
+        if (dataScope.scope === 'department') {
+            // 验证负责人是否在同一部门
+            const assigneeCheckQuery = `
+                SELECT u.DepartmentID 
+                FROM [User] u 
+                WHERE u.ID = @assigneeId
+            `;
+            const assigneeResult = await pool.request()
+                .input('assigneeId', sql.Int, assigneeId)
+                .query(assigneeCheckQuery);
+                
+            if (assigneeResult.recordset.length === 0 || 
+                assigneeResult.recordset[0].DepartmentID !== dataScope.departmentId) {
+                return res.status(403).json({
+                    success: false,
+                    message: '您只能为本部门人员创建工作计划'
+                });
+            }
+        }
+        
         // 开始事务
         const transaction = new sql.Transaction(pool);
         await transaction.begin();
@@ -830,10 +1083,16 @@ const updatePlan = async (req, res) => {
         
         const userId = req.user?.id || 1; // 获取当前用户ID
         
-        // 检查计划是否存在
+        // 获取用户权限范围
+        const dataScope = await getUserDataScope(userId);
+        
+        // 检查计划是否存在并验证权限
         const checkQuery = `
-            SELECT ID FROM WorkPlans 
-            WHERE ID = @id
+            SELECT wp.ID, wp.CreatedBy, wp.AssignedTo, wp.DepartmentID,
+                   u.DepartmentID as AssigneeDeptID
+            FROM WorkPlans wp
+            LEFT JOIN [User] u ON wp.AssignedTo = u.ID
+            WHERE wp.ID = @id
         `;
         
         const checkResult = await pool.request()
@@ -844,6 +1103,24 @@ const updatePlan = async (req, res) => {
             return res.status(404).json({
                 success: false,
                 message: '工作计划不存在'
+            });
+        }
+        
+        const plan = checkResult.recordset[0];
+        
+        // 权限验证：检查是否有权限更新此计划
+        const canEdit = dataScope.isAdmin || 
+                       plan.CreatedBy === userId || 
+                       (dataScope.scope === 'all') ||
+                       (dataScope.scope === 'department' && 
+                        (plan.DepartmentID === dataScope.departmentId || 
+                         plan.AssigneeDeptID === dataScope.departmentId)) ||
+                       (dataScope.scope === 'personal' && plan.AssignedTo === userId);
+        
+        if (!canEdit) {
+            return res.status(403).json({
+                success: false,
+                message: '您没有权限更新此工作计划'
             });
         }
         
@@ -1001,6 +1278,48 @@ const deletePlan = async (req, res) => {
     try {
         const pool = await getConnection();
         const { id } = req.params;
+        const userId = req.user?.id || 1; // 获取当前用户ID
+        
+        // 获取用户权限范围
+        const dataScope = await getUserDataScope(userId);
+        
+        // 检查计划是否存在并验证权限
+        const checkQuery = `
+            SELECT wp.ID, wp.CreatedBy, wp.AssignedTo, wp.DepartmentID,
+                   u.DepartmentID as AssigneeDeptID
+            FROM WorkPlans wp
+            LEFT JOIN [User] u ON wp.AssignedTo = u.ID
+            WHERE wp.ID = @id
+        `;
+        
+        const checkResult = await pool.request()
+            .input('id', sql.Int, id)
+            .query(checkQuery);
+        
+        if (checkResult.recordset.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: '工作计划不存在'
+            });
+        }
+        
+        const plan = checkResult.recordset[0];
+        
+        // 权限验证：检查是否有权限删除此计划
+        const canDelete = dataScope.isAdmin || 
+                         plan.CreatedBy === userId || 
+                         (dataScope.scope === 'all') ||
+                         (dataScope.scope === 'department' && 
+                          (plan.DepartmentID === dataScope.departmentId || 
+                           plan.AssigneeDeptID === dataScope.departmentId)) ||
+                         (dataScope.scope === 'personal' && plan.AssignedTo === userId);
+        
+        if (!canDelete) {
+            return res.status(403).json({
+                success: false,
+                message: '您没有权限删除此工作计划'
+            });
+        }
         
         // 开始事务处理
         const transaction = new sql.Transaction(pool);
@@ -1081,6 +1400,7 @@ module.exports = {
         
         try {
             const { planIds } = req.body;
+            const userId = req.user?.id || 1; // 获取当前用户ID
             
             // 参数验证
             if (!planIds || !Array.isArray(planIds) || planIds.length === 0) {
@@ -1103,9 +1423,53 @@ module.exports = {
                 });
             }
             
+            // 获取用户权限范围
+            const dataScope = await getUserDataScope(userId);
+            
             console.log('获取数据库连接...');
             const pool = await getConnection();
             console.log('数据库连接成功');
+            
+            // 权限验证：检查用户是否有权限删除这些计划
+            const checkPlaceholders = validIds.map((_, index) => `@planId${index}`).join(',');
+            const checkQuery = `
+                SELECT wp.ID, wp.CreatedBy, wp.AssignedTo, wp.DepartmentID,
+                       u.DepartmentID as AssigneeDeptID
+                FROM WorkPlans wp
+                LEFT JOIN [User] u ON wp.AssignedTo = u.ID
+                WHERE wp.ID IN (${checkPlaceholders})
+            `;
+            
+            const checkRequest = pool.request();
+            validIds.forEach((id, index) => {
+                checkRequest.input(`planId${index}`, sql.Int, parseInt(id));
+            });
+            
+            const checkResult = await checkRequest.query(checkQuery);
+            
+            // 过滤出用户有权限删除的计划
+            const allowedPlans = checkResult.recordset.filter(plan => {
+                return dataScope.isAdmin || 
+                       plan.CreatedBy === userId || 
+                       (dataScope.scope === 'all') ||
+                       (dataScope.scope === 'department' && 
+                        (plan.DepartmentID === dataScope.departmentId || 
+                         plan.AssigneeDeptID === dataScope.departmentId)) ||
+                       (dataScope.scope === 'personal' && plan.AssignedTo === userId);
+            });
+            
+            if (allowedPlans.length === 0) {
+                return res.status(403).json({
+                    success: false,
+                    message: '您没有权限删除任何选中的工作计划'
+                });
+            }
+            
+            if (allowedPlans.length < validIds.length) {
+                console.log(`权限过滤: 原计划删除${validIds.length}个，实际可删除${allowedPlans.length}个`);
+            }
+            
+            const allowedIds = allowedPlans.map(plan => plan.ID);
             
             // 开始事务处理
             const transaction = new sql.Transaction(pool);
@@ -1114,12 +1478,12 @@ module.exports = {
             
             try {
                 // 第一步：删除相关的工作日志
-                const logPlaceholders = validIds.map((_, index) => `@planId${index}`).join(',');
+                const logPlaceholders = allowedIds.map((_, index) => `@planId${index}`).join(',');
                 const deleteLogsQuery = `DELETE FROM WorkLogs WHERE PlanID IN (${logPlaceholders})`;
                 
                 console.log('删除相关工作日志:', deleteLogsQuery);
                 const logRequest = new sql.Request(transaction);
-                validIds.forEach((id, index) => {
+                allowedIds.forEach((id, index) => {
                     logRequest.input(`planId${index}`, sql.Int, parseInt(id));
                 });
                 
@@ -1128,12 +1492,12 @@ module.exports = {
                 console.log('删除的工作日志数量:', deletedLogsCount);
                 
                 // 第二步：删除计划
-                const planPlaceholders = validIds.map((_, index) => `@planId${index}`).join(',');
+                const planPlaceholders = allowedIds.map((_, index) => `@planId${index}`).join(',');
                 const deletePlansQuery = `DELETE FROM WorkPlans WHERE ID IN (${planPlaceholders})`;
                 
                 console.log('删除计划:', deletePlansQuery);
                 const planRequest = new sql.Request(transaction);
-                validIds.forEach((id, index) => {
+                allowedIds.forEach((id, index) => {
                     planRequest.input(`planId${index}`, sql.Int, parseInt(id));
                 });
                 
@@ -1457,6 +1821,7 @@ module.exports = {
     getLogList: async (req, res) => {
         try {
             const pool = await getConnection();
+            const currentUserId = req.user?.id || 1; // 获取当前用户ID
             const {
                 page = 1,
                 pageSize = 20,
@@ -1467,8 +1832,37 @@ module.exports = {
                 keyword = ''
             } = req.query;
             
+            // 获取用户的数据访问权限范围
+            const dataScope = await getUserDataScope(currentUserId);
+            
             let whereConditions = ['1=1'];
             const request = pool.request();
+            
+            // 添加数据权限控制条件
+            if (dataScope.scope === 'all') {
+                // 管理员可以查看所有日志，不添加额外限制
+            } else if (dataScope.scope === 'department') {
+                // 部门经理可以查看本部门的日志
+                if (dataScope.userInfo?.DepartmentID) {
+                    whereConditions.push(`(
+                        wl.UserID = @currentUserId OR
+                        EXISTS (
+                            SELECT 1 FROM [User] u 
+                            WHERE u.ID = wl.UserID 
+                            AND u.DepartmentID = @departmentId
+                        )
+                    )`);
+                    request.input('currentUserId', sql.Int, currentUserId);
+                    request.input('departmentId', sql.Int, dataScope.userInfo.DepartmentID);
+                } else {
+                    whereConditions.push('wl.UserID = @currentUserId');
+                    request.input('currentUserId', sql.Int, currentUserId);
+                }
+            } else {
+                // 普通用户只能查看自己的日志
+                whereConditions.push('wl.UserID = @currentUserId');
+                request.input('currentUserId', sql.Int, currentUserId);
+            }
             
             // 计划筛选
             if (planId) {
@@ -1476,10 +1870,10 @@ module.exports = {
                 request.input('planId', sql.Int, parseInt(planId));
             }
             
-            // 用户筛选
-            if (userId) {
-                whereConditions.push('wl.UserID = @userId');
-                request.input('userId', sql.Int, parseInt(userId));
+            // 用户筛选（仅在有权限的情况下生效）
+            if (userId && (dataScope.scope === 'all' || dataScope.scope === 'department')) {
+                whereConditions.push('wl.UserID = @filterUserId');
+                request.input('filterUserId', sql.Int, parseInt(userId));
             }
             
             // 日期范围筛选
@@ -3206,7 +3600,12 @@ module.exports = {
     getStatisticsOverview: async (req, res) => {
         try {
             const pool = await getConnection();
+            const userId = req.user?.id || 1; // 获取当前用户ID
             const { startDate, endDate } = req.query;
+            
+            // 获取用户的数据访问权限范围
+            const dataScope = await getUserDataScope(userId);
+            const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
             
             let dateCondition = '';
             const request = pool.request();
@@ -3221,16 +3620,18 @@ module.exports = {
             const overviewQuery = `
                 SELECT 
                     COUNT(*) as TotalPlans,
-                    SUM(CASE WHEN Status = 'completed' THEN 1 ELSE 0 END) as CompletedPlans,
-                    SUM(CASE WHEN Status = 'in_progress' THEN 1 ELSE 0 END) as InProgressPlans,
-                    SUM(CASE WHEN Status = 'pending' THEN 1 ELSE 0 END) as PendingPlans,
-                    SUM(CASE WHEN Status = 'cancelled' THEN 1 ELSE 0 END) as CancelledPlans,
-                    SUM(CASE WHEN Status IN ('pending', 'in_progress') AND EndDate < GETDATE() THEN 1 ELSE 0 END) as OverduePlans,
-                    AVG(CAST(Progress as FLOAT)) as AvgProgress,
-                    SUM(EstimatedHours) as TotalEstimatedHours,
-                    SUM(ActualHours) as TotalActualHours
+                    SUM(CASE WHEN wp.Status = 'completed' THEN 1 ELSE 0 END) as CompletedPlans,
+                    SUM(CASE WHEN wp.Status = 'in_progress' THEN 1 ELSE 0 END) as InProgressPlans,
+                    SUM(CASE WHEN wp.Status = 'pending' THEN 1 ELSE 0 END) as PendingPlans,
+                    SUM(CASE WHEN wp.Status = 'cancelled' THEN 1 ELSE 0 END) as CancelledPlans,
+                    SUM(CASE WHEN wp.Status IN ('pending', 'in_progress') AND wp.EndDate < GETDATE() THEN 1 ELSE 0 END) as OverduePlans,
+                    AVG(CAST(wp.Progress as FLOAT)) as AvgProgress,
+                    SUM(wp.EstimatedHours) as TotalEstimatedHours,
+                    SUM(wp.ActualHours) as TotalActualHours
                 FROM WorkPlans wp
-                WHERE 1=1 ${dateCondition}
+                LEFT JOIN [User] u ON wp.AssignedTo = u.ID
+                LEFT JOIN Department d ON u.DepartmentID = d.ID
+                WHERE 1=1 ${dataScopeCondition} ${dateCondition}
             `;
             
             const overviewResult = await request.query(overviewQuery);
@@ -3332,6 +3733,11 @@ module.exports = {
     getWorkloadStats: async (req, res) => {
         try {
             const pool = await getConnection();
+            const userId = req.user?.id || 1; // 获取当前用户ID
+            
+            // 获取用户的数据访问权限范围
+            const dataScope = await getUserDataScope(userId);
+            const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
             
             // 按工作类型统计
             const typeStatsQuery = `
@@ -3343,7 +3749,9 @@ module.exports = {
                     AVG(CAST(wp.Progress as FLOAT)) as AvgProgress
                 FROM WorkPlans wp
                 LEFT JOIN WorkTypes wt ON wp.WorkTypeID = wt.ID
-                WHERE 1=1
+                LEFT JOIN [User] u ON wp.AssignedTo = u.ID
+                LEFT JOIN Department d ON u.DepartmentID = d.ID
+                WHERE 1=1 ${dataScopeCondition}
                 GROUP BY wt.TypeName
                 ORDER BY PlanCount DESC
             `;
@@ -3355,8 +3763,10 @@ module.exports = {
                     COUNT(*) as PlanCount,
                     SUM(EstimatedHours) as EstimatedHours,
                     SUM(ActualHours) as ActualHours
-                FROM WorkPlans
-                WHERE 1=1
+                FROM WorkPlans wp
+                LEFT JOIN [User] u ON wp.AssignedTo = u.ID
+                LEFT JOIN Department d ON u.DepartmentID = d.ID
+                WHERE 1=1 ${dataScopeCondition}
                 GROUP BY Priority
                 ORDER BY 
                     CASE Priority 
@@ -3378,7 +3788,8 @@ module.exports = {
                     AVG(CAST(wp.Progress as FLOAT)) as AvgProgress
                 FROM WorkPlans wp
                 LEFT JOIN [User] u ON wp.AssignedTo = u.ID
-                WHERE u.RealName IS NOT NULL
+                LEFT JOIN Department d ON u.DepartmentID = d.ID
+                WHERE u.RealName IS NOT NULL ${dataScopeCondition}
                 GROUP BY u.RealName
                 ORDER BY PlanCount DESC
             `;
@@ -3416,6 +3827,11 @@ module.exports = {
     getDepartmentStats: async (req, res) => {
         try {
             const pool = await getConnection();
+            const userId = req.user.id;
+            
+            // 获取用户ID和数据权限范围
+            const dataScope = await getUserDataScope(userId);
+            const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
             
             const query = `
                 SELECT 
@@ -3435,7 +3851,7 @@ module.exports = {
                 FROM Department d
                 LEFT JOIN [User] u ON d.ID = u.DepartmentID
                 LEFT JOIN WorkPlans wp ON u.ID = wp.AssignedTo
-                WHERE 1=1
+                WHERE 1=1 ${dataScopeCondition}
                 GROUP BY d.Name
                 HAVING COUNT(wp.ID) > 0
                 ORDER BY TotalPlans DESC
@@ -3873,7 +4289,12 @@ module.exports = {
     getUserStats: async (req, res) => {
         try {
             const pool = await getConnection();
+            const userId = req.user?.id || 1; // 获取当前用户ID
             const { startDate, endDate } = req.query;
+            
+            // 获取用户的数据访问权限范围
+            const dataScope = await getUserDataScope(userId);
+            const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
             
             let dateCondition = '';
             if (startDate && endDate) {
@@ -3898,7 +4319,7 @@ module.exports = {
                 FROM [User] u
                 LEFT JOIN WorkPlans wp ON u.ID = wp.AssignedTo ${dateCondition}
                 LEFT JOIN Department d ON u.DepartmentID = d.ID
-                WHERE u.Status = 1 AND u.RealName IS NOT NULL
+                WHERE u.Status = 1 AND u.RealName IS NOT NULL ${dataScopeCondition}
                 GROUP BY u.ID, u.RealName, d.Name
                 HAVING COUNT(wp.ID) > 0
                 ORDER BY CompletionRate DESC, TotalPlans DESC
@@ -3929,7 +4350,12 @@ module.exports = {
     getTypeStats: async (req, res) => {
         try {
             const pool = await getConnection();
+            const userId = req.user?.id || 1; // 获取当前用户ID
             const { startDate, endDate } = req.query;
+            
+            // 获取用户的数据访问权限范围
+            const dataScope = await getUserDataScope(userId);
+            const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
             
             let dateCondition = '';
             if (startDate && endDate) {
@@ -3952,7 +4378,9 @@ module.exports = {
                     AVG(DATEDIFF(DAY, wp.CreatedAt, COALESCE(wp.CompletedAt, GETDATE()))) as AvgDuration
                 FROM WorkTypes wt
                 LEFT JOIN WorkPlans wp ON wt.ID = wp.WorkTypeID ${dateCondition}
-                WHERE wt.IsActive = 1
+                LEFT JOIN [User] u ON wp.AssignedTo = u.ID
+                LEFT JOIN Department d ON u.DepartmentID = d.ID
+                WHERE wt.IsActive = 1 ${dataScopeCondition}
                 GROUP BY wt.ID, wt.TypeName
                 HAVING COUNT(wp.ID) > 0
                 ORDER BY TotalPlans DESC
@@ -3983,7 +4411,12 @@ module.exports = {
     getTrendStats: async (req, res) => {
         try {
             const pool = await getConnection();
+            const userId = req.user?.id || 1; // 获取当前用户ID
             const { period = 'week', startDate, endDate } = req.query;
+            
+            // 获取用户的数据访问权限范围
+            const dataScope = await getUserDataScope(userId);
+            const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
             
             let dateFormat, groupBy, dateRange;
             const now = new Date();
@@ -4014,10 +4447,12 @@ module.exports = {
                 SELECT 
                     ${dateFormat} as dates,
                     COUNT(*) as created,
-                    SUM(CASE WHEN Status = 'completed' THEN 1 ELSE 0 END) as completed,
-                    SUM(CASE WHEN EndDate < GETDATE() AND Status != 'completed' THEN 1 ELSE 0 END) as overdue
+                    SUM(CASE WHEN wp.Status = 'completed' THEN 1 ELSE 0 END) as completed,
+                    SUM(CASE WHEN wp.EndDate < GETDATE() AND wp.Status != 'completed' THEN 1 ELSE 0 END) as overdue
                 FROM WorkPlans wp
-                WHERE ${dateCondition}
+                LEFT JOIN [User] u ON wp.AssignedTo = u.ID
+                LEFT JOIN Department d ON u.DepartmentID = d.ID
+                WHERE ${dateCondition} ${dataScopeCondition}
                 GROUP BY ${dateFormat}
                 ORDER BY ${dateFormat}
             `;
@@ -4057,14 +4492,19 @@ module.exports = {
             const pool = await getConnection();
             const { startDate, endDate } = req.query;
             
+            // 获取用户ID和数据权限范围
+            const userId = req.user.id;
+            const dataScope = await getUserDataScope(userId);
+            const dataScopeCondition = buildDataScopeCondition(dataScope, 'wp');
+            
             let dateCondition = '';
             if (startDate && endDate) {
-                dateCondition = `AND CreatedAt >= '${startDate}' AND CreatedAt <= '${endDate}'`;
+                dateCondition = `AND wp.CreatedAt >= '${startDate}' AND wp.CreatedAt <= '${endDate}'`;
             }
             
             const query = `
                 SELECT 
-                    CASE Status
+                    CASE wp.Status
                         WHEN 'pending' THEN '待开始'
                         WHEN 'in_progress' THEN '进行中'
                         WHEN 'completed' THEN '已完成'
@@ -4072,9 +4512,9 @@ module.exports = {
                         ELSE '其他'
                     END as name,
                     COUNT(*) as value
-                FROM WorkPlans
-                WHERE 1=1 ${dateCondition}
-                GROUP BY Status
+                FROM WorkPlans wp
+                WHERE 1=1 ${dateCondition} ${dataScopeCondition}
+                GROUP BY wp.Status
                 ORDER BY value DESC
             `;
             

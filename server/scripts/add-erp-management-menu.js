@@ -7,6 +7,7 @@
 
 const sql = require('mssql');
 const { getConnection } = require('../db');
+const { createPermissionRefreshHelper } = require('./utils/permission-refresh-helper');
 
 /**
  * 添加ERP管理菜单到数据库
@@ -100,10 +101,31 @@ async function addErpManagementMenu() {
             VALUES (@RoleID, @MenuID, GETDATE())
           `);
         console.log('✅ 管理员角色ERP管理权限分配完成');
+        
+        // 5. 刷新管理员用户权限缓存
+        console.log('\n📋 步骤5：刷新管理员用户权限缓存...');
+        const permissionHelper = createPermissionRefreshHelper();
+        const refreshResult = await permissionHelper.refreshAdminUsersPermissions();
+        
+        if (refreshResult.success) {
+          console.log('✅ 管理员用户权限缓存刷新完成');
+          if (refreshResult.refreshedUsers.length > 0) {
+            permissionHelper.showRefreshSuggestions(refreshResult.refreshedUsers);
+          }
+        } else {
+          console.log('⚠️ 权限缓存刷新失败:', refreshResult.message);
+        }
+        
+        // 记录权限变更日志
+        await permissionHelper.logPermissionChange(
+          'MENU_PERMISSION_ASSIGNED',
+          `为管理员角色分配ERP管理菜单权限 (MenuID: ${erpMenuId})`,
+          null
+        );
       }
     }
     
-    // 5. 验证菜单添加结果
+    // 6. 验证菜单添加结果
     console.log('\n📋 步骤5：验证菜单结构...');
     const verifyResult = await pool.request()
       .query(`
@@ -135,7 +157,7 @@ async function addErpManagementMenu() {
       console.log(`   状态: ${menu.Status}`);
     }
     
-    // 6. 显示完成信息
+    // 7. 显示完成信息
     console.log('\n🎉 ERP管理菜单添加完成！');
     console.log('\n📁 菜单结构：');
     console.log('  系统管理 (system)');

@@ -6,7 +6,7 @@
 const express = require('express')
 const router = express.Router()
 const sql = require('mssql')
-const { getConnection, executeQuery } = require('../db')
+const { getConnection, executeQuery, getDynamicConfig } = require('../db')
 
 // 获取角色列表（支持分页和搜索）
 router.get('/', async (req, res) => {
@@ -71,7 +71,7 @@ router.get('/', async (req, res) => {
             r.UpdatedAt,
             COUNT(ur.UserID) as UserCount
           FROM Roles r
-          LEFT JOIN UserRoles ur ON r.ID = ur.RoleID
+          LEFT JOIN [UserRoles] ur ON r.ID = ur.RoleID
           WHERE ${whereClause}
           GROUP BY r.ID, r.RoleName, r.RoleCode, r.Description, r.SortOrder, r.Status, r.CreatedAt, r.UpdatedAt
         ) AS T
@@ -437,7 +437,7 @@ router.delete('/:id', async (req, res) => {
       // 检查是否有用户关联
       const userResult = await transaction.request()
         .input('roleId', sql.Int, id)
-        .query('SELECT COUNT(*) as count FROM UserRoles WHERE RoleID = @roleId')
+        .query('SELECT COUNT(*) as count FROM [UserRoles] WHERE RoleID = @roleId')
       
       if (userResult.recordset[0].count > 0) {
         await transaction.rollback()
@@ -691,5 +691,67 @@ router.post('/:id/departments', async (req, res) => {
     })
   }
 })
+
+// 获取角色下的所有用户
+router.get('/:id/users', async (req, res) => {
+  try {
+    const roleId = req.params.id;
+    
+    // 使用直接连接方式，与auth.js保持一致
+    let pool = await sql.connect(await getDynamicConfig());
+    
+    // 检查角色是否存在
+    const roleCheck = await pool.request()
+      .input('roleId', sql.Int, roleId)
+      .query('SELECT ID, RoleName FROM [Roles] WHERE ID = @roleId');
+    
+    if (roleCheck.recordset.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '角色不存在'
+      });
+    }
+    
+    const role = roleCheck.recordset[0];
+    
+    // 获取该角色下的所有用户
+    const usersResult = await pool.request()
+      .input('roleId', sql.Int, roleId)
+      .query(`
+        SELECT DISTINCT 
+          u.ID,
+          u.Username,
+          u.RealName,
+          u.Email,
+          u.Status,
+          u.CreatedAt
+        FROM [User] u
+        INNER JOIN [UserRoles] ur ON u.ID = ur.UserID
+        WHERE ur.RoleID = @roleId AND u.Status = 1
+        ORDER BY u.Username
+      `);
+    
+    res.json({
+      success: true,
+      data: {
+        role: {
+          id: role.ID,
+          name: role.RoleName
+        },
+        users: usersResult.recordset,
+        total: usersResult.recordset.length
+      },
+      message: '获取角色用户列表成功'
+    });
+    
+  } catch (error) {
+    console.error('获取角色用户列表失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取角色用户列表失败',
+      error: error.message
+    });
+  }
+});
 
 module.exports = router

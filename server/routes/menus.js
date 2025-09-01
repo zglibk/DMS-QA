@@ -339,7 +339,7 @@ router.get('/user-menus', authenticateToken, async (req, res) => {
               m.Status
             FROM Menus m
             INNER JOIN RoleMenus rm ON m.ID = rm.MenuID
-            INNER JOIN UserRoles ur ON rm.RoleID = ur.RoleID AND ur.UserID = @userId
+            INNER JOIN [UserRoles] ur ON rm.RoleID = ur.RoleID AND ur.UserID = @userId
             WHERE m.Status = 1 
               AND m.Visible = 1
               AND m.MenuType IN ('catalog', 'menu')
@@ -374,7 +374,7 @@ router.get('/user-menus', authenticateToken, async (req, res) => {
                 -- 通过角色权限获得的菜单
                 EXISTS (
                   SELECT 1 FROM RoleMenus rm 
-                  INNER JOIN UserRoles ur ON rm.RoleID = ur.RoleID 
+                  INNER JOIN [UserRoles] ur ON rm.RoleID = ur.RoleID 
                   WHERE rm.MenuID = m.ID AND ur.UserID = @userId
                 )
                 OR
