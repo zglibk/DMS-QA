@@ -69,13 +69,18 @@
       <el-card>
         <div class="table-header">
           <div class="table-actions">
-            <el-button type="primary" @click="showCreateDialog">
+            <el-button 
+              v-if="hasCreatePermission" 
+              type="primary" 
+              @click="showCreateDialog"
+            >
               <el-icon><Plus /></el-icon>
               新建日志
             </el-button>
             <el-button
+              v-if="hasDeletePermission"
               type="danger"
-              :disabled="selectedLogs.length === 0"
+              :disabled="selectedLogs.length === 0 || !canBatchDelete"
               @click="batchDeleteLogs"
             >
               <el-icon><Delete /></el-icon>
@@ -238,11 +243,21 @@
                     <el-icon><View /></el-icon>
                     详情
                   </el-button>
-                  <el-button type="warning" size="small" @click="editLog(row)">
+                  <el-button 
+                    v-if="canEditLog(row)" 
+                    type="warning" 
+                    size="small" 
+                    @click="editLog(row)"
+                  >
                     <el-icon><Edit /></el-icon>
                     编辑
                   </el-button>
-                  <el-button type="danger" size="small" @click="deleteLog(row)">
+                  <el-button 
+                    v-if="canDeleteLog(row)" 
+                    type="danger" 
+                    size="small" 
+                    @click="deleteLog(row)"
+                  >
                     <el-icon><Delete /></el-icon>
                     删除
                   </el-button>
@@ -447,10 +462,12 @@ import {
 } from '@element-plus/icons-vue'
 import api from '@/services/api'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/store/user'
 import * as XLSX from 'xlsx-js-style'
 import { saveAs } from 'file-saver'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 响应式数据
 const loading = ref(false)
@@ -497,6 +514,45 @@ const logFormRules = {
   LogDate: [{ required: true, message: '请选择日志日期', trigger: 'change' }],
   Content: [{ required: true, message: '请输入工作内容', trigger: 'blur' }]
 }
+
+// 权限检查
+const hasAdminRole = computed(() => userStore.hasRole('admin') || userStore.hasRole('系统管理员'))
+const hasCreatePermission = computed(() => userStore.hasActionPermission('work-plan:log:create'))
+const hasEditPermission = computed(() => userStore.hasActionPermission('work-plan:log:edit'))
+const hasDeletePermission = computed(() => userStore.hasActionPermission('work-plan:log:delete'))
+const currentUserId = computed(() => userStore.user?.ID)
+
+/**
+ * 检查是否可以编辑指定日志
+ * @param {Object} log - 日志对象
+ * @returns {boolean} 是否可以编辑
+ */
+const canEditLog = (log) => {
+  if (!hasEditPermission.value) return false
+  if (hasAdminRole.value) return true
+  return log.CreatedBy === currentUserId.value
+}
+
+/**
+ * 检查是否可以删除指定日志
+ * @param {Object} log - 日志对象
+ * @returns {boolean} 是否可以删除
+ */
+const canDeleteLog = (log) => {
+  if (!hasDeletePermission.value) return false
+  if (hasAdminRole.value) return true
+  return log.CreatedBy === currentUserId.value
+}
+
+/**
+ * 检查是否可以批量删除选中的日志
+ * @returns {boolean} 是否可以批量删除
+ */
+const canBatchDelete = computed(() => {
+  if (selectedLogs.value.length === 0) return false
+  if (hasAdminRole.value) return true
+  return selectedLogs.value.every(log => log.CreatedBy === currentUserId.value)
+})
 
 // 计算属性
 const dialogTitle = computed(() => isEdit.value ? '编辑日志' : '新建日志')

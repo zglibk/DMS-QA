@@ -704,13 +704,15 @@ const drawDepartmentChart = (data) => {
         name: '完成率',
         type: 'bar',
         data: data.map(item => item.CompletionRate) || [],
-        itemStyle: { color: '#409eff' }
+        itemStyle: { color: '#409eff' },
+        barMaxWidth: 60  // 设置柱形最大宽度为60px
       },
       {
         name: '平均进度',
         type: 'bar',
         data: data.map(item => item.AvgProgress) || [],
-        itemStyle: { color: '#67c23a' }
+        itemStyle: { color: '#67c23a' },
+        barMaxWidth: 60  // 设置柱形最大宽度为60px
       }
     ]
   }
@@ -769,7 +771,6 @@ const refreshData = async () => {
       getStatusData(),
       getDepartmentData()
     ])
-    ElMessage.success('数据刷新成功')
   } catch (error) {
     console.error('刷新数据失败:', error)
     ElMessage.error('刷新数据失败')

@@ -59,13 +59,18 @@
       <el-card>
         <div class="table-header">
           <div class="table-actions">
-            <el-button type="primary" @click="showCreateDialog">
+            <el-button 
+              v-if="hasCreatePermission" 
+              type="primary" 
+              @click="showCreateDialog"
+            >
               <el-icon><Plus /></el-icon>
               新建模板
             </el-button>
             <el-button
+              v-if="hasDeletePermission"
               type="danger"
-              :disabled="selectedTemplates.length === 0"
+              :disabled="selectedTemplates.length === 0 || !canBatchDelete"
               @click="batchDeleteTemplates"
             >
               <el-icon><Delete /></el-icon>
@@ -166,10 +171,20 @@
                 <el-button type="success" size="small" @click="useTemplate(row)">
                   使用
                 </el-button>
-                <el-button type="warning" size="small" @click="editTemplate(row)">
+                <el-button 
+                  v-if="canEditTemplate(row)" 
+                  type="warning" 
+                  size="small" 
+                  @click="editTemplate(row)"
+                >
                   编辑
                 </el-button>
-                <el-button type="danger" size="small" @click="deleteTemplate(row)">
+                <el-button 
+                  v-if="canDeleteTemplate(row)" 
+                  type="danger" 
+                  size="small" 
+                  @click="deleteTemplate(row)"
+                >
                   删除
                 </el-button>
               </div>
@@ -492,7 +507,11 @@
             <el-icon><Plus /></el-icon>
             使用此模板
           </el-button>
-          <el-button type="warning" @click="editTemplate(selectedTemplate)">
+          <el-button 
+            v-if="canEditTemplate(selectedTemplate)" 
+            type="warning" 
+            @click="editTemplate(selectedTemplate)"
+          >
             <el-icon><Edit /></el-icon>
             编辑模板
           </el-button>
@@ -516,8 +535,10 @@ import {
 } from '@element-plus/icons-vue'
 import api from '@/services/api'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/store/user'
 
 const router = useRouter()
+const userStore = useUserStore()
 
 // 响应式数据
 const loading = ref(false)
@@ -591,6 +612,61 @@ const templateFormRules = {
   estimatedDays: [{ required: true, message: '请输入预计工期', trigger: 'blur' }],
   estimatedHours: [{ required: true, message: '请输入预计工时', trigger: 'blur' }]
 }
+
+// 权限检查计算属性
+const hasAdminRole = computed(() => {
+  return userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+})
+
+const hasCreatePermission = computed(() => {
+  return hasAdminRole.value || userStore.hasActionPermission('work-plan:template:create')
+})
+
+const hasEditPermission = computed(() => {
+  return hasAdminRole.value || userStore.hasActionPermission('work-plan:template:edit')
+})
+
+const hasDeletePermission = computed(() => {
+  return hasAdminRole.value || userStore.hasActionPermission('work-plan:template:delete')
+})
+
+const currentUserId = computed(() => {
+  return userStore.user?.id || userStore.user?.userID
+})
+
+/**
+ * 检查是否可以编辑模板
+ * @param {Object} template - 模板对象
+ * @returns {boolean} 是否可以编辑
+ */
+const canEditTemplate = (template) => {
+  if (hasAdminRole.value) return true
+  if (!hasEditPermission.value) return false
+  return template.createdBy === userStore.user?.username || template.createdByID === currentUserId.value
+}
+
+/**
+ * 检查是否可以删除模板
+ * @param {Object} template - 模板对象
+ * @returns {boolean} 是否可以删除
+ */
+const canDeleteTemplate = (template) => {
+  if (hasAdminRole.value) return true
+  if (!hasDeletePermission.value) return false
+  return template.createdBy === userStore.user?.username || template.createdByID === currentUserId.value
+}
+
+/**
+ * 检查是否可以批量删除
+ * @returns {boolean} 是否可以批量删除
+ */
+const canBatchDelete = computed(() => {
+  if (!hasDeletePermission.value) return false
+  if (hasAdminRole.value) return true
+  return selectedTemplates.value.every(template => 
+    template.createdBy === userStore.user?.username || template.createdByID === currentUserId.value
+  )
+})
 
 // 计算属性
 const dialogTitle = computed(() => {

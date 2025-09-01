@@ -1162,8 +1162,6 @@ const refreshData = async () => {
   // 数据更新后刷新图表
   await nextTick()
   updateBarChart()
-  
-  ElMessage.success('数据刷新成功')
 }
 
 /**

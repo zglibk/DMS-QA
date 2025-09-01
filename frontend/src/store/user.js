@@ -802,6 +802,64 @@ export const useUserStore = defineStore('user', {
       this.user.permissions = { ...this.user.permissions, ...permissions }
     },
 
+    /**
+     * 刷新用户权限缓存
+     * 调用后端API强制重新加载权限数据
+     * @param {number} userId - 可选，要刷新权限的用户ID，不传则刷新当前用户
+     * @returns {Promise<Object>} 刷新结果
+     */
+    async refreshPermissions(userId = null) {
+      try {
+        console.log('🔄 开始刷新用户权限缓存...', { userId })
+        
+        const response = await apiService.post('/auth/refresh-permissions', {
+          userId: userId
+        })
+        
+        if (response.data.success) {
+          const data = response.data.data
+          
+          // 如果刷新的是当前用户的权限，更新本地状态
+          if (!userId || userId === this.user.id) {
+            console.log('✅ 更新当前用户权限数据')
+            
+            // 更新角色信息
+            this.user.roles = data.roles || []
+            
+            // 更新权限信息
+            this.user.permissions = {
+              menus: data.menus || data.permissions || [],
+              departments: data.departments || [],
+              actions: data.actions || []
+            }
+            
+            console.log('📊 权限数据已更新:', {
+              roles: this.user.roles.length,
+              menus: this.user.permissions.menus.length
+            })
+          }
+          
+          return {
+            success: true,
+            message: response.data.message,
+            data: data
+          }
+        } else {
+          console.error('❌ 权限刷新失败:', response.data.message)
+          return {
+            success: false,
+            message: response.data.message || '权限刷新失败'
+          }
+        }
+      } catch (error) {
+        console.error('❌ 刷新权限缓存出错:', error)
+        return {
+          success: false,
+          message: error.response?.data?.message || '网络错误，权限刷新失败'
+        }
+      }
+    },
+
     // 设置token
     setToken(token) {
       // 使用useStorage自动同步到localStorage

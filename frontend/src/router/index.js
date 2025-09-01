@@ -274,6 +274,11 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
+        path: 'system/logs',
+        component: () => import('../views/admin/SystemLogs.vue'),
+        meta: { title: '系统日志', requiresAuth: true }
+      },
+      {
         path: 'system/accordion-table-example',
         component: () => import('../examples/AccordionTableExample.vue'), // AccordionTable组件示例页面
         meta: { requiresAuth: true }

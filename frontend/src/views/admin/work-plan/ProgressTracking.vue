@@ -823,7 +823,6 @@ const refreshData = async () => {
     getOverviewData(),
     getPlanList()
   ])
-  ElMessage.success('数据刷新成功')
 }
 
 /**

@@ -10,7 +10,11 @@
         <p class="page-subtitle">工作计划的创建、编辑、删除和查看</p>
       </div>
       <div class="header-right">
-        <el-button type="primary" @click="showCreateDialog">
+        <el-button 
+          v-if="hasCreatePermission" 
+          type="primary" 
+          @click="showCreateDialog"
+        >
           <el-icon><Plus /></el-icon>
           新建计划
         </el-button>
@@ -77,8 +81,9 @@
           <div class="table-title">计划列表</div>
           <div class="table-actions">
             <el-button
+              v-if="hasDeletePermission"
               type="danger"
-              :disabled="selectedPlans.length === 0"
+              :disabled="selectedPlans.length === 0 || !canBatchDelete"
               @click="batchDeletePlans"
             >
               <el-icon><Delete /></el-icon>
@@ -155,10 +160,20 @@
               <el-button type="primary" size="small" @click="viewPlanDetail(row.ID)">
                 查看
               </el-button>
-              <el-button type="warning" size="small" @click="editPlan(row)">
+              <el-button 
+                v-if="canEditPlan(row)" 
+                type="warning" 
+                size="small" 
+                @click="editPlan(row)"
+              >
                 编辑
               </el-button>
-              <el-button type="danger" size="small" @click="deletePlan(row)">
+              <el-button 
+                v-if="canDeletePlan(row)" 
+                type="danger" 
+                size="small" 
+                @click="deletePlan(row)"
+              >
                 删除
               </el-button>
             </template>
@@ -395,9 +410,11 @@ import {
 } from '@element-plus/icons-vue'
 import api, { workPlanApi } from '@/services/api'
 import { useRouter, useRoute } from 'vue-router'
+import { useUserStore } from '@/store/user'
 
 const router = useRouter()
 const route = useRoute()
+const userStore = useUserStore()
 
 // 响应式数据
 const loading = ref(false)
@@ -443,6 +460,45 @@ const planForm = reactive({
   EndDate: '',
   phases: [], // 添加阶段信息字段
   milestones: [] // 添加里程碑字段
+})
+
+// 权限检查
+const hasAdminRole = computed(() => userStore.hasRole('admin') || userStore.hasRole('系统管理员'))
+const hasCreatePermission = computed(() => userStore.hasActionPermission('work-plan:plan:create'))
+const hasEditPermission = computed(() => userStore.hasActionPermission('work-plan:plan:edit'))
+const hasDeletePermission = computed(() => userStore.hasActionPermission('work-plan:plan:delete'))
+const currentUserId = computed(() => userStore.user?.ID)
+
+/**
+ * 检查是否可以编辑指定计划
+ * @param {Object} plan - 计划对象
+ * @returns {boolean} 是否可以编辑
+ */
+const canEditPlan = (plan) => {
+  if (!hasEditPermission.value) return false
+  if (hasAdminRole.value) return true
+  return plan.CreatedBy === currentUserId.value || plan.AssigneeID === currentUserId.value
+}
+
+/**
+ * 检查是否可以删除指定计划
+ * @param {Object} plan - 计划对象
+ * @returns {boolean} 是否可以删除
+ */
+const canDeletePlan = (plan) => {
+  if (!hasDeletePermission.value) return false
+  if (hasAdminRole.value) return true
+  return plan.CreatedBy === currentUserId.value
+}
+
+/**
+ * 检查是否可以批量删除选中的计划
+ * @returns {boolean} 是否可以批量删除
+ */
+const canBatchDelete = computed(() => {
+  if (selectedPlans.value.length === 0) return false
+  if (hasAdminRole.value) return true
+  return selectedPlans.value.every(plan => plan.CreatedBy === currentUserId.value)
 })
 
 // 状态选项

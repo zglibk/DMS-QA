@@ -212,7 +212,6 @@
         :props="{ children: 'children', label: 'Name' }"
         node-key="ID"
         show-checkbox
-        :default-checked-keys="selectedMenuIds"
         @check="handleMenuCheck"
         class="menu-tree"
       >
@@ -231,6 +230,9 @@
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="handlePermissionDialogClose">取消</el-button>
+          <el-button type="info" @click="refreshRolePermissions" :loading="refreshingPermissions" :icon="Refresh">
+            刷新权限缓存
+          </el-button>
           <el-button type="primary" @click="savePermissions" :loading="permissionSubmitting">
             保存权限
           </el-button>
@@ -292,7 +294,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus,
@@ -313,6 +315,7 @@ const loading = ref(false)
 const submitting = ref(false)
 const permissionSubmitting = ref(false)
 const departmentSubmitting = ref(false)
+const refreshingPermissions = ref(false)
 const dialogVisible = ref(false)
 const permissionDialogVisible = ref(false)
 const departmentDialogVisible = ref(false)
@@ -524,11 +527,24 @@ const showPermissionDialog = async (role) => {
     // 然后获取角色的权限数据
     const response = await axios.get(`/roles/${role.ID}/menus`)
     selectedMenuIds.value = response.data.data || []
+    
+    // 打开对话框
+    permissionDialogVisible.value = true
+    
+    // 等待DOM更新后手动设置树组件的选中状态
+    await nextTick()
+    if (menuTreeRef.value && selectedMenuIds.value.length > 0) {
+      // 清除之前的选中状态
+      menuTreeRef.value.setCheckedKeys([])
+      // 设置新的选中状态
+      menuTreeRef.value.setCheckedKeys(selectedMenuIds.value)
+      console.log('手动设置树组件选中状态:', selectedMenuIds.value)
+    }
   } catch (error) {
     console.error('获取角色权限失败:', error)
     selectedMenuIds.value = []
+    permissionDialogVisible.value = true
   }
-  permissionDialogVisible.value = true
 }
 
 // 显示部门分配对话框
@@ -612,6 +628,59 @@ const savePermissions = async () => {
     ElMessage.error(error.response?.data?.message || '保存权限失败')
   } finally {
     permissionSubmitting.value = false
+  }
+}
+
+// 刷新角色权限缓存
+const refreshRolePermissions = async () => {
+  if (!currentRole.value) return
+  
+  try {
+    refreshingPermissions.value = true
+    
+    // 获取该角色下的所有用户
+    const usersResponse = await axios.get(`/roles/${currentRole.value.ID}/users`)
+    console.log('API响应:', usersResponse)
+    
+    if (!usersResponse || !usersResponse.data) {
+      ElMessage.error('获取用户列表失败：API响应异常')
+      return
+    }
+    
+    const users = usersResponse.data.data?.users || []
+    
+    if (users.length === 0) {
+      ElMessage.info('该角色下没有用户需要刷新权限')
+      return
+    }
+    
+    // 批量刷新用户权限
+    let successCount = 0
+    let failCount = 0
+    
+    for (const user of users) {
+      try {
+        await axios.post('/auth/refresh-permissions', {
+          userId: user.ID
+        })
+        successCount++
+      } catch (error) {
+        console.error(`刷新用户 ${user.Username} 权限失败:`, error)
+        failCount++
+      }
+    }
+    
+    if (failCount === 0) {
+      ElMessage.success(`成功刷新 ${successCount} 个用户的权限缓存`)
+    } else {
+      ElMessage.warning(`刷新完成：成功 ${successCount} 个，失败 ${failCount} 个`)
+    }
+    
+  } catch (error) {
+    console.error('刷新权限缓存失败:', error)
+    ElMessage.error(error.response?.data?.message || '刷新权限缓存失败')
+  } finally {
+    refreshingPermissions.value = false
   }
 }
 
@@ -738,6 +807,10 @@ const handlePermissionDialogClose = () => {
   permissionDialogVisible.value = false
   currentRole.value = null
   selectedMenuIds.value = []
+  // 清除树组件的选中状态
+  if (menuTreeRef.value) {
+    menuTreeRef.value.setCheckedKeys([])
+  }
 }
 
 const handleDepartmentDialogClose = () => {
