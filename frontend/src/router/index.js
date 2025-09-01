@@ -279,6 +279,11 @@ const routes = [
         meta: { title: '系统日志', requiresAuth: true }
       },
       {
+        path: 'system/logs/analytics',
+        component: () => import('../views/admin/SystemLogsAnalytics.vue'),
+        meta: { title: '日志统计分析', requiresAuth: true }
+      },
+      {
         path: 'system/accordion-table-example',
         component: () => import('../examples/AccordionTableExample.vue'), // AccordionTable组件示例页面
         meta: { requiresAuth: true }

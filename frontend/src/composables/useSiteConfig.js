@@ -34,8 +34,8 @@ import axios from 'axios'
 const siteConfig = reactive({
   siteName: '质量数据管理系统',
   companyName: 'DMS质量管理系统',
-  logoBase64Img: '/logo.png',
-  faviconBase64Img: '/logo.png',
+  logoBase64Img: '',
+  faviconBase64Img: '',
   headerTitle: '质量数据系统',
   loginTitle: 'DMS-QA 质量管理系统',
   footerCopyright: '© 2025 DMS质量管理系统. All rights reserved.'

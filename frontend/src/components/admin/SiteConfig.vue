@@ -171,8 +171,8 @@ const imageRefreshKey = ref(0) // 用于强制刷新图片
 const config = reactive({
   siteName: '质量数据管理系统',
   companyName: 'DMS质量管理系统',
-  logoBase64Img: '/logo.png',
-  faviconBase64Img: '/logo.png',
+  logoBase64Img: '',
+  faviconBase64Img: '',
   headerTitle: '质量数据系统',
   loginTitle: 'DMS-QA 质量管理系统',
   footerCopyright: '© 2025 DMS质量管理系统. All rights reserved.'
@@ -234,8 +234,8 @@ const resetConfig = () => {
   Object.assign(config, {
     siteName: '质量数据管理系统',
     companyName: 'DMS质量管理系统',
-    logoBase64Img: '/logo.png',
-    faviconBase64Img: '/logo.png',
+    logoBase64Img: '',
+    faviconBase64Img: '',
     headerTitle: '质量数据系统',
     loginTitle: 'DMS-QA 质量管理系统',
     footerCopyright: '© 2025 DMS质量管理系统. All rights reserved.'
@@ -361,7 +361,7 @@ const uploadFavicon = async (options) => {
 
 // 图片加载错误处理
 const handleImageError = (event) => {
-  event.target.src = '/logo.png' // 回退到默认图片
+  event.target.style.display = 'none' // 隐藏加载失败的图片
 }
 
 // 组件挂载时加载配置

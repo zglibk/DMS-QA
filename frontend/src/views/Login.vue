@@ -53,7 +53,7 @@
         <el-col :xs="24" :sm="24" :md="12" :lg="10" :xl="10" class="login-col">
           <div class="login-box">
         <div class="logo-container">
-          <img :src="siteConfig?.logoBase64Img || '/logo.png'" alt="Logo" class="logo" @error="handleLogoError" />
+          <img v-if="siteConfig?.logoBase64Img" :src="siteConfig.logoBase64Img" alt="Logo" class="logo" @error="handleLogoError" />
         </div>
         
         <!-- 登录标题 - 使用Element Plus布局组件 -->
@@ -313,7 +313,7 @@ const reset = () => {
 }
 // 图片加载错误处理
 const handleLogoError = (event) => {
-  event.target.src = '/logo.png' // 回退到默认图片
+  event.target.style.display = 'none' // 隐藏加载失败的图片
 }
 
 onMounted(() => {

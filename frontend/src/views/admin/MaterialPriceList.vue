@@ -34,6 +34,8 @@
             v-model="searchForm.materialName"
             placeholder="请输入材料名称"
             clearable
+            @blur="handleAutoSearch"
+            @clear="handleAutoSearch"
             style="width: 200px"
           />
         </el-form-item>
@@ -42,6 +44,8 @@
             v-model="searchForm.supplier"
             placeholder="请输入供应商"
             clearable
+            @blur="handleAutoSearch"
+            @clear="handleAutoSearch"
             style="width: 200px"
           />
         </el-form-item>
@@ -51,6 +55,8 @@
             placeholder="最低价格"
             :min="0"
             :precision="2"
+            @change="handleAutoSearch"
+            @clear="handleAutoSearch"
             style="width: 120px"
           />
           <span style="margin: 0 8px">-</span>
@@ -59,6 +65,8 @@
             placeholder="最高价格"
             :min="0"
             :precision="2"
+            @change="handleAutoSearch"
+            @clear="handleAutoSearch"
             style="width: 120px"
           />
         </el-form-item>
@@ -594,6 +602,17 @@ const fetchData = async () => {
 const handleSearch = () => {
   pagination.currentPage = 1
   fetchData()
+}
+
+/**
+ * 自动搜索处理函数
+ * 当输入框失去焦点、清空内容或下拉选择时自动执行查询
+ */
+const handleAutoSearch = () => {
+  // 延迟执行查询，避免频繁触发
+  setTimeout(() => {
+    handleSearch()
+  }, 100)
 }
 
 // 重置搜索

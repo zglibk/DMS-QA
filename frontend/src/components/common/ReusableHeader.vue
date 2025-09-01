@@ -2,7 +2,7 @@
   <div class="app-header fixed-header">
     <!-- 左侧logo及系统名 -->
     <div class="header-left">
-      <img :src="siteConfig?.logoBase64Img || '/logo.png'" alt="logo" class="logo" @error="handleLogoError" />
+      <img v-if="siteConfig?.logoBase64Img" :src="siteConfig.logoBase64Img" alt="logo" class="logo" @error="handleLogoError" />
       <span class="logo-text">{{ siteConfig?.siteName || '质量数据管理系统' }}</span>
     </div>
     <!-- 中间菜单栏 -->
@@ -105,7 +105,7 @@ const goProfile = () => {
 // logout方法和goAdmin方法已迁移到UserDropdown组件
 
 const handleLogoError = (event) => {
-  event.target.src = '/logo.png'
+  event.target.style.display = 'none' // 隐藏加载失败的图片
 }
 
 

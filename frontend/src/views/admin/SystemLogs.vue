@@ -2,7 +2,7 @@
   <div class="system-logs">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2>系统日志管理</h2>
+      <h2>系统日志</h2>
       <p>查看和管理系统操作日志，监控系统运行状态</p>
     </div>
 
@@ -16,11 +16,13 @@
               placeholder="搜索操作或详情"
               clearable
               style="min-width: 100px"
+              @blur="handleAutoSearch"
+              @clear="handleAutoSearch"
             />
           </el-form-item>
           
           <el-form-item label="日志分类">
-            <el-select v-model="searchForm.category" placeholder="选择分类" clearable style="min-width: 120px">
+            <el-select v-model="searchForm.category" placeholder="选择分类" clearable style="min-width: 120px" @change="handleAutoSearch" @clear="handleAutoSearch">
               <el-option
                 v-for="category in categories"
                 :key="category"
@@ -31,7 +33,7 @@
           </el-form-item>
           
           <el-form-item label="模块">
-            <el-select v-model="searchForm.module" placeholder="选择模块" clearable style="min-width: 120px">
+            <el-select v-model="searchForm.module" placeholder="选择模块" clearable style="min-width: 120px" @change="handleAutoSearch" @clear="handleAutoSearch">
               <el-option
                 v-for="module in modules"
                 :key="module"
@@ -42,7 +44,7 @@
           </el-form-item>
           
           <el-form-item label="严重级别">
-            <el-select v-model="searchForm.severity" placeholder="选择级别" clearable style="min-width: 120px">
+            <el-select v-model="searchForm.severity" placeholder="选择级别" clearable style="min-width: 120px" @change="handleAutoSearch" @clear="handleAutoSearch">
               <el-option
                 v-for="level in severityLevels"
                 :key="level"
@@ -58,6 +60,8 @@
               placeholder="用户ID"
               clearable
               style="width: 80px"
+              @blur="handleAutoSearch"
+              @clear="handleAutoSearch"
             />
           </el-form-item>
           
@@ -71,7 +75,7 @@
               format="YYYY-MM-DD HH:mm:ss"
               value-format="YYYY-MM-DD HH:mm:ss"
               style="width:300px;min-width: 250px"
-              @change="handleDateRangeChange"
+              @change="handleDateRangeChangeWithAutoSearch"
             />
           </el-form-item>
           
@@ -83,6 +87,10 @@
             <el-button type="primary" @click="handleSearch" :loading="loading">
               <el-icon><Search /></el-icon>
               <span class="button-text">搜索</span>
+            </el-button>
+            <el-button type="success" @click="goToAnalytics">
+              <el-icon><TrendCharts /></el-icon>
+              <span class="button-text">统计分析</span>
             </el-button>
 
           </el-form-item>
@@ -477,7 +485,8 @@
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Download, Delete, DataAnalysis, View } from '@element-plus/icons-vue'
+import { Search, Refresh, Download, Delete, DataAnalysis, View, TrendCharts } from '@element-plus/icons-vue'
+import { useRouter } from 'vue-router'
 import axios from 'axios'
 
 export default {
@@ -488,9 +497,13 @@ export default {
     Download,
     Delete,
     DataAnalysis,
-    View
+    View,
+    TrendCharts
   },
   setup() {
+    // 路由
+    const router = useRouter()
+    
     // 响应式数据
     const loading = ref(false)
     const exportLoading = ref(false)
@@ -604,7 +617,7 @@ export default {
     
     const formatDateTime = (dateTime) => {
       if (!dateTime) return '-'
-      return new Date(dateTime).toLocaleString('zh-CN')
+      return new Date(dateTime).toLocaleString('zh-CN').replace(/\//g, '-')
     }
     
     const formatJsonData = (data) => {
@@ -659,7 +672,25 @@ export default {
     // 获取统计信息
     const fetchStatistics = async () => {
       try {
-        const response = await axios.get('/system-logs/statistics')
+        // 构建统计查询参数，使用当前的筛选条件
+        const params = {
+          startDate: searchForm.startDate,
+          endDate: searchForm.endDate,
+          category: searchForm.category,
+          module: searchForm.module,
+          severity: searchForm.severity,
+          userID: searchForm.userID,
+          keyword: searchForm.keyword
+        }
+        
+        // 过滤掉空值参数
+        Object.keys(params).forEach(key => {
+          if (!params[key]) {
+            delete params[key]
+          }
+        })
+        
+        const response = await axios.get('/system-logs/statistics', { params })
         if (response.data.success) {
           const stats = response.data.data.totalStats
           totalLogs.value = stats.totalLogs || 0
@@ -676,6 +707,7 @@ export default {
     const handleSearch = () => {
       pagination.page = 1
       fetchLogList()
+      fetchStatistics() // 根据筛选条件更新统计数据
     }
     
     // 处理重置
@@ -686,6 +718,7 @@ export default {
       dateRange.value = []
       pagination.page = 1
       fetchLogList()
+      fetchStatistics() // 重置后更新统计数据
     }
     
     // 处理日期范围变化
@@ -697,6 +730,28 @@ export default {
         searchForm.startDate = ''
         searchForm.endDate = ''
       }
+      // 时间范围变化时自动更新统计数据
+      fetchStatistics()
+    }
+    
+    // 处理日期范围变化并自动搜索
+    const handleDateRangeChangeWithAutoSearch = (dates) => {
+      handleDateRangeChange(dates)
+      // 延迟执行查询，避免频繁触发
+      setTimeout(() => {
+        handleSearch()
+      }, 100)
+    }
+    
+    /**
+     * 自动搜索处理函数
+     * 当输入框失去焦点、清空内容或下拉选择时自动执行查询
+     */
+    const handleAutoSearch = () => {
+      // 延迟执行查询，避免频繁触发
+      setTimeout(() => {
+        handleSearch()
+      }, 100)
     }
     
     // 处理分页大小变化
@@ -801,7 +856,7 @@ export default {
     // 获取导出模板
     const fetchExportTemplate = async () => {
       try {
-        const response = await axios.get('/api/log-export/template')
+        const response = await axios.get('/log-export/template')
         if (response.data.success) {
           availableColumns.value = response.data.data.availableColumns
           exportFormats.value = response.data.data.formats
@@ -898,6 +953,13 @@ export default {
              searchForm.severity || searchForm.userID || searchForm.startDate || searchForm.endDate
     })
     
+    /**
+      * 跳转到统计分析页面
+      */// 跳转到统计分析页面
+    const goToAnalytics = () => {
+      router.push('/admin/system/logs/analytics')
+    }
+    
     // 生命周期
     onMounted(() => {
       fetchConfigOptions()
@@ -941,6 +1003,8 @@ export default {
       handleSearch,
       handleReset,
       handleDateRangeChange,
+      handleDateRangeChangeWithAutoSearch,
+      handleAutoSearch,
       handleSizeChange,
       handleCurrentChange,
       handleRowClick,
@@ -955,7 +1019,8 @@ export default {
       selectAllColumns,
       clearAllColumns,
       selectDefaultColumns,
-      hasActiveFilters
+      hasActiveFilters,
+      goToAnalytics
     }
   }
 }

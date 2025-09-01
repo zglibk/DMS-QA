@@ -414,6 +414,12 @@ export const breadcrumbConfig = {
     icon: 'Bell'
   },
 
+  // 系统管理 - 系统日志
+  '/admin/system/logs': {
+    title: '系统日志',
+    icon: 'Document'
+  },
+
   // 供应商管理
   '/admin/supplier/list': {
     title: '供应商管理',

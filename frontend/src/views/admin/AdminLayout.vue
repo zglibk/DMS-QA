@@ -144,7 +144,7 @@ document.addEventListener('fullscreenchange', () => {
 
 // 图片加载错误处理
 const handleLogoError = (event) => {
-  event.target.src = '/logo.png'
+  event.target.style.display = 'none' // 隐藏加载失败的图片
 }
 
 onMounted(async () => {
