@@ -174,11 +174,37 @@ const checkPermission = (permission) => {
   };
 };
 
+/**
+ * 管理员权限检查中间件
+ * 功能：检查用户是否为管理员
+ */
+const requireAdmin = (req, res, next) => {
+  try {
+    // 检查用户是否已登录
+    if (!req.user) {
+      return res.status(401).json({ message: '用户未登录' });
+    }
+
+    // 检查是否为管理员
+    if (isAdmin(req.user)) {
+      return next();
+    } else {
+      return res.status(403).json({ 
+        message: '需要管理员权限，拒绝访问'
+      });
+    }
+  } catch (error) {
+    console.error('管理员权限验证失败:', error);
+    return res.status(500).json({ message: '权限验证失败' });
+  }
+};
+
 // 导出中间件函数
 module.exports = {
   authenticateToken,
   checkPermission,
   checkUserPermission,
   checkUserActionPermission,
-  isAdmin
+  isAdmin,
+  requireAdmin
 };

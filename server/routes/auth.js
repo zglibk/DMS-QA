@@ -108,6 +108,100 @@ router.get('/captcha', (req, res) => {
 });
 
 /**
+ * 记录用户登录日志
+ * @param {Object} pool - 数据库连接池
+ * @param {Object} logData - 登录日志数据
+ * @param {number} logData.UserID - 用户ID（可选，登录失败时可能为null）
+ * @param {string} logData.Username - 用户名
+ * @param {string} logData.RealName - 真实姓名（可选）
+ * @param {number} logData.DepartmentID - 部门ID（可选）
+ * @param {string} logData.SessionID - 会话ID
+ * @param {Date} logData.LoginTime - 登录时间
+ * @param {string} logData.IPAddress - IP地址
+ * @param {string} logData.UserAgent - 用户代理
+ * @param {string} logData.Browser - 浏览器
+ * @param {string} logData.OS - 操作系统
+ * @param {string} logData.LoginStatus - 登录状态（成功/失败）
+ * @param {string} logData.FailureReason - 失败原因（可选）
+ */
+async function recordLoginLog(pool, logData) {
+  try {
+    await pool.request()
+      .input('UserID', sql.Int, logData.UserID || null)
+      .input('Username', sql.NVarChar, logData.Username)
+      .input('RealName', sql.NVarChar, logData.RealName || null)
+      .input('DepartmentID', sql.Int, logData.DepartmentID || null)
+      .input('SessionID', sql.NVarChar, logData.SessionID)
+      .input('LoginTime', sql.DateTime2, logData.LoginTime)
+      .input('IPAddress', sql.NVarChar, logData.IPAddress)
+      .input('UserAgent', sql.NVarChar, logData.UserAgent || '')
+      .input('Browser', sql.NVarChar, logData.Browser || '')
+      .input('OS', sql.NVarChar, logData.OS || '')
+      .input('LoginStatus', sql.NVarChar, logData.LoginStatus)
+      .input('IsOnline', sql.Bit, logData.LoginStatus === '成功' ? 1 : 0)
+      .input('LastActivity', sql.DateTime2, logData.LoginTime)
+      .input('FailureReason', sql.NVarChar, logData.FailureReason || null)
+      .query(`
+        INSERT INTO [UserLoginLogs] (
+          UserID, Username, RealName, DepartmentID, SessionID, 
+          LoginTime, IPAddress, UserAgent, Browser, OS, 
+          LoginStatus, IsOnline, LastActivity, FailureReason
+        ) VALUES (
+          @UserID, @Username, @RealName, @DepartmentID, @SessionID,
+          @LoginTime, @IPAddress, @UserAgent, @Browser, @OS,
+          @LoginStatus, @IsOnline, @LastActivity, @FailureReason
+        )
+      `);
+  } catch (error) {
+    console.error('记录登录日志失败:', error);
+  }
+}
+
+/**
+ * 解析用户代理字符串，提取浏览器和操作系统信息
+ * @param {string} userAgent - 用户代理字符串
+ * @returns {Object} 包含browser和os的对象
+ */
+function parseUserAgent(userAgent) {
+  if (!userAgent) return { browser: '', os: '' };
+  
+  let browser = '';
+  let os = '';
+  
+  // 检测浏览器
+  if (userAgent.includes('Chrome')) {
+    browser = 'Chrome';
+  } else if (userAgent.includes('Firefox')) {
+    browser = 'Firefox';
+  } else if (userAgent.includes('Safari')) {
+    browser = 'Safari';
+  } else if (userAgent.includes('Edge')) {
+    browser = 'Edge';
+  } else if (userAgent.includes('Opera')) {
+    browser = 'Opera';
+  } else {
+    browser = 'Unknown';
+  }
+  
+  // 检测操作系统
+  if (userAgent.includes('Windows')) {
+    os = 'Windows';
+  } else if (userAgent.includes('Mac')) {
+    os = 'macOS';
+  } else if (userAgent.includes('Linux')) {
+    os = 'Linux';
+  } else if (userAgent.includes('Android')) {
+    os = 'Android';
+  } else if (userAgent.includes('iOS')) {
+    os = 'iOS';
+  } else {
+    os = 'Unknown';
+  }
+  
+  return { browser, os };
+}
+
+/**
  * 用户登录接口
  * 安全特性：
  * 1. 密码使用bcrypt加密验证
@@ -115,27 +209,88 @@ router.get('/captcha', (req, res) => {
  * 3. 检查用户状态（是否被禁用）
  * 4. 不泄露具体错误原因（用户名不存在vs密码错误）
  * 5. 验证码验证
+ * 6. 记录所有登录尝试（成功和失败）
  */
 router.post('/login', async (req, res) => {
   const { username, password, captchaId, captchaText } = req.body;
+  const loginTime = new Date();
+  const sessionId = require('crypto').randomUUID();
+  const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || '未知';
+  const userAgent = req.get('User-Agent') || '';
+  const { browser, os } = parseUserAgent(userAgent);
 
   try {
+    // 连接数据库
+    let pool = await sql.connect(await getDynamicConfig());
+
+    // 先查询用户信息，以便在所有失败情况下都能记录UserID
+    const result = await pool.request()
+      .input('Username', sql.NVarChar, username)
+      .query('SELECT * FROM [User] WHERE Username = @Username');
+
+    const user = result.recordset[0];
+
     // 验证验证码参数
     if (!captchaId || !captchaText) {
+      // 记录登录失败日志
+      await recordLoginLog(pool, {
+        UserID: user ? user.ID : null,
+        Username: username || '未知',
+        RealName: user ? user.RealName : null,
+        DepartmentID: user ? user.DepartmentID : null,
+        SessionID: sessionId,
+        LoginTime: loginTime,
+        IPAddress: clientIP,
+        UserAgent: userAgent,
+        Browser: browser,
+        OS: os,
+        LoginStatus: '失败',
+        FailureReason: '验证码参数缺失'
+      });
       return res.status(400).json({ message: '请输入验证码' });
     }
-    
+
     // 获取存储的验证码信息
     const storedCaptcha = captchaStore.get(captchaId);
     if (!storedCaptcha) {
+      // 记录登录失败日志
+      await recordLoginLog(pool, {
+        UserID: user ? user.ID : null,
+        Username: username || '未知',
+        RealName: user ? user.RealName : null,
+        DepartmentID: user ? user.DepartmentID : null,
+        SessionID: sessionId,
+        LoginTime: loginTime,
+        IPAddress: clientIP,
+        UserAgent: userAgent,
+        Browser: browser,
+        OS: os,
+        LoginStatus: '失败',
+        FailureReason: '验证码不存在或已过期'
+      });
       return res.status(400).json({ message: '验证码不存在或已过期，请重新获取' });
     }
-    
+
     // 检查验证码是否过期
     const currentTime = Date.now();
     if (currentTime >= storedCaptcha.expires) {
       // 立即删除过期的验证码
       captchaStore.delete(captchaId);
+      // 记录登录失败日志
+      await recordLoginLog(pool, {
+        UserID: user ? user.ID : null,
+        Username: username || '未知',
+        RealName: user ? user.RealName : null,
+        DepartmentID: user ? user.DepartmentID : null,
+        SessionID: sessionId,
+        LoginTime: loginTime,
+        IPAddress: clientIP,
+        UserAgent: userAgent,
+        Browser: browser,
+        OS: os,
+        LoginStatus: '失败',
+        FailureReason: '验证码已过期'
+      });
       return res.status(400).json({ message: '验证码已过期，请重新获取' });
     }
     
@@ -144,29 +299,61 @@ router.post('/login', async (req, res) => {
     const storedText = storedCaptcha.text.toLowerCase().trim();
     
     if (inputText !== storedText) {
+      // 记录登录失败日志（如果用户存在则记录UserID）
+      await recordLoginLog(pool, {
+        UserID: user ? user.ID : null,
+        Username: username || '未知',
+        RealName: user ? user.RealName : null,
+        DepartmentID: user ? user.DepartmentID : null,
+        SessionID: sessionId,
+        LoginTime: loginTime,
+        IPAddress: clientIP,
+        UserAgent: userAgent,
+        Browser: browser,
+        OS: os,
+        LoginStatus: '失败',
+        FailureReason: '验证码错误'
+      });
       return res.status(400).json({ message: '验证码错误，请重新输入' });
     }
     
     // 验证码验证成功，立即删除已使用的验证码，防止重复使用
     captchaStore.delete(captchaId);
 
-    // 连接数据库
-    let pool = await sql.connect(await getDynamicConfig());
-
-    // 查询用户信息
-    const result = await pool.request()
-      .input('Username', sql.NVarChar, username)
-      .query('SELECT * FROM [User] WHERE Username = @Username');
-
-    const user = result.recordset[0];
-
     // 用户不存在
     if (!user) {
+      // 记录登录失败日志
+      await recordLoginLog(pool, {
+        Username: username || '未知',
+        SessionID: sessionId,
+        LoginTime: loginTime,
+        IPAddress: clientIP,
+        UserAgent: userAgent,
+        Browser: browser,
+        OS: os,
+        LoginStatus: '失败',
+        FailureReason: '用户不存在'
+      });
       return res.status(401).json({ message: '用户名或密码错误' });
     }
 
     // 用户被禁用
     if (user.Status === 0) {
+      // 记录登录失败日志
+      await recordLoginLog(pool, {
+        UserID: user.ID,
+        Username: user.Username,
+        RealName: user.RealName,
+        DepartmentID: user.DepartmentID,
+        SessionID: sessionId,
+        LoginTime: loginTime,
+        IPAddress: clientIP,
+        UserAgent: userAgent,
+        Browser: browser,
+        OS: os,
+        LoginStatus: '失败',
+        FailureReason: '用户已被禁用'
+      });
       return res.status(403).json({ message: '该用户已被禁用，请联系管理员' });
     }
 
@@ -174,11 +361,25 @@ router.post('/login', async (req, res) => {
     const valid = await bcrypt.compare(password, user.Password);
     
     if (!valid) {
+      // 记录登录失败日志
+      await recordLoginLog(pool, {
+        UserID: user.ID,
+        Username: user.Username,
+        RealName: user.RealName,
+        DepartmentID: user.DepartmentID,
+        SessionID: sessionId,
+        LoginTime: loginTime,
+        IPAddress: clientIP,
+        UserAgent: userAgent,
+        Browser: browser,
+        OS: os,
+        LoginStatus: '失败',
+        FailureReason: '密码错误'
+      });
       return res.status(401).json({ message: '用户名或密码错误' });
     }
 
     // 更新用户最后登录时间
-    const loginTime = new Date();
     await pool.request()
       .input('UserId', sql.Int, user.ID)
       .input('LoginTime', sql.DateTime, loginTime)
@@ -223,6 +424,21 @@ router.post('/login', async (req, res) => {
       { expiresIn: '2h' }
     );
 
+    // 记录登录成功日志
+    await recordLoginLog(pool, {
+      UserID: user.ID,
+      Username: user.Username,
+      RealName: user.RealName,
+      DepartmentID: user.DepartmentID,
+      SessionID: sessionId,
+      LoginTime: loginTime,
+      IPAddress: clientIP,
+      UserAgent: userAgent,
+      Browser: browser,
+      OS: os,
+      LoginStatus: '成功'
+    });
+
     // 返回token和用户信息（包含正确的lastLoginTime）
     res.json({ 
       token,
@@ -240,6 +456,24 @@ router.post('/login', async (req, res) => {
     // 登录过程中出现异常时，确保删除当前验证码
     if (req.body.captchaId) {
       captchaStore.delete(req.body.captchaId);
+    }
+    
+    // 记录系统异常导致的登录失败
+    try {
+      let pool = await sql.connect(await getDynamicConfig());
+      await recordLoginLog(pool, {
+        Username: username || '未知',
+        SessionID: sessionId,
+        LoginTime: loginTime,
+        IPAddress: clientIP,
+        UserAgent: userAgent,
+        Browser: browser,
+        OS: os,
+        LoginStatus: '失败',
+        FailureReason: '系统异常: ' + err.message
+      });
+    } catch (logError) {
+      console.error('记录异常登录日志失败:', logError);
     }
     
     res.status(500).json({ message: '登录失败，请重试' });
@@ -1052,6 +1286,92 @@ router.get('/check-permission/:permission', authenticateToken, async (req, res) 
     res.status(500).json({
       success: false,
       message: '检查权限失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 用户退出登录接口
+ *
+ * 路由：POST /api/auth/logout
+ *
+ * 功能说明：
+ * 1. 记录用户退出登录日志
+ * 2. 更新UserLoginLogs表中的LogoutTime和IsOnline状态
+ *
+ * 请求参数：
+ * - sessionId: 会话ID（可选，如果不提供则从token中获取）
+ *
+ * 返回数据：
+ * - success: 操作是否成功
+ * - message: 操作结果消息
+ */
+router.post('/logout', authenticateToken, async (req, res) => {
+  try {
+    const { sessionId } = req.body;
+    const userInfo = req.user;
+    
+    // 获取客户端IP地址
+    const clientIP = req.headers['x-forwarded-for'] || 
+                    req.connection.remoteAddress || 
+                    req.socket.remoteAddress ||
+                    (req.connection.socket ? req.connection.socket.remoteAddress : null) ||
+                    '未知';
+    
+    // 解析User-Agent信息
+    const userAgent = req.headers['user-agent'] || '';
+    const { browser, os } = parseUserAgent(userAgent);
+    
+    // 获取数据库连接
+    const pool = await sql.connect(await getDynamicConfig());
+    
+    // 更新用户登录日志，记录退出时间
+    const logoutTime = new Date();
+    
+    // 如果提供了sessionId，则更新指定会话的退出时间
+    // 否则更新当前用户最近的在线会话
+    let updateQuery;
+    let request = pool.request()
+      .input('LogoutTime', sql.DateTime2, logoutTime)
+      .input('IsOnline', sql.Bit, 0);
+    
+    if (sessionId) {
+      // 更新指定会话
+      request.input('SessionID', sql.NVarChar, sessionId);
+      updateQuery = `
+        UPDATE [UserLoginLogs] 
+        SET LogoutTime = @LogoutTime, IsOnline = @IsOnline
+        WHERE SessionID = @SessionID AND LogoutTime IS NULL
+      `;
+    } else {
+      // 更新当前用户最近的在线会话
+      request.input('UserID', sql.Int, userInfo.UserID);
+      updateQuery = `
+        UPDATE [UserLoginLogs] 
+        SET LogoutTime = @LogoutTime, IsOnline = @IsOnline
+        WHERE UserID = @UserID AND IsOnline = 1 AND LogoutTime IS NULL
+      `;
+    }
+    
+    const result = await request.query(updateQuery);
+    
+    // 退出登录已通过更新UserLoginLogs表记录，无需在SystemLogs中重复记录
+    
+    res.json({
+      success: true,
+      message: '退出登录成功',
+      data: {
+        logoutTime: logoutTime,
+        affectedRows: result.rowsAffected[0]
+      }
+    });
+    
+  } catch (error) {
+    console.error('退出登录失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '退出登录失败',
       error: error.message
     });
   }

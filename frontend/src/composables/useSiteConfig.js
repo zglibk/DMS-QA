@@ -15,8 +15,8 @@
 
 // 导入Vue 3响应式API
 import { ref, reactive } from 'vue'
-// 导入HTTP请求库
-import axios from 'axios'
+// 导入配置好的API实例（包含认证token）
+import api from '@/api/index.js'
 
 /**
  * 全局网站配置状态
@@ -65,7 +65,7 @@ const loadSiteConfig = async () => {
   isLoading.value = true
   try {
     // 请求网站配置API
-    const response = await axios.get('/config/site-config')
+    const response = await api.get('/api/config/site-config')
 
     if (response.data.success) {
       // 合并新配置到全局状态

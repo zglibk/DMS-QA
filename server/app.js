@@ -64,6 +64,8 @@ const userPermissionsRouter = require('./routes/userPermissions'); // 用户权�
 const erpRouter = require('./routes/erp');                     // ERP系统集成路由
 const erpConfigRouter = require('./routes/erpConfig');         // ERP配置管理路由
 const systemLogsRouter = require('./routes/systemLogs');       // 系统日志管理路由
+const userLoginLogsRouter = require('./routes/userLoginLogs');   // 用户登录日志管理路由
+const dashboardRouter = require('./routes/dashboard');           // 仪表板数据路由
 const erpSyncService = require('./services/erpSyncService');
 const { startFileServer } = require('./file-server');
 const { logCleanupService } = require('./services/logCleanupService');
@@ -150,6 +152,105 @@ app.get('/api/test-connection', (req, res) => {
 });
 
 /**
+ * 系统信息API端点
+ *
+ * 功能：获取系统运行状态信息
+ * 路径：GET /api/system-info
+ *
+ * 用途：
+ * - 获取系统版本信息
+ * - 检查服务器运行状态
+ * - 检查数据库连接状态
+ * - 获取系统运行时间
+ *
+ * 响应信息：
+ * - 系统版本
+ * - 服务器状态
+ * - 数据库状态
+ * - 最后更新时间
+ */
+app.get('/api/system-info', async (req, res) => {
+  try {
+    const { executeQuery } = require('./db');
+    const packageJson = require('./package.json');
+    
+    // 检查数据库连接状态
+    let dbStatus = '连接正常';
+    let dbConnected = true;
+    
+    try {
+      await executeQuery(async (pool) => {
+        await pool.request().query('SELECT 1 as test');
+        return { success: true };
+      });
+    } catch (error) {
+      dbStatus = '连接异常';
+      dbConnected = false;
+      console.error('数据库连接检查失败:', error.message);
+    }
+    
+    // 获取系统运行时间
+    const uptime = process.uptime();
+    const uptimeHours = Math.floor(uptime / 3600);
+    const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+    
+    // 获取服务器IP地址
+    const os = require('os');
+    const networkInterfaces = os.networkInterfaces();
+    let serverIP = 'localhost';
+    
+    // 查找第一个非回环的IPv4地址
+    for (const interfaceName in networkInterfaces) {
+      const interfaces = networkInterfaces[interfaceName];
+      for (const iface of interfaces) {
+        if (iface.family === 'IPv4' && !iface.internal) {
+          serverIP = iface.address;
+          break;
+        }
+      }
+      if (serverIP !== 'localhost') break;
+    }
+    
+    // 格式化时间为 yyyy-m-d hh:mm:ss
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = now.getMonth() + 1;
+    const day = now.getDate();
+    const hours = now.getHours().toString().padStart(2, '0');
+    const minutes = now.getMinutes().toString().padStart(2, '0');
+    const seconds = now.getSeconds().toString().padStart(2, '0');
+    const formattedTime = `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
+    
+    const systemInfo = {
+      version: packageJson.version || 'v2.1.0',
+      serverStatus: '正常运行',
+      serverIP: serverIP,
+      dbStatus: dbStatus,
+      dbIP: process.env.DB_SERVER || '192.168.1.57',
+      dbConnected: dbConnected,
+      lastUpdateTime: formattedTime,
+      uptime: `${uptimeHours}小时${uptimeMinutes}分钟`,
+      nodeVersion: process.version,
+      platform: process.platform,
+      serverPid: process.pid
+    };
+    
+    res.json({
+      success: true,
+      data: systemInfo
+    });
+    
+  } catch (error) {
+    console.error('获取系统信息失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '获取系统信息失败',
+      error: error.message
+    });
+  }
+});
+
+/**
  * 注册API路由
  *
  * 路由模块说明：
@@ -188,6 +289,8 @@ app.use('/api/user-permissions', userPermissionsRouter);
 app.use('/api/erp', erpRouter);
 app.use('/api/erp-config', erpConfigRouter);
 app.use('/api/system-logs', systemLogsRouter);
+app.use('/api/user-login-logs', userLoginLogsRouter);
+app.use('/api/dashboard', dashboardRouter);
 app.use('/api/log-export', require('./routes/logExport'));
 
 // 错误日志记录中间件（必须在所有路由之后）

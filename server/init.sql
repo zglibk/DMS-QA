@@ -625,6 +625,7 @@ INSERT INTO [dbo].[Positions] ([PositionCode], [PositionName], [Level], [Descrip
 -- 初始化菜单数据
 -- 主菜单
 INSERT INTO [dbo].[Menus] ([MenuCode], [MenuName], [MenuType], [Icon], [Path], [Permission], [SortOrder], [Visible], [Status]) VALUES
+('home', N'主页', 'menu', 'HomeFilled', '/admin/', NULL, 1, 1, 1),
 ('dashboard', N'仪表盘', 'menu', 'Dashboard', '/dashboard', 'dashboard:view', 10, 1, 1),
 ('system', N'系统管理', 'menu', 'Setting', '/system', 'system:view', 90, 1, 1),
 ('quality', N'质量管理', 'menu', 'DocumentChecked', '/quality', 'quality:view', 20, 1, 1),
@@ -3055,6 +3056,63 @@ BEGIN
 END
 
 -- =====================================================
+-- 用户登录日志表 (UserLoginLogs)
+-- 功能：记录用户登录、退出和在线状态
+-- 用途：用户行为追踪、在线用户管理、安全审计
+-- =====================================================
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[UserLoginLogs]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[UserLoginLogs] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,                    -- 主键，自增ID
+        [UserID] INT NOT NULL,                                 -- 用户ID（关联User表）
+        [Username] NVARCHAR(50) NOT NULL,                      -- 用户名
+        [RealName] NVARCHAR(50) NULL,                          -- 真实姓名
+        [DepartmentID] INT NULL,                               -- 部门ID（关联Department表）
+        [SessionID] NVARCHAR(100) NOT NULL,                    -- 会话ID（唯一标识）
+        [LoginTime] DATETIME NOT NULL,                         -- 登录时间
+        [LogoutTime] DATETIME NULL,                            -- 退出时间
+        [IPAddress] NVARCHAR(45) NOT NULL,                     -- IP地址（支持IPv6）
+        [UserAgent] NVARCHAR(500) NULL,                        -- 用户代理字符串
+        [Browser] NVARCHAR(100) NULL,                          -- 浏览器信息
+        [OS] NVARCHAR(100) NULL,                               -- 操作系统信息
+        [LoginStatus] NVARCHAR(20) DEFAULT 'SUCCESS',          -- 登录状态（SUCCESS、FAILED）
+        [IsOnline] BIT DEFAULT 1,                              -- 是否在线（0=离线，1=在线）
+        [LastActivity] DATETIME NOT NULL,                      -- 最后活动时间
+        [CreatedAt] DATETIME DEFAULT GETDATE(),                -- 创建时间
+        
+        -- 外键约束
+        CONSTRAINT FK_UserLoginLogs_User 
+            FOREIGN KEY ([UserID]) REFERENCES [dbo].[User]([ID]),
+        CONSTRAINT FK_UserLoginLogs_Department 
+            FOREIGN KEY ([DepartmentID]) REFERENCES [dbo].[Department]([ID])
+    );
+    
+    -- 创建性能优化索引
+    CREATE INDEX IX_UserLoginLogs_UserID ON [dbo].[UserLoginLogs] ([UserID]);
+    CREATE UNIQUE INDEX IX_UserLoginLogs_SessionID ON [dbo].[UserLoginLogs] ([SessionID]);
+    CREATE INDEX IX_UserLoginLogs_LoginTime ON [dbo].[UserLoginLogs] ([LoginTime] DESC);
+    CREATE INDEX IX_UserLoginLogs_IsOnline ON [dbo].[UserLoginLogs] ([IsOnline]) WHERE [IsOnline] = 1;
+    CREATE INDEX IX_UserLoginLogs_LastActivity ON [dbo].[UserLoginLogs] ([LastActivity] DESC);
+    CREATE INDEX IX_UserLoginLogs_UserID_IsOnline ON [dbo].[UserLoginLogs] ([UserID], [IsOnline]);
+    CREATE INDEX IX_UserLoginLogs_DepartmentID ON [dbo].[UserLoginLogs] ([DepartmentID]);
+    CREATE INDEX IX_UserLoginLogs_IPAddress ON [dbo].[UserLoginLogs] ([IPAddress]);
+    
+    -- 添加表注释
+    EXEC sp_addextendedproperty 
+        @name = N'MS_Description', 
+        @value = N'用户登录日志表，记录用户登录、退出和在线状态，支持在线用户管理和行为分析', 
+        @level0type = N'SCHEMA', @level0name = N'dbo', 
+        @level1type = N'TABLE', @level1name = N'UserLoginLogs';
+    
+    PRINT '✅ 用户登录日志表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ 用户登录日志表已存在，跳过创建';
+END
+
+-- =====================================================
 -- 添加系统日志管理菜单和权限
 -- =====================================================
 
@@ -3141,5 +3199,89 @@ BEGIN
 END
 
 PRINT '✅ 系统日志管理菜单和权限配置完成';
+
+-- =====================================================
+-- 添加登录日志管理菜单和权限
+-- =====================================================
+
+-- 添加登录日志管理主菜单
+DECLARE @LoginLogsMenuID INT;
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Menus] WHERE [Name] = '登录日志管理')
+BEGIN
+    INSERT INTO [dbo].[Menus] ([Name], [Path], [Icon], [ParentID], [SortOrder], [IsActive], [CreatedAt])
+    VALUES ('登录日志管理', '/login-logs', 'user-check', NULL, 9, 1, GETDATE());
+    
+    SET @LoginLogsMenuID = SCOPE_IDENTITY();
+    PRINT '✅ 已添加登录日志管理主菜单';
+END
+ELSE
+BEGIN
+    SELECT @LoginLogsMenuID = [ID] FROM [dbo].[Menus] WHERE [Name] = '登录日志管理';
+    PRINT '⚠️ 登录日志管理主菜单已存在';
+END
+
+-- 添加登录日志管理操作按钮
+DECLARE @LoginLogOperations TABLE (
+    [Name] NVARCHAR(50),
+    [Code] NVARCHAR(50),
+    [Description] NVARCHAR(200)
+);
+
+INSERT INTO @LoginLogOperations ([Name], [Code], [Description]) VALUES
+('查看登录日志', 'login_log_view', '查看用户登录日志列表和详情'),
+('在线用户管理', 'online_users_manage', '查看和管理当前在线用户'),
+('强制下线', 'force_logout', '强制指定用户下线'),
+('登录统计', 'login_statistics', '查看登录统计和分析报告'),
+('导出登录日志', 'login_log_export', '导出登录日志数据'),
+('清理登录日志', 'login_log_cleanup', '清理过期的登录日志记录');
+
+-- 插入操作按钮
+INSERT INTO [dbo].[Operations] ([MenuID], [Name], [Code], [Description], [SortOrder], [IsActive], [CreatedAt])
+SELECT 
+    @LoginLogsMenuID,
+    ops.[Name],
+    ops.[Code],
+    ops.[Description],
+    ROW_NUMBER() OVER (ORDER BY ops.[Name]),
+    1,
+    GETDATE()
+FROM @LoginLogOperations ops
+WHERE NOT EXISTS (
+    SELECT 1 FROM [dbo].[Operations] 
+    WHERE [MenuID] = @LoginLogsMenuID AND [Code] = ops.[Code]
+);
+
+PRINT '✅ 已添加登录日志管理操作按钮';
+
+-- 为admin用户授予登录日志管理菜单权限
+IF @AdminUserID IS NOT NULL AND @LoginLogsMenuID IS NOT NULL
+BEGIN
+    -- 授予菜单访问权限
+    INSERT INTO [dbo].[UserMenuPermissions] ([UserID], [MenuID], [CanAccess], [CreatedAt])
+    SELECT @AdminUserID, @LoginLogsMenuID, 1, GETDATE()
+    WHERE NOT EXISTS (
+        SELECT 1 FROM [dbo].[UserMenuPermissions] 
+        WHERE [UserID] = @AdminUserID AND [MenuID] = @LoginLogsMenuID
+    );
+    
+    -- 授予所有操作权限
+    INSERT INTO [dbo].[UserOperationPermissions] ([UserID], [OperationID], [CanAccess], [CreatedAt])
+    SELECT @AdminUserID, [ID], 1, GETDATE()
+    FROM [dbo].[Operations]
+    WHERE [MenuID] = @LoginLogsMenuID
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[UserOperationPermissions] 
+        WHERE [UserID] = @AdminUserID AND [OperationID] = [Operations].[ID]
+    );
+    
+    PRINT '✅ 已为admin用户授予登录日志管理权限';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ 无法为admin用户授予登录日志管理权限：用户或菜单不存在';
+END
+
+PRINT '✅ 登录日志管理菜单和权限配置完成';
 PRINT '🎉 数据库初始化完成！';
 GO

@@ -318,11 +318,19 @@ const buildMenuTree = (menus) => {
 const getDefaultMenus = () => {
   return [
     {
+      ID: 0,
+      Name: '主页',
+      Code: 'home',
+      Path: '/admin/',
+      Icon: 'HomeFilled',
+      Type: 'menu'
+    },
+    {
       ID: 1,
       Name: '仪表盘',
       Code: 'dashboard',
       Path: '/admin/dashboard',
-      Icon: 'HomeFilled',
+      Icon: 'Dashboard',
       Type: 'menu'
     }
   ]

@@ -1011,12 +1011,13 @@ router.post('/init-site-config', authenticateToken, checkPermission('system:conf
   }
 });
 
-// 获取网站配置
-router.get('/site-config', authenticateToken, checkPermission('system:config:view'), async (req, res) => {
+// 获取网站配置（公开接口，不需要认证）
+router.get('/site-config', async (req, res) => {
   try {
     // 默认配置
     const defaultConfig = {
       siteName: '质量数据管理系统',
+      siteDescription: '专业的质量数据管理与分析平台，提供全面的质量控制和数据统计功能',
       companyName: 'DMS质量管理系统',
       logoBase64Img: '/logo.png',
       faviconBase64Img: '/logo.png',
@@ -1029,7 +1030,7 @@ router.get('/site-config', authenticateToken, checkPermission('system:config:vie
       // 从数据库读取配置
       const result = await executeQuery(async (pool) => {
         return await pool.request()
-          .query(`SELECT ConfigKey, ConfigValue FROM SiteConfig WHERE ConfigKey IN ('siteName', 'companyName', 'logoBase64Img', 'faviconBase64Img', 'headerTitle', 'loginTitle', 'footerCopyright')`);
+          .query(`SELECT ConfigKey, ConfigValue FROM SiteConfig WHERE ConfigKey IN ('siteName', 'siteDescription', 'companyName', 'logoBase64Img', 'faviconBase64Img', 'headerTitle', 'loginTitle', 'footerCopyright')`);
       });
       console.log('数据库查询结果:', result);
 
@@ -1077,14 +1078,15 @@ router.get('/site-config', authenticateToken, checkPermission('system:config:vie
 });
 
 // 保存网站配置
-router.put('/site-config', authenticateToken, checkPermission('system:config:edit'), async (req, res) => {
+router.put('/site-config', async (req, res) => {
   try {
-    const { siteName, companyName, logoBase64Img, faviconBase64Img, headerTitle, loginTitle, footerCopyright } = req.body;
+    const { siteName, siteDescription, companyName, logoBase64Img, faviconBase64Img, headerTitle, loginTitle, footerCopyright } = req.body;
 
     try {
       // 配置项映射
       const configItems = [
         { key: 'siteName', value: siteName || '质量数据管理系统' },
+        { key: 'siteDescription', value: siteDescription || '专业的质量数据管理与分析平台，提供全面的质量控制和数据统计功能' },
         { key: 'companyName', value: companyName || 'DMS质量管理系统' },
         { key: 'logoBase64Img', value: logoBase64Img || '/logo.png' },
         { key: 'faviconBase64Img', value: faviconBase64Img || '/logo.png' },
@@ -1116,6 +1118,7 @@ router.put('/site-config', authenticateToken, checkPermission('system:config:edi
             // 插入新配置
             const description = {
               'siteName': '网站名称',
+              'siteDescription': '网站描述信息',
               'companyName': '公司名称',
               'logoBase64Img': '网站LOGO图片BASE64数据',
               'faviconBase64Img': '网站图标BASE64数据',
@@ -1144,6 +1147,7 @@ router.put('/site-config', authenticateToken, checkPermission('system:config:edi
         message: '网站配置保存成功',
         data: {
           siteName: siteName || '质量数据管理系统',
+          siteDescription: siteDescription || '专业的质量数据管理与分析平台，提供全面的质量控制和数据统计功能',
           companyName: companyName || 'DMS质量管理系统',
           logoBase64Img: logoBase64Img || '/logo.png',
           faviconBase64Img: faviconBase64Img || '/logo.png',
@@ -1162,6 +1166,7 @@ router.put('/site-config', authenticateToken, checkPermission('system:config:edi
         message: '网站配置保存成功（临时生效，数据库保存失败）',
         data: {
           siteName: siteName || '质量数据管理系统',
+          siteDescription: siteDescription || '专业的质量数据管理与分析平台，提供全面的质量控制和数据统计功能',
           companyName: companyName || 'DMS质量管理系统',
           logoBase64Img: logoBase64Img || '/logo.png',
           faviconBase64Img: faviconBase64Img || '/logo.png',

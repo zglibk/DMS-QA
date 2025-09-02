@@ -267,7 +267,7 @@ const goAdmin = async () => {
 
   // 权限验证 - 只检查一次
   if (hasAdminPermission.value) {
-    router.push('/admin/dashboard')
+    router.push('/admin')
   } else {
     ElMessage.error('您没有后台访问权限，请联系管理员')
   }
@@ -314,6 +314,24 @@ const logout = async () => {
         type: 'warning'
       }
     )
+    
+    // 调用后端退出登录接口记录日志
+    try {
+      const token = localStorage.getItem('token')
+      if (token) {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({})
+        })
+      }
+    } catch (logoutError) {
+      console.warn('记录退出登录日志失败:', logoutError)
+      // 即使日志记录失败，也继续执行退出登录流程
+    }
     
     userStore.clearUser()
     ElMessage.success('已退出登录')

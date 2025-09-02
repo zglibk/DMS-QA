@@ -98,13 +98,13 @@
               <el-table-column prop="logoutTime" label="登出时间" width="140" show-overflow-tooltip />
               <el-table-column prop="loginDevice" label="登录设备" width="150" show-overflow-tooltip />
               <el-table-column prop="sessionDuration" label="会话时长" width="100" align="center" />
-              <el-table-column prop="status" label="状态" width="80" align="center">
+              <el-table-column prop="loginStatus" label="登录状态" width="100" align="center">
                 <template #default="scope">
                   <el-tag 
-                    :type="getLoginStatusType(scope.row.status)" 
+                    :type="getLoginStatusType(scope.row.loginStatus)" 
                     size="small"
                   >
-                    {{ getLoginStatusText(scope.row.status) }}
+                    {{ getLoginStatusText(scope.row.loginStatus) }}
                   </el-tag>
                 </template>
               </el-table-column>
@@ -631,6 +631,8 @@ const formatNoticeTime = (dateStr) => {
  */
 const getLoginStatusType = (status) => {
   const statusMap = {
+    '成功': 'success',
+    '失败': 'danger',
     'online': 'success',
     'offline': 'info',
     'timeout': 'warning',
@@ -646,6 +648,8 @@ const getLoginStatusType = (status) => {
  */
 const getLoginStatusText = (status) => {
   const statusMap = {
+    '成功': '登录成功',
+    '失败': '登录失败',
     'online': '在线',
     'offline': '离线',
     'timeout': '超时',

@@ -30,6 +30,14 @@
                 </el-form-item>
               </el-col>
             </el-row>
+            <el-form-item label="网站描述">
+              <el-input 
+                v-model="config.siteDescription" 
+                type="textarea" 
+                :rows="3" 
+                placeholder="请输入网站描述信息，用于介绍网站的主要功能和特色" 
+              />
+            </el-form-item>
             <el-row :gutter="20">
               <el-col :span="12">
                 <el-form-item label="页面头部标题">
@@ -158,7 +166,7 @@
 import { ref, reactive, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Picture, Upload, Check, RefreshLeft, Refresh } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/utils/api'
 
 // 响应式数据
 const isLoading = ref(false)
@@ -170,6 +178,7 @@ const imageRefreshKey = ref(0) // 用于强制刷新图片
 // 配置数据
 const config = reactive({
   siteName: '质量数据管理系统',
+  siteDescription: '专业的质量数据管理与分析平台，提供全面的质量控制和数据统计功能',
   companyName: 'DMS质量管理系统',
   logoBase64Img: '',
   faviconBase64Img: '',
@@ -182,7 +191,7 @@ const config = reactive({
 const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
-    const response = await axios.get('/config/site-config')
+    const response = await api.get('/config/site-config')
     if (response.data.success) {
       const data = response.data.data
       Object.assign(config, data)
@@ -204,7 +213,7 @@ const loadConfig = async (showMessage = false) => {
 const saveConfig = async () => {
   isSubmitting.value = true
   try {
-    const response = await axios.put('/config/site-config', config)
+    const response = await api.put('/config/site-config', config)
 
     if (response.data.success) {
       ElMessage.success('网站配置保存成功')
@@ -233,6 +242,7 @@ const saveConfig = async () => {
 const resetConfig = () => {
   Object.assign(config, {
     siteName: '质量数据管理系统',
+    siteDescription: '专业的质量数据管理与分析平台，提供全面的质量控制和数据统计功能',
     companyName: 'DMS质量管理系统',
     logoBase64Img: '',
     faviconBase64Img: '',
@@ -361,7 +371,9 @@ const uploadFavicon = async (options) => {
 
 // 图片加载错误处理
 const handleImageError = (event) => {
-  event.target.style.display = 'none' // 隐藏加载失败的图片
+  console.log('图片加载失败:', event.target.src)
+  // 不隐藏图片，而是显示一个占位符
+  event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMTIwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjRjVGNUY1Ii8+CjxwYXRoIGQ9Ik02MCA0MEw3MCA1MEg1MEw2MCA0MFoiIGZpbGw9IiNEQ0RGRTYiLz4KPHN2Zz4K'
 }
 
 // 组件挂载时加载配置
