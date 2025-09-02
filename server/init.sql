@@ -2991,5 +2991,155 @@ BEGIN
 END
 
 PRINT '✅ 通知公告管理菜单和权限配置完成';
+
+-- =====================================================
+-- 系统日志表 (SystemLogs)
+-- 功能：记录系统操作日志，支持审计和监控
+-- =====================================================
+
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[SystemLogs]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[SystemLogs] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,                    -- 主键，自增ID
+        [UserID] INT NULL,                                     -- 用户ID（关联User表，允许NULL用于匿名操作）
+        [Action] NVARCHAR(100) NOT NULL,                       -- 操作动作描述
+        [Details] NVARCHAR(1000) NULL,                        -- 详细信息
+        [Category] NVARCHAR(50) NULL,                          -- 日志分类（AUTH、USER_MGMT、DATA_OP等）
+        [Module] NVARCHAR(50) NULL,                            -- 所属模块（USER、ROLE、PERMISSION等）
+        [ResourceType] NVARCHAR(50) NULL,                      -- 资源类型
+        [ResourceID] NVARCHAR(100) NULL,                       -- 资源ID
+        [OperationType] NVARCHAR(20) NULL,                     -- 操作类型（CREATE、READ、UPDATE、DELETE等）
+        [Severity] NVARCHAR(20) DEFAULT 'INFO',                -- 严重级别（DEBUG、INFO、WARN、ERROR、FATAL）
+        [Duration] INT NULL,                                   -- 操作耗时（毫秒）
+        [RequestData] NVARCHAR(MAX) NULL,                      -- 请求数据（JSON格式）
+        [ResponseData] NVARCHAR(MAX) NULL,                     -- 响应数据（JSON格式）
+        [SessionID] NVARCHAR(100) NULL,                        -- 会话ID
+        [TraceID] NVARCHAR(100) NULL,                          -- 链路追踪ID
+        [IPAddress] NVARCHAR(45) NULL,                         -- IP地址（支持IPv6）
+        [UserAgent] NVARCHAR(500) NULL,                        -- 用户代理字符串
+        [Status] NVARCHAR(20) DEFAULT 'SUCCESS',               -- 状态（SUCCESS、ERROR、FAILED等）
+        [ErrorMessage] NVARCHAR(1000) NULL,                    -- 错误信息
+        [IsAnonymous] BIT DEFAULT 0,                           -- 是否匿名操作
+        [CreatedAt] DATETIME NOT NULL DEFAULT GETDATE(),       -- 创建时间
+        
+        -- 外键约束
+        CONSTRAINT FK_SystemLogs_User 
+            FOREIGN KEY ([UserID]) REFERENCES [dbo].[User]([ID]) ON DELETE SET NULL
+    );
+    
+    -- 创建性能优化索引
+    CREATE INDEX IX_SystemLogs_UserID ON [dbo].[SystemLogs] ([UserID]);
+    CREATE INDEX IX_SystemLogs_CreatedAt ON [dbo].[SystemLogs] ([CreatedAt]);
+    CREATE INDEX IX_SystemLogs_Category ON [dbo].[SystemLogs] ([Category]);
+    CREATE INDEX IX_SystemLogs_Module ON [dbo].[SystemLogs] ([Module]);
+    CREATE INDEX IX_SystemLogs_Severity ON [dbo].[SystemLogs] ([Severity]);
+    CREATE INDEX IX_SystemLogs_OperationType ON [dbo].[SystemLogs] ([OperationType]);
+    CREATE INDEX IX_SystemLogs_Status ON [dbo].[SystemLogs] ([Status]);
+    CREATE INDEX IX_SystemLogs_ResourceType_ResourceID ON [dbo].[SystemLogs] ([ResourceType], [ResourceID]);
+    CREATE INDEX IX_SystemLogs_SessionID ON [dbo].[SystemLogs] ([SessionID]);
+    CREATE INDEX IX_SystemLogs_TraceID ON [dbo].[SystemLogs] ([TraceID]);
+    CREATE INDEX IX_SystemLogs_IPAddress ON [dbo].[SystemLogs] ([IPAddress]);
+    
+    -- 添加表注释
+    EXEC sp_addextendedproperty 
+        @name = N'MS_Description', 
+        @value = N'系统日志表，记录所有系统操作和事件，支持审计追踪和安全监控', 
+        @level0type = N'SCHEMA', @level0name = N'dbo', 
+        @level1type = N'TABLE', @level1name = N'SystemLogs';
+    
+    PRINT '✅ 系统日志表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ 系统日志表已存在，跳过创建';
+END
+
+-- =====================================================
+-- 添加系统日志管理菜单和权限
+-- =====================================================
+
+-- 添加系统日志管理主菜单
+DECLARE @SystemLogsMenuID INT;
+DECLARE @AdminUserID INT;
+
+-- 获取admin用户ID
+SELECT @AdminUserID = [ID] FROM [dbo].[User] WHERE [Username] = 'admin';
+
+IF NOT EXISTS (SELECT 1 FROM [dbo].[Menus] WHERE [Name] = '系统日志管理')
+BEGIN
+    INSERT INTO [dbo].[Menus] ([Name], [Path], [Icon], [ParentID], [SortOrder], [IsActive], [CreatedAt])
+    VALUES ('系统日志管理', '/system-logs', 'file-text', NULL, 8, 1, GETDATE());
+    
+    SET @SystemLogsMenuID = SCOPE_IDENTITY();
+    PRINT '✅ 已添加系统日志管理主菜单';
+END
+ELSE
+BEGIN
+    SELECT @SystemLogsMenuID = [ID] FROM [dbo].[Menus] WHERE [Name] = '系统日志管理';
+    PRINT '⚠️ 系统日志管理主菜单已存在';
+END
+
+-- 添加系统日志管理操作按钮
+DECLARE @LogOperations TABLE (
+    [Name] NVARCHAR(50),
+    [Code] NVARCHAR(50),
+    [Description] NVARCHAR(200)
+);
+
+INSERT INTO @LogOperations ([Name], [Code], [Description]) VALUES
+('查看日志', 'log_view', '查看系统日志列表和详情'),
+('导出日志', 'log_export', '导出系统日志数据'),
+('删除日志', 'log_delete', '删除系统日志记录'),
+('清理日志', 'log_cleanup', '批量清理过期日志'),
+('日志统计', 'log_statistics', '查看日志统计分析'),
+('日志配置', 'log_config', '配置日志记录和清理规则');
+
+-- 插入操作按钮
+INSERT INTO [dbo].[Operations] ([MenuID], [Name], [Code], [Description], [SortOrder], [IsActive], [CreatedAt])
+SELECT 
+    @SystemLogsMenuID,
+    ops.[Name],
+    ops.[Code],
+    ops.[Description],
+    ROW_NUMBER() OVER (ORDER BY ops.[Name]),
+    1,
+    GETDATE()
+FROM @LogOperations ops
+WHERE NOT EXISTS (
+    SELECT 1 FROM [dbo].[Operations] 
+    WHERE [MenuID] = @SystemLogsMenuID AND [Code] = ops.[Code]
+);
+
+PRINT '✅ 已添加系统日志管理操作按钮';
+
+-- 为admin用户授予系统日志管理菜单权限
+IF @AdminUserID IS NOT NULL AND @SystemLogsMenuID IS NOT NULL
+BEGIN
+    -- 授予菜单访问权限
+    INSERT INTO [dbo].[UserMenuPermissions] ([UserID], [MenuID], [CanAccess], [CreatedAt])
+    SELECT @AdminUserID, @SystemLogsMenuID, 1, GETDATE()
+    WHERE NOT EXISTS (
+        SELECT 1 FROM [dbo].[UserMenuPermissions] 
+        WHERE [UserID] = @AdminUserID AND [MenuID] = @SystemLogsMenuID
+    );
+    
+    -- 授予所有操作权限
+    INSERT INTO [dbo].[UserOperationPermissions] ([UserID], [OperationID], [CanAccess], [CreatedAt])
+    SELECT @AdminUserID, [ID], 1, GETDATE()
+    FROM [dbo].[Operations]
+    WHERE [MenuID] = @SystemLogsMenuID
+    AND NOT EXISTS (
+        SELECT 1 FROM [dbo].[UserOperationPermissions] 
+        WHERE [UserID] = @AdminUserID AND [OperationID] = [Operations].[ID]
+    );
+    
+    PRINT '✅ 已为admin用户授予系统日志管理权限';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ 无法为admin用户授予系统日志管理权限：用户或菜单不存在';
+END
+
+PRINT '✅ 系统日志管理菜单和权限配置完成';
 PRINT '🎉 数据库初始化完成！';
 GO

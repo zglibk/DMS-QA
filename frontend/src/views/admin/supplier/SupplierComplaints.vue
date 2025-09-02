@@ -1376,6 +1376,40 @@ const exportToExcel = async (data, selectedFields) => {
   // 导出文件
   const buffer = await workbook.xlsx.writeBuffer()
   const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+  
+  // 检查浏览器是否支持 File System Access API
+  if ('showSaveFilePicker' in window) {
+    try {
+      // 使用现代浏览器的文件保存API，让用户选择保存位置
+      const fileHandle = await window.showSaveFilePicker({
+        suggestedName: fileName,
+        types: [{
+          description: 'Excel文件',
+          accept: {
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
+          }
+        }]
+      })
+      
+      const writable = await fileHandle.createWritable()
+      await writable.write(blob)
+      await writable.close()
+      
+      ElMessage.success('文件保存成功')
+      return
+    } catch (saveError) {
+      // 用户取消保存或其他错误，回退到传统下载方式
+      if (saveError.name !== 'AbortError') {
+        console.warn('使用文件保存API失败，回退到传统下载:', saveError)
+      } else {
+        ElMessage.info('用户取消了文件保存')
+        return
+      }
+    }
+  }
+  
+  // 回退方案：传统的下载方式（直接下载到默认目录）
+  ElMessage.info('文件将下载到浏览器默认下载目录')
   saveAs(blob, fileName)
 }
 

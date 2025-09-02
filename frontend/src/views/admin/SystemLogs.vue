@@ -100,36 +100,56 @@
 
     <!-- 统计信息 -->
     <div class="stats-section">
-      <el-row :gutter="20">
+      <el-row :gutter="30">
         <el-col :span="6">
-          <el-card class="stats-card">
+          <el-card class="stats-card stats-card-primary">
             <div class="stats-item">
-              <div class="stats-value">{{ totalLogs }}</div>
-              <div class="stats-label">总日志数</div>
+              <div class="stats-icon">
+                <el-icon><Document /></el-icon>
+              </div>
+              <div class="stats-content">
+                <div class="stats-value">{{ totalLogs }}</div>
+                <div class="stats-label">总日志数</div>
+              </div>
             </div>
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stats-card">
+          <el-card class="stats-card stats-card-danger">
             <div class="stats-item">
-              <div class="stats-value error">{{ errorCount }}</div>
-              <div class="stats-label">错误日志</div>
+              <div class="stats-icon">
+                <el-icon><Warning /></el-icon>
+              </div>
+              <div class="stats-content">
+                <div class="stats-value">{{ errorCount }}</div>
+                <div class="stats-label">错误日志</div>
+              </div>
             </div>
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stats-card">
+          <el-card class="stats-card stats-card-warning">
             <div class="stats-item">
-              <div class="stats-value warning">{{ warningCount }}</div>
-              <div class="stats-label">警告日志</div>
+              <div class="stats-icon">
+                <el-icon><InfoFilled /></el-icon>
+              </div>
+              <div class="stats-content">
+                <div class="stats-value">{{ warningCount }}</div>
+                <div class="stats-label">警告日志</div>
+              </div>
             </div>
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stats-card">
+          <el-card class="stats-card stats-card-success">
             <div class="stats-item">
-              <div class="stats-value">{{ uniqueUsers }}</div>
-              <div class="stats-label">活跃用户</div>
+              <div class="stats-icon">
+                <el-icon><User /></el-icon>
+              </div>
+              <div class="stats-content">
+                <div class="stats-value">{{ uniqueUsers }}</div>
+                <div class="stats-label">活跃用户</div>
+              </div>
             </div>
           </el-card>
         </el-col>
@@ -138,22 +158,9 @@
 
     <!-- 操作按钮区域 -->
     <div class="action-section">
-      <el-button type="success" @click="showExportDialog" :loading="exportLoading">
-        <el-icon><Download /></el-icon>
-        <span class="button-text">导出日志</span>
-      </el-button>
-      <el-button type="warning" @click="showCleanupDialog">
-        <el-icon><Delete /></el-icon>
-        <span class="button-text">清理日志</span>
-      </el-button>
-      <el-button type="info" @click="showStatsDialog">
-        <el-icon><DataAnalysis /></el-icon>
-        <span class="button-text">统计分析</span>
-      </el-button>
-      <el-button @click="handleRefresh" :loading="loading">
-        <el-icon><Refresh /></el-icon>
-        <span class="button-text">刷新</span>
-      </el-button>
+      <el-button type="success" @click="showExportDialog" :loading="exportLoading"><el-icon style="margin-right: 3px;"><Download /></el-icon>导出日志</el-button>
+      <el-button type="danger" @click="showCleanupDialog"><el-icon style="margin-right: 3px;"><Delete /></el-icon>清理日志</el-button>
+      <el-button type="primary" plain @click="handleRefresh" :loading="loading"><el-icon style="margin-right: 3px;"><Refresh /></el-icon>刷新</el-button>
     </div>
 
     <!-- 日志列表 -->
@@ -382,54 +389,67 @@
       </template>
     </el-dialog>
 
-    <!-- 统计分析对话框 -->
-    <el-dialog
-      v-model="statsDialogVisible"
-      title="统计分析"
-      width="80%"
-    >
-      <div class="stats-content">
-        <!-- 这里可以添加图表组件 -->
-        <p>统计分析功能开发中...</p>
-      </div>
-    </el-dialog>
-
     <!-- 导出对话框 -->
     <el-dialog
       v-model="exportDialogVisible"
       title="导出日志"
-      width="600px"
+      width="720px"
+      class="export-dialog"
     >
-      <el-form :model="exportForm" label-width="100px">
+      <el-form :model="exportForm" label-width="80px">
+        <!-- 导出格式选择 -->
         <el-form-item label="导出格式">
-          <el-radio-group v-model="exportForm.format">
+          <el-radio-group v-model="exportForm.format" class="format-radio-group">
             <el-radio
               v-for="format in exportFormats"
               :key="format.value"
               :label="format.value"
+              class="format-radio"
             >
               {{ format.label }}
             </el-radio>
           </el-radio-group>
         </el-form-item>
         
-        <el-form-item label="导出字段">
-          <el-checkbox-group v-model="exportForm.columns">
-            <div class="checkbox-grid">
-              <el-checkbox
-                v-for="(label, key) in availableColumns"
-                :key="key"
-                :label="key"
-                class="checkbox-item"
-              >
-                {{ label }}
-              </el-checkbox>
+        <!-- 导出字段选择 -->
+        <el-form-item label="导出字段" class="export-fields-item">
+          <div class="fields-selection-container">
+            <!-- 快捷操作按钮和统计信息 -->
+            <div class="field-header">
+              <div class="field-actions">
+                <el-button size="small" type="primary" plain @click="selectAllColumns">
+                  <el-icon><Check /></el-icon>
+                  全选
+                </el-button>
+                <el-button size="small" type="info" plain @click="clearAllColumns">
+                  <el-icon><Close /></el-icon>
+                  清空
+                </el-button>
+                <el-button size="small" type="success" plain @click="selectDefaultColumns">
+                  <el-icon><Star /></el-icon>
+                  默认
+                </el-button>
+              </div>
+              <div class="selected-count">
+                <el-tag type="info" size="small">
+                  已选择 {{ exportForm.columns.length }} / {{ Object.keys(availableColumns).length }} 个字段
+                </el-tag>
+              </div>
             </div>
-          </el-checkbox-group>
-          <div class="form-tip">
-            <el-button size="small" type="text" @click="selectAllColumns">全选</el-button>
-            <el-button size="small" type="text" @click="clearAllColumns">清空</el-button>
-            <el-button size="small" type="text" @click="selectDefaultColumns">默认</el-button>
+            
+            <!-- 字段选择区域 -->
+            <el-checkbox-group v-model="exportForm.columns" class="fields-checkbox-group">
+              <div class="fields-grid">
+                <el-checkbox
+                  v-for="(label, key) in availableColumns"
+                  :key="key"
+                  :label="key"
+                  class="field-checkbox"
+                >
+                  <span class="field-label" :title="label">{{ label }}</span>
+                </el-checkbox>
+              </div>
+            </el-checkbox-group>
           </div>
         </el-form-item>
         
@@ -439,9 +459,9 @@
             :min="100"
             :max="50000"
             :step="1000"
-            style="width: 200px"
+            style="max-width: 130px"
           />
-          <div class="form-tip">建议不超过50000行，避免文件过大</div>
+          <el-tag type="danger" size="small" class="form-tip">建议不超过 50,000 行，避免文件过大</el-tag>
         </el-form-item>
         
         <el-form-item label="当前筛选">
@@ -472,10 +492,21 @@
         </el-form-item>
       </el-form>
       
+      <!-- 导出状态提示 -->
+      <div v-if="exportLoading" class="export-loading">
+        <el-icon class="is-loading"><Loading /></el-icon>
+        <span class="loading-text">正在生成Excel文件，请稍候...</span>
+      </div>
+      
       <template #footer>
-        <el-button @click="exportDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="handleExport" :loading="exportLoading">
-          确认导出
+        <el-button @click="exportDialogVisible = false" :disabled="exportLoading">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="handleExport" 
+          :loading="exportLoading"
+          :disabled="exportLoading"
+        >
+          {{ exportLoading ? '导出中...' : '确认导出' }}
         </el-button>
       </template>
     </el-dialog>
@@ -485,7 +516,7 @@
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Refresh, Download, Delete, DataAnalysis, View, TrendCharts } from '@element-plus/icons-vue'
+import { Search, Refresh, Download, Delete, View, TrendCharts, Check, Close, Star, Document, Warning, InfoFilled, User, Loading } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
 
@@ -496,9 +527,16 @@ export default {
     Refresh,
     Download,
     Delete,
-    DataAnalysis,
     View,
-    TrendCharts
+    TrendCharts,
+    Check,
+    Close,
+    Star,
+    Document,
+    Warning,
+    InfoFilled,
+    User,
+    Loading
   },
   setup() {
     // 路由
@@ -515,7 +553,7 @@ export default {
     const dateRange = ref([])
     const detailDialogVisible = ref(false)
     const cleanupDialogVisible = ref(false)
-    const statsDialogVisible = ref(false)
+
     const currentLog = ref(null)
     
     // 统计数据
@@ -797,10 +835,7 @@ export default {
       cleanupDialogVisible.value = true
     }
     
-    // 显示统计对话框
-    const showStatsDialog = () => {
-      statsDialogVisible.value = true
-    }
+
     
     // 处理清理
     const handleCleanup = async () => {
@@ -874,56 +909,275 @@ export default {
     }
     
     // 处理导出
+
+    
+
+    
+    /**
+     * 直接导出系统日志到Excel文件
+     * 参考样品承认书管理页面的实现方式
+     */
     const handleExport = async () => {
+      console.log('🚀 [前端调试] handleExport 函数被调用')
+      console.log('📋 [前端调试] 选中的字段:', exportForm.columns)
+      
       if (exportForm.columns.length === 0) {
+        console.warn('⚠️ [前端调试] 未选择导出字段')
         ElMessage.warning('请选择要导出的字段')
         return
       }
       
-      exportLoading.value = true
       try {
-        const exportData = {
-          format: exportForm.format,
-          filters: {
-            ...searchForm
-          },
-          columns: exportForm.columns,
-          maxRows: exportForm.maxRows
+        console.log('🔄 [前端调试] 开始导出流程')
+        exportLoading.value = true
+        ElMessage.info('正在导出数据，请稍候...')
+        
+        // 构建查询参数，严格遵循对话框设置
+        const params = {
+          page: 1,
+          pageSize: exportForm.maxRows, // 严格使用用户设置的最大行数
+          keyword: searchForm.keyword,
+          category: searchForm.category,
+          module: searchForm.module,
+          severity: searchForm.severity,
+          userID: searchForm.userID,
+          startDate: searchForm.startDate,
+          endDate: searchForm.endDate
         }
         
-        const response = await axios.post('/api/log-export/export', exportData, {
-          responseType: 'blob'
+        console.log('⚙️ [前端调试] 导出设置:', {
+          format: exportForm.format,
+          maxRows: exportForm.maxRows,
+          selectedColumns: exportForm.columns.length,
+          columns: exportForm.columns
         })
         
-        // 创建下载链接
-        const blob = new Blob([response.data])
-        const url = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = url
+        console.log('📤 [前端调试] 准备发送导出请求:', params)
         
-        // 从响应头获取文件名
-        const contentDisposition = response.headers['content-disposition']
-        let fileName = '系统日志.xlsx'
-        if (contentDisposition) {
-          const fileNameMatch = contentDisposition.match(/filename[^;=\n]*=(['"]?)([^'"\n]*?)\1/)
-          if (fileNameMatch && fileNameMatch[2]) {
-            fileName = decodeURIComponent(fileNameMatch[2])
+        // 获取数据
+        const response = await axios.get('/system-logs/list', { params })
+        console.log('✅ [前端调试] 数据获取响应:', response.data)
+        
+        if (response.data.success && response.data.data) {
+          const allData = response.data.data.list
+          
+          if (allData.length === 0) {
+            ElMessage.warning('没有符合条件的数据可导出')
+            return
           }
+          
+          // 验证数据行数是否超过设置的最大行数
+          if (allData.length > exportForm.maxRows) {
+            console.warn('⚠️ [前端调试] 数据行数超过最大限制:', allData.length, '>', exportForm.maxRows)
+            ElMessage.warning(`数据行数(${allData.length})超过设置的最大行数(${exportForm.maxRows})，将只导出前${exportForm.maxRows}行`)
+          }
+          
+          // 严格按照最大行数限制数据
+          const limitedData = allData.slice(0, exportForm.maxRows)
+          console.log('📊 [前端调试] 实际导出数据条数:', limitedData.length, '/ 获取到:', allData.length)
+          
+          // 动态导入XLSX库和样式库
+          const XLSX = await import('xlsx-js-style')
+          const { saveAs } = await import('file-saver')
+          
+          console.log('📚 [前端调试] XLSX库加载完成')
+          
+          // 准备导出数据，使用限制后的数据
+          const exportData = limitedData.map((item, index) => {
+            const row = { '序号': index + 1 }
+            
+            // 根据选中的字段添加数据
+            exportForm.columns.forEach(column => {
+              switch (column) {
+                case 'ID':
+                  row['日志ID'] = item.ID
+                  break
+                case 'CreatedAt':
+                  row['创建时间'] = formatDateTime(item.CreatedAt)
+                  break
+                case 'Username':
+                  row['用户'] = item.Username || '系统'
+                  break
+                case 'Action':
+                  row['操作'] = item.Action
+                  break
+                case 'Details':
+                  row['详情'] = item.Details
+                  break
+                case 'Category':
+                  row['分类'] = getCategoryLabel(item.Category)
+                  break
+                case 'Module':
+                  row['模块'] = getModuleLabel(item.Module)
+                  break
+                case 'Severity':
+                  row['级别'] = item.Severity
+                  break
+                case 'Status':
+                  row['状态'] = item.Status === 'SUCCESS' ? '成功' : '失败'
+                  break
+                case 'Duration':
+                  row['耗时'] = item.Duration ? item.Duration + 'ms' : '-'
+                  break
+                case 'IPAddress':
+                  row['IP地址'] = item.IPAddress || '-'
+                  break
+                case 'UserAgent':
+                  row['用户代理'] = item.UserAgent || '-'
+                  break
+              }
+            })
+            
+            return row
+          })
+          
+          console.log('📋 [前端调试] 导出数据准备完成，行数:', exportData.length)
+          console.log('📋 [前端调试] 导出格式:', exportForm.format)
+          
+          // 创建工作簿和工作表
+          const workbook = XLSX.utils.book_new()
+          const worksheet = XLSX.utils.json_to_sheet(exportData)
+          
+          // 设置列宽
+          const columnWidths = []
+          const headers = Object.keys(exportData[0] || {})
+          headers.forEach(header => {
+            switch (header) {
+              case '序号':
+              case '日志ID':
+                columnWidths.push({ wch: 8 })
+                break
+              case '创建时间':
+                columnWidths.push({ wch: 20 })
+                break
+              case '用户':
+              case '操作':
+              case '分类':
+              case '模块':
+              case '级别':
+              case '状态':
+                columnWidths.push({ wch: 12 })
+                break
+              case '详情':
+                columnWidths.push({ wch: 40 })
+                break
+              case 'IP地址':
+                columnWidths.push({ wch: 15 })
+                break
+              case '用户代理':
+                columnWidths.push({ wch: 30 })
+                break
+              default:
+                columnWidths.push({ wch: 15 })
+            }
+          })
+          worksheet['!cols'] = columnWidths
+          
+          // 设置表格样式
+          const range = XLSX.utils.decode_range(worksheet['!ref'])
+          
+          // 定义样式
+          const headerStyle = {
+            font: { bold: true, sz: 11, color: { rgb: '000000' } },
+            fill: { fgColor: { rgb: 'D9D9D9' } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: {
+              top: { style: 'thin', color: { rgb: '808080' } },
+              bottom: { style: 'thin', color: { rgb: '808080' } },
+              left: { style: 'thin', color: { rgb: '808080' } },
+              right: { style: 'thin', color: { rgb: '808080' } }
+            }
+          }
+          
+          const dataStyle = {
+            font: { sz: 10, color: { rgb: '000000' } },
+            alignment: { horizontal: 'center', vertical: 'center' },
+            border: {
+              top: { style: 'thin', color: { rgb: '808080' } },
+              bottom: { style: 'thin', color: { rgb: '808080' } },
+              left: { style: 'thin', color: { rgb: '808080' } },
+              right: { style: 'thin', color: { rgb: '808080' } }
+            }
+          }
+          
+          const dataStyleLeft = {
+            ...dataStyle,
+            alignment: { horizontal: 'left', vertical: 'center' }
+          }
+          
+          // 应用样式到单元格
+          for (let R = range.s.r; R <= range.e.r; ++R) {
+            for (let C = range.s.c; C <= range.e.c; ++C) {
+              const cellAddress = XLSX.utils.encode_cell({ r: R, c: C })
+              if (!worksheet[cellAddress]) continue
+              
+              if (R === 0) {
+                // 表头行样式
+                worksheet[cellAddress].s = headerStyle
+              } else {
+                // 数据行样式
+                const header = headers[C]
+                if (header === '详情' || header === '用户代理') {
+                  worksheet[cellAddress].s = dataStyleLeft
+                } else {
+                  worksheet[cellAddress].s = dataStyle
+                }
+                
+                // 交替行背景色
+                if (R % 2 === 0) {
+                  worksheet[cellAddress].s = {
+                    ...worksheet[cellAddress].s,
+                    fill: { fgColor: { rgb: 'F8F9FA' } }
+                  }
+                }
+              }
+            }
+          }
+          
+          // 添加工作表到工作簿
+          XLSX.utils.book_append_sheet(workbook, worksheet, '系统日志')
+          
+          // 生成文件名
+          const now = new Date()
+          const year = now.getFullYear().toString().slice(-2)
+          const month = (now.getMonth() + 1).toString().padStart(2, '0')
+          const day = now.getDate().toString().padStart(2, '0')
+          const hours = now.getHours().toString().padStart(2, '0')
+          const minutes = now.getMinutes().toString().padStart(2, '0')
+          const seconds = now.getSeconds().toString().padStart(2, '0')
+          
+          const dateStr = `${year}${month}${day}`
+          const timeStr = `${hours}${minutes}${seconds}`
+          const fileName = `系统日志_${dateStr}_${timeStr}.xlsx`
+          
+          console.log('💾 [前端调试] 准备生成文件:', fileName)
+          
+          // 使用浏览器下载方式（直接下载到默认目录）
+          console.log('📥 [前端调试] 使用浏览器下载方式')
+          const wbout = XLSX.write(workbook, { bookType: exportForm.format === 'excel' ? 'xlsx' : 'xlsx', type: 'array' })
+          const blob = new Blob([wbout], { type: 'application/octet-stream' })
+          saveAs(blob, fileName)
+          
+          ElMessage.success(`导出成功！共导出 ${limitedData.length} 条记录`)
+          exportDialogVisible.value = false
+          
+        } else {
+          console.error('❌ [前端调试] 后端返回数据格式异常:', response.data)
+          ElMessage.error('后端返回数据格式异常')
         }
         
-        link.download = fileName
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(url)
-        
-        ElMessage.success('导出成功')
-        exportDialogVisible.value = false
-        
       } catch (error) {
-        console.error('导出失败:', error)
-        ElMessage.error('导出失败')
+        console.error('❌ [前端调试] 导出失败:', error)
+        console.error('❌ [前端调试] 错误详情:', {
+          message: error.message,
+          status: error.response?.status,
+          statusText: error.response?.statusText,
+          data: error.response?.data,
+          config: error.config
+        })
+        ElMessage.error(`导出失败: ${error.message || '未知错误'}`)
       } finally {
+        console.log('🏁 [前端调试] 导出流程结束，设置loading为false')
         exportLoading.value = false
       }
     }
@@ -979,7 +1233,6 @@ export default {
       dateRange,
       detailDialogVisible,
       cleanupDialogVisible,
-      statsDialogVisible,
       exportDialogVisible,
       currentLog,
       totalLogs,
@@ -1011,7 +1264,6 @@ export default {
       viewLogDetail,
       handleDetailDialogClose,
       showCleanupDialog,
-      showStatsDialog,
       showExportDialog,
       handleCleanup,
       handleExport,
@@ -1056,36 +1308,129 @@ export default {
   gap: 10px;
 }
 
+/* 统计卡片样式 */
 .stats-section {
   margin-bottom: 20px;
 }
 
 .stats-card {
-  text-align: center;
+  position: relative;
+  overflow: hidden;
+  border: none;
+  border-radius: 10px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+  max-height: 140px;
+}
+
+.stats-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.15);
+}
+
+.stats-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+}
+
+/* 不同类型卡片的渐变背景 */
+.stats-card-primary {
+  background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+}
+
+.stats-card-primary::before {
+  background: linear-gradient(90deg, #409EFF, #2196F3);
+}
+
+.stats-card-danger {
+  background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+}
+
+.stats-card-danger::before {
+  background: linear-gradient(90deg, #F56C6C, #e53935);
+}
+
+.stats-card-warning {
+  background: linear-gradient(135deg, #fff8e1 0%, #ffecb3 100%);
+}
+
+.stats-card-warning::before {
+  background: linear-gradient(90deg, #E6A23C, #ff9800);
+}
+
+.stats-card-success {
+  background: linear-gradient(135deg, #e8f5e8 0%, #c8e6c9 100%);
+}
+
+.stats-card-success::before {
+  background: linear-gradient(90deg, #67C23A, #4caf50);
 }
 
 .stats-item {
-  padding: 10px;
+  display: flex;
+  align-items: center;
+  padding: 2px 20px;
+  gap: 12px;
+  min-height: 60px;
+}
+
+.stats-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  color: white;
+  flex-shrink: 0;
+}
+
+.stats-card-primary .stats-icon {
+  background: linear-gradient(135deg, #409EFF, #2196F3);
+  box-shadow: 0 4px 15px rgba(64, 158, 255, 0.3);
+}
+
+.stats-card-danger .stats-icon {
+  background: linear-gradient(135deg, #F56C6C, #e53935);
+  box-shadow: 0 4px 15px rgba(245, 108, 108, 0.3);
+}
+
+.stats-card-warning .stats-icon {
+  background: linear-gradient(135deg, #E6A23C, #ff9800);
+  box-shadow: 0 4px 15px rgba(230, 162, 60, 0.3);
+}
+
+.stats-card-success .stats-icon {
+  background: linear-gradient(135deg, #67C23A, #4caf50);
+  box-shadow: 0 4px 15px rgba(103, 194, 58, 0.3);
+}
+
+.stats-content {
+  flex: 1;
+  text-align: left;
 }
 
 .stats-value {
-  font-size: 24px;
-  font-weight: bold;
-  color: #409EFF;
+  font-size: 28px;
+  font-weight: 700;
+  color: #2c3e50;
   margin-bottom: 5px;
-}
-
-.stats-value.error {
-  color: #F56C6C;
-}
-
-.stats-value.warning {
-  color: #E6A23C;
+  line-height: 1;
 }
 
 .stats-label {
   font-size: 14px;
-  color: #909399;
+  color: #7f8c8d;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .action-section {
@@ -1137,8 +1482,9 @@ export default {
 
 .form-tip {
   font-size: 12px;
-  color: #909399;
-  margin-top: 5px;
+  margin-top: 8px;
+  margin-bottom: 12px;
+  margin-left: 8px;
 }
 
 .stats-content {
@@ -1147,15 +1493,122 @@ export default {
   color: #909399;
 }
 
-.checkbox-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 10px;
-  margin-bottom: 10px;
+/* 导出对话框样式优化 */
+.export-dialog {
+  .el-dialog__body {
+    padding: 20px 25px;
+  }
 }
 
-.checkbox-item {
+/* 导出格式选择样式 */
+.format-radio-group {
+  display: flex;
+  gap: 20px;
+  
+  .format-radio {
+    margin-right: 0;
+    
+    :deep(.el-radio__label) {
+      font-weight: 500;
+    }
+  }
+}
+
+/* 导出字段选择容器 */
+.export-fields-item {
+  :deep(.el-form-item__content) {
+    line-height: normal;
+  }
+}
+
+.fields-selection-container {
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  padding: 16px;
+  background-color: #fafafa;
+  width: 100%;
+  max-width: 720px;
+}
+
+/* 字段选择头部区域 */
+.field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+/* 快捷操作按钮 */
+.field-actions {
+  display: flex;
+  gap: 8px;
+  
+  .el-button {
+    height: 28px;
+    padding: 0 12px;
+    font-size: 12px;
+    
+    .el-icon {
+      margin-right: 4px;
+    }
+  }
+}
+
+/* 字段选择网格 */
+.fields-checkbox-group {
+  margin-bottom: 12px;
+}
+
+.fields-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  padding: 8px;
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e4e7ed;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+.field-checkbox {
   margin: 0;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  padding: 2px 6px;
+  border-radius: 3px;
+  transition: background-color 0.2s;
+  
+  &:hover {
+    background-color: #f0f9ff;
+  }
+  
+  :deep(.el-checkbox__input.is-checked + .el-checkbox__label) {
+    color: #409eff;
+    font-weight: 500;
+  }
+  
+  :deep(.el-checkbox__input) {
+    margin-right: 6px;
+  }
+  
+  .field-label {
+    font-size: 12px;
+    line-height: 1.3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
+/* 已选字段统计 */
+.selected-count {
+  .el-tag {
+    font-size: 12px;
+  }
 }
 
 .current-filters {
@@ -1255,5 +1708,71 @@ export default {
 /* 确保按钮内容对齐 */
 .el-button .el-icon + .button-text {
   margin-left: 6px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .stats-section .el-row {
+    --el-row-gutter: 12px;
+  }
+  
+  .stats-card {
+    height: 72px;
+  }
+  
+  .stats-item {
+    padding: 10px 12px;
+    gap: 10px;
+    min-height: 52px;
+  }
+}
+
+@media (max-width: 576px) {
+  .stats-section .el-row {
+    --el-row-gutter: 8px;
+  }
+  
+  .stats-card {
+    height: 68px;
+  }
+  
+  .stats-item {
+    padding: 8px 10px;
+    gap: 8px;
+    min-height: 48px;
+  }
+}
+
+/* 导出加载样式 */
+.export-loading {
+  margin: 20px 0;
+  padding: 16px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e4e7ed;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-text {
+  font-size: 14px;
+  color: #606266;
+  font-weight: 500;
+}
+
+/* 导出对话框中的加载图标动画 */
+.export-loading .el-icon.is-loading {
+  animation: rotating 2s linear infinite;
+  color: #409eff;
+}
+
+@keyframes rotating {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 </style>

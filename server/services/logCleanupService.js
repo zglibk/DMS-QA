@@ -309,12 +309,19 @@ class LogCleanupService {
   /**
    * 手动执行清理
    */
-  async manualCleanup(options = {}) {
+  async manualCleanup(options = {}, userInfo = {}) {
     const {
       severity,
       beforeDate,
       maxCount
     } = options;
+    
+    const {
+      userID,
+      userName,
+      ipAddress,
+      userAgent
+    } = userInfo;
     
     if (this.isRunning) {
       throw new Error('清理任务正在运行中，请稍后再试');
@@ -364,12 +371,16 @@ class LogCleanupService {
       
       // 记录手动清理日志
       await logger.log({
+        userID,
+        userName,
         action: '手动清理系统日志',
         details: `手动清理了 ${totalCleaned} 条日志记录`,
         category: 'SYSTEM_CONFIG',
         module: 'SYSTEM_LOG',
         operationType: 'DELETE',
         severity: SEVERITY_LEVELS.INFO,
+        ipAddress,
+        userAgent,
         requestData: options,
         responseData: { totalCleaned },
         status: 'SUCCESS'

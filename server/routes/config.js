@@ -4,6 +4,7 @@ const path = require('path');
 const { sql, config, getDynamicConfig, getConnection, executeQuery } = require('../db');
 const XLSX = require('xlsx');
 const cron = require('node-cron');
+const { authenticateToken, checkPermission } = require('../middleware/auth');
 
 // 自动备份调度器相关变量
 let autoBackupScheduler = null;
@@ -332,7 +333,7 @@ const cleanupOldBackups = async (retentionCount) => {
 };
 
 // 获取所有数据库配置列表
-router.get('/db-list', async (req, res) => {
+router.get('/db-list', authenticateToken, checkPermission('system:config:view'), async (req, res) => {
   try {
     let pool = await sql.connect(config);
     const result = await pool.request()
@@ -346,7 +347,7 @@ router.get('/db-list', async (req, res) => {
 });
 
 // 设置当前配置
-router.post('/set-current', async (req, res) => {
+router.post('/set-current', authenticateToken, checkPermission('system:config:edit'), async (req, res) => {
   const { configId } = req.body;
   if (!configId) {
     return res.status(400).json({ message: '请提供配置ID' });
@@ -371,7 +372,7 @@ router.post('/set-current', async (req, res) => {
 });
 
 // 测试数据库连接（不保存，仅测试）
-router.post('/test-db', async (req, res) => {
+router.post('/test-db', authenticateToken, checkPermission('system:config:edit'), async (req, res) => {
   const { Host, DatabaseName, DbUser, DbPassword } = req.body;
   if (!Host || !DatabaseName || !DbUser || !DbPassword) {
     return res.status(400).json({ message: '请填写所有字段' });
@@ -393,7 +394,7 @@ router.post('/test-db', async (req, res) => {
 });
 
 // 保存数据库配置（检查重复记录）
-router.post('/db', async (req, res) => {
+router.post('/db', authenticateToken, checkPermission('system:config:edit'), async (req, res) => {
   const { Host, DatabaseName, DbUser, DbPassword, ConfigName, Remark, FileStoragePath, FileServerPort, FileUrlPrefix, ExcelTempPath, NetworkSharePath } = req.body;
   if (!Host || !DatabaseName || !DbUser || !DbPassword) {
     return res.status(400).json({ message: '请填写所有必填字段' });
@@ -446,7 +447,7 @@ router.post('/db', async (req, res) => {
 });
 
 // 更新数据库配置
-router.put('/db/:id', async (req, res) => {
+router.put('/db/:id', authenticateToken, checkPermission('system:config:edit'), async (req, res) => {
   const { id } = req.params;
   const { Host, DatabaseName, DbUser, DbPassword, ConfigName, Remark, FileStoragePath, FileServerPort, FileUrlPrefix, ExcelTempPath, NetworkSharePath } = req.body;
 
@@ -494,7 +495,7 @@ router.put('/db/:id', async (req, res) => {
 });
 
 // 获取单个配置详情
-router.get('/db/:id', async (req, res) => {
+router.get('/db/:id', authenticateToken, checkPermission('system:config:view'), async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -516,7 +517,7 @@ router.get('/db/:id', async (req, res) => {
 });
 
 // 删除数据库配置
-router.delete('/db/:id', async (req, res) => {
+router.delete('/db/:id', authenticateToken, checkPermission('system:config:delete'), async (req, res) => {
   const { id } = req.params;
 
   try {
@@ -983,7 +984,7 @@ router.put('/home-cards', async (req, res) => {
 // ===================== 网站LOGO配置接口 =====================
 
 // 初始化SiteConfig表
-router.post('/init-site-config', async (req, res) => {
+router.post('/init-site-config', authenticateToken, checkPermission('system:config:edit'), async (req, res) => {
   try {
     const fs = require('fs');
     const path = require('path');
@@ -1011,7 +1012,7 @@ router.post('/init-site-config', async (req, res) => {
 });
 
 // 获取网站配置
-router.get('/site-config', async (req, res) => {
+router.get('/site-config', authenticateToken, checkPermission('system:config:view'), async (req, res) => {
   try {
     // 默认配置
     const defaultConfig = {
@@ -1076,7 +1077,7 @@ router.get('/site-config', async (req, res) => {
 });
 
 // 保存网站配置
-router.put('/site-config', async (req, res) => {
+router.put('/site-config', authenticateToken, checkPermission('system:config:edit'), async (req, res) => {
   try {
     const { siteName, companyName, logoBase64Img, faviconBase64Img, headerTitle, loginTitle, footerCopyright } = req.body;
 
@@ -2166,7 +2167,7 @@ router.post('/create-backup', async (req, res) => {
 });
 
 // 获取备份配置
-router.get('/backup-config', async (req, res) => {
+router.get('/backup-config', authenticateToken, checkPermission('system:backup:view'), async (req, res) => {
   try {
     const result = await executeQuery(async (pool) => {
       return await pool.request()
@@ -2201,7 +2202,7 @@ router.get('/backup-config', async (req, res) => {
 });
 
 // 更新备份配置
-router.post('/backup-config', async (req, res) => {
+router.post('/backup-config', authenticateToken, checkPermission('system:backup:edit'), async (req, res) => {
   try {
     const { backupPath, backupRetentionDays, autoBackupEnabled, autoBackupTime } = req.body;
 

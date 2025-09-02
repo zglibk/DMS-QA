@@ -61,6 +61,11 @@
               />
             </el-select>
           </el-form-item>
+          <el-form-item>
+            <el-button type="danger" plain @click="resetFilters" :icon="RefreshRight" >
+              重置查询
+            </el-button>
+          </el-form-item>
         </el-form>
       </el-card>
     </div>
@@ -69,34 +74,54 @@
     <div class="overview-section">
       <el-row :gutter="20">
         <el-col :span="6">
-          <el-card class="stats-card">
+          <el-card class="stats-card stats-card-primary">
             <div class="stats-item">
-              <div class="stats-value">{{ overviewData.totalLogs }}</div>
-              <div class="stats-label">总日志数</div>
+              <div class="stats-icon">
+                <el-icon><Document /></el-icon>
+              </div>
+              <div class="stats-content">
+                <div class="stats-value">{{ overviewData.totalLogs }}</div>
+                <div class="stats-label">总日志数</div>
+              </div>
             </div>
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stats-card">
+          <el-card class="stats-card stats-card-danger">
             <div class="stats-item">
-              <div class="stats-value error">{{ overviewData.errorLogs }}</div>
-              <div class="stats-label">错误日志</div>
+              <div class="stats-icon">
+                <el-icon><Warning /></el-icon>
+              </div>
+              <div class="stats-content">
+                <div class="stats-value">{{ overviewData.errorLogs }}</div>
+                <div class="stats-label">错误日志</div>
+              </div>
             </div>
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stats-card">
+          <el-card class="stats-card stats-card-warning">
             <div class="stats-item">
-              <div class="stats-value warning">{{ overviewData.warningLogs }}</div>
-              <div class="stats-label">警告日志</div>
+              <div class="stats-icon">
+                <el-icon><InfoFilled /></el-icon>
+              </div>
+              <div class="stats-content">
+                <div class="stats-value">{{ overviewData.warningLogs }}</div>
+                <div class="stats-label">警告日志</div>
+              </div>
             </div>
           </el-card>
         </el-col>
         <el-col :span="6">
-          <el-card class="stats-card">
+          <el-card class="stats-card stats-card-success">
             <div class="stats-item">
-              <div class="stats-value">{{ overviewData.uniqueUsers }}</div>
-              <div class="stats-label">活跃用户</div>
+              <div class="stats-icon">
+                <el-icon><User /></el-icon>
+              </div>
+              <div class="stats-content">
+                <div class="stats-value">{{ overviewData.uniqueUsers }}</div>
+                <div class="stats-label">活跃用户</div>
+              </div>
             </div>
           </el-card>
         </el-col>
@@ -248,7 +273,7 @@
 import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { ArrowLeft, Refresh, Download } from '@element-plus/icons-vue'
+import { ArrowLeft, Refresh, Download, Document, Warning, InfoFilled, User, RefreshRight } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import api from '@/utils/api'
 
@@ -330,7 +355,9 @@ const moduleLabels = {
   'ERP': 'ERP',
   'MATERIAL': '材料',
   'SAMPLE': '样品',
-  'MENU': '菜单'
+  'MENU': '菜单',
+  'SYSTEM_LOG': '系统日志',
+  'UNKNOWN': '未知模块'
 }
 
 /**
@@ -401,6 +428,25 @@ const handleDateRangeChange = (dates) => {
 }
 
 /**
+ * 重置筛选条件
+ */
+const resetFilters = () => {
+  // 重置筛选表单
+  filterForm.category = ''
+  filterForm.module = ''
+  filterForm.startDate = ''
+  filterForm.endDate = ''
+  
+  // 重置日期范围选择器
+  dateRange.value = []
+  
+  // 重新获取数据
+  fetchAnalyticsData()
+  
+  ElMessage.success('筛选条件已重置')
+}
+
+/**
  * 获取配置选项
  */
 const fetchConfigOptions = async () => {
@@ -421,6 +467,12 @@ const fetchConfigOptions = async () => {
 const fetchAnalyticsData = async () => {
   loading.value = true
   console.log('🔍 [DEBUG] 开始获取统计分析数据')
+  console.log('🔍 [DEBUG] 当前筛选表单状态:', {
+    category: filterForm.category,
+    module: filterForm.module,
+    startDate: filterForm.startDate,
+    endDate: filterForm.endDate
+  })
   
   try {
     const params = {
@@ -430,6 +482,12 @@ const fetchAnalyticsData = async () => {
       module: filterForm.module
     }
     console.log('📋 [DEBUG] API调用参数:', params)
+    console.log('📋 [DEBUG] 参数类型检查:', {
+      startDate: typeof params.startDate,
+      endDate: typeof params.endDate,
+      category: typeof params.category,
+      module: typeof params.module
+    })
 
     // 获取概览数据
     console.log('📊 [DEBUG] 正在获取概览数据...')
@@ -540,6 +598,10 @@ const fetchTrendData = async () => {
     if (response.data.success) {
       trendData.value = response.data.data
       console.log('✅ [DEBUG] 趋势数据已更新，数据条数:', trendData.value.length)
+      // 更新趋势图表
+      await nextTick()
+      updateTrendChart()
+      console.log('🎨 [DEBUG] 趋势图表已更新')
     } else {
       console.warn('⚠️ [DEBUG] 趋势数据获取失败:', response.data)
     }
@@ -593,71 +655,274 @@ const initCharts = () => {
  * 更新图表
  */
 const updateCharts = () => {
+  console.log('🎨 [DEBUG] updateCharts 被调用')
+  console.log('🎨 [DEBUG] 当前数据状态:', {
+    trendDataLength: trendData.value?.length || 0,
+    categoryStatsLength: categoryStats.value?.length || 0,
+    moduleStatsLength: moduleStats.value?.length || 0,
+    userStatsLength: userStats.value?.length || 0,
+    overviewData: overviewData
+  })
   updateTrendChart()
   updateCategoryChart()
   updateModuleChart()
   updateUserChart()
   updateErrorChart()
+  console.log('🎨 [DEBUG] updateCharts 执行完成')
 }
 
 /**
  * 更新趋势图
  */
 const updateTrendChart = () => {
-  if (!trendChart.value || !trendData.value.length) return
+  console.log('📈 [DEBUG] updateTrendChart 被调用')
+  console.log('📈 [DEBUG] 趋势图状态检查:', {
+    chartExists: !!trendChart.value,
+    dataLength: trendData.value?.length || 0,
+    data: trendData.value
+  })
+  if (!trendChart.value || !trendData.value.length) {
+    console.log('⚠️ [DEBUG] 趋势图更新跳过 - 图表实例或数据不存在')
+    return
+  }
 
   const option = {
     tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'shadow' },
+      trigger: 'item',
+      triggerOn: 'mousemove',
+      showDelay: 0,
+      hideDelay: 100,
+      enterable: true,
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderColor: '#ddd',
+      borderWidth: 1,
+      borderRadius: 6,
+      textStyle: {
+        color: '#333',
+        fontSize: 12
+      },
+      padding: [8, 12],
       formatter: function(params) {
-        let result = params[0].name + '<br/>';
-        params.forEach(param => {
-          if (param.value > 0) {
-            result += param.seriesName + ': ' + param.value + '<br/>';
-          }
-        });
-        return result;
+        return `<div style="font-weight: 600; margin-bottom: 4px;">${params.name}</div><div style="margin: 2px 0;"><span style="display: inline-block; width: 10px; height: 10px; border-radius: 50%; background-color: ${params.color}; margin-right: 6px;"></span>${params.seriesName}: <span style="font-weight: 600;">${params.value || 0}</span></div>`;
       }
     },
     legend: {
       data: ['总数', '错误', '警告'],
-      bottom: 0
+      bottom: 8,
+      left: 'center',
+      itemGap: 20,
+      textStyle: {
+        fontSize: 12,
+        color: '#666'
+      },
+      icon: 'circle'
     },
     grid: {
       left: '3%',
-      right: '4%',
-      bottom: '15%',
+      right: '8%',
+      bottom: '18%',
+      top: '12%',
       containLabel: true
     },
     xAxis: {
       type: 'category',
-      data: trendData.value.map(item => item.time)
+      data: trendData.value.map(item => item?.time || ''),
+      axisLine: {
+        lineStyle: {
+          color: '#e8e8e8',
+          width: 1
+        }
+      },
+      axisTick: {
+        show: false
+      },
+      axisLabel: {
+        color: '#666',
+        fontSize: 11,
+        margin: 8
+      }
     },
-    yAxis: {
-      type: 'value'
-    },
+    yAxis: [
+      {
+        type: 'value',
+        name: '{primary|总数}',
+        nameTextStyle: {
+          rich: {
+            primary: {
+              backgroundColor: '#409eff',
+              color: '#fff',
+              borderRadius: 4,
+              padding: [4, 8],
+              fontSize: 12,
+              fontWeight: 'normal'
+            }
+          }
+        },
+        position: 'left',
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        },
+        axisLabel: {
+          color: '#666',
+          fontSize: 11,
+          margin: 8
+        },
+        splitLine: {
+          lineStyle: {
+            color: '#f5f5f5',
+            width: 1,
+            type: 'solid'
+          }
+        }
+      },
+      {
+        type: 'value',
+        name: '{danger|错误/警告}',
+        nameTextStyle: {
+          rich: {
+            danger: {
+              backgroundColor: '#f56c6c',
+              color: '#fff',
+              borderRadius: 4,
+              padding: [4, 8],
+              fontSize: 12,
+              fontWeight: 'normal'
+            }
+          }
+        },
+        position: 'right',
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        },
+        axisLabel: {
+          color: '#666',
+          fontSize: 11,
+          margin: 8
+        },
+        splitLine: {
+          show: false
+        }
+      }
+    ],
     series: [
       {
         name: '总数',
         type: 'line',
-        data: trendData.value.map(item => item.total),
+        data: trendData.value.map(item => item?.total || 0),
         smooth: true,
-        itemStyle: { color: '#409EFF' }
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 4,
+          color: '#5470c6',
+          shadowColor: 'rgba(84, 112, 198, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#5470c6',
+          shadowColor: 'rgba(84, 112, 198, 0.4)',
+          shadowBlur: 8
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 5
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#5470c6',
+            shadowBlur: 15,
+            shadowColor: 'rgba(84, 112, 198, 0.6)'
+          }
+        }
       },
       {
         name: '错误',
         type: 'line',
-        data: trendData.value.map(item => item.error),
+        yAxisIndex: 1,
+        data: trendData.value.map(item => item?.error || 0),
         smooth: true,
-        itemStyle: { color: '#F56C6C' }
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 4,
+          color: '#ee6666',
+          shadowColor: 'rgba(238, 102, 102, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#ee6666',
+          shadowColor: 'rgba(238, 102, 102, 0.4)',
+          shadowBlur: 8
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 5
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#ee6666',
+            shadowBlur: 15,
+            shadowColor: 'rgba(238, 102, 102, 0.6)'
+          }
+        }
       },
       {
         name: '警告',
         type: 'line',
-        data: trendData.value.map(item => item.warning),
+        yAxisIndex: 1,
+        data: trendData.value.map(item => item?.warning || 0),
         smooth: true,
-        itemStyle: { color: '#E6A23C' }
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 4,
+          color: '#fac858',
+          shadowColor: 'rgba(250, 200, 88, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#fac858',
+          shadowColor: 'rgba(250, 200, 88, 0.4)',
+          shadowBlur: 8
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 5
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#fac858',
+            shadowBlur: 15,
+            shadowColor: 'rgba(250, 200, 88, 0.6)'
+          }
+        }
       }
     ]
   }
@@ -669,7 +934,16 @@ const updateTrendChart = () => {
  * 更新分类分布图
  */
 const updateCategoryChart = () => {
-  if (!categoryChart.value || !categoryStats.value.length) return
+  console.log('🥧 [DEBUG] updateCategoryChart 被调用')
+  console.log('🥧 [DEBUG] 分类图状态检查:', {
+    chartExists: !!categoryChart.value,
+    dataLength: categoryStats.value?.length || 0,
+    data: categoryStats.value
+  })
+  if (!categoryChart.value || !categoryStats.value.length) {
+    console.log('⚠️ [DEBUG] 分类图更新跳过 - 图表实例或数据不存在')
+    return
+  }
 
   // 定义饼图颜色配置
   const pieColors = ['#409EFF', '#67C23A', '#E6A23C', '#F56C6C', '#909399', '#C0C4CC']
@@ -718,8 +992,8 @@ const updateCategoryChart = () => {
           length2: 10
         },
         data: categoryStats.value.map((item, index) => ({
-          value: item.count,
-          name: getCategoryLabel(item.category),
+          value: item?.count || 0,
+          name: getCategoryLabel(item?.category || ''),
           itemStyle: {
             color: pieColors[index % pieColors.length],
             borderColor: '#fff',
@@ -766,22 +1040,48 @@ const updateModuleChart = () => {
     },
     grid: {
       left: '3%',
-      right: '4%',
+      right: '12%',
       bottom: '3%',
       containLabel: true
     },
     xAxis: {
-      type: 'value'
+      type: 'value',
+      name: '{success|日志数量}',
+      nameTextStyle: {
+        rich: {
+          success: {
+            backgroundColor: '#67c23a',
+            color: '#fff',
+            borderRadius: 4,
+            padding: [4, 8],
+            fontSize: 12,
+            fontWeight: 'normal'
+          }
+        }
+      }
     },
     yAxis: {
       type: 'category',
-      data: moduleStats.value.map(item => getModuleLabel(item.module))
+      name: '{info|模块名称}',
+      nameTextStyle: {
+        rich: {
+          info: {
+            backgroundColor: '#909399',
+            color: '#fff',
+            borderRadius: 4,
+            padding: [4, 8],
+            fontSize: 12,
+            fontWeight: 'normal'
+          }
+        }
+      },
+      data: moduleStats.value.map(item => getModuleLabel(item?.module || ''))
     },
     series: [
       {
         name: '日志数量',
         type: 'bar',
-        data: moduleStats.value.map(item => item.count),
+        data: moduleStats.value.map(item => item?.count || 0),
         itemStyle: { color: '#67C23A' },
         barMaxWidth: 40  // 设置柱形最大宽度为40px
       }
@@ -808,22 +1108,48 @@ const updateUserChart = () => {
     },
     grid: {
       left: '3%',
-      right: '4%',
+      right: '12%',
       bottom: '3%',
       containLabel: true
     },
     xAxis: {
-      type: 'value'
+      type: 'value',
+      name: '{warning|操作次数}',
+      nameTextStyle: {
+        rich: {
+          warning: {
+            backgroundColor: '#e6a23c',
+            color: '#fff',
+            borderRadius: 4,
+            padding: [4, 8],
+            fontSize: 12,
+            fontWeight: 'normal'
+          }
+        }
+      }
     },
     yAxis: {
       type: 'category',
-      data: topUsers.map(item => item.username || '匿名用户')
+      name: '{info|用户名称}',
+      nameTextStyle: {
+        rich: {
+          info: {
+            backgroundColor: '#909399',
+            color: '#fff',
+            borderRadius: 4,
+            padding: [4, 8],
+            fontSize: 12,
+            fontWeight: 'normal'
+          }
+        }
+      },
+      data: topUsers.map(item => item?.username || '匿名用户')
     },
     series: [
       {
         name: '操作次数',
         type: 'bar',
-        data: topUsers.map(item => item.count),
+        data: topUsers.map(item => item?.count || 0),
         itemStyle: { color: '#909399' },
         barMaxWidth: 40  // 设置柱形最大宽度为40px
       }
@@ -858,7 +1184,7 @@ const updateErrorChart = () => {
     },
     xAxis: {
       type: 'category',
-      data: categoryStats.value.map(item => getCategoryLabel(item.category))
+      data: categoryStats.value.map(item => getCategoryLabel(item?.category || ''))
     },
     yAxis: {
       type: 'value'
@@ -867,14 +1193,14 @@ const updateErrorChart = () => {
       {
         name: '错误数',
         type: 'bar',
-        data: categoryStats.value.map(item => item.errorCount || 0),
+        data: categoryStats.value.map(item => item?.errorCount || 0),
         itemStyle: { color: '#F56C6C' },
         barMaxWidth: 35  // 设置柱形最大宽度为35px
       },
       {
         name: '警告数',
         type: 'bar',
-        data: categoryStats.value.map(item => item.warningCount || 0),
+        data: categoryStats.value.map(item => item?.warningCount || 0),
         itemStyle: { color: '#E6A23C' },
         barMaxWidth: 35  // 设置柱形最大宽度为35px
       }
@@ -1049,32 +1375,105 @@ onUnmounted(() => {
   margin-bottom: 20px;
 }
 
+/* 统计卡片基础样式 */
 .stats-card {
-  text-align: center;
+  border-radius: 12px;
+  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+  overflow: hidden;
+  position: relative;
+}
+
+.stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
+}
+
+.stats-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+}
+
+/* 不同类型卡片的渐变背景 */
+.stats-card-primary::before {
+  background: linear-gradient(90deg, #409EFF, #79bbff);
+}
+
+.stats-card-danger::before {
+  background: linear-gradient(90deg, #F56C6C, #f78989);
+}
+
+.stats-card-warning::before {
+  background: linear-gradient(90deg, #E6A23C, #ebb563);
+}
+
+.stats-card-success::before {
+  background: linear-gradient(90deg, #67C23A, #85ce61);
 }
 
 .stats-item {
-  padding: 10px;
+  padding: 24px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.stats-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.stats-card-primary .stats-icon {
+  background: linear-gradient(135deg, #409EFF, #79bbff);
+  color: white;
+}
+
+.stats-card-danger .stats-icon {
+  background: linear-gradient(135deg, #F56C6C, #f78989);
+  color: white;
+}
+
+.stats-card-warning .stats-icon {
+  background: linear-gradient(135deg, #E6A23C, #ebb563);
+  color: white;
+}
+
+.stats-card-success .stats-icon {
+  background: linear-gradient(135deg, #67C23A, #85ce61);
+  color: white;
+}
+
+.stats-content {
+  flex: 1;
+  text-align: left;
 }
 
 .stats-value {
-  font-size: 28px;
-  font-weight: bold;
-  color: #409EFF;
-  margin-bottom: 5px;
-}
-
-.stats-value.error {
-  color: #F56C6C;
-}
-
-.stats-value.warning {
-  color: #E6A23C;
+  font-size: 32px;
+  font-weight: 700;
+  color: #303133;
+  margin-bottom: 4px;
+  line-height: 1;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
 }
 
 .stats-label {
   font-size: 14px;
   color: #909399;
+  font-weight: 500;
+  margin: 0;
 }
 
 .charts-section {
@@ -1145,6 +1544,26 @@ onUnmounted(() => {
   .chart-container,
   .chart-container-large {
     height: 250px;
+  }
+
+  /* 移动端统计卡片样式调整 */
+  .stats-item {
+    padding: 20px 16px;
+    gap: 12px;
+  }
+
+  .stats-icon {
+    width: 50px;
+    height: 50px;
+    font-size: 20px;
+  }
+
+  .stats-value {
+    font-size: 28px;
+  }
+
+  .stats-label {
+    font-size: 13px;
   }
 }
 

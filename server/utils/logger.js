@@ -117,11 +117,16 @@ class SystemLogger {
       // 生成TraceID（如果未提供）
       const traceID = logData.traceID || uuidv4();
       
-      // 准备插入数据
+      // 准备插入数据，确保字符串长度不超过数据库字段限制
+      const truncateString = (str, maxLength) => {
+        if (!str) return str;
+        return str.length > maxLength ? str.substring(0, maxLength - 3) + '...' : str;
+      };
+      
       const insertData = {
         UserID: logData.userID || null,
-        Action: logData.action || '',
-        Details: logData.details || '',
+        Action: truncateString(logData.action || '', 100),
+        Details: truncateString(logData.details || '', 1000),
         Category: logData.category || LOG_CATEGORIES.SYSTEM_ERROR,
         Module: logData.module || '',
         ResourceType: logData.resourceType || '',
@@ -134,17 +139,18 @@ class SystemLogger {
         SessionID: logData.sessionID || '',
         TraceID: traceID,
         IPAddress: logData.ipAddress || '',
-        UserAgent: logData.userAgent || '',
+        UserAgent: truncateString(logData.userAgent || '', 500),
         Status: logData.status || 'SUCCESS',
-        ErrorMessage: logData.errorMessage || '',
+        ErrorMessage: truncateString(logData.errorMessage || '', 1000),
+        IsAnonymous: logData.isAnonymous || false,
         CreatedAt: new Date()
       };
       
       // 插入日志记录
       await pool.request()
         .input('UserID', sql.Int, insertData.UserID)
-        .input('Action', sql.NVarChar(255), insertData.Action)
-        .input('Details', sql.NVarChar(sql.MAX), insertData.Details)
+        .input('Action', sql.NVarChar(100), insertData.Action)
+        .input('Details', sql.NVarChar(1000), insertData.Details)
         .input('Category', sql.NVarChar(50), insertData.Category)
         .input('Module', sql.NVarChar(50), insertData.Module)
         .input('ResourceType', sql.NVarChar(50), insertData.ResourceType)
@@ -159,19 +165,20 @@ class SystemLogger {
         .input('IPAddress', sql.NVarChar(45), insertData.IPAddress)
         .input('UserAgent', sql.NVarChar(500), insertData.UserAgent)
         .input('Status', sql.NVarChar(20), insertData.Status)
-        .input('ErrorMessage', sql.NVarChar(sql.MAX), insertData.ErrorMessage)
+        .input('ErrorMessage', sql.NVarChar(1000), insertData.ErrorMessage)
+        .input('IsAnonymous', sql.Bit, insertData.IsAnonymous)
         .input('CreatedAt', sql.DateTime, insertData.CreatedAt)
         .query(`
           INSERT INTO [dbo].[SystemLogs] (
             [UserID], [Action], [Details], [Category], [Module], [ResourceType], 
             [ResourceID], [OperationType], [Severity], [Duration], [RequestData], 
             [ResponseData], [SessionID], [TraceID], [IPAddress], [UserAgent], 
-            [Status], [ErrorMessage], [CreatedAt]
+            [Status], [ErrorMessage], [IsAnonymous], [CreatedAt]
           ) VALUES (
             @UserID, @Action, @Details, @Category, @Module, @ResourceType, 
             @ResourceID, @OperationType, @Severity, @Duration, @RequestData, 
             @ResponseData, @SessionID, @TraceID, @IPAddress, @UserAgent, 
-            @Status, @ErrorMessage, @CreatedAt
+            @Status, @ErrorMessage, @IsAnonymous, @CreatedAt
           )
         `);
       

@@ -31,9 +31,9 @@ function loggerMiddleware(options = {}) {
     // 记录请求开始时间
     const startTime = Date.now();
 
-    // 获取用户信息
-    const userID = req.user?.id || req.user?.ID || 0; // 使用0作为匿名用户ID
-    const userName = req.user?.username || req.user?.Username || 'Anonymous';
+    // 用户信息将在响应完成时获取，因为认证中间件在路由中执行
+    let userID = 0;
+    let userName = 'Anonymous';
 
     // 准备请求数据
     const requestData = {
@@ -77,40 +77,80 @@ function loggerMiddleware(options = {}) {
 
     // 请求完成后记录日志
     res.on('finish', async () => {
-      const duration = Date.now() - startTime;
+      const endTime = Date.now();
+      const duration = endTime - startTime;
       const isError = res.statusCode >= 400;
       
-      try {
-        // 使用setTimeout异步记录日志，避免阻塞主要业务流程
-        setTimeout(async () => {
-          try {
-            await logger.log({
-              userID,
-              action: `${req.method} ${req.path}`,
-              details: `${userName} 访问 ${req.method} ${req.originalUrl || req.url}`,
-              category: determineCategory(req.path, req.method),
-              module: determineModule(req.path),
-              resourceType: determineResourceType(req.path),
-              resourceID: extractResourceID(req),
-              operationType: mapMethodToOperation(req.method),
-              severity: isError ? SEVERITY_LEVELS.WARN : SEVERITY_LEVELS.INFO,
-              duration,
-              requestData,
-              responseData,
-              sessionID: req.sessionID || '',
-              traceID,
-              ipAddress: getClientIP(req),
-              userAgent: req.headers['user-agent'] || '',
-              status: isError ? 'ERROR' : 'SUCCESS',
-              errorMessage: isError ? `HTTP ${res.statusCode}` : ''
-            });
-          } catch (logError) {
-            // 静默处理日志记录错误，不输出到控制台
-          }
-        }, 0);
-      } catch (error) {
-        // 不影响主要业务流程
+      // 在响应完成时重新获取用户信息，此时认证中间件已经执行
+      userID = req.user?.id || req.user?.ID || null;
+      userName = req.user?.username || req.user?.Username || null;
+      const ipAddress = getClientIP(req);
+      
+      // 判断是否为匿名访问
+      const isAnonymous = !userID;
+      
+      // 构建请求数据对象
+      const requestDataObj = {
+        method: req.method,
+        url: req.originalUrl,
+        headers: req.headers,
+        query: req.query,
+        params: req.params
+      };
+      
+      // 如果是POST/PUT/PATCH请求，记录请求体（排除敏感信息）
+      if (['POST', 'PUT', 'PATCH'].includes(req.method) && req.body) {
+        const sanitizedBody = { ...req.body };
+        // 移除敏感字段
+        delete sanitizedBody.password;
+        delete sanitizedBody.token;
+        delete sanitizedBody.secret;
+        requestDataObj.body = sanitizedBody;
       }
+      
+      // 构建响应数据对象
+      const responseDataObj = {
+        statusCode: res.statusCode,
+        statusMessage: res.statusMessage
+      };
+      
+      // 根据用户身份构建不同的日志详情
+      let logDetails;
+      if (isAnonymous) {
+        logDetails = `匿名用户访问 ${req.method} ${req.originalUrl || req.url}`;
+      } else {
+        logDetails = `${userName} 访问 ${req.method} ${req.originalUrl || req.url}`;
+      }
+      
+      // 异步记录日志，避免阻塞响应
+      setImmediate(async () => {
+        try {
+          await logger.log({
+            userID: userID || 0, // 数据库字段不允许null，匿名用户使用0
+            userName: userName || 'Anonymous',
+            action: `${req.method} ${req.originalUrl}`,
+            details: logDetails,
+            category: determineCategory(req.path, req.method),
+            module: determineModule(req.path),
+            resourceType: determineResourceType(req.path),
+            resourceID: extractResourceID(req),
+            operationType: mapMethodToOperation(req.method),
+            severity: isError ? SEVERITY_LEVELS.WARN : SEVERITY_LEVELS.INFO,
+            duration,
+            requestData: requestDataObj,
+            responseData: responseDataObj,
+            sessionID: req.sessionID || '',
+            traceID,
+            ipAddress,
+            userAgent: req.headers['user-agent'] || '',
+            status: isError ? 'ERROR' : 'SUCCESS',
+            errorMessage: isError ? `HTTP ${res.statusCode}` : '',
+            isAnonymous
+          });
+        } catch (error) {
+          console.error('记录系统日志失败:', error);
+        }
+      });
     });
 
     next();
@@ -243,14 +283,32 @@ function mapMethodToOperation(method) {
 }
 
 /**
- * 获取客户端IP地址
+ * 获取客户端真实IP地址
+ * @param {Object} req - Express请求对象
+ * @returns {string} 客户端IP地址
  */
 function getClientIP(req) {
-  return req.headers['x-forwarded-for'] || 
-         req.headers['x-real-ip'] || 
-         req.connection?.remoteAddress || 
-         req.socket?.remoteAddress || 
-         req.ip || '';
+  // 优先从代理头获取真实IP
+  let ip = req.headers['x-forwarded-for'] ||
+           req.headers['x-real-ip'] ||
+           req.headers['x-client-ip'] ||
+           req.headers['cf-connecting-ip'] || // Cloudflare
+           req.connection?.remoteAddress ||
+           req.socket?.remoteAddress ||
+           req.ip;
+  
+  // 处理x-forwarded-for可能包含多个IP的情况
+  if (ip && ip.includes(',')) {
+    ip = ip.split(',')[0].trim();
+  }
+  
+  // 处理IPv6映射的IPv4地址
+  if (ip && ip.startsWith('::ffff:')) {
+    ip = ip.substring(7);
+  }
+  
+  // 如果仍然无法获取IP，返回默认值
+  return ip || 'unknown';
 }
 
 /**

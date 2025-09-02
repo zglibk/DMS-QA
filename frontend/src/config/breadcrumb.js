@@ -420,6 +420,12 @@ export const breadcrumbConfig = {
     icon: 'Document'
   },
 
+  // 系统管理 - 系统日志统计分析
+  '/admin/system/logs/analytics': {
+    title: '日志统计分析',
+    icon: 'TrendCharts'
+  },
+
   // 供应商管理
   '/admin/supplier/list': {
     title: '供应商管理',
@@ -642,8 +648,9 @@ function generateDefaultTitle(segment) {
     'work': '工作',
     'plan': '计划',
     'plans': '计划管理',
-    'logs': '工作日志',
+    'logs': '日志管理',
     'log': '日志',
+    'analytics': '统计分析',
     'progress': '进度跟踪',
     'templates': '计划模板',
     'template': '模板',

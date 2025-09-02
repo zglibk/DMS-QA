@@ -7,12 +7,13 @@ const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
 const db = require('../db');
+const { authenticateToken, checkPermission } = require('../middleware/auth');
 
 /**
  * 获取质量指标趋势数据
  * GET /api/quality-metrics/trends
  */
-router.get('/trends', async (req, res) => {
+router.get('/trends', authenticateToken, checkPermission('quality:metrics:view'), async (req, res) => {
     try {
         const { year = new Date().getFullYear(), months = 12 } = req.query;
         
@@ -101,7 +102,7 @@ router.get('/trends', async (req, res) => {
  * 获取质量指标汇总数据
  * GET /api/quality-metrics/summary
  */
-router.get('/summary', async (req, res) => {
+router.get('/summary', authenticateToken, checkPermission('quality:metrics:view'), async (req, res) => {
     try {
         const { year = new Date().getFullYear() } = req.query;
         
@@ -188,7 +189,7 @@ router.get('/summary', async (req, res) => {
  * 获取月度批次统计数据
  * GET /api/quality-metrics/monthly-batches
  */
-router.get('/monthly-batches', async (req, res) => {
+router.get('/monthly-batches', authenticateToken, checkPermission('quality:metrics:view'), async (req, res) => {
     try {
         const { year = new Date().getFullYear() } = req.query;
         
@@ -244,7 +245,7 @@ router.get('/monthly-batches', async (req, res) => {
  * 更新月度批次数据
  * PUT /api/quality-metrics/monthly-batches/:id
  */
-router.put('/monthly-batches/:id', async (req, res) => {
+router.put('/monthly-batches/:id', authenticateToken, checkPermission('quality:metrics:edit'), async (req, res) => {
     try {
         const { id } = req.params;
         const { InspectionBatches, DeliveryBatches, Remarks } = req.body;
@@ -300,7 +301,7 @@ router.put('/monthly-batches/:id', async (req, res) => {
  * 获取指定月份的批次统计数据（用于首页卡片）
  * GET /api/quality-metrics/month-batch-stats
  */
-router.get('/month-batch-stats', async (req, res) => {
+router.get('/month-batch-stats', authenticateToken, checkPermission('quality:metrics:view'), async (req, res) => {
     try {
         const { month } = req.query; // 格式: YYYY-MM
 

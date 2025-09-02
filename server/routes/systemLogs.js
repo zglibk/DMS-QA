@@ -7,13 +7,28 @@ const express = require('express');
 const { sql, getDynamicConfig } = require('../db');
 const { logger, LOG_CATEGORIES, SEVERITY_LEVELS, MODULES } = require('../utils/logger');
 const { logCleanupService } = require('../services/logCleanupService');
+const { authenticateToken, checkPermission } = require('../middleware/auth');
 const router = express.Router();
+
+// 为所有系统日志路由添加认证中间件
+router.use((req, res, next) => {
+  console.log('🔐 [DEBUG] SystemLogs 认证中间件被调用');
+  console.log('🔐 [DEBUG] 请求路径:', req.path);
+  console.log('🔐 [DEBUG] 请求方法:', req.method);
+  console.log('🔐 [DEBUG] Authorization头:', req.headers.authorization ? '存在' : '不存在');
+  next();
+});
+router.use(authenticateToken);
 
 /**
  * 获取系统日志列表
  * 支持分页、过滤、排序
  */
 router.get('/list', async (req, res) => {
+  console.log('📋 [DEBUG] /list API 被调用');
+  console.log('📋 [DEBUG] 请求参数:', req.query);
+  console.log('📋 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+  
   let pool;
   const startTime = Date.now();
   
@@ -220,6 +235,11 @@ router.get('/statistics', async (req, res) => {
     const {
       startDate,
       endDate,
+      category,
+      module,
+      severity,
+      userID,
+      keyword,
       groupBy = 'day' // day, hour, category, module, severity
     } = req.query;
     
@@ -236,6 +256,31 @@ router.get('/statistics', async (req, res) => {
     if (endDate) {
       whereConditions.push('CreatedAt <= @endDate');
       queryParams.endDate = new Date(endDate);
+    }
+    
+    if (category) {
+      whereConditions.push('Category = @category');
+      queryParams.category = category;
+    }
+    
+    if (module) {
+      whereConditions.push('Module = @module');
+      queryParams.module = module;
+    }
+    
+    if (severity) {
+      whereConditions.push('Severity = @severity');
+      queryParams.severity = severity;
+    }
+    
+    if (userID) {
+      whereConditions.push('UserID = @userID');
+      queryParams.userID = parseInt(userID);
+    }
+    
+    if (keyword) {
+      whereConditions.push('(Action LIKE @keyword OR Details LIKE @keyword)');
+      queryParams.keyword = `%${keyword}%`;
     }
     
     const whereClause = whereConditions.length > 0 ? 
@@ -290,7 +335,7 @@ router.get('/statistics', async (req, res) => {
     const totalStatsResult = await request.query(`
       SELECT 
         COUNT(*) as totalLogs,
-        COUNT(DISTINCT UserID) as uniqueUsers,
+        COUNT(DISTINCT CASE WHEN UserID IS NOT NULL THEN UserID END) as uniqueUsers,
         COUNT(CASE WHEN Severity = 'ERROR' THEN 1 END) as totalErrors,
         COUNT(CASE WHEN Severity = 'WARN' THEN 1 END) as totalWarnings,
         AVG(CAST(Duration as FLOAT)) as avgDuration,
@@ -451,12 +496,31 @@ router.get('/config/options', async (req, res) => {
       req
     );
     
+    // 从数据库获取实际存在的模块
+    let actualModules = Object.values(MODULES);
+    try {
+      const pool = await sql.connect(await getDynamicConfig());
+      const moduleQuery = `
+        SELECT DISTINCT Module 
+        FROM SystemLogs 
+        WHERE Module IS NOT NULL AND Module != ''
+        ORDER BY Module
+      `;
+      const moduleResult = await pool.request().query(moduleQuery);
+      if (moduleResult.recordset && moduleResult.recordset.length > 0) {
+        actualModules = moduleResult.recordset.map(r => r.Module);
+        console.log('📋 [DEBUG] 从数据库获取的实际模块:', actualModules);
+      }
+    } catch (dbError) {
+      console.warn('⚠️ [DEBUG] 获取数据库模块失败，使用默认配置:', dbError.message);
+    }
+    
     res.json({
       success: true,
       data: {
         categories: Object.values(LOG_CATEGORIES),
         severityLevels: Object.values(SEVERITY_LEVELS),
-        modules: Object.values(MODULES)
+        modules: actualModules
       }
     });
     
@@ -569,7 +633,7 @@ router.delete('/batch', async (req, res) => {
 /**
  * 手动清理日志
  */
-router.post('/cleanup', async (req, res) => {
+router.post('/cleanup', authenticateToken, checkPermission('system:logs:delete'), async (req, res) => {
   try {
     const { severity, beforeDate, maxCount } = req.body;
     
@@ -585,6 +649,11 @@ router.post('/cleanup', async (req, res) => {
       severity,
       beforeDate,
       maxCount
+    }, {
+      userID: req.user?.id || req.user?.ID,
+      userName: req.user?.username || req.user?.Username,
+      ipAddress: req.ip || req.connection?.remoteAddress,
+      userAgent: req.get('User-Agent')
     });
     
     res.json({
@@ -700,6 +769,780 @@ router.post('/cleanup/execute', async (req, res) => {
       success: false,
       message: '启动清理任务失败',
       error: error.message
+    });
+  }
+});
+
+/**
+ * 获取统计分析概览数据
+ */
+router.get('/analytics/overview', async (req, res) => {
+  console.log('📊 [DEBUG] /analytics/overview API 被调用');
+  console.log('📊 [DEBUG] 请求参数:', req.query);
+  console.log('📊 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+  
+  let pool;
+  const startTime = Date.now();
+  
+  try {
+    const {
+      startDate,
+      endDate,
+      category,
+      module
+    } = req.query;
+    
+    pool = await sql.connect(await getDynamicConfig());
+    console.log('📊 [DEBUG] 数据库连接成功');
+    
+    // 构建查询条件
+    let whereConditions = ['1=1'];
+    let queryParams = {};
+    
+    if (startDate) {
+      whereConditions.push('sl.CreatedAt >= @startDate');
+      queryParams.startDate = startDate;
+      console.log('📊 [DEBUG] 添加开始日期过滤:', startDate);
+    }
+    
+    if (endDate) {
+      whereConditions.push('sl.CreatedAt <= @endDate');
+      queryParams.endDate = endDate;
+      console.log('📊 [DEBUG] 添加结束日期过滤:', endDate);
+    }
+    
+    if (category) {
+      whereConditions.push('sl.Category = @category');
+      queryParams.category = category;
+      console.log('📊 [DEBUG] 添加类别过滤:', category);
+    }
+    
+    if (module) {
+      whereConditions.push('sl.Module = @module');
+      queryParams.module = module;
+      console.log('📊 [DEBUG] 添加模块过滤:', module);
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
+    
+    // 获取概览统计
+    const overviewQuery = `
+      SELECT 
+        COUNT(*) as totalLogs,
+        SUM(CASE WHEN sl.Severity = 'ERROR' THEN 1 ELSE 0 END) as errorLogs,
+        SUM(CASE WHEN sl.Severity = 'WARN' THEN 1 ELSE 0 END) as warningLogs,
+        COUNT(DISTINCT sl.UserID) as uniqueUsers
+      FROM SystemLogs sl
+      WHERE ${whereClause}
+    `;
+    
+    const request = pool.request();
+    Object.keys(queryParams).forEach(key => {
+      request.input(key, queryParams[key]);
+    });
+    
+    console.log('📊 [DEBUG] 执行SQL查询:', overviewQuery);
+    const result = await request.query(overviewQuery);
+    const overview = result.recordset[0];
+    console.log('📊 [DEBUG] 查询结果:', overview);
+    
+    // 记录操作日志
+    const queryDetails = JSON.stringify(req.query);
+    logger.log({
+      action: '获取日志统计概览',
+      category: LOG_CATEGORIES.QUERY_STATS,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      details: `查询条件: ${queryDetails.length > 900 ? queryDetails.substring(0, 900) + '...' : queryDetails}`,
+      duration: Date.now() - startTime
+    });
+    
+    const responseData = {
+      totalLogs: parseInt(overview.totalLogs) || 0,
+      errorLogs: parseInt(overview.errorLogs) || 0,
+      warningLogs: parseInt(overview.warningLogs) || 0,
+      uniqueUsers: parseInt(overview.uniqueUsers) || 0
+    };
+    
+    console.log('✅ [DEBUG] 概览数据响应:', responseData);
+    
+    res.json({
+      success: true,
+      data: responseData
+    });
+    
+  } catch (error) {
+    console.error('❌ [DEBUG] 获取统计概览数据失败:', error);
+    
+    logger.log({
+      action: '获取日志统计概览失败',
+      category: LOG_CATEGORIES.SYSTEM_ERROR,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      errorMessage: error.message.length > 900 ? error.message.substring(0, 900) + '...' : error.message,
+      severity: 'ERROR',
+      duration: Date.now() - startTime
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: '获取统计概览失败'
+    });
+  }
+});
+
+/**
+ * 获取分类统计数据
+ */
+router.get('/analytics/category', async (req, res) => {
+  console.log('📈 [DEBUG] /analytics/category API 被调用');
+  console.log('📈 [DEBUG] 请求参数:', req.query);
+  console.log('📈 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+  
+  let pool;
+  const startTime = Date.now();
+  
+  try {
+    const {
+      startDate,
+      endDate,
+      category,
+      module
+    } = req.query;
+    
+    pool = await sql.connect(await getDynamicConfig());
+    console.log('📈 [DEBUG] 数据库连接成功');
+    
+    // 构建查询条件
+    let whereConditions = ['1=1'];
+    let queryParams = {};
+    
+    if (startDate) {
+      whereConditions.push('sl.CreatedAt >= @startDate');
+      queryParams.startDate = startDate;
+      console.log('📈 [DEBUG] 添加开始日期过滤:', startDate);
+    }
+    
+    if (endDate) {
+      whereConditions.push('sl.CreatedAt <= @endDate');
+      queryParams.endDate = endDate;
+      console.log('📈 [DEBUG] 添加结束日期过滤:', endDate);
+    }
+    
+    if (category) {
+      whereConditions.push('sl.Category = @category');
+      queryParams.category = category;
+      console.log('📈 [DEBUG] 添加类别过滤:', category);
+    }
+    
+    if (module) {
+      whereConditions.push('sl.Module = @module');
+      queryParams.module = module;
+      console.log('📈 [DEBUG] 添加模块过滤:', module);
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
+    
+    // 获取分类统计
+    const categoryQuery = `
+      SELECT 
+        sl.Category as category,
+        COUNT(*) as count,
+        SUM(CASE WHEN sl.Severity = 'ERROR' THEN 1 ELSE 0 END) as errorCount,
+        SUM(CASE WHEN sl.Severity = 'WARN' THEN 1 ELSE 0 END) as warningCount,
+        CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM SystemLogs sl2 WHERE ${whereClause.replace(/sl\./g, 'sl2.')}) AS DECIMAL(5,2)) as percentage
+      FROM SystemLogs sl
+      WHERE ${whereClause}
+      GROUP BY sl.Category
+      ORDER BY count DESC
+    `;
+    
+    const request = pool.request();
+    Object.keys(queryParams).forEach(key => {
+      request.input(key, queryParams[key]);
+    });
+    
+    console.log('📈 [DEBUG] 执行SQL查询:', categoryQuery);
+    const result = await request.query(categoryQuery);
+    console.log('📈 [DEBUG] 分类统计查询结果:', result.recordset);
+    
+    // 记录操作日志
+    const queryDetails = JSON.stringify(req.query);
+    logger.log({
+      action: '获取日志分类统计',
+      category: LOG_CATEGORIES.QUERY_STATS,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      details: `查询条件: ${queryDetails.length > 900 ? queryDetails.substring(0, 900) + '...' : queryDetails}`,
+      duration: Date.now() - startTime
+    });
+    
+    console.log('✅ [DEBUG] 分类统计数据响应成功发送');
+    
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+    
+  } catch (error) {
+    console.error('❌ [DEBUG] 获取分类统计数据失败:', error);
+    
+    logger.log({
+      action: '获取日志分类统计失败',
+      category: LOG_CATEGORIES.SYSTEM_ERROR,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      errorMessage: error.message.length > 900 ? error.message.substring(0, 900) + '...' : error.message,
+      severity: 'ERROR',
+      duration: Date.now() - startTime
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: '获取分类统计失败'
+    });
+  }
+});
+
+/**
+ * 获取模块统计数据
+ */
+router.get('/analytics/module', async (req, res) => {
+  console.log('🔧 [DEBUG] /analytics/module API 被调用');
+  console.log('🔧 [DEBUG] 请求参数:', req.query);
+  console.log('🔧 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+  
+  let pool;
+  const startTime = Date.now();
+  
+  try {
+    const {
+      startDate,
+      endDate,
+      category,
+      module
+    } = req.query;
+    
+    pool = await sql.connect(await getDynamicConfig());
+    console.log('🔧 [DEBUG] 数据库连接成功');
+    
+    // 构建查询条件
+    let whereConditions = ['1=1'];
+    let queryParams = {};
+    
+    if (startDate) {
+      whereConditions.push('sl.CreatedAt >= @startDate');
+      queryParams.startDate = startDate;
+      console.log('🔧 [DEBUG] 添加开始日期过滤:', startDate);
+    }
+    
+    if (endDate) {
+      whereConditions.push('sl.CreatedAt <= @endDate');
+      queryParams.endDate = endDate;
+      console.log('🔧 [DEBUG] 添加结束日期过滤:', endDate);
+    }
+    
+    if (category) {
+      whereConditions.push('sl.Category = @category');
+      queryParams.category = category;
+      console.log('🔧 [DEBUG] 添加类别过滤:', category);
+    }
+    
+    if (module) {
+      whereConditions.push('sl.Module = @module');
+      queryParams.module = module;
+      console.log('🔧 [DEBUG] 添加模块过滤:', module);
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
+    
+    // 获取模块统计
+    const moduleQuery = `
+      SELECT 
+        sl.Module as module,
+        COUNT(*) as count,
+        SUM(CASE WHEN sl.Severity = 'ERROR' THEN 1 ELSE 0 END) as errorCount,
+        AVG(CAST(sl.Duration AS FLOAT)) as avgDuration,
+        CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM SystemLogs sl2 WHERE ${whereClause.replace(/sl\./g, 'sl2.')}) AS DECIMAL(5,2)) as percentage
+      FROM SystemLogs sl
+      WHERE ${whereClause}
+      GROUP BY sl.Module
+      ORDER BY count DESC
+    `;
+    
+    const request = pool.request();
+    Object.keys(queryParams).forEach(key => {
+      request.input(key, queryParams[key]);
+    });
+    
+    console.log('🔧 [DEBUG] 执行SQL查询:', moduleQuery);
+    const result = await request.query(moduleQuery);
+    console.log('🔧 [DEBUG] 模块统计查询结果:', result.recordset);
+    
+    // 记录操作日志
+    const queryDetails = JSON.stringify(req.query);
+    logger.log({
+      action: '获取日志模块统计',
+      category: LOG_CATEGORIES.QUERY_STATS,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      details: `查询条件: ${queryDetails.length > 900 ? queryDetails.substring(0, 900) + '...' : queryDetails}`,
+      duration: Date.now() - startTime
+    });
+    
+    const responseData = result.recordset.map(item => ({
+      ...item,
+      avgDuration: item.avgDuration ? Math.round(item.avgDuration) : null
+    }));
+    
+    console.log('✅ [DEBUG] 模块统计数据响应成功发送');
+    
+    res.json({
+      success: true,
+      data: responseData
+    });
+    
+  } catch (error) {
+    console.error('❌ [DEBUG] 获取模块统计数据失败:', error);
+    
+    logger.log({
+      action: '获取日志模块统计失败',
+      category: LOG_CATEGORIES.SYSTEM_ERROR,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      errorMessage: error.message.length > 900 ? error.message.substring(0, 900) + '...' : error.message,
+      severity: 'ERROR',
+      duration: Date.now() - startTime
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: '获取模块统计失败'
+    });
+  }
+});
+
+/**
+ * 获取用户统计数据
+ */
+router.get('/analytics/user', async (req, res) => {
+  console.log('👤 [DEBUG] /analytics/user API 被调用');
+  console.log('👤 [DEBUG] 请求参数:', req.query);
+  console.log('👤 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+  
+  let pool;
+  const startTime = Date.now();
+  
+  try {
+    const {
+      startDate,
+      endDate,
+      category,
+      module
+    } = req.query;
+    
+    pool = await sql.connect(await getDynamicConfig());
+    console.log('👤 [DEBUG] 数据库连接成功');
+    
+    // 构建查询条件
+    let whereConditions = ['1=1'];
+    let queryParams = {};
+    
+    if (startDate) {
+      whereConditions.push('sl.CreatedAt >= @startDate');
+      queryParams.startDate = startDate;
+      console.log('👤 [DEBUG] 添加开始日期过滤:', startDate);
+    }
+    
+    if (endDate) {
+      whereConditions.push('sl.CreatedAt <= @endDate');
+      queryParams.endDate = endDate;
+      console.log('👤 [DEBUG] 添加结束日期过滤:', endDate);
+    }
+    
+    if (category) {
+      whereConditions.push('sl.Category = @category');
+      queryParams.category = category;
+      console.log('👤 [DEBUG] 添加类别过滤:', category);
+    }
+    
+    if (module) {
+      whereConditions.push('sl.Module = @module');
+      queryParams.module = module;
+      console.log('👤 [DEBUG] 添加模块过滤:', module);
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
+    
+    // 获取用户统计
+    const userQuery = `
+      SELECT 
+        COALESCE(u.Username, '匿名用户') as username,
+        sl.UserID,
+        COUNT(*) as count,
+        MAX(sl.CreatedAt) as lastActivity,
+        SUM(CASE WHEN sl.Severity = 'ERROR' THEN 1 ELSE 0 END) as errorCount,
+        CAST((COUNT(*) - SUM(CASE WHEN sl.Severity = 'ERROR' THEN 1 ELSE 0 END)) * 100.0 / COUNT(*) AS DECIMAL(5,2)) as successRate
+      FROM SystemLogs sl
+      LEFT JOIN [dbo].[User] u ON sl.UserID = u.ID
+      WHERE ${whereClause}
+      GROUP BY sl.UserID, u.Username
+      ORDER BY count DESC
+    `;
+    
+    const request = pool.request();
+    Object.keys(queryParams).forEach(key => {
+      request.input(key, queryParams[key]);
+    });
+    
+    console.log('👤 [DEBUG] 执行SQL查询:', userQuery);
+    const result = await request.query(userQuery);
+    console.log('👤 [DEBUG] 用户统计查询结果:', result.recordset);
+    
+    // 记录操作日志
+    const queryDetails = JSON.stringify(req.query);
+    logger.log({
+      action: '获取日志用户统计',
+      category: LOG_CATEGORIES.QUERY_STATS,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      details: `查询条件: ${queryDetails.length > 900 ? queryDetails.substring(0, 900) + '...' : queryDetails}`,
+      duration: Date.now() - startTime
+    });
+    
+    console.log('✅ [DEBUG] 用户统计数据响应成功发送');
+    
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+    
+  } catch (error) {
+    console.error('❌ [DEBUG] 获取用户统计数据失败:', error);
+    
+    logger.log({
+      action: '获取日志用户统计失败',
+      category: LOG_CATEGORIES.SYSTEM_ERROR,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      errorMessage: error.message.length > 900 ? error.message.substring(0, 900) + '...' : error.message,
+      severity: 'ERROR',
+      duration: Date.now() - startTime
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: '获取用户统计失败'
+    });
+  }
+});
+
+/**
+ * 获取趋势数据
+ */
+router.get('/analytics/trend', async (req, res) => {
+  console.log('📈 [DEBUG] /analytics/trend API 被调用');
+  console.log('📈 [DEBUG] 请求参数:', req.query);
+  console.log('📈 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+  
+  let pool;
+  const startTime = Date.now();
+  
+  try {
+    const {
+      startDate,
+      endDate,
+      category,
+      module,
+      period = 'day'
+    } = req.query;
+    
+    pool = await sql.connect(await getDynamicConfig());
+    console.log('📈 [DEBUG] 数据库连接成功');
+    
+    // 构建查询条件
+    let whereConditions = ['1=1'];
+    let queryParams = {};
+    
+    if (startDate) {
+      whereConditions.push('sl.CreatedAt >= @startDate');
+      queryParams.startDate = startDate;
+      console.log('📈 [DEBUG] 添加开始日期过滤:', startDate);
+    }
+    
+    if (endDate) {
+      whereConditions.push('sl.CreatedAt <= @endDate');
+      queryParams.endDate = endDate;
+      console.log('📈 [DEBUG] 添加结束日期过滤:', endDate);
+    }
+    
+    if (category) {
+      whereConditions.push('sl.Category = @category');
+      queryParams.category = category;
+      console.log('📈 [DEBUG] 添加类别过滤:', category);
+    }
+    
+    if (module) {
+      whereConditions.push('sl.Module = @module');
+      queryParams.module = module;
+      console.log('📈 [DEBUG] 添加模块过滤:', module);
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
+    
+    // 根据时间周期构建分组字段 (SQL Server 2008R2 兼容)
+    let dateFormat;
+    switch (period) {
+      case 'hour':
+        dateFormat = "CONVERT(VARCHAR(13), sl.CreatedAt, 120) + ':00'";
+        break;
+      case 'week':
+        dateFormat = "CAST(YEAR(sl.CreatedAt) AS VARCHAR) + '-W' + RIGHT('0' + CAST(DATEPART(week, sl.CreatedAt) AS VARCHAR), 2)";
+        break;
+      case 'day':
+      default:
+        dateFormat = "CONVERT(VARCHAR(10), sl.CreatedAt, 120)";
+        break;
+    }
+    
+    console.log('📈 [DEBUG] 时间周期:', period, '日期格式:', dateFormat);
+    
+    // 获取趋势数据
+    const trendQuery = `
+      SELECT 
+        ${dateFormat} as time,
+        COUNT(*) as total,
+        SUM(CASE WHEN sl.Severity = 'ERROR' THEN 1 ELSE 0 END) as error,
+        SUM(CASE WHEN sl.Severity = 'WARN' THEN 1 ELSE 0 END) as warning
+      FROM SystemLogs sl
+      WHERE ${whereClause}
+      GROUP BY ${dateFormat}
+      ORDER BY time
+    `;
+    
+    const request = pool.request();
+    Object.keys(queryParams).forEach(key => {
+      request.input(key, queryParams[key]);
+    });
+    
+    console.log('📈 [DEBUG] 执行SQL查询:', trendQuery);
+    const result = await request.query(trendQuery);
+    console.log('📈 [DEBUG] 趋势数据查询结果:', result.recordset);
+    
+    // 记录操作日志
+    const queryDetails = JSON.stringify(req.query);
+    logger.log({
+      action: '获取日志趋势数据',
+      category: LOG_CATEGORIES.QUERY_STATS,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      details: `查询条件: ${queryDetails.length > 900 ? queryDetails.substring(0, 900) + '...' : queryDetails}`,
+      duration: Date.now() - startTime
+    });
+    
+    console.log('✅ [DEBUG] 趋势数据响应成功发送');
+    
+    res.json({
+      success: true,
+      data: result.recordset
+    });
+    
+  } catch (error) {
+    console.error('❌ [DEBUG] 获取趋势数据失败:', error);
+    
+    logger.log({
+      action: '获取日志趋势数据失败',
+      category: LOG_CATEGORIES.SYSTEM_ERROR,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      errorMessage: error.message.length > 900 ? error.message.substring(0, 900) + '...' : error.message,
+      severity: 'ERROR',
+      duration: Date.now() - startTime
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: '获取趋势数据失败'
+    });
+  }
+});
+
+/**
+ * 导出统计分析报告
+ */
+router.get('/analytics/export', async (req, res) => {
+  let pool;
+  const startTime = Date.now();
+  
+  try {
+    const {
+      startDate,
+      endDate,
+      category,
+      module
+    } = req.query;
+    
+    pool = await sql.connect(await getDynamicConfig());
+    
+    // 构建查询条件
+    let whereConditions = ['1=1'];
+    let queryParams = {};
+    
+    if (startDate) {
+      whereConditions.push('sl.CreatedAt >= @startDate');
+      queryParams.startDate = startDate;
+    }
+    
+    if (endDate) {
+      whereConditions.push('sl.CreatedAt <= @endDate');
+      queryParams.endDate = endDate;
+    }
+    
+    if (category) {
+      whereConditions.push('sl.Category = @category');
+      queryParams.category = category;
+    }
+    
+    if (module) {
+      whereConditions.push('sl.Module = @module');
+      queryParams.module = module;
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
+    
+    const request = pool.request();
+    Object.keys(queryParams).forEach(key => {
+      request.input(key, queryParams[key]);
+    });
+    
+    // 获取概览数据
+    const overviewQuery = `
+      SELECT 
+        COUNT(*) as totalLogs,
+        SUM(CASE WHEN sl.Severity = 'ERROR' THEN 1 ELSE 0 END) as errorLogs,
+        SUM(CASE WHEN sl.Severity = 'WARN' THEN 1 ELSE 0 END) as warningLogs,
+        COUNT(DISTINCT sl.UserID) as uniqueUsers
+      FROM SystemLogs sl
+      WHERE ${whereClause}
+    `;
+    
+    const overviewResult = await request.query(overviewQuery);
+    const overview = overviewResult.recordset[0];
+    
+    // 获取分类统计
+    const categoryQuery = `
+      SELECT 
+        sl.Category as category,
+        COUNT(*) as count,
+        SUM(CASE WHEN sl.Severity = 'ERROR' THEN 1 ELSE 0 END) as errorCount,
+        SUM(CASE WHEN sl.Severity = 'WARN' THEN 1 ELSE 0 END) as warningCount,
+        CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM SystemLogs sl2 WHERE ${whereClause.replace(/sl\./g, 'sl2.')}) AS DECIMAL(5,2)) as percentage
+      FROM SystemLogs sl
+      WHERE ${whereClause}
+      GROUP BY sl.Category
+      ORDER BY count DESC
+    `;
+    
+    const categoryResult = await request.query(categoryQuery);
+    
+    // 获取模块统计
+    const moduleQuery = `
+      SELECT 
+        sl.Module as module,
+        COUNT(*) as count,
+        SUM(CASE WHEN sl.Severity = 'ERROR' THEN 1 ELSE 0 END) as errorCount,
+        AVG(CAST(sl.Duration AS FLOAT)) as avgDuration,
+        CAST(COUNT(*) * 100.0 / (SELECT COUNT(*) FROM SystemLogs sl2 WHERE ${whereClause.replace(/sl\./g, 'sl2.')}) AS DECIMAL(5,2)) as percentage
+      FROM SystemLogs sl
+      WHERE ${whereClause}
+      GROUP BY sl.Module
+      ORDER BY count DESC
+    `;
+    
+    const moduleResult = await request.query(moduleQuery);
+    
+    // 构建Excel数据
+    const XLSX = require('xlsx');
+    const workbook = XLSX.utils.book_new();
+    
+    // 概览数据工作表
+    const overviewData = [
+      ['指标', '数值'],
+      ['总日志数', overview.totalLogs || 0],
+      ['错误日志数', overview.errorLogs || 0],
+      ['警告日志数', overview.warningLogs || 0],
+      ['活跃用户数', overview.uniqueUsers || 0]
+    ];
+    const overviewSheet = XLSX.utils.aoa_to_sheet(overviewData);
+    XLSX.utils.book_append_sheet(workbook, overviewSheet, '概览统计');
+    
+    // 分类统计工作表
+    const categoryData = [
+      ['分类', '日志数量', '错误数', '警告数', '占比(%)']
+    ];
+    categoryResult.recordset.forEach(item => {
+      categoryData.push([
+        item.category,
+        item.count,
+        item.errorCount || 0,
+        item.warningCount || 0,
+        item.percentage || 0
+      ]);
+    });
+    const categorySheet = XLSX.utils.aoa_to_sheet(categoryData);
+    XLSX.utils.book_append_sheet(workbook, categorySheet, '分类统计');
+    
+    // 模块统计工作表
+    const moduleData = [
+      ['模块', '日志数量', '错误数', '平均耗时(ms)', '占比(%)']
+    ];
+    moduleResult.recordset.forEach(item => {
+      moduleData.push([
+        item.module,
+        item.count,
+        item.errorCount || 0,
+        item.avgDuration ? Math.round(item.avgDuration) : 0,
+        item.percentage || 0
+      ]);
+    });
+    const moduleSheet = XLSX.utils.aoa_to_sheet(moduleData);
+    XLSX.utils.book_append_sheet(workbook, moduleSheet, '模块统计');
+    
+    // 生成Excel文件
+    const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    // 记录操作日志
+    const queryDetails = JSON.stringify(req.query);
+    logger.log({
+      action: '导出日志统计分析报告',
+      category: LOG_CATEGORIES.IMPORT_EXPORT,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      details: `查询条件: ${queryDetails.length > 900 ? queryDetails.substring(0, 900) + '...' : queryDetails}`,
+      duration: Date.now() - startTime
+    });
+    
+    // 设置响应头
+    const fileName = `系统日志分析报告_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    
+    res.send(excelBuffer);
+    
+  } catch (error) {
+    logger.log({
+      action: '导出日志统计分析报告失败',
+      category: LOG_CATEGORIES.SYSTEM_ERROR,
+      module: MODULES.SYSTEM,
+      userID: req.user?.id,
+      errorMessage: error.message.length > 900 ? error.message.substring(0, 900) + '...' : error.message,
+      severity: 'ERROR',
+      duration: Date.now() - startTime
+    });
+    
+    res.status(500).json({
+      success: false,
+      message: '导出报告失败'
     });
   }
 });
