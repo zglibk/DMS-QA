@@ -87,21 +87,33 @@
               class="action-item" 
               v-for="action in quickActions" 
               :key="action.key"
+              :class="{ 'action-disabled': !action.enabled }"
               @click="handleQuickAction(action)"
               @keydown.enter="handleQuickAction(action)"
               @keydown.space="handleQuickAction(action)"
-              tabindex="0"
+              :tabindex="action.enabled ? 0 : -1"
             >
               <div 
                 class="action-button" 
-                :style="{ backgroundColor: action.color }"
+                :style="{ 
+                  backgroundColor: action.color,
+                  cursor: action.enabled ? 'pointer' : 'not-allowed'
+                }"
               >
                 <Icon 
                   :icon="action.icon" 
-                  :style="{ color: action.iconColor }"
+                  :style="{ 
+                    color: action.iconColor
+                  }"
                 />
+                <!-- 禁用状态遮罩层 -->
+                <div v-if="!action.enabled" class="disabled-overlay">
+                  <Icon icon="mdi:lock" class="disabled-icon" />
+                </div>
               </div>
-              <div class="action-name">{{ action.title }}</div>
+              <div class="action-name">
+                {{ action.title }}
+              </div>
             </div>
           </div>
         </div>
@@ -356,10 +368,16 @@
               class="module-card" 
               v-for="module in systemModules" 
               :key="module.key"
+              :class="{ 'module-disabled': !module.enabled }"
               @click="navigateToModule(module)"
+              :style="{ cursor: module.enabled ? 'pointer' : 'not-allowed' }"
             >
               <div class="module-icon">
                 <Icon :icon="module.icon" :style="{ color: module.color, fontSize: '40px' }" />
+                <!-- 禁用状态遮罩层 -->
+                <div v-if="!module.enabled" class="module-disabled-overlay">
+                  <Icon icon="mdi:lock" class="module-disabled-icon" />
+                </div>
               </div>
               <div class="module-content">
                 <div class="module-title">{{ module.title }}</div>
@@ -554,6 +572,9 @@ const fetchModuleCounts = async () => {
   }
 }
 
+// 模块子菜单数量
+const moduleCounts = ref({})
+
 /**
  * 计算模块的功能数量
  * @param {string} moduleKey - 模块键名
@@ -655,8 +676,8 @@ const overviewData = ref([
   }
 ])
 
-// 快捷操作
-const quickActions = ref([
+// 快捷操作基础配置
+const quickActionsConfig = [
   {
     key: 'new-complaint',
     title: '新建客诉',
@@ -664,7 +685,10 @@ const quickActions = ref([
     icon: 'mdi:message-alert-outline',
     path: '/admin/quality/complaint/customer',
     color: '#F56C6C', // 红色 - 投诉相关
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：需要客户投诉管理权限
+    requiredPermissions: ['quality:complaint:add'],
+    requiredMenus: ['/admin/quality/complaint/customer']
   },
   {
     key: 'new-internal-complaint',
@@ -673,16 +697,22 @@ const quickActions = ref([
     icon: 'mdi:message-text-outline',
     path: '/admin/quality/complaint/internal',
     color: '#FF9800', // 橙色 - 内部投诉
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：需要内部投诉管理权限
+    requiredPermissions: ['quality:complaint:add'],
+    requiredMenus: ['/admin/quality/complaint/internal']
   },
   {
     key: 'customer-sample',
     title: '客户签样',
     description: '管理客户样品签收',
     icon: 'mdi:clipboard-check-outline',
-    path: 'admin/sample/approval',
+    path: '/admin/sample/approval',
     color: '#3F51B5', // 靛蓝色 - 客户签样
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：需要样品管理权限
+    requiredPermissions: ['sample:approval:view'],
+    requiredMenus: ['/admin/sample/approval']
   },
   {
     key: 'quality-check',
@@ -691,7 +721,10 @@ const quickActions = ref([
     icon: 'mdi:target',
     path: '/admin/quality/targets',
     color: '#67C23A', // 绿色 - 质量目标
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：需要质量目标管理权限
+    requiredPermissions: ['quality:targets:view'],
+    requiredMenus: ['/admin/quality/targets']
   },
   {
     key: 'user-management',
@@ -700,7 +733,11 @@ const quickActions = ref([
     icon: 'mdi:account-group-outline',
     path: '/admin/system/user',
     color: '#409EFF', // 蓝色 - 用户管理
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：需要用户管理权限或管理员角色
+    requiredPermissions: ['system:user:view'],
+    requiredMenus: ['/admin/system/user'],
+    requiredRoles: ['admin', '系统管理员']
   },
   {
     key: 'system-config',
@@ -709,7 +746,11 @@ const quickActions = ref([
     icon: 'mdi:cog-outline',
     path: '/admin/system/config',
     color: '#E6A23C', // 橙色 - 系统配置
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：需要系统配置权限或管理员角色
+    requiredPermissions: ['system:config:view'],
+    requiredMenus: ['/admin/system/config'],
+    requiredRoles: ['admin', '系统管理员']
   },
   {
     key: 'notice-announcement',
@@ -718,7 +759,10 @@ const quickActions = ref([
     icon: 'mdi:bullhorn-outline',
     path: '/admin/system/notices',
     color: '#909399', // 灰色 - 通知公告
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：需要通知管理权限
+    requiredPermissions: ['system:notice:view'],
+    requiredMenus: ['/admin/system/notices']
   },
   {
     key: 'personal-center',
@@ -727,7 +771,9 @@ const quickActions = ref([
     icon: 'mdi:account-circle-outline',
     path: '/admin/profile',
     color: '#9C27B0', // 紫色 - 个人中心
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：所有用户都可以访问个人中心
+    alwaysEnabled: true
   },
   {
     key: 'back-to-frontend',
@@ -736,7 +782,9 @@ const quickActions = ref([
     icon: 'mdi:home-outline',
     path: '/',
     color: '#00BCD4', // 青色 - 回到前台
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：所有用户都可以回到前台
+    alwaysEnabled: true
   },
   {
     key: 'logout',
@@ -745,9 +793,111 @@ const quickActions = ref([
     icon: 'mdi:logout',
     path: '/logout',
     color: '#FF5722', // 深橙色 - 退出登录
-    iconColor: '#FFFFFF'
+    iconColor: '#FFFFFF',
+    // 权限检查：所有用户都可以退出登录
+    alwaysEnabled: true
   }
-])
+]
+
+/**
+ * 检查用户是否有权限访问快捷操作（支持用户权限优先级）
+ * @param {Object} action - 快捷操作配置
+ * @returns {Promise<boolean>} - 是否有权限
+ */
+const checkQuickActionPermission = async (action) => {
+  // 如果设置为始终启用，直接返回true
+  if (action.alwaysEnabled) {
+    return true
+  }
+  
+  // 检查角色权限
+  if (action.requiredRoles && action.requiredRoles.length > 0) {
+    const hasRequiredRole = action.requiredRoles.some(role => userStore.hasRole(role))
+    if (hasRequiredRole) {
+      return true
+    }
+  }
+  
+  // 检查菜单权限
+  if (action.requiredMenus && action.requiredMenus.length > 0) {
+    const hasMenuPermission = action.requiredMenus.some(menu => userStore.hasMenuPermission(menu))
+    if (hasMenuPermission) {
+      return true
+    }
+  }
+  
+  // 检查操作权限（支持用户级权限优先级）
+  if (action.requiredPermissions && action.requiredPermissions.length > 0) {
+    try {
+      // 使用异步权限检查方法，支持用户权限覆盖角色权限
+      const permissionChecks = await Promise.all(
+        action.requiredPermissions.map(permission => 
+          userStore.hasActionPermissionAsync(permission)
+        )
+      )
+      
+      // 如果任一权限检查通过，则返回true
+      if (permissionChecks.some(hasPermission => hasPermission)) {
+        return true
+      }
+    } catch (error) {
+      console.warn('异步权限检查失败，回退到同步检查:', error)
+      // 回退到同步权限检查
+      const hasActionPermission = action.requiredPermissions.some(permission => 
+        userStore.hasActionPermission(permission)
+      )
+      if (hasActionPermission) {
+        return true
+      }
+    }
+  }
+  
+  return false
+}
+
+// 快捷操作权限状态
+const quickActionPermissions = ref(new Map())
+
+// 根据权限过滤快捷操作
+const quickActions = computed(() => {
+  return quickActionsConfig.map(action => ({
+    ...action,
+    enabled: quickActionPermissions.value.get(action.key) ?? false
+  }))
+})
+
+/**
+ * 初始化快捷操作权限
+ */
+const initQuickActionPermissions = async () => {
+  try {
+    const permissionMap = new Map()
+    
+    // 并行检查所有快捷操作的权限
+    const permissionChecks = await Promise.all(
+      quickActionsConfig.map(async (action) => {
+        const hasPermission = await checkQuickActionPermission(action)
+        return { key: action.key, hasPermission }
+      })
+    )
+    
+    // 更新权限状态
+    permissionChecks.forEach(({ key, hasPermission }) => {
+      permissionMap.set(key, hasPermission)
+    })
+    
+    quickActionPermissions.value = permissionMap
+    console.log('快捷操作权限初始化完成:', Object.fromEntries(permissionMap))
+  } catch (error) {
+    console.error('快捷操作权限初始化失败:', error)
+    // 失败时设置默认权限（alwaysEnabled的为true，其他为false）
+    const defaultMap = new Map()
+    quickActionsConfig.forEach(action => {
+      defaultMap.set(action.key, action.alwaysEnabled || false)
+    })
+    quickActionPermissions.value = defaultMap
+  }
+}
 
 // 用户活动选项卡
 const activeTab = ref('login-logs')
@@ -811,7 +961,8 @@ const onlineUsers = ref([
 ])
 
 // 系统功能模块
-const systemModules = computed(() => [
+// 功能模块基础配置
+const systemModulesConfig = [
   {
     key: 'quality',
     title: '质量管理',
@@ -819,7 +970,11 @@ const systemModules = computed(() => [
     icon: 'mdi:quality-high',
     color: '#409EFF',
     count: calculateModuleCount('quality'),
-    path: '/admin/quality/targets'
+    path: '/admin/quality/targets',
+    // 权限检查：需要质量管理相关权限
+    requiredPermissions: ['quality:targets:view', 'quality:complaint:view'],
+    requiredMenus: ['/admin/quality/targets', '/admin/quality/complaint'],
+    requiredRoles: ['质量经理']
   },
   {
     key: 'system',
@@ -828,7 +983,11 @@ const systemModules = computed(() => [
     icon: 'mdi:cog',
     color: '#909399',
     count: calculateModuleCount('system'),
-    path: '/admin/system/logs'
+    path: '/admin/system/logs',
+    // 权限检查：需要系统管理权限或管理员角色
+    requiredPermissions: ['system:user:view', 'system:role:view', 'system:menu:view'],
+    requiredMenus: ['/admin/system/user', '/admin/system/role', '/admin/system/menu'],
+    requiredRoles: ['admin', '系统管理员']
   },
   {
     key: 'work-plan',
@@ -837,7 +996,10 @@ const systemModules = computed(() => [
     icon: 'mdi:calendar-check',
     color: '#67C23A',
     count: calculateModuleCount('work-plan'),
-    path: '/admin/work-plan'
+    path: '/admin/work-plan',
+    // 权限检查：需要工作计划管理权限
+    requiredPermissions: ['work-plan:dashboard:view', 'work-plan:plans:view'],
+    requiredMenus: ['/admin/work-plan', '/admin/work-plan/dashboard']
   },
   {
     key: 'supplier',
@@ -846,7 +1008,10 @@ const systemModules = computed(() => [
     icon: 'mdi:store',
     color: '#E6A23C',
     count: calculateModuleCount('supplier'),
-    path: '/admin/supplier/basic-info'
+    path: '/admin/supplier/basic-info',
+    // 权限检查：需要供应商管理权限
+    requiredPermissions: ['supplier:basic:view', 'supplier:complaints:view'],
+    requiredMenus: ['/admin/supplier/basic-info', '/admin/supplier/complaints']
   },
   {
     key: 'copq',
@@ -855,7 +1020,10 @@ const systemModules = computed(() => [
     icon: 'mdi:currency-usd',
     color: '#F56C6C',
     count: calculateModuleCount('copq'),
-    path: '/admin/copq'
+    path: '/admin/copq',
+    // 权限检查：需要质量成本管理权限
+    requiredPermissions: ['copq:material:view', 'copq:statistics:view'],
+    requiredMenus: ['/admin/copq', '/admin/copq/material-price']
   },
   {
     key: 'sample',
@@ -864,9 +1032,108 @@ const systemModules = computed(() => [
     icon: 'mdi:palette',
     color: '#9C27B0',
     count: calculateModuleCount('sample'),
-    path: '/admin/sample'
+    path: '/admin/sample',
+    // 权限检查：需要样版管理权限
+    requiredPermissions: ['sample:approval:view', 'sample:color:view'],
+    requiredMenus: ['/admin/sample/approval', '/admin/sample/color-card']
   }
-])
+]
+
+/**
+ * 检查用户是否有权限访问功能模块（支持用户权限优先级）
+ * @param {Object} module - 功能模块配置
+ * @returns {Promise<boolean>} - 是否有权限
+ */
+const checkModulePermission = async (module) => {
+  // 检查角色权限
+  if (module.requiredRoles && module.requiredRoles.length > 0) {
+    const hasRequiredRole = module.requiredRoles.some(role => userStore.hasRole(role))
+    if (hasRequiredRole) {
+      return true
+    }
+  }
+  
+  // 检查菜单权限
+  if (module.requiredMenus && module.requiredMenus.length > 0) {
+    const hasMenuPermission = module.requiredMenus.some(menu => userStore.hasMenuPermission(menu))
+    if (hasMenuPermission) {
+      return true
+    }
+  }
+  
+  // 检查操作权限（支持用户级权限优先级）
+  if (module.requiredPermissions && module.requiredPermissions.length > 0) {
+    try {
+      // 使用异步权限检查方法，支持用户权限覆盖角色权限
+      const permissionChecks = await Promise.all(
+        module.requiredPermissions.map(permission => 
+          userStore.hasActionPermissionAsync(permission)
+        )
+      )
+      
+      // 如果任一权限检查通过，则返回true
+      if (permissionChecks.some(hasPermission => hasPermission)) {
+        return true
+      }
+    } catch (error) {
+      console.warn('异步权限检查失败，回退到同步检查:', error)
+      // 回退到同步权限检查
+      const hasActionPermission = module.requiredPermissions.some(permission => 
+        userStore.hasActionPermission(permission)
+      )
+      if (hasActionPermission) {
+        return true
+      }
+    }
+  }
+  
+  return false
+}
+
+// 系统模块权限状态
+const systemModulePermissions = ref(new Map())
+
+// 根据权限过滤功能模块
+const systemModules = computed(() => {
+  return systemModulesConfig.map(module => ({
+    ...module,
+    enabled: systemModulePermissions.value.get(module.key) ?? false,
+    count: calculateModuleCount(module.key) // 动态计算模块数量
+  }))
+})
+
+/**
+ * 初始化系统模块权限
+ */
+const initSystemModulePermissions = async () => {
+  try {
+    const permissionMap = new Map()
+    
+    // 并行检查所有系统模块的权限
+    const permissionChecks = await Promise.all(
+      systemModulesConfig.map(async (module) => {
+        const hasPermission = await checkModulePermission(module)
+        return { key: module.key, hasPermission }
+      })
+    )
+    
+    // 更新权限状态
+    permissionChecks.forEach(({ key, hasPermission }) => {
+      permissionMap.set(key, hasPermission)
+    })
+    
+    systemModulePermissions.value = permissionMap
+    console.log('系统模块权限初始化完成:', Object.fromEntries(permissionMap))
+  } catch (error) {
+    console.error('系统模块权限初始化失败:', error)
+    // 失败时设置默认权限（所有模块都为false）
+    const defaultMap = new Map()
+    systemModulesConfig.forEach(module => {
+      defaultMap.set(module.key, false)
+    })
+    systemModulePermissions.value = defaultMap
+  }
+}
 
 // 系统通知
 const notifications = ref([])
@@ -874,8 +1141,7 @@ const notifications = ref([])
 // 最后更新时间
 const lastUpdateTime = ref('')
 
-// 模块子菜单数量
-const moduleCounts = ref({})
+
 
 // 系统信息
 const systemInfo = ref({
@@ -890,13 +1156,16 @@ const systemInfo = ref({
 const introActiveTab = ref('tech')
 
 /**
- * 处理快捷操作点击
- */
-/**
  * 处理快捷操作点击事件
- * @param {Object} action - 快捷操作对象
+ * @param {Object} action - 快捷操作配置
  */
 const handleQuickAction = (action) => {
+  // 检查权限，如果没有权限则提示用户
+  if (!action.enabled) {
+    ElMessage.warning(`您没有权限访问「${action.title}」功能，请联系管理员授权`)
+    return
+  }
+  
   // 特殊处理退出登录
   if (action.key === 'logout') {
     ElMessageBox.confirm(
@@ -937,8 +1206,15 @@ const handleQuickAction = (action) => {
 
 /**
  * 导航到功能模块
+ * @param {Object} module - 功能模块配置
  */
 const navigateToModule = (module) => {
+  // 检查权限，如果没有权限则提示用户
+  if (!module.enabled) {
+    ElMessage.warning(`您没有权限访问「${module.title}」模块，请联系管理员授权`)
+    return
+  }
+  
   if (module.path) {
     router.push(module.path)
   } else {
@@ -1322,7 +1598,7 @@ const viewNotification = async (notification) => {
 }
 
 // 组件挂载时获取数据
-onMounted(() => {
+onMounted(async () => {
   fetchSystemStats()
   fetchLoginLogs()
   fetchOnlineUsers()
@@ -1330,6 +1606,17 @@ onMounted(() => {
   fetchSystemInfo()
   fetchOverviewData() // 获取数据概览信息
   fetchModuleCounts() // 获取模块子菜单数量
+  
+  // 初始化权限检查（支持用户权限优先级）
+  try {
+    await Promise.all([
+      initQuickActionPermissions(), // 初始化快捷操作权限
+      initSystemModulePermissions() // 初始化系统模块权限
+    ])
+  } catch (error) {
+    console.error('权限系统初始化失败:', error)
+  }
+  
   // 初始化时间显示
   updateCurrentDateTime()
   // 每秒更新时间
@@ -1792,6 +2079,57 @@ defineExpose({
   transition: all 0.3s;
 }
 
+/* 禁用状态样式 */
+.action-disabled {
+  cursor: not-allowed !important;
+}
+
+.action-disabled:hover {
+  transform: none !important;
+}
+
+.action-disabled .action-button {
+  cursor: not-allowed !important;
+  position: relative;
+}
+
+.action-disabled:hover .action-button {
+  transform: none !important;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15) !important;
+  filter: none !important;
+}
+
+.action-disabled:hover .action-name {
+  color: #303133 !important;
+  font-weight: 500 !important;
+}
+
+/* 禁用状态遮罩层 */
+.disabled-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.action-disabled:hover .disabled-overlay {
+  opacity: 1;
+}
+
+.disabled-icon {
+  color: white;
+  font-size: 20px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
+}
+
 /* 功能模块 */
 .modules-grid {
   display: flex;
@@ -1822,6 +2160,7 @@ defineExpose({
   align-items: center;
   justify-content: center;
   font-size: 28px;
+  position: relative;
 }
 
 .module-content {
@@ -1850,6 +2189,42 @@ defineExpose({
   font-size: 16px;
   font-weight: bold;
   color: #409eff;
+}
+
+/* 功能模块禁用状态样式 */
+.module-disabled {
+  cursor: not-allowed !important;
+}
+
+.module-disabled:hover {
+  border-color: #e4e7ed !important;
+  background-color: #ffffff !important;
+  transform: none !important;
+}
+
+.module-disabled-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.module-disabled:hover .module-disabled-overlay {
+  opacity: 1;
+}
+
+.module-disabled-icon {
+  color: white;
+  font-size: 18px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.3));
 }
 
 /* 系统通知 */
