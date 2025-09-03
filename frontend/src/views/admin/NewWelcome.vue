@@ -5,7 +5,7 @@
       <div class="welcome-content">
         <div class="welcome-text">
           <h4 class="welcome-title">
-            <span class="greeting-text">欢迎回来</span>
+            <span class="greeting-text">欢迎回来 ~</span>
             <span class="username-highlight">{{ userStore.user?.realName || userStore.user?.RealName || userStore.user?.username || '用户' }}</span>
           </h4>
           <div class="welcome-subtitle">            
@@ -376,7 +376,7 @@
             <el-icon><Bell /></el-icon>
             系统通知
             <el-button 
-              type="text" 
+              link 
               size="small" 
               class="more-button"
               @click="router.push('/admin/system/notices')"

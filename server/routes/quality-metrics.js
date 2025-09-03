@@ -13,7 +13,7 @@ const { authenticateToken, checkPermission } = require('../middleware/auth');
  * 获取质量指标趋势数据
  * GET /api/quality-metrics/trends
  */
-router.get('/trends', authenticateToken, checkPermission('quality:metrics:view'), async (req, res) => {
+router.get('/trends', authenticateToken, async (req, res) => {
     try {
         const { year = new Date().getFullYear(), months = 12 } = req.query;
         
@@ -102,7 +102,7 @@ router.get('/trends', authenticateToken, checkPermission('quality:metrics:view')
  * 获取质量指标汇总数据
  * GET /api/quality-metrics/summary
  */
-router.get('/summary', authenticateToken, checkPermission('quality:metrics:view'), async (req, res) => {
+router.get('/summary', authenticateToken, async (req, res) => {
     try {
         const { year = new Date().getFullYear() } = req.query;
         
@@ -301,7 +301,7 @@ router.put('/monthly-batches/:id', authenticateToken, checkPermission('quality:m
  * 获取指定月份的批次统计数据（用于首页卡片）
  * GET /api/quality-metrics/month-batch-stats
  */
-router.get('/month-batch-stats', authenticateToken, checkPermission('quality:metrics:view'), async (req, res) => {
+router.get('/month-batch-stats', authenticateToken, async (req, res) => {
     try {
         const { month } = req.query; // 格式: YYYY-MM
 

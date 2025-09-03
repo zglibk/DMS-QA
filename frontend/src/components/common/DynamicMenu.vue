@@ -14,9 +14,10 @@
       <!-- 一级菜单（有子菜单） -->
       <el-sub-menu v-if="menu.children && menu.children.length > 0" :key="'menu-' + (menu.ID || menu.Code || menu.Name)" :index="menu.Path || menu.Code">
         <template #title>
-          <el-icon v-if="menu.Icon">
+          <el-icon v-if="menu.Icon && !menu.Icon.startsWith('mdi:')">
             <component :is="getIconComponent(menu.Icon)" />
           </el-icon>
+          <Icon v-else-if="menu.Icon && menu.Icon.startsWith('mdi:')" :icon="menu.Icon" :style="{ fontSize: '16px', marginRight: '8px' }" />
           <span>{{ menu.Name }}</span>
         </template>
         
@@ -25,9 +26,10 @@
           <!-- 二级菜单（有子菜单） -->
           <el-sub-menu v-if="subMenu.children && subMenu.children.length > 0" :key="'submenu-' + (subMenu.ID || subMenu.Code || subMenu.Name)" :index="subMenu.Path || subMenu.Code">
             <template #title>
-              <el-icon v-if="subMenu.Icon">
+              <el-icon v-if="subMenu.Icon && !subMenu.Icon.startsWith('mdi:')">
                 <component :is="getIconComponent(subMenu.Icon)" />
               </el-icon>
+              <Icon v-else-if="subMenu.Icon && subMenu.Icon.startsWith('mdi:')" :icon="subMenu.Icon" :style="{ fontSize: '16px', marginRight: '8px' }" />
               <span>{{ subMenu.Name }}</span>
             </template>
             
@@ -37,30 +39,34 @@
               :key="thirdMenu.ID || thirdMenu.Code || thirdMenu.Name" 
               :index="thirdMenu.Path || thirdMenu.Code"
             >
-              <el-icon v-if="thirdMenu.Icon">
+              <el-icon v-if="thirdMenu.Icon && !thirdMenu.Icon.startsWith('mdi:')">
                 <component :is="getIconComponent(thirdMenu.Icon)" />
               </el-icon>
+              <Icon v-else-if="thirdMenu.Icon && thirdMenu.Icon.startsWith('mdi:')" :icon="thirdMenu.Icon" :style="{ fontSize: '16px', marginRight: '8px' }" />
               <span>{{ thirdMenu.Name }}</span>
             </el-menu-item>
           </el-sub-menu>
           
           <!-- 二级菜单项（无子菜单） -->
           <el-menu-item v-else :key="'menuitem-' + (subMenu.ID || subMenu.Code || subMenu.Name)" :index="subMenu.Path || subMenu.Code">
-            <el-icon v-if="subMenu.Icon">
+            <el-icon v-if="subMenu.Icon && !subMenu.Icon.startsWith('mdi:')">
               <component :is="getIconComponent(subMenu.Icon)" />
             </el-icon>
+            <Icon v-else-if="subMenu.Icon && subMenu.Icon.startsWith('mdi:')" :icon="subMenu.Icon" :style="{ fontSize: '16px', marginRight: '8px' }" />
             <span>{{ subMenu.Name }}</span>
           </el-menu-item>
         </template>
       </el-sub-menu>
       
       <!-- 一级菜单项（无子菜单） -->
-      <el-tooltip v-else :content="menu.Name" placement="right" :disabled="!props.collapsed" effect="dark">
-        <el-menu-item :key="'menuitem-' + (menu.ID || menu.Code || menu.Name)" :index="menu.Path || menu.Code">
-          <el-icon v-if="menu.Icon">
-            <component :is="getIconComponent(menu.Icon)" />
-          </el-icon>
-          <span>{{ menu.Name }}</span>
+      <!-- 一级菜单项（无子菜单） -->
+       <el-tooltip v-else :content="menu.Name" placement="right" :disabled="!props.collapsed" effect="dark">
+         <el-menu-item :key="'menuitem-' + (menu.ID || menu.Code || menu.Name)" :index="menu.Path || menu.Code">
+           <el-icon v-if="menu.Icon && !menu.Icon.startsWith('mdi:')">
+             <component :is="getIconComponent(menu.Icon)" />
+           </el-icon>
+           <Icon v-else-if="menu.Icon && menu.Icon.startsWith('mdi:')" :icon="menu.Icon" :style="{ fontSize: '16px', marginRight: '8px' }" />
+           <span>{{ menu.Name }}</span>
         </el-menu-item>
       </el-tooltip>
     </template>
@@ -83,6 +89,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
 import apiService from '@/services/apiService'
+import { Icon } from '@iconify/vue'
 
 // 引入图标组件
 import {

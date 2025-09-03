@@ -55,7 +55,7 @@
             <div class="stat-card total-card">
               <div class="card-header">
                 <h3>总投诉数</h3>
-                <el-icon class="card-icon"><Document /></el-icon>
+                <Icon icon="mdi:file-document" class="card-icon" />
               </div>
               <div class="card-value">{{ statsData.totalComplaints }}</div>
               <div class="card-trend">
@@ -68,7 +68,7 @@
             <div class="stat-card">
               <div class="card-header">
                 <h3>内诉数量</h3>
-                <el-icon class="card-icon"><WarningFilled /></el-icon>
+                <Icon icon="mdi:alert" class="card-icon" />
               </div>
               <div class="card-value">{{ statsData.innerComplaints }}</div>
               <div class="card-trend">
@@ -81,7 +81,7 @@
             <div class="stat-card">
               <div class="card-header">
                 <h3>客诉数量</h3>
-                <el-icon class="card-icon"><User /></el-icon>
+                <Icon icon="mdi:account" class="card-icon" />
               </div>
               <div class="card-value">{{ statsData.outerComplaints }}</div>
               <div class="card-trend">
@@ -94,7 +94,7 @@
             <div class="stat-card">
               <div class="card-header">
                 <h3>平均不良率</h3>
-                <el-icon class="card-icon"><InfoFilled /></el-icon>
+                <Icon icon="mdi:information" class="card-icon" />
               </div>
               <div class="card-value">{{ statsData.avgDefectiveRate }}%</div>
               <div class="card-trend">
@@ -180,6 +180,7 @@
 <script setup>
 import { ref, onMounted, nextTick } from 'vue'
 import { RefreshLeft, Download, Document, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
+import { Icon } from '@iconify/vue'
 import * as echarts from 'echarts'
 import axios from 'axios'
 import { ElMessage } from 'element-plus'

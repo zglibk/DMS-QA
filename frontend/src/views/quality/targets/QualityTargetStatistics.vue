@@ -168,7 +168,7 @@
                         <div class="filter-label-compact">
                           <span>部门筛选：</span>
                           <el-button 
-                            type="text" 
+                            link 
                             @click="toggleSelectAll"
                             :disabled="chartOptionsLoading"
                             size="small"

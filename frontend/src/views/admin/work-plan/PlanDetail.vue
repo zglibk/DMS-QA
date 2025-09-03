@@ -4,7 +4,7 @@
     <div class="page-header">
       <div class="header-left">
         <el-button 
-          type="text" 
+          link 
           @click="goBack"
           class="back-button"
         >

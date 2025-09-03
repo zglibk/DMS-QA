@@ -7,297 +7,297 @@ export const breadcrumbConfig = {
   // 仪表盘
   '/admin': {
     title: '仪表盘',
-    icon: 'Dashboard'
+    icon: 'mdi:view-dashboard'
   },
   '/admin/dashboard': {
     title: '仪表盘',
-    icon: 'Dashboard'
+    icon: 'mdi:view-dashboard'
   },
 
   // 供应商管理
   '/admin/supplier': {
     title: '供应商管理',
-    icon: 'Shop'
+    icon: 'mdi:store'
   },
 
   // 供应商列表
   '/admin/supplier/list': {
     title: '供应商列表',
-    icon: 'List'
+    icon: 'mdi:format-list-bulleted'
   },
 
   // 供应商材料价格
   '/admin/supplier/material-price': {
     title: '材料价格',
-    icon: 'Money'
+    icon: 'mdi:currency-usd'
   },
 
   // 供应商基础信息
   '/admin/supplier/basic-info': {
     title: '供应商基础信息',
-    icon: 'InfoFilled'
+    icon: 'mdi:information'
   },
 
   // 原材料供应商
   '/admin/supplier/materials': {
     title: '原材料供应商',
-    icon: 'Package'
+    icon: 'mdi:package-variant'
   },
 
   // 仪器供应商
   '/admin/supplier/equipment': {
     title: '仪器供应商',
-    icon: 'Platform'
+    icon: 'mdi:tools'
   },
 
   // 供应商质量评估
   '/admin/supplier/quality': {
     title: '供应商质量评估',
-    icon: 'Star'
+    icon: 'mdi:star-check'
   },
 
   // 供应商绩效管理
   '/admin/supplier/performance': {
     title: '供应商绩效管理',
-    icon: 'Promotion'
+    icon: 'mdi:chart-line'
   },
 
   // 供应商合同管理
   '/admin/supplier/contracts': {
     title: '供应商合同管理',
-    icon: 'Document'
+    icon: 'mdi:file-document'
   },
 
   // 合格供应商清单
   '/admin/supplier/qualified': {
     title: '合格供应商清单',
-    icon: 'CircleCheck'
+    icon: 'mdi:check-circle'
   },
 
   // 质量管理
   '/admin/quality': {
     title: '质量管理',
-    icon: 'Medal'
+    icon: 'mdi:medal'
   },
 
   // 质量目标管理
   '/admin/quality/targets': {
     title: '目标管理',
-    icon: 'Target'
+    icon: 'mdi:target'
   },
 
   // 质量目标统计分析
   '/admin/quality/targets/analysis': {
     title: '目标统计分析',
-    icon: 'TrendCharts'
+    icon: 'mdi:chart-areaspline'
   },
 
   // 供应商审核
   '/admin/supplier/audit': {
     title: '供应商审核',
-    icon: 'Search'
+    icon: 'mdi:magnify'
   },
 
   // 出厂检验报告
   '/admin/supplier/inspection-reports': {
     title: '出厂检验报告',
-    icon: 'DocumentChecked'
+    icon: 'mdi:file-check'
   },
   '/admin/supplier/annual-audit-plan': {
     title: '年度审核计划',
-    icon: 'Calendar'
+    icon: 'mdi:calendar-check'
   },
   '/admin/supplier/audit-reports': {
     title: '审核报告管理',
-    icon: 'FolderOpened'
+    icon: 'mdi:folder-open'
   },
 
   // 供应商投诉管理
   '/admin/supplier/complaints': {
     title: '供应商投诉管理',
-    icon: 'Comment'
+    icon: 'mdi:comment-alert'
   },
 
   // 样版管理
   '/admin/sample': {
     title: '样版管理',
-    icon: 'Collection'
+    icon: 'mdi:view-grid'
   },
   '/admin/sample/approval': {
     title: '样品承认书',
-    icon: 'DocumentCopy'
+    icon: 'mdi:file-document-multiple'
   },
   '/admin/sample/color-card': {
     title: '内部色卡',
-    icon: 'Picture'
+    icon: 'mdi:palette'
   },
 
   // 用户管理
   '/admin/user': {
     title: '用户管理',
-    icon: 'User'
+    icon: 'mdi:account'
   },
 
   // 用户列表
   '/admin/user/list': {
     title: '用户列表',
-    icon: 'Users'
+    icon: 'mdi:account-group'
   },
 
   // 人员管理
   '/admin/person-management': {
     title: '人员管理',
-    icon: 'People'
+    icon: 'mdi:account-multiple'
   },
 
   // 返工管理
   '/admin/rework-management': {
     title: '返工管理',
-    icon: 'RefreshRight'
+    icon: 'mdi:refresh'
   },
 
   // 权限管理
   '/admin/permission': {
     title: '权限管理',
-    icon: 'Lock'
+    icon: 'mdi:lock'
   },
 
   // 部门管理
   '/admin/department-management': {
     title: '部门管理',
-    icon: 'OfficeBuilding'
+    icon: 'mdi:office-building'
   },
 
   // 岗位管理
   '/admin/position-management': {
     title: '岗位管理',
-    icon: 'Briefcase'
+    icon: 'mdi:briefcase'
   },
 
   // 角色管理
   '/admin/role-management': {
     title: '角色管理',
-    icon: 'UserGroup'
+    icon: 'mdi:account-supervisor'
   },
 
   // 菜单管理
   '/admin/menu-management': {
     title: '菜单管理',
-    icon: 'Menu'
+    icon: 'mdi:menu'
   },
 
   // 角色列表
   '/admin/role-list': {
     title: '角色列表',
-    icon: 'List'
+    icon: 'mdi:format-list-numbered'
   },
 
   // 权限列表
   '/admin/permission-list': {
     title: '权限列表',
-    icon: 'Key'
+    icon: 'mdi:key'
   },
 
   // 设置
   '/admin/settings': {
     title: '设置',
-    icon: 'Setting'
+    icon: 'mdi:cog'
   },
 
   // 数据管理
   '/admin/data-management': {
     title: '数据管理',
-    icon: 'Database'
+    icon: 'mdi:database'
   },
 
   // 路径格式分析
   '/admin/path-analysis': {
     title: '路径格式分析',
-    icon: 'Connection'
+    icon: 'mdi:connection'
   },
 
   // 文件拷贝测试
   '/admin/file-copy-test': {
     title: '文件拷贝测试',
-    icon: 'CopyDocument'
+    icon: 'mdi:content-copy'
   },
 
   // 系统配置
   '/admin/system-config': {
     title: '系统配置',
-    icon: 'SetUp'
+    icon: 'mdi:tune'
   },
 
   // 主页卡片配置
   '/admin/home-card-config': {
     title: '主页卡片配置',
-    icon: 'Grid'
+    icon: 'mdi:view-grid-plus'
   },
 
   // 用户中心
   '/admin/profile': {
     title: '用户中心',
-    icon: 'UserFilled'
+    icon: 'mdi:account-circle'
   },
 
   // 质量管理
   '/admin/quality': {
     title: '质量管理',
-    icon: 'Medal'
+    icon: 'mdi:medal'
   },
 
   // 质量指标
   '/admin/quality/metrics': {
     title: '质量指标',
-    icon: 'Odometer'
+    icon: 'mdi:speedometer'
   },
 
   // 质量异常数据导入
   '/admin/quality/data-management': {
     title: '质量异常数据导入',
-    icon: 'Upload'
+    icon: 'mdi:upload'
   },
 
   // 质量报告
   '/admin/quality/reports': {
     title: '质量报告',
-    icon: 'Notebook'
+    icon: 'mdi:notebook'
   },
 
   // 投诉管理
   '/admin/complaint': {
     title: '投诉管理',
-    icon: 'MessageBox'
+    icon: 'mdi:message-alert'
   },
 
   // 质量管理 - 投诉管理
   '/admin/quality/complaint': {
     title: '投诉管理',
-    icon: 'WarningFilled'
+    icon: 'mdi:alert-circle'
   },
 
   // 内部投诉
   '/admin/quality/complaint/internal': {
     title: '内部投诉',
-    icon: 'ChatDotRound'
+    icon: 'mdi:chat-processing'
   },
 
   // 客户投诉
   '/admin/quality/complaint/customer': {
     title: '客户投诉',
-    icon: 'Phone'
+    icon: 'mdi:phone'
   },
 
   // 投诉列表
   '/admin/complaint/list': {
     title: '投诉列表',
-    icon: 'ChatLineSquare'
+    icon: 'mdi:chat-outline'
   },
 
   // 投诉分析
   '/admin/complaint/analysis': {
     title: '投诉分析',
-    icon: 'PieChart'
+    icon: 'mdi:chart-pie'
   },
 
   // 材料管理
