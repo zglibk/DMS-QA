@@ -272,14 +272,59 @@ router.get('/stats', authenticateToken, async (req, res) => {
     });
     const totalUsers = totalUsersResult ? totalUsersResult.recordset[0].count : 0;
     
+    // 获取待处理任务数（状态为pending或in_progress的工作计划）
+    const taskCountQuery = `
+      SELECT COUNT(*) as count 
+      FROM WorkPlans 
+      WHERE Status IN ('pending', 'in_progress')
+    `;
+    const taskCountResult = await executeQuery(async (pool) => {
+      let request = pool.request();
+      return await request.query(taskCountQuery);
+    });
+    const taskCount = taskCountResult ? taskCountResult.recordset[0].count : 0;
+    
+    // 获取质量预警数（包括客诉、内诉和逾期任务）
+    const alertCountQuery = `
+      SELECT 
+        (
+          -- 本月客诉数量
+          SELECT COUNT(*) 
+          FROM ComplaintRegister 
+          WHERE ComplaintCategory = N'客诉' 
+            AND YEAR(Date) = YEAR(GETDATE()) 
+            AND MONTH(Date) = MONTH(GETDATE())
+        ) + 
+        (
+          -- 本月内诉数量
+          SELECT COUNT(*) 
+          FROM ComplaintRegister 
+          WHERE ComplaintCategory = N'内诉' 
+            AND YEAR(Date) = YEAR(GETDATE()) 
+            AND MONTH(Date) = MONTH(GETDATE())
+        ) + 
+        (
+          -- 逾期未完成的工作计划数量
+          SELECT COUNT(*) 
+          FROM WorkPlans 
+          WHERE Status IN ('pending', 'in_progress') 
+            AND EndDate < GETDATE()
+        ) as count
+    `;
+    const alertCountResult = await executeQuery(async (pool) => {
+      let request = pool.request();
+      return await request.query(alertCountQuery);
+    });
+    const alertCount = alertCountResult ? alertCountResult.recordset[0].count : 0;
+
     res.json({
       success: true,
       data: {
         todayLoginCount,
         onlineUserCount,
         totalUsers,
-        taskCount: 0, // 待处理任务数，需要根据实际业务逻辑实现
-        alertCount: 0 // 质量预警数，需要根据实际业务逻辑实现
+        taskCount, // 待处理任务数（真实数据）
+        alertCount // 质量预警数（真实数据）
       },
       message: '获取统计数据成功'
     });

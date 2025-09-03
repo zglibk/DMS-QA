@@ -970,6 +970,8 @@ export const useUserStore = defineStore('user', {
      */
     async fetchUnreadNoticeCount() {
       try {
+        // 确保apiService已初始化
+        await apiService.initialize()
         const response = await apiService.get('/notice/unread/count')
         if (response.data.success) {
           this.unreadNoticeCount = response.data.data?.unreadCount || 0

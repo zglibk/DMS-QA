@@ -4,14 +4,17 @@
     <el-card class="welcome-header">
       <div class="welcome-content">
         <div class="welcome-text">
-          <h2>欢迎回来，{{ userStore.user?.username || '用户' }}！</h2>
-          <p class="welcome-subtitle">
+          <h2 class="welcome-title">
+            <span class="greeting-text">欢迎回来，</span>
+            <span class="username-highlight">{{ userStore.user?.realName || userStore.user?.RealName || userStore.user?.username || '用户' }}</span>
+          </h2>
+          <div class="welcome-subtitle">            
             <el-icon class="calendar-icon"><Calendar /></el-icon>
-            现在是 {{ currentDateTime }}
-            <el-tag size="small" type="primary" class="weekday-tag">
+            <span class="datetime-text">现在是 {{ currentDateTime }}</span>
+            <el-tag size="small" type="success" style="margin-left: 8px;">
               {{ getCurrentWeekday() }}
-            </el-tag>
-          </p>
+            </el-tag>            
+          </div>
         </div>
         <div class="welcome-stats">
           <div class="stat-item">
@@ -416,7 +419,8 @@ import {
   Plus,
   ArrowRight,
   Calendar,
-  Check
+  Check,
+  List
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -994,14 +998,17 @@ defineExpose({
 }
 
 .calendar-icon {
-  color: #909399;
-  font-size: 14px;
+  color: #667eea;
+  font-size: 16px;
+  padding: 4px;
+  border-radius: 50%;
+  background: rgba(102, 126, 234, 0.1);
+  transition: all 0.3s ease;
 }
 
-.weekday-tag {
-  margin-left: 8px;
-  font-weight: 500;
-  border-radius: 12px;
+.calendar-icon:hover {
+  background: rgba(102, 126, 234, 0.2);
+  transform: scale(1.1);
 }
 
 .welcome-content {
@@ -1010,16 +1017,47 @@ defineExpose({
   align-items: center;
 }
 
-.welcome-text h1 {
-  margin: 0 0 8px 0;
-  font-size: 28px;
-  font-weight: 600;
+/* 欢迎标题样式 */
+.welcome-title {
+  margin: 0 0 12px 0;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.2;
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 
+.greeting-text {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: fadeInLeft 0.8s ease-out;
+}
+
+.username-highlight {
+  background: linear-gradient(135deg, #93affb 0%, #f5576c 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  font-weight: 700;
+  position: relative;
+  animation: fadeInUp 0.8s ease-out 0.2s both;
+}
+
+/* 时间信息容器 */
 .welcome-subtitle {
   margin: 0;
+  animation: fadeInRight 0.8s ease-out 0.4s both;
+}
+
+.datetime-text {
   font-size: 16px;
-  opacity: 0.9;
+  font-weight: 500;
+  color: #4a5568;
+  letter-spacing: 0.5px;
 }
 
 .welcome-stats {
@@ -1040,6 +1078,61 @@ defineExpose({
 .stat-label {
   font-size: 14px;
   opacity: 0.8;
+}
+
+/* 动画关键帧 */
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes expandWidth {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes bounce {
+  0%, 20%, 50%, 80%, 100% {
+    transform: translateY(0);
+  }
+  40% {
+    transform: translateY(-8px);
+  }
+  60% {
+    transform: translateY(-4px);
+  }
 }
 
 /* 主要内容区域 */

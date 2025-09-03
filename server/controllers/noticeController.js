@@ -6,7 +6,7 @@
  */
 
 const sql = require('mssql');
-const { getConnection } = require('../config/database');
+const { getConnection, executeQuery } = require('../config/database');
 const moment = require('moment');
 const fs = require('fs');
 const path = require('path');
@@ -40,7 +40,6 @@ const cleanPTags = (content) => {
  */
 const getNoticeList = async (req, res) => {
     try {
-        const pool = await getConnection();
         const { 
             limit = 10, 
             page = 1, 
@@ -99,58 +98,81 @@ const getNoticeList = async (req, res) => {
             }
         }
         
-        // 先查询总数
-        const countQuery = `
-            SELECT COUNT(*) as total
-            FROM Notices n
-            LEFT JOIN NoticeReadStatus nrs ON n.ID = nrs.NoticeID AND nrs.UserID = @userId
-            ${whereClause}
-        `;
-        
-        const countResult = await pool.request()
-            .input('userId', sql.Int, userId)
-            .query(countQuery);
-        
-        const total = countResult.recordset[0].total;
-        
-        // 查询通知公告（包含已读状态和分页）- 使用ROW_NUMBER()兼容旧版SQL Server
-        const noticeQuery = `
-            SELECT * FROM (
-                SELECT 
-                    n.ID,
-                    n.Title,
-                    n.Content,
-                    n.Type,
-                    n.Priority,
-                    n.PublishDate,
-                    n.CreatedBy,
-                    n.IsActive,
-                    n.ViewCount,
-                    n.IsSticky,
-                    n.ExpiryDate,
-                    n.RequireConfirmation,
-                    n.ImagePath,
-                    ISNULL(nrs.IsRead, 0) as IsRead,
-                    nrs.ReadTime,
-                    ISNULL(nrs.IsConfirmed, 0) as IsConfirmed,
-                    nrs.ConfirmTime,
-                    ROW_NUMBER() OVER (ORDER BY n.IsSticky DESC, n.Priority DESC, n.PublishDate DESC) as RowNum
+        // 使用 executeQuery 执行数据库查询
+        const queryResult = await executeQuery(async (pool) => {
+            // 先查询总数
+            const countQuery = `
+                SELECT COUNT(*) as total
                 FROM Notices n
                 LEFT JOIN NoticeReadStatus nrs ON n.ID = nrs.NoticeID AND nrs.UserID = @userId
                 ${whereClause}
-            ) AS PagedResults
-            WHERE RowNum > @offset AND RowNum <= @offset + @pageSize
-            ORDER BY RowNum
-        `;
+            `;
+            
+            const countResult = await pool.request()
+                .input('userId', sql.Int, userId)
+                .query(countQuery);
+            
+            const total = countResult.recordset[0].total;
+            
+            // 查询通知公告（包含已读状态和分页）- 使用ROW_NUMBER()兼容旧版SQL Server
+            const noticeQuery = `
+                SELECT * FROM (
+                    SELECT 
+                        n.ID,
+                        n.Title,
+                        n.Content,
+                        n.Type,
+                        n.Priority,
+                        n.PublishDate,
+                        n.CreatedBy,
+                        n.IsActive,
+                        n.ViewCount,
+                        n.IsSticky,
+                        n.ExpiryDate,
+                        n.RequireConfirmation,
+                        n.ImagePath,
+                        ISNULL(nrs.IsRead, 0) as IsRead,
+                        nrs.ReadTime,
+                        ISNULL(nrs.IsConfirmed, 0) as IsConfirmed,
+                        nrs.ConfirmTime,
+                        ROW_NUMBER() OVER (ORDER BY n.IsSticky DESC, n.Priority DESC, n.PublishDate DESC) as RowNum
+                    FROM Notices n
+                    LEFT JOIN NoticeReadStatus nrs ON n.ID = nrs.NoticeID AND nrs.UserID = @userId
+                    ${whereClause}
+                ) AS PagedResults
+                WHERE RowNum > @offset AND RowNum <= @offset + @pageSize
+                ORDER BY RowNum
+            `;
+            
+            const result = await pool.request()
+                .input('offset', sql.Int, offset)
+                .input('pageSize', sql.Int, pageSize)
+                .input('userId', sql.Int, userId)
+                .query(noticeQuery);
+                
+            return { total, notices: result.recordset };
+        });
         
-        const result = await pool.request()
-            .input('offset', sql.Int, offset)
-            .input('pageSize', sql.Int, pageSize)
-            .input('userId', sql.Int, userId)
-            .query(noticeQuery);
+        // 检查查询结果
+        if (!queryResult) {
+            // 如果数据库查询失败，返回默认数据
+            return res.json({
+                success: true,
+                data: [],
+                pagination: {
+                    page: pageNum,
+                    size: pageSize,
+                    total: 0,
+                    totalPages: 0
+                },
+                message: '通知公告获取成功（数据库连接异常，返回空数据）'
+            });
+        }
+        
+        const { total, notices } = queryResult;
         
         // 格式化日期和处理图片路径
-        const notices = result.recordset.map(notice => {
+        const formattedNotices = notices.map(notice => {
             // 解析图片路径信息
             let imagePath = [];
             try {
@@ -177,7 +199,7 @@ const getNoticeList = async (req, res) => {
         
         res.json({
             success: true,
-            data: notices,
+            data: formattedNotices,
             pagination: {
                 page: pageNum,
                 size: pageSize,
