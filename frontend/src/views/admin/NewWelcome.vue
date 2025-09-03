@@ -680,7 +680,7 @@ const quickActions = ref([
     title: '客户签样',
     description: '管理客户样品签收',
     icon: 'mdi:clipboard-check-outline',
-    path: '/admin/quality/customer-sample',
+    path: 'admin/sample/approval',
     color: '#3F51B5', // 靛蓝色 - 客户签样
     iconColor: '#FFFFFF'
   },
@@ -716,7 +716,7 @@ const quickActions = ref([
     title: '通知公告',
     description: '查看和管理系统公告',
     icon: 'mdi:bullhorn-outline',
-    path: '/admin/system/notice',
+    path: '/admin/system/notices',
     color: '#909399', // 灰色 - 通知公告
     iconColor: '#FFFFFF'
   },
