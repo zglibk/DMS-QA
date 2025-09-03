@@ -8,6 +8,7 @@
     :collapse="collapsed"
     unique-opened
     :default-active="activeMenu"
+    popper-effect="dark"
   >
     <template v-for="menu in menuList">
       <!-- 一级菜单（有子菜单） -->
@@ -54,12 +55,14 @@
       </el-sub-menu>
       
       <!-- 一级菜单项（无子菜单） -->
-      <el-menu-item v-else :key="'menuitem-' + (menu.ID || menu.Code || menu.Name)" :index="menu.Path || menu.Code">
-        <el-icon v-if="menu.Icon">
-          <component :is="getIconComponent(menu.Icon)" />
-        </el-icon>
-        <span>{{ menu.Name }}</span>
-      </el-menu-item>
+      <el-tooltip v-else :content="menu.Name" placement="right" :disabled="!props.collapsed" effect="dark">
+        <el-menu-item :key="'menuitem-' + (menu.ID || menu.Code || menu.Name)" :index="menu.Path || menu.Code">
+          <el-icon v-if="menu.Icon">
+            <component :is="getIconComponent(menu.Icon)" />
+          </el-icon>
+          <span>{{ menu.Name }}</span>
+        </el-menu-item>
+      </el-tooltip>
     </template>
   </el-menu>
 </template>
@@ -227,8 +230,53 @@ const getIconComponent = (iconName) => {
 }
 
 // 计算当前激活的菜单
+/**
+ * 计算当前激活的菜单项
+ * 在折叠状态下，需要找到当前路由对应的顶级菜单
+ */
 const activeMenu = computed(() => {
-  return route.path
+  const currentPath = route.path
+  
+  // 如果菜单未折叠，直接返回当前路径
+  if (!props.collapsed) {
+    return currentPath
+  }
+  
+  // 折叠状态下，需要找到当前路由对应的顶级菜单
+  const findTopLevelMenu = (menus, targetPath) => {
+    for (const menu of menus) {
+      // 检查当前菜单是否匹配
+      if (menu.Path === targetPath) {
+        return menu.Path
+      }
+      
+      // 检查子菜单是否匹配
+      if (menu.children && menu.children.length > 0) {
+        const childMatch = findChildMatch(menu.children, targetPath)
+        if (childMatch) {
+          return menu.Path // 返回顶级菜单的路径
+        }
+      }
+    }
+    return currentPath
+  }
+  
+  // 递归查找子菜单匹配
+  const findChildMatch = (children, targetPath) => {
+    for (const child of children) {
+      if (child.Path === targetPath) {
+        return true
+      }
+      if (child.children && child.children.length > 0) {
+        if (findChildMatch(child.children, targetPath)) {
+          return true
+        }
+      }
+    }
+    return false
+  }
+  
+  return findTopLevelMenu(menuList.value, currentPath)
 })
 
 // 获取用户菜单

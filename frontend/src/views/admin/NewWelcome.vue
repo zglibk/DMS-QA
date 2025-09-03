@@ -4,12 +4,12 @@
     <el-card class="welcome-header">
       <div class="welcome-content">
         <div class="welcome-text">
-          <h2 class="welcome-title">
+          <h4 class="welcome-title">
             <span class="greeting-text">欢迎回来</span>
             <span class="username-highlight">{{ userStore.user?.realName || userStore.user?.RealName || userStore.user?.username || '用户' }}</span>
-          </h2>
+          </h4>
           <div class="welcome-subtitle">            
-            <Icon icon="mdi:clock-outline" class="calendar-icon" :style="{ fontSize: '42px', color: '#409eff' }" />
+            <Icon icon="mdi:clock-outline" class="calendar-icon" :style="{ fontSize: '22px', color: '#409eff' }" />
             <span class="datetime-text">现在是 {{ currentDateTime }}</span>
             <el-tag size="small" type="success" style="margin-left: 8px;">
               {{ getCurrentWeekday() }}
@@ -1388,7 +1388,7 @@ defineExpose({
 /* 欢迎标题样式 */
 .welcome-title {
   margin: 0 0 12px 0;
-  font-size: 26px;
+  font-size: 18px;
   font-weight: 700;
   line-height: 1.2;
   display: flex;
@@ -1398,7 +1398,7 @@ defineExpose({
 }
 
 .greeting-text {
-  font-size: 20px;
+  font-size: 14px;
   color: #67C23A;
   font-weight: 500;
   animation: fadeInLeft 0.8s ease-out;
@@ -1585,7 +1585,7 @@ defineExpose({
 /* 主要内容区域 */
 .dashboard-main {
   display: grid;
-  grid-template-columns: 2fr 1fr;
+  grid-template-columns: 3fr 1fr;
   gap: 24px;
 }
 

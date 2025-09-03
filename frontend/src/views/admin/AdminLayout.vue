@@ -197,6 +197,11 @@ onMounted(async () => {
   border-radius: 0.5rem;
   background: #fff;
 }
+
+/* 折叠状态下LOGO图片居中 */
+.admin-aside[style*="width: 64px"] .logo-img {
+  margin-right: 0;
+}
 .logo-text {
   font-size: 1.1rem;
   font-weight: bold;
@@ -421,15 +426,17 @@ onMounted(async () => {
   color: #fff !important;
 }
 .el-menu-vertical-demo :deep(.el-menu-item:hover) {
-  border-left: 4px solid #009587;
+  border-left: 4px solid #409EFF;
   background: #3a4149 !important;
   color: #fff !important;
 }
 .el-menu-vertical-demo :deep(.el-menu-item.is-active) {
-  border-left: 4px solid #009587;
-  background: #009587 !important;
+  border-left: 4px solid #409EFF;
+  background: #409EFF !important;
   color: #fff !important;
 }
+
+
 .el-menu-vertical-demo :deep(.el-sub-menu__title) {
   background: #3a4149 !important;
   color: #fff !important;
@@ -441,9 +448,14 @@ onMounted(async () => {
 .el-menu-vertical-demo :deep(.el-sub-menu .el-menu-item) {
   background: #232a32 !important;
   color: #fff !important;
+  transition: background 0.2s;
+}
+.el-menu-vertical-demo :deep(.el-sub-menu .el-menu-item:hover) {
+  background: #409EFF !important;
+  color: #fff !important;
 }
 .el-menu-vertical-demo :deep(.el-sub-menu .el-menu-item.is-active) {
-  background: #009587 !important;
+  background: #409EFF !important;
   color: #fff !important;
 }
 /* 用户下拉触发器样式 */
