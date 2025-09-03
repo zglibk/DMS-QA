@@ -290,9 +290,17 @@
 
         <!-- 系统通知 -->
         <div class="notifications-section">
-          <h2 class="section-title">
+          <h2 class="section-title section-title-with-more">
             <el-icon><Bell /></el-icon>
             系统通知
+            <el-button 
+              type="text" 
+              size="small" 
+              class="more-button"
+              @click="router.push('/admin/system/notices')"
+            >
+              更多>>
+            </el-button>
           </h2>
           <div class="notifications-list">
             <div 
@@ -1176,6 +1184,21 @@ defineExpose({
   font-size: 18px;
   font-weight: 600;
   color: #303133;
+}
+
+.section-title-with-more {
+  justify-content: space-between;
+}
+
+.more-button {
+  margin-left: auto;
+  color: #409eff;
+  font-size: 14px;
+  padding: 0;
+}
+
+.more-button:hover {
+  color: #66b1ff;
 }
 
 /* 数据概览 */
