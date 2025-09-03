@@ -5,11 +5,11 @@
       <div class="welcome-content">
         <div class="welcome-text">
           <h2 class="welcome-title">
-            <span class="greeting-text">欢迎回来，</span>
+            <span class="greeting-text">欢迎回来</span>
             <span class="username-highlight">{{ userStore.user?.realName || userStore.user?.RealName || userStore.user?.username || '用户' }}</span>
           </h2>
           <div class="welcome-subtitle">            
-            <el-icon class="calendar-icon"><Calendar /></el-icon>
+            <Icon icon="mdi:clock-outline" class="calendar-icon" :style="{ fontSize: '42px', color: '#409eff' }" />
             <span class="datetime-text">现在是 {{ currentDateTime }}</span>
             <el-tag size="small" type="success" style="margin-left: 8px;">
               {{ getCurrentWeekday() }}
@@ -17,17 +17,32 @@
           </div>
         </div>
         <div class="welcome-stats">
-          <div class="stat-item">
-            <div class="stat-number">{{ todayStats.loginCount }}</div>
-            <div class="stat-label">今日登录</div>
+          <div class="stat-item stat-login">
+            <div class="stat-icon">
+              <Icon icon="mdi:login" :style="{ fontSize: '24px', color: 'white' }" />
+            </div>
+            <div class="stat-content">
+              <div class="stat-number">{{ todayStats.loginCount }}</div>
+              <div class="stat-label">今日登录</div>
+            </div>
           </div>
-          <div class="stat-item">
-            <div class="stat-number">{{ todayStats.taskCount }}</div>
-            <div class="stat-label">待处理任务</div>
+          <div class="stat-item stat-task clickable" @click="navigateToTasks">
+            <div class="stat-icon">
+              <Icon icon="mdi:clipboard-list" :style="{ fontSize: '24px', color: 'white' }" />
+            </div>
+            <div class="stat-content">
+              <div class="stat-number">{{ todayStats.taskCount }}</div>
+              <div class="stat-label">待处理任务</div>
+            </div>
           </div>
-          <div class="stat-item">
-            <div class="stat-number">{{ todayStats.alertCount }}</div>
-            <div class="stat-label">质量预警</div>
+          <div class="stat-item stat-alert clickable" @click="navigateToAlerts">
+            <div class="stat-icon">
+              <Icon icon="mdi:alert-circle" :style="{ fontSize: '24px', color: 'white' }" />
+            </div>
+            <div class="stat-content">
+              <div class="stat-number">{{ todayStats.alertCount }}</div>
+              <div class="stat-label">质量预警</div>
+            </div>
           </div>
         </div>
       </div>
@@ -41,19 +56,20 @@
         <div class="overview-section">
           <h2 class="section-title">
             <el-icon><DataBoard /></el-icon>
-            数据概览
+            年度数据概览
           </h2>
           <div class="overview-grid">
             <div class="overview-card" v-for="item in overviewData" :key="item.key">
-              <div class="card-icon" :style="{ backgroundColor: item.color }">
-                <el-icon><component :is="item.icon" /></el-icon>
+              <div class="card-icon">
+                <Icon :icon="item.icon" :style="{ color: item.color, fontSize: '40px' }" />
               </div>
               <div class="card-content">
                 <div class="card-title">{{ item.title }}</div>
                 <div class="card-value">{{ item.value }}</div>
                 <div class="card-trend" :class="item.trend">
-                  <el-icon><component :is="item.trendIcon" /></el-icon>
-                  {{ item.trendText }}
+                  相比去年同期
+                  <Icon :icon="item.trendIcon" :style="{ fontSize: '14px', color: item.trendColor }" />
+                  <span :style="{ color: item.trendColor }">{{ item.trendText }}</span>
                 </div>
               </div>
             </div>
@@ -68,34 +84,45 @@
           </h2>
           <div class="quick-actions-grid">
             <div 
-              class="action-card" 
+              class="action-item" 
               v-for="action in quickActions" 
               :key="action.key"
               @click="handleQuickAction(action)"
+              @keydown.enter="handleQuickAction(action)"
+              @keydown.space="handleQuickAction(action)"
+              tabindex="0"
             >
-              <div class="action-icon">
-                <el-icon><component :is="action.icon" /></el-icon>
+              <div 
+                class="action-button" 
+                :style="{ backgroundColor: action.color }"
+              >
+                <Icon 
+                  :icon="action.icon" 
+                  :style="{ color: action.iconColor }"
+                />
               </div>
-              <div class="action-title">{{ action.title }}</div>
-              <div class="action-desc">{{ action.description }}</div>
+              <div class="action-name">{{ action.title }}</div>
             </div>
           </div>
         </div>
 
         <!-- 系统介绍卡片 -->
         <div class="system-intro-section">
-          <h2 class="section-title">
-            <el-icon><InfoFilled /></el-icon>
-            系统介绍
-          </h2>
           <el-card class="system-intro-card">
+            <template #header>
+              <div class="card-header">
+                <el-icon><InfoFilled /></el-icon>
+                <span>系统介绍</span>
+              </div>
+            </template>
             <!-- 切换按钮组 -->
             <div class="intro-tabs">
               <el-button
                 :type="introActiveTab === 'tech' ? 'primary' : 'default'"
                 @click="introActiveTab = 'tech'"
                 size="default"
-                plain
+                :plain="introActiveTab !== 'tech'"
+                class="intro-tab-btn"
               >
                 <el-icon><Monitor /></el-icon>
                 技术栈
@@ -104,7 +131,8 @@
                 :type="introActiveTab === 'features' ? 'success' : 'default'"
                 @click="introActiveTab = 'features'"
                 size="default"
-                plain
+                :plain="introActiveTab !== 'features'"
+                class="intro-tab-btn"
               >
                 <el-icon><List /></el-icon>
                 主要功能
@@ -113,7 +141,8 @@
                 :type="introActiveTab === 'developer' ? 'warning' : 'default'"
                 @click="introActiveTab = 'developer'"
                 size="default"
-                plain
+                :plain="introActiveTab !== 'developer'"
+                class="intro-tab-btn"
               >
                 <el-icon><User /></el-icon>
                 开发者信息
@@ -127,40 +156,49 @@
                 <div class="tech-stack">
                   <!-- 前端技术栈 -->
                   <div class="tech-category">
-                    <span class="tech-category-title">前端</span>
+                    <div class="tech-category-header">
+                      <Icon icon="mdi:monitor" class="tech-category-icon" :style="{ color: '#409eff' }" />
+                      <span class="tech-category-title">前端技术</span>
+                    </div>
                     <div class="tech-tags">
-                      <el-tag type="primary">Vue 3.0.0</el-tag>
-                      <el-tag type="success">Element Plus 2.0.0</el-tag>
-                      <el-tag type="info">Vite 4.5.1</el-tag>
-                      <el-tag type="warning">Pinia 3.0.3</el-tag>
-                      <el-tag>Vue Router 4.0.0</el-tag>
-                      <el-tag>ECharts 5.4.3</el-tag>
+                      <el-tag type="primary" class="tech-tag">Vue 3.0.0</el-tag>
+                      <el-tag type="success" class="tech-tag">Element Plus 2.0.0</el-tag>
+                      <el-tag type="info" class="tech-tag">Vite 4.5.1</el-tag>
+                      <el-tag type="warning" class="tech-tag">Pinia 3.0.3</el-tag>
+                      <el-tag class="tech-tag">Vue Router 4.0.0</el-tag>
+                      <el-tag class="tech-tag">ECharts 5.4.3</el-tag>
                     </div>
                   </div>
                   
                   <!-- 后端技术栈 -->
                   <div class="tech-category">
-                    <span class="tech-category-title">后端</span>
+                    <div class="tech-category-header">
+                      <Icon icon="mdi:server" class="tech-category-icon" :style="{ color: '#67c23a' }" />
+                      <span class="tech-category-title">后端技术</span>
+                    </div>
                     <div class="tech-tags">
-                      <el-tag type="primary">Node.js 16.0.0+</el-tag>
-                      <el-tag type="success">Express 4.18.2</el-tag>
-                      <el-tag type="danger">SQL Server</el-tag>
-                      <el-tag type="warning">JWT</el-tag>
-                      <el-tag>Multer 1.4.5</el-tag>
-                      <el-tag>Node-Cron 4.2.1</el-tag>
+                      <el-tag type="primary" class="tech-tag">Node.js 16.0.0+</el-tag>
+                      <el-tag type="success" class="tech-tag">Express 4.18.2</el-tag>
+                      <el-tag type="danger" class="tech-tag">SQL Server</el-tag>
+                      <el-tag type="warning" class="tech-tag">JWT</el-tag>
+                      <el-tag class="tech-tag">Multer 1.4.5</el-tag>
+                      <el-tag class="tech-tag">Node-Cron 4.2.1</el-tag>
                     </div>
                   </div>
                   
                   <!-- 工具库 -->
                   <div class="tech-category">
-                    <span class="tech-category-title">工具库</span>
+                    <div class="tech-category-header">
+                      <Icon icon="mdi:tools" class="tech-category-icon" :style="{ color: '#e6a23c' }" />
+                      <span class="tech-category-title">工具库</span>
+                    </div>
                     <div class="tech-tags">
-                      <el-tag type="info">Axios 1.11.0</el-tag>
-                      <el-tag>ExcelJS 4.4.0</el-tag>
-                      <el-tag>Moment 2.30.1</el-tag>
-                      <el-tag>UUID 11.1.0</el-tag>
-                      <el-tag>BCryptJS 2.4.3</el-tag>
-                      <el-tag>Sharp 0.34.3</el-tag>
+                      <el-tag type="info" class="tech-tag">Axios 1.11.0</el-tag>
+                      <el-tag class="tech-tag">ExcelJS 4.4.0</el-tag>
+                      <el-tag class="tech-tag">Moment 2.30.1</el-tag>
+                      <el-tag class="tech-tag">UUID 11.1.0</el-tag>
+                      <el-tag class="tech-tag">BCryptJS 2.4.3</el-tag>
+                      <el-tag class="tech-tag">Sharp 0.34.3</el-tag>
                     </div>
                   </div>
                 </div>
@@ -168,15 +206,39 @@
               
               <!-- 主要功能内容 -->
               <div v-show="introActiveTab === 'features'" class="intro-item">
-                <div class="feature-tags">
-                  <el-tag class="feature-tag" type="success">质量管理与投诉处理</el-tag>
-                  <el-tag class="feature-tag" type="warning">工作计划管理</el-tag>
-                  <el-tag class="feature-tag" type="danger">供应商管理</el-tag>
-                  <el-tag class="feature-tag" type="info">质量成本分析</el-tag>
-                  <el-tag class="feature-tag" type="success">系统权限管理</el-tag>
-                  <el-tag class="feature-tag" type="warning">数据统计与报表</el-tag>
-                  <el-tag class="feature-tag" type="danger">文件管理与共享</el-tag>
-                  <el-tag class="feature-tag" type="info">系统日志管理</el-tag>
+                <div class="features-grid">
+                  <div class="feature-item">
+                    <Icon icon="mdi:shield-check" class="feature-icon" :style="{ color: '#67c23a' }" />
+                    <span class="feature-text">质量管理与投诉处理</span>
+                  </div>
+                  <div class="feature-item">
+                    <Icon icon="mdi:calendar-check" class="feature-icon" :style="{ color: '#e6a23c' }" />
+                    <span class="feature-text">工作计划管理</span>
+                  </div>
+                  <div class="feature-item">
+                    <Icon icon="mdi:account-group" class="feature-icon" :style="{ color: '#f56c6c' }" />
+                    <span class="feature-text">供应商管理</span>
+                  </div>
+                  <div class="feature-item">
+                    <Icon icon="mdi:chart-line" class="feature-icon" :style="{ color: '#409eff' }" />
+                    <span class="feature-text">质量成本分析</span>
+                  </div>
+                  <div class="feature-item">
+                    <Icon icon="mdi:account-key" class="feature-icon" :style="{ color: '#67c23a' }" />
+                    <span class="feature-text">系统权限管理</span>
+                  </div>
+                  <div class="feature-item">
+                    <Icon icon="mdi:chart-bar" class="feature-icon" :style="{ color: '#e6a23c' }" />
+                    <span class="feature-text">数据统计与报表</span>
+                  </div>
+                  <div class="feature-item">
+                    <Icon icon="mdi:folder-multiple" class="feature-icon" :style="{ color: '#f56c6c' }" />
+                    <span class="feature-text">文件管理与共享</span>
+                  </div>
+                  <div class="feature-item">
+                    <Icon icon="mdi:file-document-outline" class="feature-icon" :style="{ color: '#409eff' }" />
+                    <span class="feature-text">系统日志管理</span>
+                  </div>
                 </div>
               </div>
               
@@ -184,14 +246,32 @@
               <div v-show="introActiveTab === 'developer'" class="intro-item">
                 <div class="developer-info">
                   <div class="system-version">
-                    <h4>DMS-QA 质量管理系统 v2.2.0</h4>
-                    <p>专为质量管理和数据分析设计的企业级解决方案</p>
-                    <p><small>基于现代化技术栈构建的高性能Web应用</small></p>
+                    <div class="version-header">
+                      <Icon icon="mdi:application-cog" class="version-icon" :style="{ color: '#409eff', fontSize: '32px' }" />
+                      <div class="version-text">
+                        <h4>DMS-QA 质量管理系统</h4>
+                        <el-tag type="success" size="large" class="version-tag">v2.2.0</el-tag>
+                      </div>
+                    </div>
+                    <p class="system-description">专为质量管理和数据分析设计的企业级解决方案</p>
+                    <p class="system-subtitle">基于现代化技术栈构建的高性能Web应用</p>
                   </div>
                   <div class="developer-details">
-                    <p><strong>开发者：</strong>David Lee (zglibk)</p>
-                    <p><strong>邮箱：</strong>1039297691@qq.com</p>
-                    <p><strong>许可证：</strong>Apache-2.0</p>
+                    <div class="detail-item">
+                      <Icon icon="mdi:account-circle" class="detail-icon" :style="{ color: '#409eff' }" />
+                      <span class="detail-label">开发者：</span>
+                      <span class="detail-value">David Lee (zglibk)</span>
+                    </div>
+                    <div class="detail-item">
+                      <Icon icon="mdi:email" class="detail-icon" :style="{ color: '#67c23a' }" />
+                      <span class="detail-label">邮箱：</span>
+                      <span class="detail-value">1039297691@qq.com</span>
+                    </div>
+                    <div class="detail-item">
+                      <Icon icon="mdi:license" class="detail-icon" :style="{ color: '#e6a23c' }" />
+                      <span class="detail-label">许可证：</span>
+                      <span class="detail-value">Apache-2.0</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -201,11 +281,13 @@
 
         <!-- 登录日志/在线用户卡片 -->
         <div class="user-activity-section">
-          <h2 class="section-title">
-            <el-icon><Monitor /></el-icon>
-            用户活动
-          </h2>
           <el-card class="user-activity-card">
+            <template #header>
+              <div class="card-header">
+                <el-icon><Monitor /></el-icon>
+                <span>用户活动</span>
+              </div>
+            </template>
             <el-tabs v-model="activeTab" class="activity-tabs">
               <el-tab-pane label="登录日志" name="login-logs">
                 <div class="login-logs">
@@ -276,13 +358,13 @@
               :key="module.key"
               @click="navigateToModule(module)"
             >
-              <div class="module-icon" :style="{ backgroundColor: module.color }">
-                <el-icon><component :is="module.icon" /></el-icon>
+              <div class="module-icon">
+                <Icon :icon="module.icon" :style="{ color: module.color, fontSize: '40px' }" />
               </div>
               <div class="module-content">
                 <div class="module-title">{{ module.title }}</div>
                 <div class="module-desc">{{ module.description }}</div>
-                <div class="module-count">{{ module.count }} 个功能</div>
+                <div class="module-count"><span class="module-count-number">{{ module.count }}</span> 个功能</div>
               </div>
             </div>
           </div>
@@ -326,13 +408,13 @@
         <!-- 系统信息 -->
         <div class="system-info-section">
           <h2 class="section-title">
-            <el-icon><Monitor /></el-icon>
+            <Icon icon="mdi:monitor" style="font-size: 20px; color: #409eff;" />
             系统信息
           </h2>
           <div class="system-info-simple">
             <!-- 系统版本 -->
             <div class="info-item-simple">
-              <el-icon class="info-icon-simple"><Box /></el-icon>
+              <Icon icon="mdi:package-variant" class="info-icon-simple" style="font-size: 20px; color: #409eff;" />
               <div class="info-content">
                 <span class="info-label">系统版本</span>
                 <span class="info-text">DMS-QA {{ systemInfo.version }}</span>
@@ -341,7 +423,7 @@
             
             <!-- 服务器状态 -->
             <div class="info-item-simple">
-              <el-icon class="info-icon-simple" :class="systemInfo.serverStatus === '正常运行' ? 'status-online' : 'status-offline'"><Monitor /></el-icon>
+              <Icon icon="mdi:server" class="info-icon-simple" :style="{ fontSize: '20px', color: systemInfo.serverStatus === '正常运行' ? '#67c23a' : '#f56c6c' }" />
               <div class="info-content">
                 <span class="info-label">服务器状态</span>
                 <span class="info-text" :class="systemInfo.serverStatus === '正常运行' ? 'status-online' : 'status-offline'">
@@ -352,7 +434,7 @@
             
             <!-- 数据库状态 -->
             <div class="info-item-simple">
-              <el-icon class="info-icon-simple" :class="systemInfo.dbConnected ? 'status-online' : 'status-offline'"><Collection /></el-icon>
+              <Icon icon="mdi:database" class="info-icon-simple" :style="{ fontSize: '20px', color: systemInfo.dbConnected ? '#67c23a' : '#f56c6c' }" />
               <div class="info-content">
                 <span class="info-label">数据库状态</span>
                 <span class="info-text" :class="systemInfo.dbConnected ? 'status-online' : 'status-offline'">
@@ -363,7 +445,7 @@
             
             <!-- 最后更新 -->
             <div class="info-item-simple">
-              <el-icon class="info-icon-simple"><RefreshRight /></el-icon>
+              <Icon icon="mdi:refresh" class="info-icon-simple" style="font-size: 20px; color: #409eff;" />
               <div class="info-content">
                 <span class="info-label">最后更新</span>
                 <span class="info-text">{{ systemInfo.lastUpdateTime || lastUpdateTime }}</span>
@@ -391,8 +473,9 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '@/utils/api'
+import { Icon } from '@iconify/vue'
 import {
   DataBoard,
   Operation,
@@ -402,12 +485,6 @@ import {
   User,
   Document,
   Setting,
-  ChatLineSquare,
-  RefreshRight,
-  PieChart,
-  TrendCharts,
-  ArrowUp,
-  ArrowDown,
   Warning,
   SuccessFilled as Success,
   InfoFilled as Info,
@@ -420,10 +497,6 @@ import {
   Search,
   Van,
   Collection,
-  Tools,
-  Management,
-  Shop,
-  Briefcase,
   Plus,
   ArrowRight,
   Calendar,
@@ -465,6 +538,43 @@ const getCurrentWeekday = () => {
 }
 
 /**
+ * 获取模块子菜单数量
+ * 从后台数据库Menus表中根据ID和ParentID获取各模块子菜单个数
+ */
+const fetchModuleCounts = async () => {
+  try {
+    const response = await api.get('/menus/module-counts')
+    if (response.data.success) {
+      moduleCounts.value = response.data.data
+    } else {
+      console.error('获取模块计数失败:', response.data.message)
+    }
+  } catch (error) {
+    console.error('获取模块计数失败:', error)
+  }
+}
+
+/**
+ * 计算模块的功能数量
+ * @param {string} moduleKey - 模块键名
+ * @returns {number} 功能数量
+ */
+const calculateModuleCount = (moduleKey) => {
+  // 模块键名到数据库模块代码的映射
+  const moduleCodeMap = {
+    'quality': 'quality',
+    'system': 'system',
+    'work-plan': 'work-plan',
+    'supplier': 'supplier-management',
+    'copq': 'copq',
+    'sample': 'sample-management'
+  }
+  
+  const moduleCode = moduleCodeMap[moduleKey]
+  return moduleCounts.value[moduleCode] || 0
+}
+
+/**
  * 根据用户名生成头像背景颜色
  * @param {string} username - 用户名
  * @returns {string} 背景颜色
@@ -501,47 +611,47 @@ const todayStats = ref({
   alertCount: 5
 })
 
-// 数据概览
+// 数据概览 - 改为响应式数据，通过API获取
 const overviewData = ref([
   {
     key: 'quality',
     title: '质量指标',
-    value: '98.5%',
+    value: '0%',
     color: '#409EFF',
-    icon: 'PieChart',
+    icon: 'mdi:chart-pie',
     trend: 'up',
-    trendIcon: 'ArrowUp',
-    trendText: '+2.3%'
+    trendIcon: 'mdi:arrow-up',
+    trendText: '0%'
   },
   {
     key: 'complaints',
     title: '客户投诉',
-    value: '12',
+    value: '0',
     color: '#F56C6C',
-    icon: 'ChatLineSquare',
+    icon: 'mdi:message-alert',
     trend: 'down',
-    trendIcon: 'ArrowDown',
-    trendText: '-15.2%'
+    trendIcon: 'mdi:arrow-down',
+    trendText: '0%'
   },
   {
-    key: 'rework',
-    title: '返工率',
-    value: '1.2%',
+    key: 'firstpass',
+    title: '一次交检合格率',
+    value: '0%',
     color: '#E6A23C',
-    icon: 'RefreshRight',
-    trend: 'down',
-    trendIcon: 'ArrowDown',
-    trendText: '-0.5%'
+    icon: 'mdi:check-circle',
+    trend: 'up',
+    trendIcon: 'mdi:arrow-up',
+    trendText: '0%'
   },
   {
-    key: 'efficiency',
-    title: '生产效率',
-    value: '95.8%',
+    key: 'delivery',
+    title: '交付合格率（批次）',
+    value: '0%',
     color: '#67C23A',
-    icon: 'TrendCharts',
+    icon: 'mdi:truck-delivery',
     trend: 'up',
-    trendIcon: 'ArrowUp',
-    trendText: '+3.1%'
+    trendIcon: 'mdi:arrow-up',
+    trendText: '0%'
   }
 ])
 
@@ -551,29 +661,91 @@ const quickActions = ref([
     key: 'new-complaint',
     title: '新建客诉',
     description: '快速创建客户投诉记录',
-    icon: 'ChatLineSquare',
-    path: '/admin/quality/complaint/customer'
+    icon: 'mdi:message-alert-outline',
+    path: '/admin/quality/complaint/customer',
+    color: '#F56C6C', // 红色 - 投诉相关
+    iconColor: '#FFFFFF'
+  },
+  {
+    key: 'new-internal-complaint',
+    title: '新建内诉',
+    description: '创建内部投诉记录',
+    icon: 'mdi:message-text-outline',
+    path: '/admin/quality/complaint/internal',
+    color: '#FF9800', // 橙色 - 内部投诉
+    iconColor: '#FFFFFF'
+  },
+  {
+    key: 'customer-sample',
+    title: '客户签样',
+    description: '管理客户样品签收',
+    icon: 'mdi:clipboard-check-outline',
+    path: '/admin/quality/customer-sample',
+    color: '#3F51B5', // 靛蓝色 - 客户签样
+    iconColor: '#FFFFFF'
   },
   {
     key: 'quality-check',
     title: '质量目标',
     description: '执行质量检查流程',
-    icon: 'Document',
-    path: '/admin/quality/targets'
+    icon: 'mdi:target',
+    path: '/admin/quality/targets',
+    color: '#67C23A', // 绿色 - 质量目标
+    iconColor: '#FFFFFF'
   },
   {
     key: 'user-management',
     title: '用户管理',
     description: '管理系统用户权限',
-    icon: 'User',
-    path: '/admin/system/user'
+    icon: 'mdi:account-group-outline',
+    path: '/admin/system/user',
+    color: '#409EFF', // 蓝色 - 用户管理
+    iconColor: '#FFFFFF'
   },
   {
     key: 'system-config',
     title: '系统配置',
     description: '调整系统参数设置',
-    icon: 'Setting',
-    path: '/admin/system/config'
+    icon: 'mdi:cog-outline',
+    path: '/admin/system/config',
+    color: '#E6A23C', // 橙色 - 系统配置
+    iconColor: '#FFFFFF'
+  },
+  {
+    key: 'notice-announcement',
+    title: '通知公告',
+    description: '查看和管理系统公告',
+    icon: 'mdi:bullhorn-outline',
+    path: '/admin/system/notice',
+    color: '#909399', // 灰色 - 通知公告
+    iconColor: '#FFFFFF'
+  },
+  {
+    key: 'personal-center',
+    title: '个人中心',
+    description: '管理个人信息和设置',
+    icon: 'mdi:account-circle-outline',
+    path: '/admin/profile',
+    color: '#9C27B0', // 紫色 - 个人中心
+    iconColor: '#FFFFFF'
+  },
+  {
+    key: 'back-to-frontend',
+    title: '回到前台',
+    description: '返回前台用户界面',
+    icon: 'mdi:home-outline',
+    path: '/',
+    color: '#00BCD4', // 青色 - 回到前台
+    iconColor: '#FFFFFF'
+  },
+  {
+    key: 'logout',
+    title: '退出登录',
+    description: '安全退出系统',
+    icon: 'mdi:logout',
+    path: '/logout',
+    color: '#FF5722', // 深橙色 - 退出登录
+    iconColor: '#FFFFFF'
   }
 ])
 
@@ -639,60 +811,60 @@ const onlineUsers = ref([
 ])
 
 // 系统功能模块
-const systemModules = ref([
+const systemModules = computed(() => [
   {
     key: 'quality',
     title: '质量管理',
-    description: '投诉处理、返工管理、质量目标',
-    icon: 'PieChart',
+    description: '投诉处理、返工管理、质量目标等',
+    icon: 'mdi:quality-high',
     color: '#409EFF',
-    count: 6,
-    path: '/admin/quality'
+    count: calculateModuleCount('quality'),
+    path: '/admin/quality/targets'
   },
   {
     key: 'system',
     title: '系统管理',
-    description: '用户、角色、菜单、部门管理',
-    icon: 'Setting',
+    description: '用户、角色、菜单、日志管理等',
+    icon: 'mdi:cog',
     color: '#909399',
-    count: 8,
-    path: '/admin/system'
+    count: calculateModuleCount('system'),
+    path: '/admin/system/logs'
   },
   {
     key: 'work-plan',
     title: '工作计划',
-    description: '计划管理、进度跟踪、统计分析',
-    icon: 'Management',
+    description: '计划管理、进度跟踪、统计分析等',
+    icon: 'mdi:calendar-check',
     color: '#67C23A',
-    count: 6,
+    count: calculateModuleCount('work-plan'),
     path: '/admin/work-plan'
   },
   {
     key: 'supplier',
     title: '供应商管理',
-    description: '供应商信息维护和管理',
-    icon: 'Shop',
+    description: '供应商信息维护和管理等',
+    icon: 'mdi:store',
     color: '#E6A23C',
-    count: 2,
-    path: '/admin/supplier'
+    count: calculateModuleCount('supplier'),
+    path: '/admin/supplier/basic-info'
   },
   {
     key: 'copq',
     title: '质量成本',
-    description: '物料单价、成本统计分析',
-    icon: 'Briefcase',
+    description: '物料单价、成本统计分析等',
+    icon: 'mdi:currency-usd',
     color: '#F56C6C',
-    count: 3,
+    count: calculateModuleCount('copq'),
     path: '/admin/copq'
   },
   {
-    key: 'development',
-    title: '二次开发',
-    description: '系统扩展和定制开发',
-    icon: 'Tools',
+    key: 'sample',
+    title: '样版管理',
+    description: '样品承认书、内部色卡管理等',
+    icon: 'mdi:palette',
     color: '#9C27B0',
-    count: 2,
-    path: '/admin/development'
+    count: calculateModuleCount('sample'),
+    path: '/admin/sample'
   }
 ])
 
@@ -701,6 +873,9 @@ const notifications = ref([])
 
 // 最后更新时间
 const lastUpdateTime = ref('')
+
+// 模块子菜单数量
+const moduleCounts = ref({})
 
 // 系统信息
 const systemInfo = ref({
@@ -717,7 +892,42 @@ const introActiveTab = ref('tech')
 /**
  * 处理快捷操作点击
  */
+/**
+ * 处理快捷操作点击事件
+ * @param {Object} action - 快捷操作对象
+ */
 const handleQuickAction = (action) => {
+  // 特殊处理退出登录
+  if (action.key === 'logout') {
+    ElMessageBox.confirm(
+      '确定要退出登录吗？',
+      '退出确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    ).then(() => {
+      // 清除本地存储的用户信息
+      localStorage.removeItem('token')
+      localStorage.removeItem('userInfo')
+      // 跳转到登录页
+      router.push('/login')
+      ElMessage.success('已安全退出登录')
+    }).catch(() => {
+      // 用户取消退出
+    })
+    return
+  }
+  
+  // 处理回到前台
+  if (action.key === 'back-to-frontend') {
+    // 在新窗口打开前台页面
+    window.open(action.path, '_blank')
+    return
+  }
+  
+  // 其他操作使用路由跳转
   if (action.path) {
     router.push(action.path)
   } else {
@@ -734,6 +944,20 @@ const navigateToModule = (module) => {
   } else {
     ElMessage.info(`模块开发中：${module.title}`)
   }
+}
+
+/**
+ * 导航到待处理任务页面
+ */
+const navigateToTasks = () => {
+  router.push('/admin/work-plan/dashboard')
+}
+
+/**
+ * 导航到质量预警页面
+ */
+const navigateToAlerts = () => {
+  router.push('/admin/quality/complaint')
 }
 
 /**
@@ -813,6 +1037,141 @@ const fetchOnlineUsers = async () => {
     ElMessage.error('获取在线用户失败')
   }
 }
+
+/**
+ * 获取数据概览信息
+ */
+const fetchOverviewData = async () => {
+  try {
+    // 获取质量指标汇总数据
+    const qualityResponse = await api.get('/quality-metrics/summary')
+    
+    // 获取质量成本统计数据
+    const costResponse = await api.get('/customer-complaints/cost-statistics')
+    
+    // 获取客诉数据
+    const complaintResponse = await api.get('/dashboard/stats')
+    
+    if (qualityResponse.data.success) {
+      const qualityData = qualityResponse.data.data
+      
+      // 计算趋势（这里简化处理，实际可以通过对比历史数据计算）
+      const qualityTrend = qualityData.YearlyFirstPassRate >= 95 ? 'up' : 'down'
+      const complaintTrend = qualityData.TotalCustomerComplaints <= 10 ? 'down' : 'up'
+      
+      // 获取质量成本数据
+      let costData = { totalCost: 0, totalTrend: 0 }
+      if (costResponse.data.success && costResponse.data.data.overview) {
+        costData = costResponse.data.data.overview
+      }
+      
+      // 更新概览数据
+      overviewData.value = [
+        {
+          key: 'cost',
+          title: '质量成本损失',
+          value: `¥ ${(costData.totalCost || 0).toLocaleString()}`,
+          // 左侧图标固定颜色，趋势颜色单独控制
+          color: '#F56C6C', // 质量成本损失用红色图标
+          icon: 'mdi:currency-cny',
+          trend: costData.totalTrend >= 0 ? 'up' : 'down',
+          trendIcon: costData.totalTrend >= 0 ? 'mdi:arrow-up' : 'mdi:arrow-down',
+          trendText: `${costData.totalTrend >= 0 ? '+' : ''}${(costData.totalTrend || 0).toFixed(1)}%`,
+          // 趋势颜色：质量成本降低是好事(绿色)，上升是坏事(红色)
+          trendColor: costData.totalTrend <= 0 ? '#67C23A' : '#F56C6C'
+        },
+        {
+          key: 'complaints',
+          title: '客户投诉',
+          value: `${qualityData.TotalCustomerComplaints || 0}`,
+          // 左侧图标固定颜色
+          color: '#E6A23C', // 客户投诉用橙色图标
+          icon: 'mdi:message-alert',
+          trend: 'neutral',
+          trendIcon: 'mdi:minus',
+          trendText: '暂无对比数据',
+          // 趋势颜色：暂无对比数据时为中性色
+          trendColor: '#909399'
+        },
+        {
+          key: 'firstpass',
+          title: '一次交检合格率',
+          value: `${qualityData.YearlyFirstPassRate || 0}%`,
+          // 左侧图标固定颜色
+          color: '#67C23A', // 一次交检合格率用绿色图标
+          icon: 'mdi:check-circle',
+          trend: 'neutral',
+          trendIcon: 'mdi:minus',
+          trendText: '暂无对比数据',
+          // 趋势颜色：暂无对比数据时为中性色
+          trendColor: '#909399'
+        },
+        {
+          key: 'delivery',
+          title: '交付合格率（批次）',
+          value: `${qualityData.YearlyDeliveryPassRate || 0}%`,
+          // 左侧图标固定颜色
+          color: '#409EFF', // 交付合格率用蓝色图标
+          icon: 'mdi:truck-delivery',
+          trend: 'neutral',
+          trendIcon: 'mdi:minus',
+          trendText: '暂无对比数据',
+          // 趋势颜色：暂无对比数据时为中性色
+          trendColor: '#909399'
+        }
+      ]
+    }
+  } catch (error) {
+    console.error('获取概览数据失败:', error)
+    ElMessage.error('获取概览数据失败')
+    
+    // 保持默认数据结构，避免页面崩溃
+    overviewData.value = [
+      {
+        key: 'quality',
+        title: '质量指标',
+        value: '暂无数据',
+        color: '#409EFF',
+        icon: 'mdi:chart-pie',
+        trend: 'up',
+        trendIcon: 'mdi:arrow-up',
+        trendText: '--'
+      },
+      {
+        key: 'complaints',
+        title: '客户投诉',
+        value: '暂无数据',
+        color: '#F56C6C',
+        icon: 'mdi:message-alert',
+        trend: 'down',
+        trendIcon: 'mdi:arrow-down',
+        trendText: '--'
+      },
+      {
+        key: 'rework',
+        title: '返工率',
+        value: '暂无数据',
+        color: '#E6A23C',
+        icon: 'mdi:refresh',
+        trend: 'down',
+        trendIcon: 'mdi:arrow-down',
+        trendText: '--'
+      },
+      {
+        key: 'efficiency',
+        title: '生产效率',
+        value: '暂无数据',
+        color: '#67C23A',
+        icon: 'mdi:trending-up',
+        trend: 'up',
+        trendIcon: 'mdi:arrow-up',
+        trendText: '--'
+      }
+    ]
+  }
+}
+
+
 
 /**
  * 获取系统通知数据
@@ -969,6 +1328,8 @@ onMounted(() => {
   fetchOnlineUsers()
   fetchNotifications()
   fetchSystemInfo()
+  fetchOverviewData() // 获取数据概览信息
+  fetchModuleCounts() // 获取模块子菜单数量
   // 初始化时间显示
   updateCurrentDateTime()
   // 每秒更新时间
@@ -983,10 +1344,9 @@ defineExpose({
 
 <style scoped>
 .dashboard-container {
-  padding: 20px;
   background-color: #f5f7fa;
   min-height: calc(100vh - 60px);
-  font-family: 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', sans-serif;
+  font-family: 'Bahnschrift';
 }
 
 /* 顶部欢迎区域 */
@@ -1003,6 +1363,8 @@ defineExpose({
   gap: 6px;
   opacity: 0.9;
   margin: 8px 0 0 0;
+  width: 550px;
+  min-width: 550px;
 }
 
 .calendar-icon {
@@ -1010,12 +1372,10 @@ defineExpose({
   font-size: 16px;
   padding: 4px;
   border-radius: 50%;
-  background: rgba(102, 126, 234, 0.1);
   transition: all 0.3s ease;
 }
 
 .calendar-icon:hover {
-  background: rgba(102, 126, 234, 0.2);
   transform: scale(1.1);
 }
 
@@ -1038,18 +1398,14 @@ defineExpose({
 }
 
 .greeting-text {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  font-size: 20px;
+  color: #67C23A;
+  font-weight: 500;
   animation: fadeInLeft 0.8s ease-out;
 }
 
 .username-highlight {
-  background: linear-gradient(135deg, #93affb 0%, #f5576c 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: #409EFF;
   font-weight: 700;
   position: relative;
   animation: fadeInUp 0.8s ease-out 0.2s both;
@@ -1063,29 +1419,112 @@ defineExpose({
 
 .datetime-text {
   font-size: 16px;
-  font-weight: 500;
   color: #4a5568;
   letter-spacing: 0.5px;
+  /* 西文数字字体样式 */
+  font-family: 'Bahnschrift';
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
 .welcome-stats {
   display: flex;
-  gap: 40px;
+  gap: 24px;
+  margin-top: 8px;
 }
 
 .stat-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 12px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  min-width: 140px;
+}
+
+.stat-item:hover {
+  background: rgba(255, 255, 255, 0.95);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.stat-item.clickable:hover {
+  background: rgba(255, 255, 255, 1);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+}
+
+.stat-item.clickable:active {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stat-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.stat-login .stat-icon {
+  background: linear-gradient(135deg, #67C23A, #85CE61);
+}
+
+.stat-task .stat-icon {
+  background: linear-gradient(135deg, #E6A23C, #EEBE77);
+}
+
+.stat-alert .stat-icon {
+  background: linear-gradient(135deg, #F56C6C, #F78989);
+}
+
+.stat-login .stat-icon,
+.stat-task .stat-icon,
+.stat-alert .stat-icon {
+  color: white !important;
+}
+
+.stat-content {
   text-align: center;
+  flex: 1;
 }
 
 .stat-number {
-  font-size: 32px;
-  font-weight: bold;
-  margin-bottom: 4px;
+  font-weight: 700;
+  font-size: 28px;
+  margin-bottom: 2px;
+  color: #2c3e50;
+  line-height: 1;
+  /* 西文数字字体样式 */
+  font-family: 'Bahnschrift';
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.03em;
+}
+
+.stat-login .stat-number {
+  color: #67C23A;
+}
+
+.stat-task .stat-number {
+  color: #E6A23C;
+}
+
+.stat-alert .stat-number {
+  color: #F56C6C;
 }
 
 .stat-label {
-  font-size: 14px;
-  opacity: 0.8;
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+  letter-spacing: 0.3px;
 }
 
 /* 动画关键帧 */
@@ -1186,6 +1625,16 @@ defineExpose({
   color: #303133;
 }
 
+/* 卡片标题样式 */
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+}
+
 .section-title-with-more {
   justify-content: space-between;
 }
@@ -1223,14 +1672,12 @@ defineExpose({
 }
 
 .card-icon {
-  width: 48px;
-  height: 48px;
-  border-radius: 8px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 20px;
+  font-size: 32px;
 }
 
 .card-content {
@@ -1245,9 +1692,13 @@ defineExpose({
 
 .card-value {
   font-size: 24px;
-  font-weight: bold;
+  font-weight: 700;
   color: #303133;
   margin-bottom: 4px;
+  /* 西文数字字体样式 */
+  font-family: 'Bahnschrift';
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.02em;
 }
 
 .card-trend {
@@ -1268,41 +1719,77 @@ defineExpose({
 /* 快捷操作 */
 .quick-actions-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
+  row-gap: 24px;
+  justify-items: center;
 }
 
-.action-card {
-  padding: 20px;
-  border: 2px solid #e4e7ed;
-  border-radius: 8px;
-  text-align: center;
+.action-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
   cursor: pointer;
+  transition: all 0.3s;
+  min-height: 90px; /* 固定最小高度，防止文字挤压 */
+  justify-content: flex-start;
+}
+
+.action-item:hover {
+  /* 移除向上移动，避免文字挤压 */
+}
+
+.action-button {
+  width: 65px;
+  height: 65px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
   transition: all 0.3s;
 }
 
-.action-card:hover {
-  border-color: #409eff;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.2);
+.action-item:hover .action-button {
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  filter: brightness(1.1) saturate(1.2);
 }
 
-.action-icon {
-  font-size: 32px;
-  color: #409eff;
-  margin-bottom: 12px;
-}
-
-.action-title {
-  font-size: 16px;
+.action-item:hover .action-name {
+  color: #1f2937;
   font-weight: 600;
-  color: #303133;
-  margin-bottom: 8px;
 }
 
-.action-desc {
-  font-size: 12px;
-  color: #909399;
+/* 焦点状态样式 */
+.action-item:focus .action-button,
+.action-item:focus-visible .action-button {
+  outline: none;
+  transform: scale(1.02);
+  box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+  filter: brightness(0.9);
+}
+
+.action-item:focus .action-name,
+.action-item:focus-visible .action-name {
+  color: #1f2937;
+  font-weight: 600;
+}
+
+.action-button .iconify {
+  font-size: 28px;
+  width: 28px;
+  height: 28px;
+}
+
+.action-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+  text-align: center;
+  line-height: 1.2;
+  transition: all 0.3s;
 }
 
 /* 功能模块 */
@@ -1329,14 +1816,12 @@ defineExpose({
 }
 
 .module-icon {
-  width: 40px;
-  height: 40px;
-  border-radius: 6px;
+  width: 48px;
+  height: 48px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-size: 18px;
+  font-size: 28px;
 }
 
 .module-content {
@@ -1359,6 +1844,12 @@ defineExpose({
 .module-count {
   font-size: 11px;
   color: #909399;
+}
+
+.module-count-number {
+  font-size: 16px;
+  font-weight: bold;
+  color: #409eff;
 }
 
 /* 系统通知 */
@@ -1463,22 +1954,14 @@ defineExpose({
 }
 
 .info-icon-simple {
-  font-size: 16px;
-  color: #409eff;
   transition: all 0.3s ease;
   flex-shrink: 0;
+  width: 20px;
+  height: 20px;
 }
 
 .info-icon-simple:hover {
   transform: scale(1.2);
-}
-
-.info-icon-simple.status-online {
-  color: #67c23a;
-}
-
-.info-icon-simple.status-offline {
-  color: #f56c6c;
 }
 
 .info-content {
@@ -1525,7 +2008,7 @@ defineExpose({
 
 /* 系统介绍卡片 */
 .system-intro-section {
-  margin-bottom: 24px;
+  /* margin-bottom已由dashboard-left的gap统一控制 */
 }
 
 .system-intro-card {
@@ -1593,61 +2076,100 @@ defineExpose({
 }
 
 .tech-category {
-  margin-bottom: 16px;
+  margin-bottom: 20px;
+  padding: 16px;
+  background: #fafbfc;
+  border-radius: 8px;
+  border: 1px solid #e4e7ed;
+  transition: all 0.3s ease;
+}
+
+.tech-category:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
 }
 
 .tech-category:last-child {
   margin-bottom: 0;
 }
 
+.tech-category-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.tech-category-icon {
+  font-size: 18px;
+}
+
 .tech-category-title {
-  display: inline-block;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
-  color: #606266;
-  margin-bottom: 8px;
-  padding: 2px 8px;
-  background: #f5f7fa;
-  border-radius: 4px;
-  border-left: 3px solid #409eff;
+  color: #303133;
+  margin: 0;
 }
 
 .tech-tags {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
+  gap: 8px;
+  margin-top: 0;
 }
 
-.tech-tags .el-tag {
+.tech-tag {
   font-size: 12px;
-  height: 24px;
-  line-height: 22px;
-  border-radius: 12px;
-  padding: 0 10px;
+  height: 28px;
+  line-height: 26px;
+  border-radius: 14px;
+  padding: 0 12px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+  cursor: default;
 }
 
-.feature-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+.tech-tag:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
   margin: 0;
   padding: 0;
 }
 
-.feature-tag {
-  font-size: 13px;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-weight: 500;
-  cursor: default;
+.feature-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #fafbfc;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
   transition: all 0.3s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  cursor: default;
 }
 
-.feature-tag:hover {
+.feature-item:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #409eff;
+}
+
+.feature-icon {
+  font-size: 20px;
+  flex-shrink: 0;
+}
+
+.feature-text {
+  font-size: 13px;
+  font-weight: 500;
+  color: #303133;
+  line-height: 1.4;
 }
 
 .developer-info {
@@ -1658,44 +2180,93 @@ defineExpose({
 }
 
 .system-version {
-  margin-bottom: 20px;
-  padding-bottom: 16px;
+  margin-bottom: 24px;
+  padding-bottom: 20px;
   border-bottom: 1px solid #ebeef5;
 }
 
-.system-version h4 {
+.version-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.version-icon {
+  flex-shrink: 0;
+}
+
+.version-text {
+  flex: 1;
+}
+
+.version-text h4 {
   color: #303133;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
   margin: 0 0 8px 0;
 }
 
-.system-version p {
-  margin: 4px 0;
+.version-tag {
+  font-weight: 600;
+}
+
+.system-description {
+  font-size: 15px;
   color: #606266;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+.system-subtitle {
+  font-size: 13px;
+  color: #909399;
+  margin: 4px 0 0 0;
+  line-height: 1.4;
 }
 
 .developer-details {
   display: grid;
-  gap: 8px;
+  gap: 12px;
 }
 
-.developer-details p {
-  margin: 0;
-  padding: 6px 0;
-  font-size: 14px;
+.detail-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: #fafbfc;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  transition: all 0.3s ease;
 }
 
-.developer-details strong {
+.detail-item:hover {
+  background: #f0f9ff;
+  border-color: #409eff;
+}
+
+.detail-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.detail-label {
+  color: #606266;
+  font-weight: 500;
+  font-size: 13px;
+  min-width: 60px;
+}
+
+.detail-value {
   color: #303133;
-  font-weight: 600;
-  min-width: 80px;
-  display: inline-block;
+  font-size: 13px;
+  font-weight: 500;
 }
 
 /* 用户活动卡片 */
 .user-activity-section {
-  margin-bottom: 24px;
+  /* margin-bottom已由dashboard-left的gap统一控制 */
 }
 
 .user-activity-card {
@@ -1800,16 +2371,56 @@ defineExpose({
 
 @media (max-width: 768px) {
   .dashboard-container {
-    padding: 12px;
   }
   
-  .overview-grid,
-  .quick-actions-grid {
+  .overview-grid {
     grid-template-columns: 1fr;
+  }
+  
+  .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+  
+  .action-button {
+    width: 60px;
+    height: 60px;
+  }
+  
+  .action-button .iconify {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+  }
+  
+  .action-name {
+    font-size: 12px;
   }
   
   .welcome-stats {
     gap: 20px;
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-actions-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  
+  .action-button {
+    width: 50px;
+    height: 50px;
+  }
+  
+  .action-button .iconify {
+    font-size: 20px;
+    width: 20px;
+    height: 20px;
+  }
+  
+  .action-name {
+    font-size: 11px;
   }
 }
 </style>

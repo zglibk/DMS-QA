@@ -36,12 +36,17 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 // 导入网站配置管理组合式函数
 import { useSiteConfig } from './src/composables/useSiteConfig.js'
+// 导入Iconify图标组件
+import { Icon } from '@iconify/vue'
 
 // 创建Vue应用实例
 const app = createApp(App)
 
 // 配置Element Plus UI组件库，使用中文本地化
 app.use(ElementPlus, { locale: zhCn })
+
+// 注册Iconify图标组件为全局组件
+app.component('Icon', Icon)
 
 // 创建Pinia实例并配置持久化插件
 const pinia = createPinia()

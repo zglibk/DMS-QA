@@ -2503,15 +2503,12 @@ onUnmounted(() => {
 
 <style scoped>
 .common-layout {
-  padding: 20px;
-  background-color: #f5f7fa;
   /* 参考进度跟踪页面的滚动条处理方式 */
   height: auto; /* 改为自动高度 */
   display: flex;
   flex-direction: column;
   overflow: visible; /* 改为可见，确保分页显示 */
   min-height: 0; /* 解决flex容器高度问题 */
-  padding-top: 20px; /* 减少顶部间距 */
   max-width: 100%; /* 确保不超出视口宽度 */
   box-sizing: border-box; /* 包含padding在内的盒模型 */
 }

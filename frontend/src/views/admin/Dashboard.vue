@@ -1206,7 +1206,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .dashboard-main {
-  padding: 20px;
   /* 背景图片暂时注释，等待用户添加 bg.jpg 文件 */
   /* background: url('@/assets/images/bg.jpg') no-repeat center center fixed; */
   /* background-size: cover; */
@@ -1574,7 +1573,6 @@ onBeforeUnmount(() => {
   }
 
   .dashboard-main {
-    padding: 15px;
   }
 
   .stat-card,

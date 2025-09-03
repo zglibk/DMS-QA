@@ -197,7 +197,6 @@ onMounted(() => {
 
 <style scoped>
 .path-analysis-container {
-  padding: 20px;
 }
 
 .header-card {

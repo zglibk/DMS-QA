@@ -1297,7 +1297,6 @@ const downloadTemplate = () => {
 
 <style scoped>
 .material-price-container {
-  padding: 20px;
   background: #f5f5f5;
   min-height: 100%;
   height: auto;

@@ -701,8 +701,6 @@ onMounted(async () => {
 
 <style scoped>
 .cost-statistics-container {
-  padding: 20px;
-  background-color: #f5f7fa;
   min-height: 100vh;
 }
 
@@ -896,7 +894,6 @@ onMounted(async () => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .cost-statistics-container {
-    padding: 10px;
   }
   
   .overview-cards {

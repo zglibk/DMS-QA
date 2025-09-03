@@ -1828,7 +1828,6 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
 
 <style scoped>
 .supplier-complaints-container {
-  padding: 8px;
   background-color: #f5f5f5;
   height: auto; /* 改为自动高度，  */
   box-sizing: border-box;
@@ -2299,7 +2298,6 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
 /* 响应式设计 */
 @media (max-width: 768px) {
   .supplier-complaints-container {
-    padding: 10px;
   }
   
   .search-form {

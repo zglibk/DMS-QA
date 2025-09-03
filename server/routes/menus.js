@@ -456,6 +456,46 @@ router.get('/user-menus', authenticateToken, async (req, res) => {
 
 
 
+// 获取各模块的子菜单数量
+router.get('/module-counts', async (req, res) => {
+  try {
+    const pool = await getConnection()
+    const result = await pool.request()
+      .query(`
+        SELECT 
+          p.ID as ModuleID,
+          p.MenuName as ModuleName,
+          p.MenuCode as ModuleCode,
+          COUNT(c.ID) as SubMenuCount
+        FROM Menus p
+        LEFT JOIN Menus c ON p.ID = c.ParentID AND c.Status = 1
+        WHERE (p.ParentID IS NULL OR p.ParentID = 0)
+          AND p.Status = 1
+        GROUP BY p.ID, p.MenuName, p.MenuCode
+        ORDER BY p.ID
+      `)
+    
+    // 将结果转换为键值对格式，便于前端使用
+    const moduleCounts = {}
+    result.recordset.forEach(row => {
+      // 使用模块代码作为键
+      moduleCounts[row.ModuleCode] = row.SubMenuCount
+    })
+    
+    res.json({
+      success: true,
+      data: moduleCounts
+    })
+  } catch (error) {
+    console.error('获取模块子菜单数量失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取模块子菜单数量失败',
+      error: error.message
+    })
+  }
+})
+
 // 根据ID获取菜单详情
 router.get('/:id', async (req, res) => {
   try {

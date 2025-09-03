@@ -785,7 +785,6 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .welcome-container {
-  padding: 0 50px;
   background: #f5f7fa;
   min-height: calc(100vh - 120px);
 }
@@ -1178,7 +1177,6 @@ onBeforeUnmount(() => {
 
 @media (max-width: 768px) {
   .welcome-container {
-    padding: 16px;
   }
   
   .banner-content {

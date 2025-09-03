@@ -26,6 +26,7 @@
   "license": "Apache-2.0",
   "_dependencies_comment": "生产环境依赖包",
   "dependencies": {
+    "@iconify/vue": "^5.0.0",
     "@tinymce/tinymce-vue": "^4.0.7",
     "@vueuse/core": "^13.8.0",
     "axios": "^1.0.0",
