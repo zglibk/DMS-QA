@@ -599,8 +599,8 @@
             <el-col :span="8">
               <el-form-item label="要求报告回复">
                 <el-radio-group v-model="formData.requireReport">
-                  <el-radio :label="true">是</el-radio>
-                  <el-radio :label="false">否</el-radio>
+                  <el-radio :value="true">是</el-radio>
+                <el-radio :value="false">否</el-radio>
                 </el-radio-group>
               </el-form-item>
             </el-col>

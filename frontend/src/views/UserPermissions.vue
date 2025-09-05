@@ -240,15 +240,15 @@
         
         <el-form-item label="权限类型" prop="permissionType">
           <el-radio-group v-model="grantForm.permissionType">
-            <el-radio label="grant">授予</el-radio>
-            <el-radio label="deny">拒绝</el-radio>
+            <el-radio value="grant">授予</el-radio>
+              <el-radio value="deny">拒绝</el-radio>
           </el-radio-group>
         </el-form-item>
         
         <el-form-item label="权限级别" prop="permissionLevel">
           <el-radio-group v-model="grantForm.permissionLevel">
-            <el-radio label="menu">菜单权限</el-radio>
-            <el-radio label="action">操作权限</el-radio>
+            <el-radio value="menu">菜单权限</el-radio>
+              <el-radio value="action">操作权限</el-radio>
           </el-radio-group>
         </el-form-item>
         

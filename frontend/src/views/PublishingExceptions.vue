@@ -1653,12 +1653,22 @@ const handleExport = () => {
  */
 const confirmExport = async () => {
   try {
+    // 检查是否有选中的记录
+    if (selectedRows.value.length === 0) {
+      ElMessage.warning('请先选择要导出的记录')
+      return
+    }
+    
     exportDialogVisible.value = false
     ElMessage.info('正在生成Excel文件，请稍候...')
     
+    // 获取选中记录的ID列表
+    const selectedIds = selectedRows.value.map(row => row.id)
+    
     // 构建导出参数
     const exportParams = new URLSearchParams({
-      includeImages: includeImages.value.toString()
+      includeImages: includeImages.value.toString(),
+      recordIds: selectedIds.join(',')
     })
     
     // 调用后端导出接口

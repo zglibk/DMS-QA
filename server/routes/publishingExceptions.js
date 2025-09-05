@@ -280,13 +280,22 @@ router.get('/export', async (req, res) => {
   const xl = require('excel4node');
   
   try {
-    console.log('开始导出出版异常数据...');
-    
     // 获取includeImages参数
     const includeImages = req.query.includeImages === 'true';
-    console.log('是否包含图片:', includeImages);
     
-    // 获取所有数据
+    // 获取recordIds参数
+    const recordIds = req.query.recordIds;
+    
+    // 构建WHERE条件
+    let whereCondition = 'WHERE isDeleted = 0';
+    if (recordIds) {
+      const ids = recordIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id));
+      if (ids.length > 0) {
+        whereCondition += ` AND id IN (${ids.join(',')})`;;
+      }
+    }
+    
+    // 获取数据
     const result = await executeQuery(async (pool) => {
       const query = `
         SELECT 
@@ -312,10 +321,11 @@ router.get('/export', async (req, res) => {
           created_date,
           updated_date
         FROM publishing_exceptions 
-        WHERE isDeleted = 0
+        ${whereCondition}
         ORDER BY registration_date ASC, id ASC
       `;
       
+      console.log('执行SQL查询:', query);
       return await pool.request().query(query);
     });
 
@@ -486,11 +496,13 @@ router.get('/export', async (req, res) => {
       
       // 如果包含图片，添加图片信息列
       if (includeImages) {
+        console.log(`[图片处理] 处理记录 ID: ${row.id}, image_path:`, row.image_path);
         // 处理图片路径信息，将图片插入到Excel中
         let imageInfo = '无图片';
         if (row.image_path) {
           try {
             const imagePaths = JSON.parse(row.image_path);
+            console.log(`[图片处理] 解析图片路径成功，图片数量: ${imagePaths.length}`);
             if (Array.isArray(imagePaths) && imagePaths.length > 0) {
               let insertedCount = 0;
               const failedImages = [];
@@ -501,8 +513,10 @@ router.get('/export', async (req, res) => {
               // 定义异步图片处理函数
               const processImage = async (image, imgIndex) => {
                 const imagePath = path.join(__dirname, '../uploads/site-images/publishing-exception', image.filename);
+                console.log(`[图片处理] 处理第 ${imgIndex + 1} 张图片:`, image.filename, '路径:', imagePath);
                 
                 if (!fs.existsSync(imagePath)) {
+                  console.warn(`[图片处理] 图片文件不存在: ${imagePath}`);
                   return { success: false, error: image.originalName || image.name || '未知文件' };
                 }
                 
@@ -583,7 +597,7 @@ router.get('/export', async (req, res) => {
                   
                   return { success: true, width: finalWidth };
                 } catch (imageError) {
-                  console.error('插入图片失败:', imageError);
+                  console.error(`[图片处理] 插入图片失败 ${image.filename}:`, imageError.message);
                   return { success: false, error: image.originalName || image.name || '未知文件' };
                 }
               };
@@ -599,11 +613,11 @@ router.get('/export', async (req, res) => {
                   failedImages.push(result.error);
                 }
               }
-              
               // 不在单元格中添加文字描述，只显示图片
               imageInfo = '';
             }
           } catch (e) {
+            console.error(`[图片处理] 解析图片路径失败:`, e.message);
             // 如果不是JSON格式，直接显示路径
             imageInfo = row.image_path;
           }
@@ -826,7 +840,7 @@ router.get('/export', async (req, res) => {
     // 生成Excel文件并发送
     workbook.write(filename, res);
     
-    console.log(`导出完成，共 ${result.recordset.length} 条记录`);
+    // 导出完成
 
   } catch (error) {
     console.error('导出失败:', error);
@@ -891,8 +905,7 @@ router.post('/', async (req, res) => {
       image_path  // 接收前端传递的已上传图片路径
     } = req.body;
 
-    console.log('接收到的数据:', req.body);
-    console.log('图片路径:', image_path);
+    // 处理接收到的数据
 
     // 获取数据库连接
     const pool = await getConnection();
@@ -934,7 +947,7 @@ router.post('/', async (req, res) => {
         )
       `);
 
-    console.log('SQL执行成功，插入结果:', result.recordset);
+    // SQL执行成功
     
     res.json({ 
       success: true, 
@@ -1012,7 +1025,6 @@ router.put('/:id', async (req, res) => {
         try {
           // 确保removedFile有filename属性且不为空
           if (!removedFile.filename) {
-            console.log('跳过无效的删除文件项:', removedFile);
             continue;
           }
           
@@ -1023,9 +1035,6 @@ router.put('/:id', async (req, res) => {
           if (fs.existsSync(filePath)) {
             // 删除物理文件
             fs.unlinkSync(filePath);
-            console.log('成功删除文件:', removedFile.filename);
-          } else {
-            console.log('文件不存在，跳过删除:', removedFile.filename);
           }
         } catch (deleteError) {
           console.error('删除文件失败:', removedFile.filename, deleteError.message);
@@ -1452,7 +1461,7 @@ router.get('/image/:id', async (req, res) => {
     const contentType = mimeTypes[ext] || 'image/jpeg';
     res.setHeader('Content-Type', contentType);
     
-    console.log(`返回图片文件: ${fileName}, 类型: ${contentType}, 大小: ${stat.size}`);
+    // 返回图片文件
     
     // 创建文件流并发送
     const fileStream = fs.createReadStream(fullImagePath);

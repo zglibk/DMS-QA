@@ -705,9 +705,9 @@ router.get('/user-list', authenticateToken, async (req, res) => {
   const { page = 1, pageSize = 10, search = '' } = req.query
   try {
     let pool = await sql.connect(await getDynamicConfig())
-    let where = ''
+    let where = "WHERE u.Username != 'admin'" // 过滤系统管理员账号
     if (search) {
-      where = `WHERE u.Username LIKE N'%${search}%' OR u.Email LIKE N'%${search}%' OR u.Phone LIKE N'%${search}%'`
+      where += ` AND (u.Username LIKE N'%${search}%' OR u.Email LIKE N'%${search}%' OR u.Phone LIKE N'%${search}%')`
     }
     const countResult = await pool.request().query(`SELECT COUNT(*) AS total FROM [User] u ${where}`)
     const total = countResult.recordset[0].total

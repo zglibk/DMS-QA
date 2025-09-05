@@ -321,6 +321,8 @@ router.get('/', async (req, res) => {
           CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
           ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor, ImprovementVerification,
           VerificationDate, Status, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy,
+          QualityPenalty, ReworkCost, CustomerCompensation, QualityLossCost,
+          InspectionCost, TransportationCost, PreventionCost, TotalQualityCost, CostRemarks,
           ROW_NUMBER() OVER (ORDER BY CreatedAt DESC, ID DESC) AS RowNum
         FROM CustomerComplaints 
         ${whereClause}
@@ -893,11 +895,13 @@ router.get('/:id', async (req, res) => {
         SELECT 
           ID, Date, CustomerCode, WorkOrderNo, ProductName, Specification,
           OrderQuantity, ProblemDescription, ProblemImages, DefectQuantity, DefectRate,
-          ComplaintMethod, ProcessingDeadline, RequireReport, CauseAnalysis,
+          ComplaintMethod, ComplaintType, ProcessingDeadline, RequireReport, CauseAnalysis,
           CorrectiveActions, DisposalMeasures, ResponsibleDepartment, ResponsiblePerson,
           ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor, 
           ImprovementVerification, VerificationDate, Status, 
-          CreatedAt, CreatedBy, UpdatedAt, UpdatedBy
+          CreatedAt, CreatedBy, UpdatedAt, UpdatedBy,
+          QualityPenalty, ReworkCost, CustomerCompensation, QualityLossCost,
+          InspectionCost, TransportationCost, PreventionCost, TotalQualityCost, CostRemarks
         FROM CustomerComplaints 
         WHERE ID = @id
       `;
@@ -962,6 +966,10 @@ router.post('/', async (req, res) => {
     
     const currentUser = req.user?.username || '系统用户';
     
+    // 调试日志：查看responsibleDepartment的值和类型
+    console.log('DEBUG - responsibleDepartment:', responsibleDepartment, 'type:', typeof responsibleDepartment);
+    console.log('DEBUG - responsiblePerson:', responsiblePerson, 'type:', typeof responsiblePerson);
+    
     const result = await executeQuery(async (pool) => {
       const request = pool.request();
       const query = `
@@ -973,7 +981,7 @@ router.post('/', async (req, res) => {
           ReplyDate, ReportAttachments, FeedbackPerson, FeedbackDate, Processor,
           ImprovementVerification, VerificationDate, Status,
           QualityPenalty, ReworkCost, CustomerCompensation, QualityLossCost,
-          InspectionCost, TransportationCost, PreventionCost, TotalQualityCost, CostRemarks,
+          InspectionCost, TransportationCost, PreventionCost, CostRemarks,
           CreatedBy, UpdatedBy
         ) VALUES (
           @date, @customerCode, @workOrderNo, @productName, @specification,
@@ -983,7 +991,7 @@ router.post('/', async (req, res) => {
           @replyDate, @reportAttachments, @feedbackPerson, @feedbackDate, @processor,
           @improvementVerification, @verificationDate, @status,
           @qualityPenalty, @reworkCost, @customerCompensation, @qualityLossCost,
-          @inspectionCost, @transportationCost, @preventionCost, @totalQualityCost, @costRemarks,
+          @inspectionCost, @transportationCost, @preventionCost, @costRemarks,
           @createdBy, @updatedBy
         );
         SELECT SCOPE_IDENTITY() as ID;
@@ -1006,13 +1014,13 @@ router.post('/', async (req, res) => {
       request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
       request.input('correctiveActions', sql.NVarChar, correctiveActions || null);
       request.input('disposalMeasures', sql.NVarChar, disposalMeasures || null);
-      request.input('responsibleDepartment', sql.NVarChar, responsibleDepartment || null);
-      request.input('responsiblePerson', sql.NVarChar, responsiblePerson || null);
+      request.input('responsibleDepartment', sql.NVarChar, responsibleDepartment ? String(responsibleDepartment) : null);
+      request.input('responsiblePerson', sql.NVarChar, responsiblePerson ? String(responsiblePerson) : null);
       request.input('replyDate', sql.Date, replyDate || null);
       request.input('reportAttachments', sql.NVarChar, JSON.stringify(reportAttachments || []));
-      request.input('feedbackPerson', sql.NVarChar, feedbackPerson || null);
+      request.input('feedbackPerson', sql.NVarChar, feedbackPerson ? String(feedbackPerson) : null);
       request.input('feedbackDate', sql.Date, feedbackDate || null);
-      request.input('processor', sql.NVarChar, processor || null);
+      request.input('processor', sql.NVarChar, processor ? String(processor) : null);
       request.input('improvementVerification', sql.NVarChar, improvementVerification || null);
       request.input('verificationDate', sql.Date, verificationDate || null);
       request.input('status', sql.NVarChar, status || 'pending');
@@ -1024,6 +1032,8 @@ router.post('/', async (req, res) => {
       request.input('inspectionCost', sql.Decimal(10, 2), inspectionCost || 0);
       request.input('transportationCost', sql.Decimal(10, 2), transportationCost || 0);
       request.input('preventionCost', sql.Decimal(10, 2), preventionCost || 0);
+      // TotalQualityCost是计算列，不需要手动插入
+      // request.input('totalQualityCost', sql.Decimal(10, 2), totalQualityCost || 0);
       request.input('costRemarks', sql.NVarChar, costRemarks || null);
       request.input('createdBy', sql.NVarChar, currentUser);
       request.input('updatedBy', sql.NVarChar, currentUser);
@@ -1181,13 +1191,13 @@ router.put('/:id', async (req, res) => {
       request.input('causeAnalysis', sql.NVarChar, causeAnalysis || null);
       request.input('correctiveActions', sql.NVarChar, correctiveActions || null);
       request.input('disposalMeasures', sql.NVarChar, disposalMeasures || null);
-      request.input('responsibleDepartment', sql.Int, responsibleDepartment || null);
-      request.input('responsiblePerson', sql.Int, responsiblePerson || null);
+      request.input('responsibleDepartment', sql.NVarChar, responsibleDepartment ? String(responsibleDepartment) : null);
+      request.input('responsiblePerson', sql.NVarChar, responsiblePerson ? String(responsiblePerson) : null);
       request.input('replyDate', sql.Date, replyDate || null);
       request.input('reportAttachments', sql.NVarChar, JSON.stringify(reportAttachments || []));
-      request.input('feedbackPerson', sql.NVarChar, feedbackPerson || null);
+      request.input('feedbackPerson', sql.NVarChar, feedbackPerson ? String(feedbackPerson) : null);
       request.input('feedbackDate', sql.Date, feedbackDate || null);
-      request.input('processor', sql.NVarChar, processor || null);
+      request.input('processor', sql.NVarChar, processor ? String(processor) : null);
       request.input('improvementVerification', sql.NVarChar, improvementVerification || null);
       request.input('verificationDate', sql.Date, verificationDate || null);
       request.input('status', sql.NVarChar, status || 'pending');

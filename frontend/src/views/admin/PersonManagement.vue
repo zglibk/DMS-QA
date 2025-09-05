@@ -137,8 +137,8 @@
         </el-form-item>
         <el-form-item label="状态" prop="isActive">
           <el-radio-group v-model="formData.isActive">
-            <el-radio :label="true">在职</el-radio>
-            <el-radio :label="false">离职</el-radio>
+            <el-radio :value="true">在职</el-radio>
+              <el-radio :value="false">离职</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>

@@ -415,9 +415,9 @@
         
         <el-form-item label="审核结果" prop="auditResult">
           <el-radio-group v-model="auditFormData.auditResult">
-            <el-radio label="approved">通过</el-radio>
-            <el-radio label="rejected">拒绝</el-radio>
-            <el-radio label="conditional">有条件通过</el-radio>
+            <el-radio value="approved">通过</el-radio>
+                <el-radio value="rejected">拒绝</el-radio>
+                <el-radio value="conditional">有条件通过</el-radio>
           </el-radio-group>
         </el-form-item>
         

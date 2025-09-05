@@ -144,8 +144,8 @@
           <div class="chart-header">
             <h3 :class="chartTitleClass">{{ chartTitle }}</h3>
             <el-radio-group v-model="chartType"  @change="updateChart">
-              <el-radio-button label="trend">趋势分析</el-radio-button>
-              <el-radio-button label="achievement">达成率分析</el-radio-button>
+              <el-radio-button value="trend">趋势分析</el-radio-button>
+            <el-radio-button value="achievement">达成率分析</el-radio-button>
             </el-radio-group>
           </div>
           <div class="chart-container">
@@ -396,8 +396,8 @@
           <el-col :span="12">
             <el-form-item label="统计周期" prop="period">
               <el-radio-group v-model="statisticsForm.periodType">
-                <el-radio label="quarter">季度</el-radio>
-                <el-radio label="month">月份</el-radio>
+                <el-radio value="quarter">季度</el-radio>
+              <el-radio value="month">月份</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>
@@ -444,8 +444,8 @@
           <el-col :span="12">
             <el-form-item label="值类型" prop="valueType">
               <el-radio-group v-model="statisticsForm.valueType">
-                <el-radio label="percentage">百分比</el-radio>
-                <el-radio label="count">次数</el-radio>
+                <el-radio value="percentage">百分比</el-radio>
+              <el-radio value="count">次数</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>

@@ -973,9 +973,9 @@
         
         <el-form-item label="通知方式">
           <el-radio-group v-model="resetPasswordForm.notifyMethod">
-            <el-radio label="email">邮件通知</el-radio>
-            <el-radio label="sms">短信通知</el-radio>
-            <el-radio label="none">不通知</el-radio>
+            <el-radio value="email">邮件通知</el-radio>
+              <el-radio value="sms">短信通知</el-radio>
+              <el-radio value="none">不通知</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>

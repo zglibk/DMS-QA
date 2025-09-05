@@ -345,9 +345,9 @@
       <el-form :model="cleanupForm" label-width="100px">
         <el-form-item label="清理方式">
           <el-radio-group v-model="cleanupForm.type">
-            <el-radio label="date">按日期清理</el-radio>
-            <el-radio label="count">按数量清理</el-radio>
-            <el-radio label="severity">按级别清理</el-radio>
+            <el-radio value="date">按日期清理</el-radio>
+              <el-radio value="count">按数量清理</el-radio>
+              <el-radio value="severity">按级别清理</el-radio>
           </el-radio-group>
         </el-form-item>
         

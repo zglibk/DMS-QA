@@ -341,8 +341,8 @@
                   <div class="chart-header">
                     <span class="chart-title">工时损耗横道图</span>
                     <el-radio-group v-model="ganttDisplayMode" size="small" @change="updateGanttChart">
-                      <el-radio-button label="hours">工时</el-radio-button>
-                      <el-radio-button label="cost">金额</el-radio-button>
+                      <el-radio-button value="hours">工时</el-radio-button>
+            <el-radio-button value="cost">金额</el-radio-button>
                     </el-radio-group>
                   </div>
                   <div ref="ganttChartRef" class="chart-container"></div>

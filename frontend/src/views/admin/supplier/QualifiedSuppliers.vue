@@ -278,9 +278,9 @@
         
         <el-form-item label="合作状态" prop="cooperationStatus">
           <el-radio-group v-model="formData.cooperationStatus">
-            <el-radio label="active">正常合作</el-radio>
-            <el-radio label="suspended">暂停合作</el-radio>
-            <el-radio label="terminated">终止合作</el-radio>
+            <el-radio value="active">正常合作</el-radio>
+              <el-radio value="suspended">暂停合作</el-radio>
+              <el-radio value="terminated">终止合作</el-radio>
           </el-radio-group>
         </el-form-item>
         

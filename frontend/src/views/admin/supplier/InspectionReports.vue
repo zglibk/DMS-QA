@@ -356,9 +356,9 @@
           <el-col :span="12">
             <el-form-item label="检验结果" prop="inspectionResult">
               <el-radio-group v-model="formData.inspectionResult">
-                <el-radio label="qualified">合格</el-radio>
-                <el-radio label="unqualified">不合格</el-radio>
-                <el-radio label="pending">待检</el-radio>
+                <el-radio value="qualified">合格</el-radio>
+                <el-radio value="unqualified">不合格</el-radio>
+                <el-radio value="pending">待检</el-radio>
               </el-radio-group>
             </el-form-item>
           </el-col>

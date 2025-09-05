@@ -38,6 +38,8 @@ import { ElMessage } from 'element-plus'
 import { useSiteConfig } from './src/composables/useSiteConfig.js'
 // 导入Iconify图标组件
 import { Icon } from '@iconify/vue'
+// 导入Element Plus图标
+import * as ElementPlusIconsVue from '@element-plus/icons-vue'
 
 // 创建Vue应用实例
 const app = createApp(App)
@@ -47,6 +49,11 @@ app.use(ElementPlus, { locale: zhCn })
 
 // 注册Iconify图标组件为全局组件
 app.component('Icon', Icon)
+
+// 注册所有Element Plus图标为全局组件
+for (const [key, component] of Object.entries(ElementPlusIconsVue)) {
+  app.component(key, component)
+}
 
 // 创建Pinia实例并配置持久化插件
 const pinia = createPinia()
