@@ -66,6 +66,7 @@ const erpConfigRouter = require('./routes/erpConfig');         // ERP配置管�
 const systemLogsRouter = require('./routes/systemLogs');       // 系统日志管理路由
 const userLoginLogsRouter = require('./routes/userLoginLogs');   // 用户登录日志管理路由
 const dashboardRouter = require('./routes/dashboard');           // 仪表板数据路由
+const monthlyBatchStatsRouter = require('./routes/monthlyBatchStats'); // 月度批次统计管理路由
 const erpSyncService = require('./services/erpSyncService');
 const { startFileServer } = require('./file-server');
 const { logCleanupService } = require('./services/logCleanupService');
@@ -291,6 +292,7 @@ app.use('/api/erp-config', erpConfigRouter);
 app.use('/api/system-logs', systemLogsRouter);
 app.use('/api/user-login-logs', userLoginLogsRouter);
 app.use('/api/dashboard', dashboardRouter);
+app.use('/api/monthly-batch-stats', monthlyBatchStatsRouter);
 app.use('/api/log-export', require('./routes/logExport'));
 
 // 错误日志记录中间件（必须在所有路由之后）

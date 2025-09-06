@@ -109,9 +109,10 @@ class ErpConfigLoader {
      * 设置默认配置
      */
     setDefaultConfigs() {
-        this.configCache.set('erp_api_url', 'http://192.168.1.168:99');
-        this.configCache.set('erp_app_id', 'xybfc6ae9da4484e95b27e71ab6c6623b4');
-        this.configCache.set('erp_app_secret', 'e020c4d79c7a49e3a7b1ab4b6749a1f6');
+        // 使用环境变量或默认值，避免硬编码
+        this.configCache.set('erp_api_url', process.env.ERP_BASE_URL);
+        this.configCache.set('erp_app_id', process.env.ERP_APP_ID);
+        this.configCache.set('erp_app_secret', process.env.ERP_APP_SECRET);
         this.configCache.set('sync_enabled', 'true');
         this.configCache.set('sync_interval', '0 */1 * * *');
         this.configCache.set('sync_types', 'production,delivery');
@@ -137,39 +138,56 @@ class ErpConfigLoader {
 
     /**
      * 获取ERP连接配置
+     * 直接从数据库获取所有配置项
      * @returns {Promise<Object>} ERP连接配置对象
      */
     async getErpConnectionConfig() {
         try {
-            const [baseUrl, appId, appSecret] = await Promise.all([
-                this.getConfig('erp_api_url', ''),
-                this.getConfig('erp_app_id', '').then(value => value ? value.replace(/\r?\n/g, '') : value),
-                this.getConfig('erp_app_secret', '')
-            ]);
-
-            // 检查配置键获取情况
-            const configStatus = {
-                baseUrl: !!baseUrl,
-                appId: !!appId,
-                appSecret: !!appSecret
-            };
+            // 直接从数据库获取所有配置项
+            const { executeQuery } = require('../db');
+            const query = 'SELECT config_key, config_value FROM erp_config ORDER BY config_key';
             
-            const allConfigsLoaded = configStatus.baseUrl && configStatus.appId && configStatus.appSecret;
-            console.log(`ERP连接配置拼接${allConfigsLoaded ? '成功' : '失败'}:`, 
-                       `baseUrl=${configStatus.baseUrl}, appId=${configStatus.appId}, appSecret=${configStatus.appSecret}`);
+            const result = await executeQuery(async (pool) => {
+                return await pool.request().query(query);
+            });
+            
+            if (result.recordset && result.recordset.length > 0) {
+                // 将结果转换为对象格式便于查找
+                const configMap = {};
+                result.recordset.forEach(row => {
+                    configMap[row.config_key] = row.config_value;
+                });
+                
+                const baseUrl = configMap['erp_api_url'] || '';
+                const appId = configMap['erp_app_id'] ? configMap['erp_app_id'].replace(/\r?\n/g, '') : '';
+                const appSecret = configMap['erp_app_secret'] || '';
+                
+                // 检查配置键获取情况
+                const configStatus = {
+                    baseUrl: !!baseUrl,
+                    appId: !!appId,
+                    appSecret: !!appSecret
+                };
+                
+                const allConfigsLoaded = configStatus.baseUrl && configStatus.appId && configStatus.appSecret;
+                console.log(`ERP连接配置通过API拼接${allConfigsLoaded ? '成功' : '失败'}:`, 
+                           `baseUrl=${configStatus.baseUrl}, appId=${configStatus.appId}, appSecret=${configStatus.appSecret}`);
 
-            return {
-                baseUrl,
-                appId,
-                appSecret
-            };
+                return {
+                    baseUrl,
+                    appId,
+                    appSecret
+                };
+            } else {
+                throw new Error('API返回数据格式错误');
+            }
         } catch (error) {
-            console.log('ERP连接配置拼接失败:', error.message);
-            // 返回默认配置
+            console.log('通过API获取ERP连接配置失败:', error.message);
+            // 返回默认配置，使用环境变量避免硬编码
             return {
-                baseUrl: 'http://192.168.1.168:99',
-                appId: 'xybfc6ae9da4484e95b27e71ab6c6623b4',
-                appSecret: 'e020c4d79c7a49e3a7b1ab4b6749a1f6'
+                baseUrl: process.env.ERP_BASE_URL || 'http://192.168.1.168:99',
+                appId: process.env.ERP_APP_ID || 'default_app_id',
+                appSecret: process.env.ERP_APP_SECRET || 'default_app_secret'
             };
         }
     }

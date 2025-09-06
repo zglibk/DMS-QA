@@ -213,6 +213,7 @@ function parseUserAgent(userAgent) {
  */
 router.post('/login', async (req, res) => {
   const { username, password, captchaId, captchaText } = req.body;
+  // 登录请求参数已记录到系统日志
   const loginTime = new Date();
   const sessionId = require('crypto').randomUUID();
   const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || '未知';
@@ -297,6 +298,7 @@ router.post('/login', async (req, res) => {
     // 验证验证码内容（不区分大小写）
     const inputText = captchaText.toLowerCase().trim();
     const storedText = storedCaptcha.text.toLowerCase().trim();
+    // 验证码验证逻辑
     
     if (inputText !== storedText) {
       // 记录登录失败日志（如果用户存在则记录UserID）
@@ -321,6 +323,7 @@ router.post('/login', async (req, res) => {
     captchaStore.delete(captchaId);
 
     // 用户不存在
+    // 用户查询完成
     if (!user) {
       // 记录登录失败日志
       await recordLoginLog(pool, {
@@ -359,6 +362,7 @@ router.post('/login', async (req, res) => {
 
     // 验证密码
     const valid = await bcrypt.compare(password, user.Password);
+    // 密码验证完成
     
     if (!valid) {
       // 记录登录失败日志
@@ -412,6 +416,7 @@ router.post('/login', async (req, res) => {
     );
 
     // 生成JWT token（包含角色信息）
+    // 开始生成JWT token
     const token = jwt.sign(
       {
         id: user.ID,
@@ -423,6 +428,51 @@ router.post('/login', async (req, res) => {
       SECRET,
       { expiresIn: '2h' }
     );
+    // JWT token生成完成
+
+    // 获取ERP配置并生成ERP token
+    let erpToken = null;
+    let erpConfig = null;
+    try {
+      // 直接从数据库获取ERP配置数据
+      const query = 'SELECT config_key, config_value FROM erp_config ORDER BY config_key';
+      const erpConfigResult = await executeQuery(async (pool) => {
+        return await pool.request().query(query);
+      });
+      
+      if (erpConfigResult.recordset && erpConfigResult.recordset.length > 0) {
+        // 将配置数组转换为对象格式便于查找
+        const configMap = {};
+        erpConfigResult.recordset.forEach(row => {
+          configMap[row.config_key] = row.config_value;
+        });
+        
+        erpConfig = {
+          baseUrl: configMap['erp_api_url'] || '',
+          appId: configMap['erp_app_id'] || '',
+          appSecret: configMap['erp_app_secret'] || ''
+        };
+        
+        // 如果ERP配置完整，则获取ERP token
+        if (erpConfig.baseUrl && erpConfig.appId && erpConfig.appSecret) {
+          const erpService = require('../services/erpService');
+          await erpService.loadConfig(); // 确保配置已加载
+          const erpTokenResult = await erpService.getToken();
+          
+          if (erpTokenResult) {
+            erpToken = erpService.token;
+            console.log('ERP token获取成功，用户:', user.Username);
+          } else {
+            console.warn('ERP token获取失败，用户:', user.Username);
+          }
+        } else {
+          console.warn('ERP配置不完整，跳过token获取，用户:', user.Username);
+        }
+      }
+    } catch (erpError) {
+      console.error('获取ERP配置或token失败:', erpError.message);
+      // ERP相关错误不影响DMS登录流程
+    }
 
     // 记录登录成功日志
     await recordLoginLog(pool, {
@@ -439,16 +489,20 @@ router.post('/login', async (req, res) => {
       LoginStatus: '成功'
     });
 
-    // 返回token和用户信息（包含正确的lastLoginTime）
-    res.json({ 
+    // 返回token和用户信息（包含DMS token和ERP token）
+    const responseData = { 
       token,
+      erpToken,
+      erpConfig,
       user: {
         id: updatedUser.ID,
         username: updatedUser.Username,
         realName: updatedUser.RealName,
         lastLoginTime: updatedUser.LastLoginTime ? updatedUser.LastLoginTime.toISOString() : null
       }
-    });
+    };
+    // 登录成功，准备返回响应
+    res.json(responseData);
 
   } catch (err) {
     console.error('登录过程中发生异常:', err);
@@ -1372,6 +1426,98 @@ router.post('/logout', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: '退出登录失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * Token刷新接口
+ * 功能：在token即将过期前刷新token，延长用户会话
+ */
+router.post('/refresh-token', authenticateToken, async (req, res) => {
+  try {
+    const userInfo = req.user;
+    
+    // 检查token是否即将过期（剩余时间少于5分钟时允许刷新）
+    const currentTime = Math.floor(Date.now() / 1000);
+    const tokenExp = userInfo.exp;
+    const timeUntilExpiry = tokenExp - currentTime;
+    
+    // 如果token剩余时间超过5分钟，不允许刷新
+    if (timeUntilExpiry > 300) { // 300秒 = 5分钟
+      return res.status(400).json({ 
+        success: false,
+      });
+    }
+    
+    let pool = await sql.connect(await getDynamicConfig());
+    
+    // 验证用户是否仍然有效
+    const userResult = await pool.request()
+      .input('UserId', sql.Int, userInfo.id)
+      .query('SELECT * FROM [User] WHERE ID = @UserId AND Status = 1');
+    
+    if (userResult.recordset.length === 0) {
+      return res.status(401).json({ 
+        success: false,
+        message: '用户不存在或已被禁用' 
+      });
+    }
+    
+    const user = userResult.recordset[0];
+    
+    // 获取用户角色信息
+    const rolesResult = await pool.request()
+      .input('UserID', sql.Int, user.ID)
+      .query(`
+        SELECT r.ID, r.RoleName, r.RoleCode
+        FROM [UserRoles] ur
+        JOIN [Roles] r ON ur.RoleID = r.ID
+        WHERE ur.UserID = @UserID AND r.Status = 1
+      `);
+    
+    const userRoles = rolesResult.recordset;
+    
+    // 检查是否为管理员角色
+    const isAdmin = userRoles.some(role => 
+      role.RoleCode === 'admin' || 
+      role.RoleName === '系统管理员' ||
+      role.RoleName === 'admin'
+    );
+    
+    // 生成新的JWT token
+    const newToken = jwt.sign(
+      {
+        id: user.ID,
+        username: user.Username,
+        role: isAdmin ? 'admin' : 'user',
+        roleCode: isAdmin ? 'admin' : 'user',
+        roles: userRoles
+      },
+      SECRET,
+      { expiresIn: '2h' }
+    );
+    
+    res.json({
+      success: true,
+      message: 'Token刷新成功',
+      data: {
+        token: newToken,
+        expiresIn: 7200, // 2小时，单位：秒
+        user: {
+          id: user.ID,
+          username: user.Username,
+          realName: user.RealName
+        }
+      }
+    });
+    
+  } catch (error) {
+    console.error('Token刷新失败:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Token刷新失败',
       error: error.message
     });
   }

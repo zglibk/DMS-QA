@@ -579,4 +579,142 @@ router.post('/sync-logs/:id/retry', authenticateToken, async (req, res) => {
     }
 });
 
+/**
+ * 根据配置键获取单个配置项
+ * GET /api/erp-config/config/key/:key
+ * 路径参数:
+ * - key: 配置键
+ */
+router.get('/config/key/:key', authenticateToken, async (req, res) => {
+    try {
+        const { key } = req.params;
+        
+        if (!key) {
+            return res.status(400).json({
+                success: false,
+                message: '配置键不能为空',
+                data: null
+            });
+        }
+        
+        // 查询指定配置键的配置项
+        const query = 'SELECT config_key, config_value, description FROM erp_config WHERE config_key = @config_key';
+        const result = await executeQuery(async (pool) => {
+            return await pool.request()
+                .input('config_key', sql.NVarChar, key)
+                .query(query);
+        });
+        
+        if (result.recordset.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: '配置项不存在',
+                data: null
+            });
+        }
+        
+        res.json({
+            success: true,
+            message: '获取配置项成功',
+            data: result.recordset[0]
+        });
+    } catch (error) {
+        console.error('获取配置项失败:', error);
+        res.status(500).json({
+            success: false,
+            message: `获取配置项失败: ${error.message}`,
+            data: null
+        });
+    }
+});
+
+/**
+ * 批量获取多个配置项
+ * POST /api/erp-config/config/batch
+ * 请求体:
+ * - keys: 配置键数组
+ */
+router.post('/config/batch', authenticateToken, async (req, res) => {
+    try {
+        const { keys } = req.body;
+        
+        if (!keys || !Array.isArray(keys) || keys.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: '配置键数组不能为空',
+                data: null
+            });
+        }
+        
+        // 构建IN查询条件
+        const placeholders = keys.map((_, index) => `@key${index}`).join(',');
+        const query = `SELECT config_key, config_value, description FROM erp_config WHERE config_key IN (${placeholders})`;
+        
+        const result = await executeQuery(async (pool) => {
+            const request = pool.request();
+            keys.forEach((key, index) => {
+                request.input(`key${index}`, sql.NVarChar, key);
+            });
+            return await request.query(query);
+        });
+        
+        // 将结果转换为键值对对象
+        const configMap = {};
+        result.recordset.forEach(row => {
+            configMap[row.config_key] = {
+                value: row.config_value,
+                description: row.description
+            };
+        });
+        
+        res.json({
+            success: true,
+            message: '批量获取配置项成功',
+            data: configMap
+        });
+    } catch (error) {
+        console.error('批量获取配置项失败:', error);
+        res.status(500).json({
+            success: false,
+            message: `批量获取配置项失败: ${error.message}`,
+            data: null
+        });
+    }
+});
+
+/**
+ * 获取所有ERP配置项（简化版）
+ * GET /api/erp-config/all
+ * 返回所有配置项的对象数组，用于系统内部调用
+ */
+router.get('/all', async (req, res) => {
+    try {
+        // 查询所有配置项
+        const query = 'SELECT config_key, config_value FROM erp_config ORDER BY config_key';
+        
+        const result = await executeQuery(async (pool) => {
+            return await pool.request().query(query);
+        });
+        
+        // 将结果转换为对象数组格式
+        const configs = result.recordset.map(row => ({
+            key: row.config_key,
+            value: row.config_value
+        }));
+        
+        res.json({
+            success: true,
+            message: '获取所有配置项成功',
+            data: configs
+        });
+    } catch (error) {
+        console.error('获取所有配置项失败:', error);
+        res.status(500).json({
+            success: false,
+            message: `获取所有配置项失败: ${error.message}`,
+            data: []
+        });
+    }
+});
+
 module.exports = router;

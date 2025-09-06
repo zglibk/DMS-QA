@@ -192,10 +192,8 @@ router.get('/delivery', authenticateToken, async (req, res) => {
  */
 router.post('/sync', authenticateToken, async (req, res) => {
     try {
-        const { syncType = 'all', dateRange, forceUpdate = false } = req.body;
-        
-        console.log('开始同步ERP数据:', { syncType, dateRange, forceUpdate });
-        
+        const { syncType = 'all', dateRange, forceUpdate = false } = req.body;        
+        // console.log('开始同步ERP数据:', { syncType, dateRange, forceUpdate });        
         const syncResult = {
             syncType,
             startTime: new Date().toISOString(),
@@ -464,7 +462,7 @@ router.get('/stock/product-in-sum', authenticateToken, async (req, res) => {
     try {
         const { StartDate, EndDate } = req.query;
         
-        console.log('获取ERP成品入库明细列表:', { StartDate, EndDate });
+        // console.log('获取ERP成品入库明细列表:', { StartDate, EndDate });
         
         const filters = {};
         if (StartDate) filters.StartDate = StartDate;
@@ -498,7 +496,7 @@ router.get('/stock/product-out-sum', authenticateToken, async (req, res) => {
     try {
         const { StartDate, EndDate } = req.query;
         
-        console.log('获取ERP成品出库明细列表:', { StartDate, EndDate });
+        // console.log('获取ERP成品出库明细列表:', { StartDate, EndDate });
         
         const filters = {};
         if (StartDate) filters.StartDate = StartDate;
@@ -532,7 +530,7 @@ router.get('/test/stock/product-in-sum', async (req, res) => {
     try {
         const { StartDate, EndDate } = req.query;
         
-        console.log('测试获取ERP成品入库明细列表（无需认证）:', { StartDate, EndDate });
+        // console.log('测试获取ERP成品入库明细列表（无需认证）:', { StartDate, EndDate });
         
         const filters = {};
         if (StartDate) filters.StartDate = StartDate;
@@ -566,7 +564,7 @@ router.get('/test/stock/product-out-sum', async (req, res) => {
     try {
         const { StartDate, EndDate } = req.query;
         
-        console.log('测试获取ERP成品出库明细列表（无需认证）:', { StartDate, EndDate });
+        // console.log('测试获取ERP成品出库明细列表（无需认证）:', { StartDate, EndDate });
         
         const filters = {};
         if (StartDate) filters.StartDate = StartDate;

@@ -12,10 +12,6 @@ const router = express.Router();
 
 // 为所有系统日志路由添加认证中间件
 router.use((req, res, next) => {
-  console.log('🔐 [DEBUG] SystemLogs 认证中间件被调用');
-  console.log('🔐 [DEBUG] 请求路径:', req.path);
-  console.log('🔐 [DEBUG] 请求方法:', req.method);
-  console.log('🔐 [DEBUG] Authorization头:', req.headers.authorization ? '存在' : '不存在');
   next();
 });
 router.use(authenticateToken);
@@ -25,9 +21,6 @@ router.use(authenticateToken);
  * 支持分页、过滤、排序
  */
 router.get('/list', async (req, res) => {
-  console.log('📋 [DEBUG] /list API 被调用');
-  console.log('📋 [DEBUG] 请求参数:', req.query);
-  console.log('📋 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
   
   let pool;
   const startTime = Date.now();
@@ -509,10 +502,9 @@ router.get('/config/options', async (req, res) => {
       const moduleResult = await pool.request().query(moduleQuery);
       if (moduleResult.recordset && moduleResult.recordset.length > 0) {
         actualModules = moduleResult.recordset.map(r => r.Module);
-        console.log('📋 [DEBUG] 从数据库获取的实际模块:', actualModules);
       }
     } catch (dbError) {
-      console.warn('⚠️ [DEBUG] 获取数据库模块失败，使用默认配置:', dbError.message);
+      // 获取数据库模块失败，使用默认配置
     }
     
     res.json({
@@ -777,9 +769,6 @@ router.post('/cleanup/execute', async (req, res) => {
  * 获取统计分析概览数据
  */
 router.get('/analytics/overview', async (req, res) => {
-  console.log('📊 [DEBUG] /analytics/overview API 被调用');
-  console.log('📊 [DEBUG] 请求参数:', req.query);
-  console.log('📊 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
   
   let pool;
   const startTime = Date.now();
@@ -793,7 +782,6 @@ router.get('/analytics/overview', async (req, res) => {
     } = req.query;
     
     pool = await sql.connect(await getDynamicConfig());
-    console.log('📊 [DEBUG] 数据库连接成功');
     
     // 构建查询条件
     let whereConditions = ['1=1'];
@@ -802,7 +790,6 @@ router.get('/analytics/overview', async (req, res) => {
     if (startDate) {
       whereConditions.push('sl.CreatedAt >= @startDate');
       queryParams.startDate = startDate;
-      console.log('📊 [DEBUG] 添加开始日期过滤:', startDate);
     }
     
     if (endDate) {

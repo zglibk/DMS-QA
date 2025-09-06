@@ -1319,45 +1319,67 @@ router.get('/table-list', async (req, res) => {
           SELECT
             t.TABLE_NAME as tableName,
             CASE
-              WHEN t.TABLE_NAME = 'ComplaintRegister' THEN '投诉登记表'
-              WHEN t.TABLE_NAME = 'MaterialPrice' THEN '物料单价表'
-              WHEN t.TABLE_NAME = 'User' THEN '用户管理表'
-              WHEN t.TABLE_NAME = 'Workshop' THEN '车间表'
-              WHEN t.TABLE_NAME = 'Department' THEN '部门表'
-              WHEN t.TABLE_NAME = 'Person' THEN '人员表'
-              WHEN t.TABLE_NAME = 'ComplaintCategory' THEN '投诉类别表'
-              WHEN t.TABLE_NAME = 'CustomerComplaintType' THEN '客诉类型表'
-              WHEN t.TABLE_NAME = 'DefectiveCategory' THEN '不良类别表'
-              WHEN t.TABLE_NAME = 'DefectiveItem' THEN '不良项表'
-              WHEN t.TABLE_NAME = 'UserTokens' THEN '用户令牌表'
-              WHEN t.TABLE_NAME = 'DbConfig' THEN '数据库配置表'
-              WHEN t.TABLE_NAME = 'PathMappingConfig' THEN '路径映射配置表'
-              WHEN t.TABLE_NAME = 'HomeCardConfig' THEN '主页卡片配置表'
-              WHEN t.TABLE_NAME = 'SiteConfig' THEN '网站配置表'
               WHEN t.TABLE_NAME = 'BackupRecord' THEN '备份记录表'
+              WHEN t.TABLE_NAME = 'ComplaintCategory' THEN '投诉类别表'
+              WHEN t.TABLE_NAME = 'ComplaintRegister' THEN '投诉登记表'
               WHEN t.TABLE_NAME = 'ConversionConfig' THEN '转换配置表'
               WHEN t.TABLE_NAME = 'CustomerComplaints' THEN '客户投诉表'
+              WHEN t.TABLE_NAME = 'CustomerComplaintType' THEN '客诉类型表'
+              WHEN t.TABLE_NAME = 'DbConfig' THEN '数据库配置表'
+              WHEN t.TABLE_NAME = 'DefectiveCategory' THEN '不良类别表'
+              WHEN t.TABLE_NAME = 'DefectiveItem' THEN '不良项表'
+              WHEN t.TABLE_NAME = 'Department' THEN '部门表'
+              WHEN t.TABLE_NAME = 'erp_config' THEN 'ERP配置表'
+              WHEN t.TABLE_NAME = 'erp_delivery_data' THEN 'ERP交付数据表'
+              WHEN t.TABLE_NAME = 'erp_production_data' THEN 'ERP生产数据表'
+              WHEN t.TABLE_NAME = 'erp_sync_logs' THEN 'ERP同步日志表'
+              WHEN t.TABLE_NAME = 'HomeCardConfig' THEN '主页卡片配置表'
+              WHEN t.TABLE_NAME = 'MaterialPrice' THEN '物料单价表'
               WHEN t.TABLE_NAME = 'Menus' THEN '菜单表'
               WHEN t.TABLE_NAME = 'MonthlyBatchStats' THEN '月度批次统计表'
+              WHEN t.TABLE_NAME = 'NoticeReadStatus' THEN '通知阅读状态表'
+              WHEN t.TABLE_NAME = 'Notices' THEN '通知公告表'
+              WHEN t.TABLE_NAME = 'PathMappingConfig' THEN '路径映射配置表'
+              WHEN t.TABLE_NAME = 'Person' THEN '人员表'
+              WHEN t.TABLE_NAME = 'PlanMilestones' THEN '计划里程碑表'
+              WHEN t.TABLE_NAME = 'PlanProgressHistory' THEN '计划进度历史表'
+              WHEN t.TABLE_NAME = 'PlanTemplates' THEN '计划模板表'
               WHEN t.TABLE_NAME = 'Positions' THEN '职位表'
               WHEN t.TABLE_NAME = 'ProductionReworkRegister' THEN '生产返工登记表'
+              WHEN t.TABLE_NAME = 'publishing_exceptions' THEN '发布异常表'
+              WHEN t.TABLE_NAME = 'quality_metrics' THEN '质量指标表'
               WHEN t.TABLE_NAME = 'QualityLevelSettings' THEN '质量等级设置表'
+              WHEN t.TABLE_NAME = 'QualityTargets' THEN '质量目标表'
+              WHEN t.TABLE_NAME = 'QualityTargetStatistics' THEN '质量目标统计表'
               WHEN t.TABLE_NAME = 'ReworkCategory' THEN '返工类别表'
               WHEN t.TABLE_NAME = 'ReworkMethod' THEN '返工方法表'
               WHEN t.TABLE_NAME = 'RoleDepartments' THEN '角色部门关联表'
               WHEN t.TABLE_NAME = 'RoleMenus' THEN '角色菜单关联表'
               WHEN t.TABLE_NAME = 'Roles' THEN '角色表'
               WHEN t.TABLE_NAME = 'SampleApproval' THEN '样品承认书表'
+              WHEN t.TABLE_NAME = 'SiteConfig' THEN '网站配置表'
+              WHEN t.TABLE_NAME = 'SupplierComplaints' THEN '供应商投诉表'
+              WHEN t.TABLE_NAME = 'User' THEN '用户管理表'
+              WHEN t.TABLE_NAME = 'UserLoginLogs' THEN '用户登录日志表'
+              WHEN t.TABLE_NAME = 'UserPermissionHistory' THEN '用户权限历史表'
+              WHEN t.TABLE_NAME = 'UserPermissions' THEN '用户权限表'
               WHEN t.TABLE_NAME = 'UserRoles' THEN '用户角色关联表'
+              WHEN t.TABLE_NAME = 'UserTokens' THEN '用户令牌表'
+              WHEN t.TABLE_NAME = 'WorkLogs' THEN '工作日志表'
+              WHEN t.TABLE_NAME = 'WorkPlanExecutors' THEN '工作计划执行者表'
+              WHEN t.TABLE_NAME = 'WorkPlans' THEN '工作计划表'
+              WHEN t.TABLE_NAME = 'WorkReminders' THEN '工作提醒表'
+              WHEN t.TABLE_NAME = 'Workshop' THEN '车间表'
+              WHEN t.TABLE_NAME = 'WorkTypes' THEN '工作类型表'
               ELSE t.TABLE_NAME
             END as displayName,
             CASE
-              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig', 'BackupRecord', 'ConversionConfig', 'Menus', 'Roles', 'RoleDepartments', 'RoleMenus', 'UserRoles', 'UserTokens') THEN 'system'
-              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice', 'Positions', 'QualityLevelSettings', 'ReworkCategory', 'ReworkMethod') THEN 'basic'
+              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig', 'BackupRecord', 'ConversionConfig', 'Menus', 'Roles', 'RoleDepartments', 'RoleMenus', 'UserRoles', 'UserTokens', 'UserLoginLogs', 'UserPermissionHistory', 'UserPermissions') THEN 'system'
+              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice', 'Positions', 'QualityLevelSettings', 'ReworkCategory', 'ReworkMethod', 'WorkTypes', 'Notices', 'NoticeReadStatus') THEN 'basic'
               ELSE 'business'
             END as tableType,
             CASE
-              WHEN t.TABLE_NAME IN ('ComplaintRegister', 'MaterialPrice', 'User', 'Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'UserTokens', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig', 'BackupRecord', 'ConversionConfig', 'CustomerComplaints', 'Menus', 'MonthlyBatchStats', 'Positions', 'ProductionReworkRegister', 'QualityLevelSettings', 'ReworkCategory', 'ReworkMethod', 'RoleDepartments', 'RoleMenus', 'Roles', 'SampleApproval', 'UserRoles') THEN 1
+              WHEN t.TABLE_NAME IN ('BackupRecord', 'ComplaintCategory', 'ComplaintRegister', 'ConversionConfig', 'CustomerComplaints', 'CustomerComplaintType', 'DbConfig', 'DefectiveCategory', 'DefectiveItem', 'Department', 'erp_config', 'erp_delivery_data', 'erp_production_data', 'erp_sync_logs', 'HomeCardConfig', 'MaterialPrice', 'Menus', 'MonthlyBatchStats', 'NoticeReadStatus', 'Notices', 'PathMappingConfig', 'Person', 'PlanMilestones', 'PlanProgressHistory', 'PlanTemplates', 'Positions', 'ProductionReworkRegister', 'publishing_exceptions', 'quality_metrics', 'QualityLevelSettings', 'QualityTargets', 'QualityTargetStatistics', 'ReworkCategory', 'ReworkMethod', 'RoleDepartments', 'RoleMenus', 'Roles', 'SampleApproval', 'SiteConfig', 'SupplierComplaints', 'User', 'UserLoginLogs', 'UserPermissionHistory', 'UserPermissions', 'UserRoles', 'UserTokens', 'WorkLogs', 'WorkPlanExecutors', 'WorkPlans', 'WorkReminders', 'Workshop', 'WorkTypes') THEN 1
               ELSE 0
             END as hasIdentity
           FROM INFORMATION_SCHEMA.TABLES t
@@ -1366,8 +1388,8 @@ router.get('/table-list', async (req, res) => {
             AND t.TABLE_NAME NOT LIKE 'sys%'
           ORDER BY
             CASE
-              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig', 'BackupRecord', 'ConversionConfig', 'Menus', 'Roles', 'RoleDepartments', 'RoleMenus', 'UserRoles', 'UserTokens') THEN 'system'
-              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice', 'Positions', 'QualityLevelSettings', 'ReworkCategory', 'ReworkMethod') THEN 'basic'
+              WHEN t.TABLE_NAME IN ('User', 'DbConfig', 'PathMappingConfig', 'HomeCardConfig', 'SiteConfig', 'BackupRecord', 'ConversionConfig', 'Menus', 'Roles', 'RoleDepartments', 'RoleMenus', 'UserRoles', 'UserTokens', 'UserLoginLogs', 'UserPermissionHistory', 'UserPermissions') THEN 'system'
+              WHEN t.TABLE_NAME IN ('Workshop', 'Department', 'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'MaterialPrice', 'Positions', 'QualityLevelSettings', 'ReworkCategory', 'ReworkMethod', 'WorkTypes', 'Notices', 'NoticeReadStatus') THEN 'basic'
               ELSE 'business'
             END,
             t.TABLE_NAME
@@ -1401,7 +1423,12 @@ router.get('/table-stats/:tableName', async (req, res) => {
       'CustomerComplaints', 'Menus', 'MonthlyBatchStats', 'Positions',
       'ProductionReworkRegister', 'QualityLevelSettings', 'ReworkCategory',
       'ReworkMethod', 'RoleDepartments', 'RoleMenus', 'Roles', 'SampleApproval',
-      'UserRoles'
+      'UserRoles', 'UserLoginLogs', 'UserPermissionHistory', 'UserPermissions',
+      'NoticeReadStatus', 'Notices', 'WorkTypes', 'erp_config', 'erp_delivery_data',
+      'erp_production_data', 'erp_sync_logs', 'PlanMilestones', 'PlanProgressHistory',
+      'PlanTemplates', 'publishing_exceptions', 'quality_metrics', 'QualityTargets',
+      'QualityTargetStatistics', 'SupplierComplaints', 'WorkLogs', 'WorkPlanExecutors',
+      'WorkPlans', 'WorkReminders'
     ];
 
     if (!validTables.includes(tableName)) {

@@ -221,6 +221,7 @@ function determineModule(path) {
   if (path.includes('/material/')) return 'MATERIAL';
   if (path.includes('/sample/')) return 'SAMPLE';
   if (path.includes('/menus/')) return 'MENU';
+  if (path.includes('/monthly-batch-stats/')) return 'MONTHLY_BATCH_STATS';
   
   return 'UNKNOWN';
 }

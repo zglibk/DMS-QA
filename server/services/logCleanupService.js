@@ -69,7 +69,6 @@ class LogCleanupService {
    */
   async performCleanup() {
     if (this.isRunning) {
-      console.log('⚠️ 日志清理任务正在运行中，跳过本次执行');
       return;
     }
 
@@ -78,33 +77,21 @@ class LogCleanupService {
     let totalCleaned = 0;
 
     try {
-      console.log('🧹 开始执行日志清理任务...');
+      // 开始执行日志清理任务
       
       // 按严重级别清理过期日志
       for (const [severity, retentionDays] of Object.entries(CLEANUP_CONFIG.retentionDays)) {
         const cleaned = await this.cleanupByRetention(severity, retentionDays);
         totalCleaned += cleaned;
-        
-        if (cleaned > 0) {
-          console.log(`✅ 清理 ${severity} 级别日志 ${cleaned} 条（保留${retentionDays}天）`);
-        }
       }
       
       // 按总数限制清理
       const cleanedByCount = await this.cleanupByCount();
       totalCleaned += cleanedByCount;
       
-      if (cleanedByCount > 0) {
-        console.log(`✅ 按数量限制清理日志 ${cleanedByCount} 条`);
-      }
-      
       // 清理孤立的会话记录
       const cleanedOrphaned = await this.cleanupOrphanedSessions();
       totalCleaned += cleanedOrphaned;
-      
-      if (cleanedOrphaned > 0) {
-        console.log(`✅ 清理孤立会话日志 ${cleanedOrphaned} 条`);
-      }
       
       const duration = Date.now() - startTime;
       
@@ -114,8 +101,6 @@ class LogCleanupService {
         lastCleanupDate: new Date(),
         lastCleanupDuration: duration
       };
-      
-      console.log(`🎉 日志清理任务完成！共清理 ${totalCleaned} 条记录，耗时 ${duration}ms`);
       
       // 记录清理操作日志
       await logger.log({

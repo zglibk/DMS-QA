@@ -19,7 +19,9 @@ const LOG_CATEGORIES = {
   QUERY_STATS: 'QUERY_STATS',     // 查询统计
   SYSTEM_ERROR: 'SYSTEM_ERROR',   // 系统异常
   SECURITY: 'SECURITY',           // 安全相关
-  PERFORMANCE: 'PERFORMANCE'      // 性能监控
+  PERFORMANCE: 'PERFORMANCE',     // 性能监控
+  BUSINESS: 'BUSINESS',           // 业务操作
+  SYSTEM: 'SYSTEM'                // 系统操作
 };
 
 /**
@@ -67,7 +69,9 @@ const MODULES = {
   ERP: 'ERP',
   MATERIAL: 'MATERIAL',
   SAMPLE: 'SAMPLE',
-  MENU: 'MENU'
+  MENU: 'MENU',
+  MONTHLY_BATCH_STATS: 'MONTHLY_BATCH_STATS',
+  ERP: 'ERP'
 };
 
 /**
@@ -333,6 +337,42 @@ class SystemLogger {
       await this.pool.close();
       this.pool = null;
     }
+  }
+
+  /**
+   * 记录信息日志
+   * @param {string} message - 日志消息
+   * @param {Object} options - 日志选项
+   */
+  info(message, options = {}) {
+    console.log(`[INFO] ${message}`, options);
+  }
+
+  /**
+   * 记录错误日志
+   * @param {string} message - 日志消息
+   * @param {Object} options - 日志选项
+   */
+  error(message, options = {}) {
+    console.error(`[ERROR] ${message}`, options);
+  }
+
+  /**
+   * 记录警告日志
+   * @param {string} message - 日志消息
+   * @param {Object} options - 日志选项
+   */
+  warn(message, options = {}) {
+    console.warn(`[WARN] ${message}`, options);
+  }
+
+  /**
+   * 记录调试日志
+   * @param {string} message - 日志消息
+   * @param {Object} options - 日志选项
+   */
+  debug(message, options = {}) {
+    console.log(`[DEBUG] ${message}`, options);
   }
 }
 

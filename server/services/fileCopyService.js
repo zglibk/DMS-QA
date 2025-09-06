@@ -16,12 +16,7 @@ class FileCopyService {
     if (!this.dbConfig) {
       try {
         this.dbConfig = await getDynamicConfig();
-        console.log('获取到动态数据库配置:', {
-          server: this.dbConfig.server,
-          fileStoragePath: this.dbConfig.FileStoragePath,
-          fileServerPort: this.dbConfig.FileServerPort,
-          fileUrlPrefix: this.dbConfig.FileUrlPrefix
-        });
+        // 获取到动态数据库配置
       } catch (error) {
         console.warn('获取动态数据库配置失败:', error.message);
         throw new Error('无法获取数据库配置');
@@ -72,7 +67,7 @@ class FileCopyService {
       if (match) {
         // 使用捕获组替换路径
         const networkPath = mapping.networkPath.replace('$1', match[1]);
-        console.log(`路径映射: ${tempPath} -> ${networkPath}`);
+        // 路径映射完成
         return networkPath;
       }
     }
@@ -109,7 +104,7 @@ class FileCopyService {
       // 尝试路径映射
       const mappedPath = this.mapTempPathToNetworkPath(cleanPath);
       if (mappedPath !== cleanPath) {
-        console.log(`使用映射路径: ${mappedPath}`);
+        // 使用映射路径
         cleanPath = mappedPath;
       }
 
@@ -128,7 +123,7 @@ class FileCopyService {
 
         // 如果是网络路径，尝试其他方法
         if (cleanPath.startsWith('\\\\')) {
-          console.log('尝试网络路径访问...');
+          // 尝试网络路径访问
           // 可以在这里添加网络路径的特殊处理
           // 比如使用net use命令或其他网络访问方法
         }
@@ -168,7 +163,7 @@ class FileCopyService {
     const targetDir = path.resolve(dbConfig.FileStoragePath);
     try {
       await fs.mkdir(targetDir, { recursive: true });
-      console.log('确保目标目录存在:', targetDir);
+      // 确保目标目录存在
       return targetDir;
     } catch (error) {
       console.error('创建目标目录失败:', error);
@@ -235,7 +230,7 @@ class FileCopyService {
       const urlPrefix = dbConfig.FileUrlPrefix || '/files';
       const accessUrl = `http://${serverIP}:${serverPort}${urlPrefix}/${uniqueFileName}`;
 
-      console.log(`文件拷贝成功: ${sourceFilePath} -> ${targetPath}`);
+      // 文件拷贝成功
 
       return {
         success: true,
@@ -261,26 +256,26 @@ class FileCopyService {
   // 跨网络拷贝文件到远程服务器
   async copyFileToRemoteServer(sourcePath, targetPath, dbConfig) {
     try {
-      console.log(`跨网络拷贝: ${sourcePath} -> ${dbConfig.server}:${targetPath}`);
+      // 跨网络拷贝开始
 
       // 方法1: 使用Node.js的fs模块直接读写文件
       // 先读取源文件内容
-      console.log('读取源文件内容...');
+      // 读取源文件内容
       const sourceData = await fs.readFile(sourcePath);
-      console.log(`源文件读取成功，大小: ${sourceData.length} bytes`);
+      // 源文件读取成功
 
       // 构建远程路径 (UNC路径)
       const remotePath = `\\\\${dbConfig.server}\\${targetPath.replace(':', '$')}`;
-      console.log(`远程目标路径: ${remotePath}`);
+      // 远程目标路径确定
 
       // 确保远程目录存在
       const remoteDir = path.dirname(remotePath);
       await this.ensureRemoteDirectory(remoteDir, dbConfig.server);
 
       // 写入到远程路径
-      console.log('写入到远程路径...');
+      // 写入到远程路径
       await fs.writeFile(remotePath, sourceData);
-      console.log(`跨网络拷贝成功: ${sourcePath} -> ${remotePath}`);
+      // 跨网络拷贝成功
 
       return {
         success: true,
@@ -293,7 +288,7 @@ class FileCopyService {
 
       // 如果直接拷贝失败，尝试使用robocopy命令
       try {
-        console.log('尝试使用robocopy进行拷贝...');
+        // 尝试使用robocopy进行拷贝
         return await this.copyFileUsingRobocopy(sourcePath, targetPath, dbConfig);
       } catch (robocopyError) {
         console.error('robocopy拷贝也失败:', robocopyError);
@@ -314,8 +309,7 @@ class FileCopyService {
     const targetDir = `\\\\${dbConfig.server}\\${path.dirname(targetPath).replace(':', '$')}`;
     const targetFileName = path.basename(targetPath);
 
-    console.log(`Robocopy: ${sourceDir} -> ${targetDir}`);
-    console.log(`文件: ${sourceFileName} -> ${targetFileName}`);
+    // Robocopy拷贝参数设置
 
     return new Promise((resolve, reject) => {
       // robocopy source destination filename /R:3 /W:1
@@ -346,7 +340,7 @@ class FileCopyService {
       robocopy.on('close', (code) => {
         // robocopy的退出码: 0=无文件拷贝, 1=成功拷贝, 2=额外文件/目录, 4=不匹配文件, 8=失败
         if (code <= 2) {
-          console.log(`Robocopy拷贝成功 (退出码: ${code})`);
+          // Robocopy拷贝成功
 
           // 如果文件名不同，需要重命名
           if (sourceFileName !== targetFileName) {
@@ -390,7 +384,7 @@ class FileCopyService {
 
         ps.on('close', (code) => {
           if (code === 0) {
-            console.log(`远程目录确保成功: ${remoteDir}`);
+            // 远程目录确保成功
             resolve();
           } else {
             console.warn(`远程目录创建警告 (退出码: ${code}):`, stderr);
@@ -450,7 +444,7 @@ class FileCopyService {
         if (stats.mtime.getTime() < cutoffTime) {
           await fs.unlink(filePath);
           deletedCount++;
-          console.log(`删除过期文件: ${file}`);
+          // 删除过期文件
         }
       }
 

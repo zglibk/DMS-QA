@@ -30,7 +30,7 @@ class ErpSyncService {
             return;
         }
 
-        console.log('启动ERP数据同步服务...');
+        // 启动ERP数据同步服务
         this.isRunning = true;
 
         // 确保配置已加载
@@ -39,7 +39,7 @@ class ErpSyncService {
         // 启动定时任务
         this.startScheduledSync();
 
-        console.log('ERP数据同步服务启动成功');
+        // ERP数据同步服务启动成功
     }
 
     /**
@@ -51,17 +51,17 @@ class ErpSyncService {
             return;
         }
 
-        console.log('停止ERP数据同步服务...');
+        // 停止ERP数据同步服务
         
         // 停止所有定时任务
         this.syncTasks.forEach((task, name) => {
             task.stop();
-            console.log(`已停止定时任务: ${name}`);
+            // 已停止定时任务
         });
         this.syncTasks.clear();
 
         this.isRunning = false;
-        console.log('ERP数据同步服务已停止');
+        // ERP数据同步服务已停止
     }
 
     /**
@@ -74,7 +74,7 @@ class ErpSyncService {
                 return;
             }
 
-            console.log('正在加载ERP同步配置...');
+            // 正在加载ERP同步配置
             // 从配置加载器获取同步配置
             const syncConfig = await erpConfigLoader.getErpSyncConfig();
             
@@ -89,14 +89,14 @@ class ErpSyncService {
                     }
                 };
                 this.configLoaded = true;
-                console.log('成功加载ERP同步配置:', this.syncConfig);
+                // 成功加载ERP同步配置
             } else {
-                console.log('未找到同步配置，使用默认配置:', this.syncConfig);
+                // 未找到同步配置，使用默认配置
                 this.configLoaded = true;
             }
         } catch (error) {
             console.error('加载同步配置失败:', error.message);
-            console.log('将使用默认配置:', this.syncConfig);
+            // 将使用默认配置
             this.configLoaded = true;
         }
     }
@@ -107,7 +107,7 @@ class ErpSyncService {
      */
     async reloadConfig() {
         try {
-            console.log('重新加载ERP同步配置...');
+            // 重新加载ERP同步配置
             this.configLoaded = false;
             // 清除配置加载器的缓存
             erpConfigLoader.clearCache();
@@ -116,12 +116,12 @@ class ErpSyncService {
             
             // 如果同步服务正在运行，需要重启以应用新配置
             if (this.isRunning) {
-                console.log('重启同步服务以应用新配置...');
+                // 重启同步服务以应用新配置
                 await this.stop();
                 await this.start();
             }
             
-            console.log('ERP同步配置重新加载完成');
+            // ERP同步配置重新加载完成
         } catch (error) {
             console.error('重新加载ERP同步配置失败:', error.message);
             throw error;
@@ -133,7 +133,7 @@ class ErpSyncService {
      */
     startScheduledSync() {
         if (!this.syncConfig.enabled) {
-            console.log('自动同步已禁用');
+            // 自动同步已禁用
             return;
         }
 
@@ -149,7 +149,7 @@ class ErpSyncService {
         task.start();
         this.syncTasks.set('main-sync', task);
 
-        console.log(`定时同步任务已启动，执行间隔: ${this.syncConfig.interval}`);
+        // 定时同步任务已启动
     }
 
     /**
@@ -166,7 +166,7 @@ class ErpSyncService {
             status: 'running'
         };
 
-        console.log(`开始执行ERP数据同步 [${syncId}]`);
+        // 开始执行ERP数据同步
 
         try {
             // 计算同步时间范围
@@ -178,7 +178,7 @@ class ErpSyncService {
                 endDate: endDate.toISOString().split('T')[0]
             };
 
-            console.log(`同步时间范围: ${dateRange.startDate} 到 ${dateRange.endDate}`);
+            // 同步时间范围
 
             // 同步生产数据
             if (syncResult.syncTypes.includes('production')) {
@@ -194,7 +194,7 @@ class ErpSyncService {
             await this.updateQualityMetrics(syncResult);
 
             syncResult.status = 'completed';
-            console.log(`ERP数据同步完成 [${syncId}]`);
+            // ERP数据同步完成
 
         } catch (error) {
             console.error(`ERP数据同步失败 [${syncId}]:`, error.message);
@@ -224,7 +224,7 @@ class ErpSyncService {
      */
     async syncProductionData(dateRange, syncResult) {
         try {
-            console.log('正在同步生产数据...');
+            // 正在同步生产数据
             
             // 从ERP获取生产数据
             const productionData = await erpService.getProductionData(dateRange);
@@ -255,7 +255,7 @@ class ErpSyncService {
                 message: `生产数据同步成功: 新增${insertCount}条，更新${updateCount}条`
             });
 
-            console.log(`生产数据同步完成: 处理${productionData.length}条记录`);
+            // 生产数据同步完成
 
         } catch (error) {
             console.error('同步生产数据失败:', error.message);
@@ -274,7 +274,7 @@ class ErpSyncService {
      */
     async syncDeliveryData(dateRange, syncResult) {
         try {
-            console.log('正在同步交付数据...');
+            // 正在同步交付数据
             
             // 从ERP获取交付数据
             const deliveryData = await erpService.getDeliveryData(dateRange);
@@ -305,7 +305,7 @@ class ErpSyncService {
                 message: `交付数据同步成功: 新增${insertCount}条，更新${updateCount}条`
             });
 
-            console.log(`交付数据同步完成: 处理${deliveryData.length}条记录`);
+            // 交付数据同步完成
 
         } catch (error) {
             console.error('同步交付数据失败:', error.message);
@@ -431,7 +431,7 @@ class ErpSyncService {
      */
     async updateQualityMetrics(syncResult) {
         try {
-            console.log('正在更新质量指标...');
+            // 正在更新质量指标
             
             // 计算客户投诉率
             await this.calculateComplaintRate();
@@ -445,7 +445,7 @@ class ErpSyncService {
                 message: '质量指标更新成功'
             });
             
-            console.log('质量指标更新完成');
+            // 质量指标更新完成
             
         } catch (error) {
             console.error('更新质量指标失败:', error.message);
@@ -489,7 +489,7 @@ class ErpSyncService {
             `;
             await db.query(updateQuery, [complaintRate]);
             
-            console.log(`客户投诉率计算完成: ${complaintRate.toFixed(2)}%`);
+            // 客户投诉率计算完成
             
         } catch (error) {
             console.error('计算客户投诉率失败:', error.message);
@@ -503,7 +503,7 @@ class ErpSyncService {
     async calculateOtherMetrics() {
         // 这里可以添加其他质量指标的计算逻辑
         // 例如：合格率、及时交付率等
-        console.log('其他质量指标计算完成');
+        // 其他质量指标计算完成
     }
 
     /**
@@ -558,7 +558,7 @@ class ErpSyncService {
             this.start();
         }
         
-        console.log('同步配置已更新:', this.syncConfig);
+        // 同步配置已更新
     }
 }
 
