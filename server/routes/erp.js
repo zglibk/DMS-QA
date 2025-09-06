@@ -9,75 +9,10 @@ const { authenticateToken } = require('../middleware/auth');
  * 用于获取生产和交付数据，支持实时更新客户投诉率等指标
  */
 
-/**
- * 测试ERP连接（无需认证）
- * GET /api/erp/test-connection-public
- */
-router.get('/test-connection-public', async (req, res) => {
-    try {
-        console.log('测试ERP系统连接（公开接口）...');
-        const isConnected = await erpService.testConnection();
-        
-        if (isConnected) {
-            res.json({
-                code: 0,
-                message: 'ERP系统连接成功',
-                data: {
-                    status: 'connected',
-                    timestamp: new Date().toISOString()
-                }
-            });
-        } else {
-            res.status(500).json({
-                code: -1,
-                message: 'ERP系统连接失败',
-                data: null
-            });
-        }
-    } catch (error) {
-        console.error('ERP连接测试错误:', error.message);
-        res.status(500).json({
-            code: -1,
-            message: `ERP连接测试失败: ${error.message}`,
-            data: null
-        });
-    }
-});
 
-/**
- * 测试ERP连接
- * GET /api/erp/test-connection
- */
-router.get('/test-connection', authenticateToken, async (req, res) => {
-    try {
-        console.log('测试ERP系统连接...');
-        const isConnected = await erpService.testConnection();
-        
-        if (isConnected) {
-            res.json({
-                code: 0,
-                message: 'ERP系统连接成功',
-                data: {
-                    status: 'connected',
-                    timestamp: new Date().toISOString()
-                }
-            });
-        } else {
-            res.status(500).json({
-                code: -1,
-                message: 'ERP系统连接失败',
-                data: null
-            });
-        }
-    } catch (error) {
-        console.error('ERP连接测试错误:', error.message);
-        res.status(500).json({
-            code: -1,
-            message: `ERP连接测试失败: ${error.message}`,
-            data: null
-        });
-    }
-});
+
+
+
 
 /**
  * 获取ERP token
@@ -519,72 +454,6 @@ router.get('/stock/product-out-sum', authenticateToken, async (req, res) => {
     }
 });
 
-/**
- * 测试接口：获取成品入库明细列表（无需认证）
- * GET /api/erp/test/stock/product-in-sum
- * 查询参数:
- * - StartDate: 开始日期 (yyyy-MM-dd HH:mm:ss)
- * - EndDate: 结束日期 (yyyy-MM-dd HH:mm:ss)
- */
-router.get('/test/stock/product-in-sum', async (req, res) => {
-    try {
-        const { StartDate, EndDate } = req.query;
-        
-        // console.log('测试获取ERP成品入库明细列表（无需认证）:', { StartDate, EndDate });
-        
-        const filters = {};
-        if (StartDate) filters.StartDate = StartDate;
-        if (EndDate) filters.EndDate = EndDate;
-        
-        const productInSumData = await erpService.getProductInSumList(filters);
-        
-        res.json({
-            code: 0,
-            message: '成品入库明细列表获取成功（测试接口）',
-            data: productInSumData
-        });
-    } catch (error) {
-        console.error('测试获取成品入库明细列表错误:', error.message);
-        res.status(500).json({
-            code: -1,
-            message: `获取成品入库明细列表失败: ${error.message}`,
-            data: null
-        });
-    }
-});
 
-/**
- * 测试接口：获取成品出库明细列表（无需认证）
- * GET /api/erp/test/stock/product-out-sum
- * 查询参数:
- * - StartDate: 开始日期 (yyyy-MM-dd HH:mm:ss)
- * - EndDate: 结束日期 (yyyy-MM-dd HH:mm:ss)
- */
-router.get('/test/stock/product-out-sum', async (req, res) => {
-    try {
-        const { StartDate, EndDate } = req.query;
-        
-        // console.log('测试获取ERP成品出库明细列表（无需认证）:', { StartDate, EndDate });
-        
-        const filters = {};
-        if (StartDate) filters.StartDate = StartDate;
-        if (EndDate) filters.EndDate = EndDate;
-        
-        const productOutSumData = await erpService.getProductOutSumList(filters);
-        
-        res.json({
-            code: 0,
-            message: '成品出库明细列表获取成功（测试接口）',
-            data: productOutSumData
-        });
-    } catch (error) {
-        console.error('测试获取成品出库明细列表错误:', error.message);
-        res.status(500).json({
-            code: -1,
-            message: `获取成品出库明细列表失败: ${error.message}`,
-            data: null
-        });
-    }
-});
 
 module.exports = router;

@@ -398,10 +398,43 @@
               <template #header>
                 <div class="card-header">
                   <h3>数据表列表</h3>
-                  <el-button type="primary" @click="refreshTableList" :loading="tableListLoading">
-                    <el-icon><Refresh /></el-icon>
-                    刷新列表
-                  </el-button>
+                  <div class="header-actions">
+                    <!-- 搜索框 -->
+                    <el-input
+                      v-model="tableSearchKeyword"
+                      placeholder="搜索数据表..."
+                      style="width: 200px; margin-right: 10px;"
+                      clearable
+                      @input="handleTableSearch"
+                    >
+                      <template #prefix>
+                        <el-icon><Search /></el-icon>
+                      </template>
+                    </el-input>
+                    <!-- 视图切换 -->
+                    <el-button-group style="margin-right: 10px;">
+                      <el-button 
+                        :type="tableViewMode === 'grid' ? 'primary' : 'default'"
+                        @click="tableViewMode = 'grid'"
+                        size="small"
+                      >
+                        <el-icon><Grid /></el-icon>
+                        网格
+                      </el-button>
+                      <el-button 
+                        :type="tableViewMode === 'list' ? 'primary' : 'default'"
+                        @click="tableViewMode = 'list'"
+                        size="small"
+                      >
+                        <el-icon><List /></el-icon>
+                        列表
+                      </el-button>
+                    </el-button-group>
+                    <el-button type="primary" @click="refreshTableList" :loading="tableListLoading">
+                      <el-icon><Refresh /></el-icon>
+                      刷新列表
+                    </el-button>
+                  </div>
                 </div>
               </template>
 
@@ -412,12 +445,13 @@
                   <template #label>
                     <span class="tab-label">
                       <el-icon><Document /></el-icon>
-                      业务数据表 ({{ businessTables.length }})
+                      业务数据表 ({{ filteredBusinessTables.length }})
                     </span>
                   </template>
-                  <div class="table-grid">
+                  <!-- 网格视图 -->
+                  <div v-if="tableViewMode === 'grid'" class="table-grid">
                     <div
-                      v-for="table in businessTables"
+                      v-for="table in filteredBusinessTables"
                       :key="table.tableName"
                       class="table-item"
                       :class="{ 'selected': selectedTable?.tableName === table.tableName }"
@@ -439,6 +473,42 @@
                       </div>
                     </div>
                   </div>
+                  <!-- 列表视图 -->
+                  <div v-else class="table-list-view">
+                    <el-table 
+                      :data="filteredBusinessTables" 
+                      @row-click="selectTable"
+                      :row-class-name="getTableRowClass"
+                      size="small"
+                      stripe
+                    >
+                      <el-table-column prop="displayName" label="表名" min-width="150">
+                        <template #default="{ row }">
+                          <div class="table-name-cell">
+                            <strong>{{ row.displayName }}</strong>
+                            <div class="table-code-small">{{ row.tableName }}</div>
+                          </div>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="记录数" width="100" align="right">
+                        <template #default="{ row }">
+                          <span class="record-count" v-if="tableStats[row.tableName]">
+                            {{ formatNumber(tableStats[row.tableName].recordCount) }}
+                          </span>
+                          <span v-else>-</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="标签" width="300">
+                        <template #default="{ row }">
+                          <div class="table-tags">
+                            <el-tag type="success" size="small">业务数据</el-tag>
+                            <el-tag v-if="row.hasIdentity" type="info" size="small">自增ID</el-tag>
+                            <el-tag v-if="tableStats[row.tableName] && tableStats[row.tableName].recordCount > 1000" type="warning" size="small">大数据量</el-tag>
+                          </div>
+                        </template>
+                      </el-table-column>
+                    </el-table>
+                  </div>
                 </el-tab-pane>
 
                 <!-- 基础数据表标签页 -->
@@ -446,12 +516,13 @@
                   <template #label>
                     <span class="tab-label">
                       <el-icon><Collection /></el-icon>
-                      基础数据表 ({{ basicTables.length }})
+                      基础数据表 ({{ filteredBasicTables.length }})
                     </span>
                   </template>
-                  <div class="table-grid">
+                  <!-- 网格视图 -->
+                  <div v-if="tableViewMode === 'grid'" class="table-grid">
                     <div
-                      v-for="table in basicTables"
+                      v-for="table in filteredBasicTables"
                       :key="table.tableName"
                       class="table-item"
                       :class="{ 'selected': selectedTable?.tableName === table.tableName }"
@@ -473,6 +544,42 @@
                       </div>
                     </div>
                   </div>
+                  <!-- 列表视图 -->
+                  <div v-else class="table-list-view">
+                    <el-table 
+                      :data="filteredBasicTables" 
+                      @row-click="selectTable"
+                      :row-class-name="getTableRowClass"
+                      size="small"
+                      stripe
+                    >
+                      <el-table-column prop="displayName" label="表名" min-width="150">
+                        <template #default="{ row }">
+                          <div class="table-name-cell">
+                            <strong>{{ row.displayName }}</strong>
+                            <div class="table-code-small">{{ row.tableName }}</div>
+                          </div>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="记录数" width="100" align="right">
+                        <template #default="{ row }">
+                          <span class="record-count" v-if="tableStats[row.tableName]">
+                            {{ formatNumber(tableStats[row.tableName].recordCount) }}
+                          </span>
+                          <span v-else>-</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="标签" width="300">
+                        <template #default="{ row }">
+                          <div class="table-tags">
+                            <el-tag type="primary" size="small">基础数据</el-tag>
+                            <el-tag v-if="row.hasIdentity" type="info" size="small">自增ID</el-tag>
+                            <el-tag v-if="tableStats[row.tableName] && tableStats[row.tableName].recordCount > 1000" type="warning" size="small">大数据量</el-tag>
+                          </div>
+                        </template>
+                      </el-table-column>
+                    </el-table>
+                  </div>
                 </el-tab-pane>
 
                 <!-- 系统配置表标签页 -->
@@ -480,12 +587,13 @@
                   <template #label>
                     <span class="tab-label">
                       <el-icon><Setting /></el-icon>
-                      系统配置表 ({{ systemTables.length }})
+                      系统配置表 ({{ filteredSystemTables.length }})
                     </span>
                   </template>
-                  <div class="table-grid">
+                  <!-- 网格视图 -->
+                  <div v-if="tableViewMode === 'grid'" class="table-grid">
                     <div
-                      v-for="table in systemTables"
+                      v-for="table in filteredSystemTables"
                       :key="table.tableName"
                       class="table-item"
                       :class="{
@@ -510,6 +618,43 @@
                         <el-tag v-if="tableStats[table.tableName] && tableStats[table.tableName].recordCount > 1000" type="warning" size="small">大数据量</el-tag>
                       </div>
                     </div>
+                  </div>
+                  <!-- 列表视图 -->
+                  <div v-else class="table-list-view">
+                    <el-table 
+                      :data="filteredSystemTables" 
+                      @row-click="selectTable"
+                      :row-class-name="getTableRowClass"
+                      size="small"
+                      stripe
+                    >
+                      <el-table-column prop="displayName" label="表名" min-width="150">
+                        <template #default="{ row }">
+                          <div class="table-name-cell">
+                            <strong>{{ row.displayName }}</strong>
+                            <div class="table-code-small">{{ row.tableName }}</div>
+                          </div>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="记录数" width="100" align="right">
+                        <template #default="{ row }">
+                          <span class="record-count" v-if="tableStats[row.tableName]">
+                            {{ formatNumber(tableStats[row.tableName].recordCount) }}
+                          </span>
+                          <span v-else>-</span>
+                        </template>
+                      </el-table-column>
+                      <el-table-column label="标签" width="300">
+                        <template #default="{ row }">
+                          <div class="table-tags">
+                            <el-tag type="warning" size="small">系统配置</el-tag>
+                            <el-tag v-if="row.hasIdentity" type="info" size="small">自增ID</el-tag>
+                            <el-tag v-if="['User', 'DbConfig'].includes(row.tableName)" type="danger" size="small">受保护</el-tag>
+                            <el-tag v-if="tableStats[row.tableName] && tableStats[row.tableName].recordCount > 1000" type="warning" size="small">大数据量</el-tag>
+                          </div>
+                        </template>
+                      </el-table-column>
+                    </el-table>
                   </div>
                 </el-tab-pane>
               </el-tabs>
@@ -1768,6 +1913,10 @@ const initializeResult = ref({})
 // 数据表标签页相关
 const activeTableTab = ref('business')
 
+// 数据表搜索和视图相关
+const tableSearchKeyword = ref('')
+const tableViewMode = ref('grid') // 'grid' 或 'list'
+
 // 确认步骤
 const confirmStep1 = ref(false)
 const confirmStep2 = ref(false)
@@ -1871,6 +2020,34 @@ const isIndeterminate = computed(() => {
 const businessTables = computed(() => tableList.value.filter(table => table.tableType === 'business'))
 const basicTables = computed(() => tableList.value.filter(table => table.tableType === 'basic'))
 const systemTables = computed(() => tableList.value.filter(table => table.tableType === 'system'))
+
+// 过滤后的数据表计算属性（支持搜索）
+const filteredBusinessTables = computed(() => {
+  if (!tableSearchKeyword.value) return businessTables.value
+  const keyword = tableSearchKeyword.value.toLowerCase()
+  return businessTables.value.filter(table => 
+    table.displayName.toLowerCase().includes(keyword) ||
+    table.tableName.toLowerCase().includes(keyword)
+  )
+})
+
+const filteredBasicTables = computed(() => {
+  if (!tableSearchKeyword.value) return basicTables.value
+  const keyword = tableSearchKeyword.value.toLowerCase()
+  return basicTables.value.filter(table => 
+    table.displayName.toLowerCase().includes(keyword) ||
+    table.tableName.toLowerCase().includes(keyword)
+  )
+})
+
+const filteredSystemTables = computed(() => {
+  if (!tableSearchKeyword.value) return systemTables.value
+  const keyword = tableSearchKeyword.value.toLowerCase()
+  return systemTables.value.filter(table => 
+    table.displayName.toLowerCase().includes(keyword) ||
+    table.tableName.toLowerCase().includes(keyword)
+  )
+})
 
 // 是否可以执行初始化
 const canExecuteInitialize = computed(() => {
@@ -2623,6 +2800,23 @@ const getTableTypeText = (type) => {
     case 'system': return '系统配置表'
     default: return '未知类型'
   }
+}
+
+// 处理表格搜索
+const handleTableSearch = () => {
+  // 搜索功能通过计算属性自动实现，这里可以添加额外的搜索逻辑
+}
+
+// 获取表格行样式类名
+const getTableRowClass = ({ row }) => {
+  let classes = []
+  if (selectedTable.value?.tableName === row.tableName) {
+    classes.push('selected-row')
+  }
+  if (['User', 'DbConfig'].includes(row.tableName)) {
+    classes.push('protected-row')
+  }
+  return classes.join(' ')
 }
 
 // 显示初始化确认对话框
@@ -3622,6 +3816,69 @@ const triggerManualBackup = async () => {
   align-items: center;
 }
 
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 列表视图样式 */
+.table-list-view {
+  margin-top: 10px;
+}
+
+.table-list-view .el-table {
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.table-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.table-code-small {
+  font-family: 'Courier New', monospace;
+  font-size: 11px;
+  color: #909399;
+  background: #f5f7fa;
+  padding: 1px 4px;
+  border-radius: 3px;
+  display: inline-block;
+  max-width: fit-content;
+}
+
+.table-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.table-tags .el-tag {
+  font-size: 11px;
+  height: 20px;
+  line-height: 18px;
+  padding: 0 6px;
+}
+
+/* 表格行样式 */
+.el-table .selected-row {
+  background-color: #f0f9ff !important;
+}
+
+.el-table .selected-row:hover > td {
+  background-color: #e6f7ff !important;
+}
+
+.el-table .protected-row {
+  background-color: #fef0f0 !important;
+}
+
+.el-table .protected-row:hover > td {
+  background-color: #fde2e2 !important;
+}
+
 .table-categories {
   margin-top: 20px;
 }
@@ -3645,9 +3902,28 @@ const triggerManualBackup = async () => {
 
 .table-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 12px;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px;
   max-width: 100%;
+}
+
+/* 响应式网格布局优化 */
+@media (max-width: 1400px) {
+  .table-grid {
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  }
+}
+
+@media (max-width: 1200px) {
+  .table-grid {
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  }
+}
+
+@media (max-width: 768px) {
+  .table-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .table-item {

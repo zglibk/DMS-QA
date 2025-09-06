@@ -9,7 +9,7 @@
   },
   "scripts": {
     "check-env": "node scripts/check-environment.js",
-    "test-version": "node scripts/version-compatibility-test.js",
+
     "setup": "npm run check-env && cd frontend && npm install && cd ../server && npm install",
     "dev": "npm run check-env && concurrently \"cd frontend && npm run dev\" \"cd server && npm start\"",
     "build": "echo 'Building DMS-QA Project...' && cd frontend && npm run build && cd ../server && npm run build && echo 'Build completed successfully!'",

@@ -188,8 +188,6 @@
             :page-sizes="[10, 20, 50, 100]"
             :total="pagination.total"
             layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
           />
         </div>
       </el-card>
@@ -398,7 +396,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Document,
@@ -981,22 +979,8 @@ const handleSelectionChange = (selection) => {
   selectedPlans.value = selection
 }
 
-/**
- * 处理页面大小变化
- */
-const handleSizeChange = (size) => {
-  pagination.pageSize = size
-  pagination.page = 1
-  getPlanList()
-}
-
-/**
- * 处理当前页变化
- */
-const handleCurrentChange = (page) => {
-  pagination.page = page
-  getPlanList()
-}
+// 注意：handleSizeChange 和 handleCurrentChange 已被 watch 监听器替代
+// 使用 v-model 双向绑定时，不需要手动处理这些事件
 
 /**
  * 获取工作类型名称
@@ -1086,6 +1070,15 @@ const isDeadlineWarning = (endDate, status) => {
   const diffDays = Math.ceil((deadline - today) / (1000 * 60 * 60 * 24))
   return diffDays <= 3 && diffDays >= 0
 }
+
+// 监听分页变化
+watch([() => pagination.page, () => pagination.pageSize], ([newPage, newPageSize], [oldPage, oldPageSize]) => {
+  // 如果页面大小改变，重置到第一页
+  if (newPageSize !== oldPageSize) {
+    pagination.page = 1
+  }
+  getPlanList()
+})
 
 // 组件挂载时获取数据
 onMounted(async () => {

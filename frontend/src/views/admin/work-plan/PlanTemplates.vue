@@ -200,8 +200,6 @@
             :page-sizes="[10, 20, 50, 100]"
             :total="pagination.total"
             layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
           />
         </div>
       </el-card>
@@ -522,7 +520,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Document,
@@ -1107,22 +1105,14 @@ const handleSelectionChange = (selection) => {
   selectedTemplates.value = selection
 }
 
-/**
- * 处理页面大小变化
- */
-const handleSizeChange = (size) => {
-  pagination.pageSize = size
-  pagination.page = 1
+// 监听分页变化
+watch([() => pagination.page, () => pagination.pageSize], ([newPage, newPageSize], [oldPage, oldPageSize]) => {
+  // 如果页面大小改变，重置到第一页
+  if (newPageSize !== oldPageSize) {
+    pagination.page = 1
+  }
   getTemplateList()
-}
-
-/**
- * 处理当前页变化
- */
-const handleCurrentChange = (page) => {
-  pagination.page = page
-  getTemplateList()
-}
+})
 
 /**
  * 获取部门名称（支持树形结构）

@@ -309,7 +309,7 @@ import {
   Menu,
   Search
 } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/utils/api'
 
 // 响应式数据
 const loading = ref(false)
@@ -469,7 +469,7 @@ const fetchMenus = async () => {
     })
     
     // 获取菜单列表数据
-    const response = await axios.get('/menus', { params })
+    const response = await api.get('/menus', { params })
     const allMenus = response.data.data.list || []
     
     // 构建树形结构
@@ -634,7 +634,7 @@ const submitForm = async () => {
     const url = isEdit.value ? `/menus/${currentEditId.value}` : '/menus'
     const method = isEdit.value ? 'put' : 'post'
     
-    await axios[method](url, formData)
+    await api[method](url, formData)
     
     ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
@@ -662,7 +662,7 @@ const deleteMenu = async (menu) => {
       }
     )
     
-    await axios.delete(`/menus/${menu.ID}`)
+    await api.delete(`/menus/${menu.ID}`)
     ElMessage.success('删除成功')
     await fetchMenus()
   } catch (error) {

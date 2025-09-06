@@ -275,8 +275,9 @@
             :page-sizes="[10, 20, 50, 100]"
             :total="pagination.total"
             layout="total, sizes, prev, pager, next, jumper"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
+            @update:current-page="handleCurrentPageUpdate"
+            @update:page-size="handlePageSizeUpdate"
+
           />
         </div>
       </el-card>
@@ -445,7 +446,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Document,
@@ -1104,19 +1105,19 @@ const getTimelineType = (log) => {
 }
 
 /**
- * 处理页面大小变化
+ * 处理当前页更新事件
  */
-const handleSizeChange = (size) => {
-  pagination.pageSize = size
-  pagination.page = 1
+const handleCurrentPageUpdate = (page) => {
+  pagination.page = page
   getLogList()
 }
 
 /**
- * 处理当前页变化
+ * 处理页面大小更新事件
  */
-const handleCurrentChange = (page) => {
-  pagination.page = page
+const handlePageSizeUpdate = (size) => {
+  pagination.pageSize = size
+  pagination.page = 1 // 重置到第一页
   getLogList()
 }
 

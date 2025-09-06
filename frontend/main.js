@@ -68,28 +68,8 @@ app.use(pinia)
 // 安装Vue Router路由插件
 app.use(router)
 
-/**
- * 全局请求拦截器
- * 功能：自动为所有请求添加JWT认证token
- *
- * 工作流程：
- * 1. 从localStorage获取token
- * 2. 如果token存在，添加到请求头的Authorization字段
- * 3. 格式：Bearer <token>
- */
-axios.interceptors.request.use(
-  config => {
-    // 从本地存储获取JWT token
-    const token = localStorage.getItem('token')
-    if (token) {
-      // 添加Bearer认证头
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  // 请求错误处理
-  error => Promise.reject(error)
-)
+// axios拦截器已移至各个api文件中处理，支持token自动刷新机制
+// 不在main.js中配置全局拦截器，避免与各api文件的token刷新逻辑冲突
 /**
  * 初始化API配置
  * 直接使用vite配置的代理路径，简化配置逻辑

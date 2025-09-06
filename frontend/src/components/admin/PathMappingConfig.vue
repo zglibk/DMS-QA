@@ -196,7 +196,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Edit } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
-import axios from 'axios'
+import api from '@/utils/api'
 
 // 响应式数据
 const isSubmitting = ref(false)
@@ -399,7 +399,7 @@ const testConversion = async () => {
 
   isTesting.value = true
   try {
-    const response = await axios.post('/import/test-path-conversion', {
+    const response = await api.post('/import/test-path-conversion', {
       path: testPath.value,
       mappings: pathMappings.value,
       config: conversionConfig
@@ -424,7 +424,7 @@ const testConversion = async () => {
 const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
-    const response = await axios.get('/import/path-mapping-config')
+    const response = await api.get('/import/path-mapping-config')
     if (response.data.success) {
       const config = response.data.data
       if (config.pathMappings) {
@@ -481,7 +481,7 @@ const saveConfig = async () => {
 
   isSubmitting.value = true
   try {
-    const response = await axios.put('/import/path-mapping-config', {
+    const response = await api.put('/import/path-mapping-config', {
       pathMappings: pathMappings.value.map(mapping => ({
         id: mapping.id,
         name: mapping.name,

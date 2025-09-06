@@ -499,78 +499,49 @@ const fetchAnalyticsData = async () => {
     })
     if (overviewResponse.data.success) {
       Object.assign(overviewData, overviewResponse.data.data)
-      console.log('✅ [DEBUG] 概览数据已更新:', overviewData)
+      // 概览数据更新成功
     } else {
-      console.warn('⚠️ [DEBUG] 概览数据获取失败:', overviewResponse.data)
+      // 概览数据获取失败
     }
 
     // 获取分类统计
-    console.log('📈 [DEBUG] 正在获取分类统计...')
     const categoryResponse = await api.get('/system-logs/analytics/category', { params })
-    console.log('📈 [DEBUG] 分类统计响应:', {
-      status: categoryResponse.status,
-      success: categoryResponse.data.success,
-      dataLength: categoryResponse.data.data?.length
-    })
     if (categoryResponse.data.success) {
       categoryStats.value = categoryResponse.data.data
-      console.log('✅ [DEBUG] 分类统计已更新，数据条数:', categoryStats.value.length)
+      // 分类统计更新成功
     } else {
-      console.warn('⚠️ [DEBUG] 分类统计获取失败:', categoryResponse.data)
+      // 分类统计获取失败
     }
 
     // 获取模块统计
-    console.log('🔧 [DEBUG] 正在获取模块统计...')
     const moduleResponse = await api.get('/system-logs/analytics/module', { params })
-    console.log('🔧 [DEBUG] 模块统计响应:', {
-      status: moduleResponse.status,
-      success: moduleResponse.data.success,
-      dataLength: moduleResponse.data.data?.length
-    })
     if (moduleResponse.data.success) {
       moduleStats.value = moduleResponse.data.data
-      console.log('✅ [DEBUG] 模块统计已更新，数据条数:', moduleStats.value.length)
+      // 模块统计更新成功
     } else {
-      console.warn('⚠️ [DEBUG] 模块统计获取失败:', moduleResponse.data)
+      // 模块统计获取失败
     }
 
     // 获取用户统计
-    console.log('👤 [DEBUG] 正在获取用户统计...')
     const userResponse = await api.get('/system-logs/analytics/user', { params })
-    console.log('👤 [DEBUG] 用户统计响应:', {
-      status: userResponse.status,
-      success: userResponse.data.success,
-      dataLength: userResponse.data.data?.length
-    })
     if (userResponse.data.success) {
       userStats.value = userResponse.data.data
-      console.log('✅ [DEBUG] 用户统计已更新，数据条数:', userStats.value.length)
+      // 用户统计更新成功
     } else {
-      console.warn('⚠️ [DEBUG] 用户统计获取失败:', userResponse.data)
+      // 用户统计获取失败
     }
 
     // 获取趋势数据
-    console.log('📉 [DEBUG] 正在获取趋势数据...')
     await fetchTrendData()
 
     // 更新图表
-    console.log('🎨 [DEBUG] 正在更新图表...')
     await nextTick()
     updateCharts()
-    console.log('🎉 [DEBUG] 统计分析数据获取完成')
 
   } catch (error) {
-    console.error('❌ [DEBUG] 获取统计数据失败:', error)
-    console.error('❌ [DEBUG] 错误详情:', {
-      message: error.message,
-      response: error.response,
-      status: error.response?.status,
-      data: error.response?.data
-    })
     ElMessage.error(`获取统计数据失败: ${error.message || '未知错误'}`)
   } finally {
     loading.value = false
-    console.log('🏁 [DEBUG] fetchAnalyticsData 执行完成')
   }
 }
 
@@ -578,7 +549,6 @@ const fetchAnalyticsData = async () => {
  * 获取趋势数据
  */
 const fetchTrendData = async () => {
-  console.log('📉 [DEBUG] fetchTrendData 开始执行')
   try {
     const params = {
       startDate: filterForm.startDate,
@@ -587,35 +557,19 @@ const fetchTrendData = async () => {
       module: filterForm.module,
       period: trendPeriod.value
     }
-    console.log('📉 [DEBUG] 趋势数据API参数:', params)
 
     const response = await api.get('/system-logs/analytics/trend', { params })
-    console.log('📉 [DEBUG] 趋势数据响应:', {
-      status: response.status,
-      success: response.data.success,
-      dataLength: response.data.data?.length
-    })
     if (response.data.success) {
       trendData.value = response.data.data
-      console.log('✅ [DEBUG] 趋势数据已更新，数据条数:', trendData.value.length)
       // 更新趋势图表
       await nextTick()
       updateTrendChart()
-      console.log('🎨 [DEBUG] 趋势图表已更新')
     } else {
-      console.warn('⚠️ [DEBUG] 趋势数据获取失败:', response.data)
+      // 趋势数据获取失败
     }
   } catch (error) {
-    console.error('❌ [DEBUG] 获取趋势数据失败:', error)
-    console.error('❌ [DEBUG] 趋势数据错误详情:', {
-      message: error.message,
-      response: error.response,
-      status: error.response?.status,
-      data: error.response?.data
-    })
     ElMessage.error('获取趋势数据失败')
   }
-  console.log('🏁 [DEBUG] fetchTrendData 执行完成')
 }
 
 /**
@@ -655,34 +609,18 @@ const initCharts = () => {
  * 更新图表
  */
 const updateCharts = () => {
-  console.log('🎨 [DEBUG] updateCharts 被调用')
-  console.log('🎨 [DEBUG] 当前数据状态:', {
-    trendDataLength: trendData.value?.length || 0,
-    categoryStatsLength: categoryStats.value?.length || 0,
-    moduleStatsLength: moduleStats.value?.length || 0,
-    userStatsLength: userStats.value?.length || 0,
-    overviewData: overviewData
-  })
   updateTrendChart()
   updateCategoryChart()
   updateModuleChart()
   updateUserChart()
   updateErrorChart()
-  console.log('🎨 [DEBUG] updateCharts 执行完成')
 }
 
 /**
  * 更新趋势图
  */
 const updateTrendChart = () => {
-  console.log('📈 [DEBUG] updateTrendChart 被调用')
-  console.log('📈 [DEBUG] 趋势图状态检查:', {
-    chartExists: !!trendChart.value,
-    dataLength: trendData.value?.length || 0,
-    data: trendData.value
-  })
   if (!trendChart.value || !trendData.value.length) {
-    console.log('⚠️ [DEBUG] 趋势图更新跳过 - 图表实例或数据不存在')
     return
   }
 

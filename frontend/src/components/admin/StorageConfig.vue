@@ -153,7 +153,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import axios from 'axios'
+import api from '@/utils/api'
 
 // 响应式数据
 const storageFormRef = ref()
@@ -191,7 +191,7 @@ const storageRules = {
 const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
-    const response = await axios.get('/config/db-list')
+    const response = await api.get('/config/db-list')
     if (response.data.success && response.data.data.length > 0) {
       const config = response.data.data[0] // 获取当前配置
       currentConfigId.value = config.ID
@@ -234,7 +234,7 @@ const saveConfig = async () => {
       isSubmitting.value = true
       try {
         // 调用更新配置的API，使用当前配置的完整信息
-        const response = await axios.put(`/config/db/${currentConfigId.value}`, {
+        const response = await api.put(`/config/db/${currentConfigId.value}`, {
           Host: currentConfig.value.Host,
           DatabaseName: currentConfig.value.DatabaseName,
           DbUser: currentConfig.value.DbUser,
@@ -268,7 +268,7 @@ const saveConfig = async () => {
 const testStorage = async () => {
   isTesting.value = true
   try {
-    const response = await axios.post('/config/test-storage', {
+    const response = await api.post('/config/test-storage', {
       path: storageConfig.FileStoragePath
     })
     

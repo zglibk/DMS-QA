@@ -113,11 +113,12 @@ app.use(loggerMiddleware({
  * - 性能分析
  * - 安全审计
  */
-app.use((req, res, next) => {
-  const logMessage = `${new Date().toLocaleString()} - ${req.method} ${req.url}`;
-  console.log(logMessage);
-  next(); // 继续执行下一个中间件
-});
+// 注释掉调试输出，使用loggerMiddleware统一处理日志
+// app.use((req, res, next) => {
+//   const logMessage = `${new Date().toLocaleString()} - ${req.method} ${req.url}`;
+//   console.log(logMessage);
+//   next(); // 继续执行下一个中间件
+// });
 
 /**
  * API测试端点
@@ -138,11 +139,7 @@ app.use((req, res, next) => {
  */
 app.get('/api/test-connection', (req, res) => {
   const testMessage = `连接测试成功 - 服务器时间: ${new Date().toLocaleString()}`;
-  console.log(testMessage);
-
-  // 记录测试日志到文件
-  require('fs').appendFileSync('debug.log', `${new Date().toISOString()} - ${testMessage}\n`);
-
+  
   // 返回测试结果
   res.json({
     success: true,
@@ -376,39 +373,27 @@ process.on('unhandledRejection', (reason, promise) => {
  * - 显示环境配置
  */
 app.listen(3001, '0.0.0.0', () => {
-  console.log('=== 后端服务已启动 ===');
-  console.log('端口: 3001');
-  console.log('时间:', new Date().toLocaleString());
-  console.log('工作目录:', process.cwd());
-  console.log('环境模式:', process.env.NODE_ENV || 'development');
-  console.log('数据库服务器:', process.env.DB_SERVER || '192.168.1.57');
-  console.log('文件服务器IP:', process.env.FILE_SERVER_IP || 'localhost');
-  console.log('文件服务器端口:', process.env.FILE_SERVER_PORT || '8080');
-  console.log('========================');
+  console.log('后端服务已启动 - 端口: 3001');
   
   // 启动文件服务器（开发环境）
   if (process.env.NODE_ENV === 'development' || process.env.NODE_ENV !== 'production') {
     try {
       startFileServer();
-      console.log('✅ 开发环境文件服务器已启动');
     } catch (error) {
-      console.error('❌ 文件服务器启动失败:', error.message);
-      console.log('💡 提示: 如果端口8080被占用，请修改.env文件中的FILE_SERVER_PORT配置');
+      console.error('文件服务器启动失败:', error.message);
     }
   }
 
   // 启动ERP数据同步服务
   setTimeout(() => {
     erpSyncService.start();
-    console.log('ERP数据同步服务已启动');
   }, 5000); // 延迟5秒启动，确保数据库连接已建立
 
   // 启动日志清理服务
   try {
     logCleanupService.start();
-    console.log('日志清理服务已启动');
   } catch (error) {
-    console.error('❌ 启动日志清理服务失败:', error);
+    console.error('启动日志清理服务失败:', error);
   }
 }).on('error', (error) => {
   console.error('服务器启动错误:', error);

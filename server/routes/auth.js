@@ -28,7 +28,7 @@ const jwt = require('jsonwebtoken');
 // 导入bcrypt库，用于密码加密
 const bcrypt = require('bcryptjs');
 // 导入数据库连接模块
-const { sql, config, getDynamicConfig } = require('../db');
+const { sql, config, getDynamicConfig, executeQuery } = require('../db');
 // 创建路由实例
 const router = express.Router();
 // JWT密钥（生产环境应使用环境变量）
@@ -433,6 +433,9 @@ router.post('/login', async (req, res) => {
     // 获取ERP配置并生成ERP token
     let erpToken = null;
     let erpConfig = null;
+    let erpTokenStatus = 'success'; // 记录ERP token获取状态
+    let erpMessage = null; // ERP相关提示信息
+    
     try {
       // 直接从数据库获取ERP配置数据
       const query = 'SELECT config_key, config_value FROM erp_config ORDER BY config_key';
@@ -440,7 +443,7 @@ router.post('/login', async (req, res) => {
         return await pool.request().query(query);
       });
       
-      if (erpConfigResult.recordset && erpConfigResult.recordset.length > 0) {
+      if (erpConfigResult && erpConfigResult.recordset && erpConfigResult.recordset.length > 0) {
         // 将配置数组转换为对象格式便于查找
         const configMap = {};
         erpConfigResult.recordset.forEach(row => {
@@ -453,25 +456,50 @@ router.post('/login', async (req, res) => {
           appSecret: configMap['erp_app_secret'] || ''
         };
         
-        // 如果ERP配置完整，则获取ERP token
-        if (erpConfig.baseUrl && erpConfig.appId && erpConfig.appSecret) {
+        // 检查ERP配置完整性并提供详细的缺失信息
+        const missingConfigs = [];
+        if (!erpConfig.baseUrl) missingConfigs.push('ERP API地址(erp_api_url)');
+        if (!erpConfig.appId) missingConfigs.push('ERP应用ID(erp_app_id)');
+        if (!erpConfig.appSecret) missingConfigs.push('ERP应用密钥(erp_app_secret)');
+        
+        if (missingConfigs.length === 0) {
+          // 配置完整，尝试获取ERP token
           const erpService = require('../services/erpService');
           await erpService.loadConfig(); // 确保配置已加载
-          const erpTokenResult = await erpService.getToken();
           
-          if (erpTokenResult) {
+          // 直接尝试获取token，而不是使用testConnection
+          try {
+            await erpService.getToken();
             erpToken = erpService.token;
-            console.log('ERP token获取成功，用户:', user.Username);
-          } else {
-            console.warn('ERP token获取失败，用户:', user.Username);
+            if (erpToken) {
+              console.log('ERP token获取成功，用户:', user.Username);
+            } else {
+              erpTokenStatus = 'failed';
+              erpMessage = 'ERP token获取失败，请检查ERP系统配置';
+              console.warn('ERP token获取失败，用户:', user.Username);
+            }
+          } catch (tokenError) {
+            erpTokenStatus = 'failed';
+            erpMessage = `ERP token获取失败: ${tokenError.message}`;
+            console.error('ERP token获取异常，用户:', user.Username, '错误:', tokenError.message);
           }
         } else {
-          console.warn('ERP配置不完整，跳过token获取，用户:', user.Username);
+          erpTokenStatus = 'config_incomplete';
+          // 配置不完整时提供具体的缺失配置项信息
+          erpMessage = `ERP系统配置不完整，缺少以下配置项：<br>${missingConfigs.map(config => `• ${config}`).join('<br>')}<br><br>请联系管理员完善ERP配置。`;
+          console.warn('ERP配置不完整，缺少配置项:', missingConfigs.join(', '), '用户:', user.Username);
         }
+      } else {
+        erpTokenStatus = 'no_config';
+        // 未配置时提供提示信息
+        erpMessage = 'ERP系统尚未配置，相关功能暂不可用。请联系管理员进行ERP系统配置。';
+        console.warn('未找到ERP配置，用户:', user.Username);
       }
     } catch (erpError) {
-      console.error('获取ERP配置或token失败:', erpError.message);
-      // ERP相关错误不影响DMS登录流程
+      // ERP配置获取异常，不影响DMS登录流程
+      erpTokenStatus = 'config_error';
+      erpMessage = null; // 配置获取异常时不显示错误信息
+      console.error('ERP配置获取异常，但不影响登录:', erpError.message);
     }
 
     // 记录登录成功日志
@@ -494,6 +522,8 @@ router.post('/login', async (req, res) => {
       token,
       erpToken,
       erpConfig,
+      erpTokenStatus, // ERP token获取状态
+      erpMessage, // ERP相关提示信息
       user: {
         id: updatedUser.ID,
         username: updatedUser.Username,
@@ -501,6 +531,11 @@ router.post('/login', async (req, res) => {
         lastLoginTime: updatedUser.LastLoginTime ? updatedUser.LastLoginTime.toISOString() : null
       }
     };
+    
+    // 如果ERP token获取失败，在控制台输出详细信息供调试
+    if (erpTokenStatus !== 'success') {
+      console.log(`用户 ${user.Username} 登录成功，但ERP token状态: ${erpTokenStatus}, 提示: ${erpMessage}`);
+    }
     // 登录成功，准备返回响应
     res.json(responseData);
 

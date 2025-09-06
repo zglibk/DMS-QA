@@ -147,13 +147,13 @@
 // Vue 3核心API
 import { ref, reactive, onMounted, watch } from 'vue'
 // HTTP请求库
-import axios from 'axios'
+import api from '@/api/index.js'
 // 路由管理
 import { useRouter } from 'vue-router'
 // Element Plus图标
 import { User, Lock, Key } from '@element-plus/icons-vue'
 // Element Plus消息组件
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 // 用户状态管理
 import { useUserStore } from '../store/user'
 // 网站配置管理
@@ -222,7 +222,7 @@ const rules = reactive({
  */
 const getCaptcha = async () => {
   try {
-    const response = await axios.get('/auth/captcha')
+    const response = await api.get('/api/auth/captcha')
     captchaSvg.value = response.data.captchaSvg
     form.value.captchaId = response.data.captchaId
     form.value.captchaText = '' // 清空验证码输入
@@ -263,23 +263,63 @@ const login = async () => {
           captchaId: form.value.captchaId,
           captchaText: form.value.captchaText
         }
-        const res = await axios.post('/auth/login', loginData)
-        
+        const res = await api.post('/api/auth/login', loginData)
         // 设置token到store和localStorage
-        userStore.setToken(res.data.token)
+        try {
+          userStore.setToken(res.data.token)
+        } catch (tokenError) {
+          console.error('设置token时出错:', tokenError)
+          throw tokenError
+        }
         
         // 直接使用登录接口返回的用户信息，包括最后登录时间
         if (res.data.user) {
-          userStore.setUser(res.data.user)
+          try {
+            userStore.setUser(res.data.user)
+          } catch (userError) {
+            console.error('设置用户信息时出错:', userError)
+            throw userError
+          }
         }
         
         // 强制刷新用户资料和权限信息，确保权限数据被正确获取和持久化
-        await userStore.fetchProfile(true) // 传入true强制刷新
+        try {
+          await userStore.fetchProfile(true) // 传入true强制刷新
+        } catch (profileError) {
+          console.warn('用户资料刷新失败，但不影响登录:', profileError)
+          // 即使权限获取失败，也继续登录流程
+        }
         
-
+        // 只在有ERP错误消息时显示提示（网络超时等临时问题不显示）
+        if (res.data.erpMessage) {
+          // ERP系统有需要用户知晓的问题，显示提示框
+          ElMessageBox.alert(
+            res.data.erpMessage,
+            'ERP系统提示',
+            {
+              confirmButtonText: '确定',
+              type: 'warning',
+              showClose: false,
+              dangerouslyUseHTMLString: true // 启用HTML格式支持换行显示
+            }
+          )
+        }
         
-        ElMessage.success('登录成功')
-        router.push('/')
+        // 恢复页面状态或跳转到首页
+        try {
+          const { restorePageState } = await import('../services/api.js')          
+          const userId = userStore.user?.id || userStore.user?.ID          
+          const targetPath = restorePageState(userId)
+          
+          if (targetPath) {
+            router.push(targetPath)
+          } else {
+            router.push('/')
+          }
+        } catch (restoreError) {
+          console.error('页面状态恢复失败:', restoreError)
+          router.push('/')
+        }
       } catch (e) {
         // 只有在验证码相关错误时才刷新验证码
         const errorMessage = e.response?.data?.message || ''

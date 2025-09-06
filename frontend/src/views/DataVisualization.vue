@@ -182,7 +182,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import { RefreshLeft, Download, Document, WarningFilled, InfoFilled } from '@element-plus/icons-vue'
 import { Icon } from '@iconify/vue'
 import * as echarts from 'echarts'
-import axios from 'axios'
+import api from '@/utils/api'
 import { ElMessage } from 'element-plus'
 import AppLayout from '@/components/common/AppLayout.vue'
 
@@ -279,9 +279,7 @@ const formatDate = (dateStr) => {
 const fetchBasicData = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/complaint/options', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/complaint/options')
 
     // 转换数据格式：从 [{Name: "xxx"}] 转换为 ["xxx"]，参考ComplaintForm的处理方式
     const data = res.data
@@ -323,8 +321,7 @@ const fetchStatsData = async () => {
 const fetchRecentComplaints = async () => {
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.get('/complaint/list', {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await api.get('/complaint/list', {
       params: { page: 1, pageSize: 10 }
     })
     

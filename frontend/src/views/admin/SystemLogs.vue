@@ -518,7 +518,7 @@ import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download, Delete, View, TrendCharts, Check, Close, Star, Document, Warning, InfoFilled, User, Loading } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import api from '@/utils/api'
 
 export default {
   name: 'SystemLogs',
@@ -673,7 +673,7 @@ export default {
     // 获取配置选项
     const fetchConfigOptions = async () => {
       try {
-        const response = await axios.get('/system-logs/config/options')
+        const response = await api.get('/system-logs/config/options')
         if (response.data.success) {
           categories.value = response.data.data.categories
           modules.value = response.data.data.modules
@@ -694,13 +694,12 @@ export default {
           ...searchForm
         }
         
-        const response = await axios.get('/system-logs/list', { params })
+        const response = await api.get('/system-logs/list', { params })
         if (response.data.success) {
           logList.value = response.data.data.list
           pagination.total = response.data.data.pagination.total
         }
       } catch (error) {
-        console.error('获取日志列表失败:', error)
         ElMessage.error('获取日志列表失败')
       } finally {
         loading.value = false
@@ -728,7 +727,7 @@ export default {
           }
         })
         
-        const response = await axios.get('/system-logs/statistics', { params })
+        const response = await api.get('/system-logs/statistics', { params })
         if (response.data.success) {
           const stats = response.data.data.totalStats
           totalLogs.value = stats.totalLogs || 0
@@ -737,7 +736,7 @@ export default {
           uniqueUsers.value = stats.uniqueUsers || 0
         }
       } catch (error) {
-        console.error('获取统计信息失败:', error)
+        // 静默处理统计信息获取失败，不影响主要功能
       }
     }
     
@@ -813,7 +812,7 @@ export default {
     // 查看日志详情
     const viewLogDetail = async (row) => {
       try {
-        const response = await axios.get(`/system-logs/${row.ID}`)
+        const response = await api.get(`/system-logs/${row.ID}`)
         if (response.data.success) {
           currentLog.value = response.data.data
           detailDialogVisible.value = true
@@ -861,7 +860,7 @@ export default {
           data.severity = cleanupForm.severity
         }
         
-        const response = await axios.post('/system-logs/cleanup', data)
+        const response = await api.post('/system-logs/cleanup', data)
         if (response.data.success) {
           ElMessage.success(response.data.message)
           cleanupDialogVisible.value = false
@@ -891,7 +890,7 @@ export default {
     // 获取导出模板
     const fetchExportTemplate = async () => {
       try {
-        const response = await axios.get('/log-export/template')
+        const response = await api.get('/log-export/template')
         if (response.data.success) {
           availableColumns.value = response.data.data.availableColumns
           exportFormats.value = response.data.data.formats
@@ -955,7 +954,7 @@ export default {
         console.log('📤 [前端调试] 准备发送导出请求:', params)
         
         // 获取数据
-        const response = await axios.get('/system-logs/list', { params })
+        const response = await api.get('/system-logs/list', { params })
         console.log('✅ [前端调试] 数据获取响应:', response.data)
         
         if (response.data.success && response.data.data) {

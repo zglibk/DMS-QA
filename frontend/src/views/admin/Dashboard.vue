@@ -167,7 +167,7 @@
 <script setup>
 import { ref, onMounted, computed, nextTick, onBeforeUnmount } from 'vue'
 import { PieChart, WarningFilled, DataLine, RefreshRight, CircleCheck, Warning, ArrowUp, ArrowDown } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/utils/api'
 import { ElMessage } from 'element-plus'
 import * as echarts from 'echarts'
 
@@ -349,20 +349,16 @@ async function fetchDashboardData() {
 
     // 并行获取当前月份和上月数据，以及批次统计数据
     const [currentRes, lastMonthRes, currentBatchRes, lastBatchRes] = await Promise.all([
-      axios.get('/complaint/month-stats', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/complaint/month-stats', {
         params: { month: selectedMonth.value }
       }),
-      axios.get('/complaint/month-stats', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/complaint/month-stats', {
         params: { month: getLastMonth(selectedMonth.value) }
       }),
-      axios.get('/quality-metrics/month-batch-stats', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/quality-metrics/month-batch-stats', {
         params: { month: selectedMonth.value }
       }),
-      axios.get('/quality-metrics/month-batch-stats', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/quality-metrics/month-batch-stats', {
         params: { month: getLastMonth(selectedMonth.value) }
       })
     ])
@@ -427,8 +423,7 @@ async function fetchQualityStats(token) {
     // 并行获取数据
     const [innerComplaintRes, outerComplaintRes, batchStatsRes] = await Promise.all([
       // 获取内诉数量（不合格数）
-      axios.get('/complaint/list', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/complaint/list', {
         params: {
           page: 1,
           pageSize: 1,
@@ -438,8 +433,7 @@ async function fetchQualityStats(token) {
         }
       }),
       // 获取客诉批次数量
-      axios.get('/complaint/list', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/complaint/list', {
         params: {
           page: 1,
           pageSize: 1,
@@ -449,8 +443,7 @@ async function fetchQualityStats(token) {
         }
       }),
       // 获取月度批次统计数据
-      axios.get('/quality-metrics/month-batch-stats', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/quality-metrics/month-batch-stats', {
         params: {
           month: selectedMonth.value
         }
@@ -504,8 +497,7 @@ async function fetchLastQualityStats(token) {
     // 并行获取上月数据
     const [innerComplaintRes, outerComplaintRes, batchStatsRes] = await Promise.all([
       // 获取上月内诉数量
-      axios.get('/complaint/list', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/complaint/list', {
         params: {
           page: 1,
           pageSize: 1,
@@ -515,8 +507,7 @@ async function fetchLastQualityStats(token) {
         }
       }),
       // 获取上月客诉数量
-      axios.get('/complaint/list', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/complaint/list', {
         params: {
           page: 1,
           pageSize: 1,
@@ -526,8 +517,7 @@ async function fetchLastQualityStats(token) {
         }
       }),
       // 获取上月批次统计数据
-      axios.get('/quality-metrics/month-batch-stats', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/quality-metrics/month-batch-stats', {
         params: {
           month: lastMonth
         }
@@ -567,8 +557,7 @@ async function fetchLastQualityStats(token) {
  */
 async function fetchQualityTarget(token, year, targetName) {
   try {
-    const response = await axios.get('/quality-targets', {
-      headers: { Authorization: `Bearer ${token}` },
+    const response = await api.get('/quality-targets', {
       params: {
         year: year,
         keyword: targetName,
@@ -601,8 +590,7 @@ async function fetchTrendData(token) {
     
     // 并行获取趋势数据和质量目标数据
     const [trendResponse, qualityTargetValue] = await Promise.all([
-      axios.get('/quality-metrics/trends', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/quality-metrics/trends', {
         params: { year: selectedYear }
       }),
       fetchQualityTarget(token, selectedYear, '一次交检合格率')

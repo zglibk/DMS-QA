@@ -148,7 +148,7 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/utils/api'
 
 // 响应式数据
 const dbFormRef = ref()
@@ -192,7 +192,7 @@ const dbRules = {
 const loadConfigs = async () => {
   isLoadingConfigs.value = true
   try {
-    const response = await axios.get('/config/db-list')
+    const response = await api.get('/config/db-list')
     if (response.data.success) {
       dbConfigs.value = response.data.data
     }
@@ -271,7 +271,7 @@ const saveConfig = async () => {
         
         const method = selectedConfigId.value ? 'put' : 'post'
         
-        const response = await axios[method](url, dbConfig)
+        const response = await api[method](url, dbConfig)
         
         if (response.data.success) {
           ElMessage.success(selectedConfigId.value ? '配置更新成功' : '配置保存成功')
@@ -298,7 +298,7 @@ const testConnection = async () => {
     if (valid) {
       isTesting.value = true
       try {
-        const response = await axios.post('/config/test-connection', dbConfig)
+        const response = await api.post('/config/test-connection', dbConfig)
         if (response.data.success) {
           ElMessage.success('连接测试成功')
         } else {
@@ -322,7 +322,7 @@ const deleteConfig = async () => {
       type: 'warning'
     })
 
-    const response = await axios.delete(`/config/db/${selectedConfigId.value}`)
+    const response = await api.delete(`/config/db/${selectedConfigId.value}`)
     if (response.data.success) {
       ElMessage.success('配置删除成功')
       selectedConfigId.value = null

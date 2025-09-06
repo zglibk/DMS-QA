@@ -59,20 +59,41 @@
             年度数据概览
           </h2>
           <div class="overview-grid">
-            <div class="overview-card" v-for="item in overviewData" :key="item.key">
-              <div class="card-icon">
-                <Icon :icon="item.icon" :style="{ color: item.color, fontSize: '40px' }" />
-              </div>
-              <div class="card-content">
-                <div class="card-title">{{ item.title }}</div>
-                <div class="card-value">{{ item.value }}</div>
-                <div class="card-trend" :class="item.trend">
-                  相比去年同期
-                  <Icon :icon="item.trendIcon" :style="{ fontSize: '14px', color: item.trendColor }" />
-                  <span :style="{ color: item.trendColor }">{{ item.trendText }}</span>
+            <!-- 加载状态 -->
+            <template v-if="overviewLoading">
+              <div class="overview-card loading-card" v-for="n in 4" :key="'loading-' + n">
+                <div class="card-icon loading-icon">
+                  <el-icon class="is-loading" :style="{ fontSize: '40px', color: '#409EFF' }">
+                    <Loading />
+                  </el-icon>
+                </div>
+                <div class="card-content">
+                  <div class="card-title loading-text">加载中...</div>
+                  <div class="card-value loading-value">--</div>
+                  <div class="card-trend loading-trend">
+                    <span class="trend-text">数据加载中</span>
+                  </div>
                 </div>
               </div>
-            </div>
+            </template>
+            
+            <!-- 数据内容 -->
+            <template v-else>
+              <div class="overview-card" v-for="item in overviewData" :key="item.key">
+                <div class="card-icon">
+                  <Icon :icon="item.icon" :style="{ color: item.color, fontSize: '40px' }" />
+                </div>
+                <div class="card-content">
+                  <div class="card-title">{{ item.title }}</div>
+                  <div class="card-value">{{ item.value }}</div>
+                  <div class="card-trend" :class="item.trend">
+                    相比去年同期
+                    <Icon :icon="item.trendIcon" :style="{ fontSize: '14px', color: item.trendColor }" />
+                    <span :style="{ color: item.trendColor }">{{ item.trendText }}</span>
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
         </div>
 
@@ -519,7 +540,8 @@ import {
   ArrowRight,
   Calendar,
   Check,
-  List
+  List,
+  Loading
 } from '@element-plus/icons-vue'
 
 const router = useRouter()
@@ -631,6 +653,9 @@ const todayStats = ref({
   taskCount: 23,
   alertCount: 5
 })
+
+// 数据概览加载状态
+const overviewLoading = ref(true)
 
 // 数据概览 - 改为响应式数据，通过API获取
 const overviewData = ref([
@@ -1020,7 +1045,7 @@ const systemModulesConfig = [
     icon: 'mdi:currency-usd',
     color: '#F56C6C',
     count: calculateModuleCount('copq'),
-    path: '/admin/copq',
+    path: '/admin/copq/quality-cost-statistics',
     // 权限检查：需要质量成本管理权限
     requiredPermissions: ['copq:material:view', 'copq:statistics:view'],
     requiredMenus: ['/admin/copq', '/admin/copq/material-price']
@@ -1319,6 +1344,9 @@ const fetchOnlineUsers = async () => {
  */
 const fetchOverviewData = async () => {
   try {
+    // 开始加载
+    overviewLoading.value = true
+    
     // 获取质量指标汇总数据
     const qualityResponse = await api.get('/quality-metrics/summary')
     
@@ -1444,6 +1472,9 @@ const fetchOverviewData = async () => {
         trendText: '--'
       }
     ]
+  } finally {
+    // 结束加载
+    overviewLoading.value = false
   }
 }
 
@@ -1986,6 +2017,47 @@ defineExpose({
   font-family: 'Bahnschrift';
   font-variant-numeric: tabular-nums lining-nums;
   letter-spacing: -0.02em;
+}
+
+/* 加载状态样式 */
+.loading-card {
+  opacity: 0.8;
+}
+
+.loading-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.loading-text {
+  color: #909399;
+  font-size: 14px;
+}
+
+.loading-value {
+  color: #C0C4CC;
+  font-size: 24px;
+  font-weight: 700;
+}
+
+.loading-trend {
+  color: #C0C4CC;
+  font-size: 12px;
+}
+
+/* 加载动画 */
+.is-loading {
+  animation: rotating 2s linear infinite;
+}
+
+@keyframes rotating {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 .card-trend {

@@ -9,7 +9,7 @@ import { useUserStore } from '@/store/user'
 // 创建 axios 实例
 const api = axios.create({
   baseURL: process.env.NODE_ENV === 'production' ? '' : 'http://localhost:3001',
-  timeout: 10000,
+  timeout: 60000, // 增加到60秒，适应ERP同步操作
   headers: {
     'Content-Type': 'application/json'
   }

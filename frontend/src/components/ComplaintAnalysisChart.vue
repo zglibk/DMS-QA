@@ -510,7 +510,7 @@ import {
   WarningFilled, Tools, QuestionFilled
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import axios from 'axios'
+import api from '@/services/api'
 import ImagePreview from './ImagePreview.vue'
 
 // 响应式数据
@@ -673,7 +673,7 @@ const loadData = async () => {
       complaintType: selectedComplaintType.value
     }
 
-    const response = await axios.get('/complaint/analysis', { params })
+    const response = await api.get('/complaint/analysis', { params })
 
     if (response.data.success) {
       chartData.value = Array.isArray(response.data.chartData) ? response.data.chartData : []
@@ -735,10 +735,7 @@ const handleDetailRowDoubleClick = async (row) => {
 
   try {
     // 获取完整的投诉记录详情
-    const token = localStorage.getItem('token')
-    const response = await axios.get(`/complaint/detail/${row.ID}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const response = await api.get(`/complaint/detail/${row.ID}`)
 
     if (response.data.success) {
       detailDrawerData.value = response.data.data
@@ -816,7 +813,7 @@ const drillDownToWorkshopDetail = async (row) => {
 const drillDownToCategoryDetail = async (row) => {
   try {
     // 使用现有的投诉列表API进行数据钻取
-    const response = await axios.get('/complaint/list', {
+    const response = await api.get('/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
@@ -840,7 +837,7 @@ const drillDownToCategoryDetail = async (row) => {
 const drillDownToCustomerDetail = async (row) => {
   try {
     // 使用现有的投诉列表API进行数据钻取
-    const response = await axios.get('/complaint/list', {
+    const response = await api.get('/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
@@ -916,10 +913,7 @@ const exportDetailData = () => {
 // 获取字段信息
 const fetchExportFields = async () => {
   try {
-    const token = localStorage.getItem('token')
-    const res = await axios.get('/complaint/fields', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/complaint/fields')
 
     if (res.data.success) {
       exportFields.value = res.data.data

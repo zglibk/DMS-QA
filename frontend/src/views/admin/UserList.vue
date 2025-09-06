@@ -1107,7 +1107,7 @@
 
 <script setup>
 import { ref, onMounted, watch, computed, nextTick } from 'vue'
-import axios from 'axios'
+import api from '@/utils/api'
 import apiService from '@/services/apiService.js'
 import { 
   Edit, Delete, Setting, Search, Plus, Refresh, User, UserFilled, 
@@ -1419,9 +1419,9 @@ const submitAddUser = () => {
         formData.Avatar = ''
       }
       
-      const res = await axios[method](url, formData, {
-        headers: { Authorization: `Bearer ${token}` }
-      })
+      const res = await api[method](url, formData, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
       
       if (res.data && res.data.success) {
         // 根据是否有头像更新显示不同的成功消息
@@ -1472,7 +1472,7 @@ const positions = ref([])
  */
 const fetchDepartments = async () => {
   const token = localStorage.getItem('token')
-  const res = await axios.get('/complaint/options', {
+  const res = await api.get('/complaint/options', {
     headers: { Authorization: `Bearer ${token}` }
   })
   if (res.data && res.data.departments) {
@@ -1485,10 +1485,7 @@ const fetchDepartments = async () => {
  */
 const fetchPositions = async () => {
   try {
-    const token = localStorage.getItem('token')
-    const res = await axios.get('/positions', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/positions')
     if (res.data && res.data.success) {
       positions.value = res.data.data.list || []
     }
@@ -1508,7 +1505,6 @@ watch(showAddUser, v => {
 const fetchUsers = async () => {
   loading.value = true
   try {
-    const token = localStorage.getItem('token')
     const params = {
       page: page.value,
       pageSize: pageSize.value,
@@ -1519,10 +1515,7 @@ const fetchUsers = async () => {
     if (filterRole.value) params.role = filterRole.value
     if (filterStatus.value !== '') params.status = filterStatus.value
     
-    const res = await axios.get('/auth/user-list', {
-      params,
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/auth/user-list', { params })
     
     if (res.data && res.data.success) {
       users.value = res.data.data
@@ -1809,7 +1802,7 @@ const deleteUser = async (row) => {
     )
     
     const token = localStorage.getItem('token')
-    const res = await axios.delete(`/auth/user/${row.ID}`, {
+    const res = await api.delete(`/auth/user/${row.ID}`, {
       headers: { Authorization: `Bearer ${token}` }
     })
     
@@ -1843,7 +1836,7 @@ const roleTable = ref(null)
 // 获取所有角色列表
 const fetchAllRoles = async () => {
   try {
-    const response = await axios.get('/roles', {
+    const response = await api.get('/roles', {
       params: { page: 1, size: 1000 } // 获取所有角色
     })
     availableRoles.value = response.data.data?.list || []
@@ -1856,7 +1849,7 @@ const fetchAllRoles = async () => {
 // 获取用户当前角色
 const fetchUserRoles = async (userId) => {
   try {
-    const response = await axios.get(`/auth/user/${userId}/roles-permissions`)
+    const response = await api.get(`/auth/user/${userId}/roles-permissions`)
     const userRoles = response.data.data?.roles || []
     selectedRoleIds.value = userRoles.map(role => role.ID)
     
@@ -1886,7 +1879,7 @@ const handleRoleSelectionChange = (selection) => {
 const saveUserRoles = async () => {
   try {
     permissionLoading.value = true
-    await axios.post(`/auth/user/${currentPermissionUser.value.ID}/assign-roles`, {
+    await api.post(`/auth/user/${currentPermissionUser.value.ID}/assign-roles`, {
       roleIds: selectedRoleIds.value
     })
     ElMessage.success('角色分配成功')
@@ -1935,7 +1928,7 @@ const exportUsers = async () => {
 
     ElMessage.info('正在导出用户数据...')
     
-    const res = await axios.get('/auth/user-list', {
+    const res = await api.get('/auth/user-list', {
       params,
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -2126,7 +2119,7 @@ const exportUsersAsCSV = async () => {
     if (filterRole.value !== '') params.role = filterRole.value
     if (filterStatus.value !== '') params.status = filterStatus.value
 
-    const res = await axios.get('/auth/user-list', {
+    const res = await api.get('/auth/user-list', {
       params,
       headers: { Authorization: `Bearer ${token}` }
     })
@@ -2391,7 +2384,7 @@ const doResetPassword = async () => {
   
   try {
     const token = localStorage.getItem('token')
-    const res = await axios.post('/auth/reset-user-password', {
+    const res = await api.post('/auth/reset-user-password', {
       userId: currentUser.value.ID,
       username: currentUser.value.Username,
       newPassword: resetPasswordForm.value.newPassword,
@@ -2421,7 +2414,7 @@ const changeStatus = async (row, val) => {
   row.Status = val;
   const token = localStorage.getItem('token');
   try {
-    const res = await axios.post('/auth/user-status', {
+    const res = await api.post('/auth/user-status', {
       username: row.Username,
       status: val
     }, {
@@ -2462,7 +2455,7 @@ const batchEnable = async () => {
     const token = localStorage.getItem('token')
     const userIds = selectedUsers.value.map(user => user.ID)
     
-    const res = await axios.post('/auth/batch-status', {
+    const res = await api.post('/auth/batch-status', {
       userIds,
       status: 1
     }, {
@@ -2513,7 +2506,7 @@ const batchDisable = async () => {
     const token = localStorage.getItem('token')
     const userIds = selectedUsers.value.map(user => user.ID)
     
-    const res = await axios.post('/auth/batch-status', {
+    const res = await api.post('/auth/batch-status', {
       userIds,
       status: 0
     }, {
@@ -2564,7 +2557,7 @@ const batchDelete = async () => {
     const token = localStorage.getItem('token')
     const userIds = selectedUsers.value.map(user => user.ID)
     
-    const res = await axios.post('/auth/batch-delete', {
+    const res = await api.post('/auth/batch-delete', {
       userIds
     }, {
       headers: { Authorization: `Bearer ${token}` }

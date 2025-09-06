@@ -607,16 +607,29 @@ class ErpService {
     }
 
     /**
-     * 测试ERP连接
+     * 测试ERP连接（轻量级检查）
      * @returns {Promise<boolean>} 连接是否成功
      */
     async testConnection() {
         try {
-            // 测试ERP系统连接
+            // 如果已有有效token，直接返回true
+            if (this.token && this.tokenExpiry && new Date() < this.tokenExpiry) {
+                return true;
+            }
+            
+            // 尝试获取token，但设置较短的超时时间
+            const originalTimeout = this.timeout;
+            this.timeout = 5000; // 设置5秒超时
+            
             const token = await this.getToken();
+            
+            // 恢复原始超时设置
+            this.timeout = originalTimeout;
+            
             return !!token;
         } catch (error) {
-            // ERP连接测试失败
+            // ERP连接测试失败，记录日志但不抛出异常
+            console.log('ERP连接测试失败:', error.message);
             return false;
         }
     }

@@ -28,6 +28,34 @@
 
     <!-- 配置管理模块 -->
     <div v-show="activeTab === 'config'" class="config-section">
+      <!-- 同步数据模块 -->
+      <el-card class="sync-data-card">
+        <template #header>
+          <div class="card-header">
+            <span>同步数据</span>
+          </div>
+        </template>
+        <div class="sync-content">
+          <div class="sync-description">
+
+          </div>
+          <!-- 快捷操作按钮 -->
+           <div class="quick-actions">
+             <div class="action-button" @click="handleSyncData">
+               <div class="action-icon-container">
+                 <el-icon class="action-icon" size="50">
+                   <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
+                     <path d="M544 150.6v73.8h128c35.3 0 64 28.7 64 64v320c0 35.3-28.7 64-64 64H352c-35.3 0-64-28.7-64-64V288.4c0-35.3 28.7-64 64-64h128v-73.8H352c-75.1 0-136 60.9-136 136v320c0 75.1 60.9 136 136 136h320c75.1 0 136-60.9 136-136V288.4c0-75.1-60.9-136-136-136H544z" fill="currentColor"/>
+                     <path d="M512 64c19.9 0 36 16.1 36 36v348.4l67.1-67.1c14.1-14.1 36.9-14.1 51 0 14.1 14.1 14.1 36.9 0 51L566.1 532.3c-14.1 14.1-36.9 14.1-51 0L415.1 432.3c-14.1-14.1-14.1-36.9 0-51 14.1-14.1 36.9-14.1 51 0L533 448.4V100c0-19.9 16.1-36 36-36z" fill="currentColor"/>
+                   </svg>
+                 </el-icon>
+               </div>
+               <span class="action-title">交检/交货数据</span>
+             </div>
+           </div>
+        </div>
+      </el-card>
+
       <el-card>
         <template #header>
           <div class="card-header">
@@ -286,15 +314,22 @@
         <el-button @click="logDetailDialogVisible = false">关闭</el-button>
       </template>
     </el-dialog>
+    
+    <!-- 同步数据表单对话框 -->
+    <SyncDataForm 
+      v-model="showSyncForm" 
+      @success="handleSyncSuccess"
+    />
   </div>
 </template>
 
 <script>
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Setting, Document, Plus, Refresh, Edit, Delete, Search, View } from '@element-plus/icons-vue'
+import { Setting, Document, Plus, Refresh, Edit, Delete, Search, View, Upload } from '@element-plus/icons-vue'
 import api from '@/api'
 import { useUserStore } from '@/store/user'
+import SyncDataForm from '@/components/admin/SyncDataForm.vue'
 
 export default {
   name: 'ErpManagement',
@@ -306,7 +341,9 @@ export default {
     Edit,
     Delete,
     Search,
-    View
+    View,
+    Upload,
+    SyncDataForm
   },
   setup() {
     // 用户store
@@ -419,6 +456,9 @@ export default {
     // 日志详情
     const logDetailDialogVisible = ref(false)
     const logDetail = ref({})
+    
+    // 同步数据表单
+    const showSyncForm = ref(false)
     
     /**
      * 格式化日期时间
@@ -769,6 +809,22 @@ export default {
     }
     
     /**
+     * 处理同步数据按钮点击
+     * 打开同步数据子页面
+     */
+    const handleSyncData = () => {
+      showSyncForm.value = true
+    }
+    
+    /**
+     * 处理同步成功回调
+     */
+    const handleSyncSuccess = () => {
+      ElMessage.success('数据同步成功')
+      loadSyncLogs()
+    }
+
+    /**
      * 格式化配置值显示
      * 对敏感配置（erp_app_id和erp_app_secret）使用星号显示
      * @param {string} configKey - 配置键
@@ -816,6 +872,9 @@ export default {
       logDetailDialogVisible,
       logDetail,
       
+      // 同步数据表单
+      showSyncForm,
+      
       // 权限相关
       canAdd,
       canEdit,
@@ -841,7 +900,9 @@ export default {
       handleManualSync,
       handleClearLogs,
       handleViewLogDetail,
-      handleRetrySync
+      handleRetrySync,
+      handleSyncData,
+      handleSyncSuccess
     }
   }
 }
@@ -849,7 +910,7 @@ export default {
 
 <style scoped>
 .erp-management {
-  padding: 20px;
+  padding: 0;
 }
 
 .page-header {
@@ -898,6 +959,107 @@ export default {
 .config-section,
 .logs-section {
   margin-top: 20px;
+}
+
+.sync-data-card {
+  margin-bottom: 20px;
+}
+
+.sync-content {
+  padding: 0 0 2px 0;
+}
+
+.sync-description {
+  margin-bottom: 0;
+  color: #606266;
+  font-size: 14px;
+}
+
+.sync-description p {
+  margin: 0;
+}
+
+/* 快捷操作按钮样式 */
+.quick-actions {
+  display: flex;
+  gap: 20px;
+  justify-content: flex-start;
+}
+
+.action-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 4px;
+  border-radius: 12px;
+  width: 120px;
+}
+
+.action-button:hover .action-icon-container {
+  transform: scale(1.05);
+  background: linear-gradient(135deg, #67C23A 0%, #85CE61 100%);
+  box-shadow: 0 8px 25px rgba(103, 194, 58, 0.3);
+}
+
+.action-button:hover .action-title {
+  font-weight: bold;
+  color: #409EFF;
+}
+
+.action-icon-container {
+  width: 70px;
+  height: 70px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #67C23A 0%, #85CE61 100%);
+  border: 2px solid #67C23A;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 4px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 4px 12px rgba(103, 194, 58, 0.2);
+}
+
+.action-icon-container::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.8) 0%, rgba(255, 255, 255, 0.2) 100%);
+  border-radius: 14px;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.action-button:hover .action-icon-container::before {
+  opacity: 1;
+}
+
+.action-icon {
+  color: #ffffff;
+  transition: all 0.3s ease;
+  z-index: 1;
+  position: relative;
+}
+
+.action-button:hover .action-icon {
+  transform: scale(1.1);
+}
+
+.action-title {
+  font-size: 14px;
+  font-weight: normal;
+  color: #303133;
+  text-align: center;
+  line-height: 1.2;
+  transition: font-weight 0.3s ease;
+  margin: 0;
 }
 
 /* 表格样式 */

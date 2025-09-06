@@ -125,7 +125,10 @@ export const useUserStore = defineStore('user', {
      // 并发控制标志
      _isUpdating: false,
      _isFetchingProfile: false, // 是否正在获取用户资料
-     _updateQueue: []
+     _updateQueue: [],
+     
+     // Token刷新定时器
+     _tokenRefreshTimer: null
     }
   },
 
@@ -868,8 +871,12 @@ export const useUserStore = defineStore('user', {
       // 同时保存到localStorage以供API请求使用
       if (token) {
         localStorage.setItem('token', token)
+        // 启动token自动刷新
+        this.startTokenRefresh()
       } else {
         localStorage.removeItem('token')
+        // 停止token自动刷新
+        this.stopTokenRefresh()
       }
     },
 
@@ -1134,6 +1141,38 @@ export const useUserStore = defineStore('user', {
       if (this._integrityCheckTimer) {
         clearInterval(this._integrityCheckTimer)
         this._integrityCheckTimer = null
+      }
+    },
+
+    // Token自动刷新相关方法
+    /**
+     * 启动token自动刷新定时器
+     * 每30分钟检查一次token是否需要刷新
+     */
+    startTokenRefresh() {
+      // 清除现有的定时器
+      this.stopTokenRefresh()
+      
+      // 设置30分钟的刷新间隔
+      this._tokenRefreshTimer = setInterval(async () => {
+        try {
+          if (this.token) {
+            console.log('自动刷新token...')
+            await this.fetchProfile(true)
+          }
+        } catch (error) {
+          console.error('Token自动刷新失败:', error)
+        }
+      }, 30 * 60 * 1000) // 30分钟
+    },
+
+    /**
+     * 停止token自动刷新定时器
+     */
+    stopTokenRefresh() {
+      if (this._tokenRefreshTimer) {
+        clearInterval(this._tokenRefreshTimer)
+        this._tokenRefreshTimer = null
       }
     },
 

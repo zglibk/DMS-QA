@@ -1234,7 +1234,7 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, Upload, Delete, Download, Close, Check, User, Document, Box, Clock, Loading, Setting, Picture, ZoomIn, QuestionFilled } from '@element-plus/icons-vue'
 import apiService from '@/services/apiService'
 import { useUserStore } from '@/store/user'
-import axios from 'axios'
+import api from '@/utils/api'
 
 /**
  * 客户投诉记录管理组件

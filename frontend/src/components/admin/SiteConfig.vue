@@ -63,7 +63,8 @@
                 <el-form-item label="网站LOGO">
                   <div class="logo-upload-section">
                     <div class="logo-preview">
-                      <img :src="config.logoBase64Img" alt="LOGO预览" class="logo-img" :key="'logo-' + imageRefreshKey" @error="handleImageError" />
+                      <img v-if="config.logoBase64Img" :src="config.logoBase64Img" alt="LOGO预览" class="logo-img" :key="'logo-' + imageRefreshKey" @error="handleImageError" />
+                      <div v-else class="logo-placeholder">LOGO预览</div>
                     </div>
                     <div class="logo-controls">
                       <el-input v-model="config.logoBase64Img" placeholder="LOGO图片BASE64数据" class="logo-input">
@@ -94,7 +95,8 @@
                 <el-form-item label="网站图标">
                   <div class="favicon-upload-section">
                     <div class="favicon-preview">
-                      <img :src="config.faviconBase64Img" alt="图标预览" class="favicon-img" :key="'favicon-' + imageRefreshKey" @error="handleImageError" />
+                      <img v-if="config.faviconBase64Img" :src="config.faviconBase64Img" alt="图标预览" class="favicon-img" :key="'favicon-' + imageRefreshKey" @error="handleImageError" />
+                      <div v-else class="favicon-placeholder">图标预览</div>
                     </div>
                     <div class="favicon-controls">
                       <el-input v-model="config.faviconBase64Img" placeholder="网站图标BASE64数据" class="favicon-input">
@@ -130,7 +132,8 @@
             <div class="preview-section">
               <div class="preview-header">
                 <div class="preview-logo-area">
-                  <img :src="config.logoBase64Img" alt="LOGO" class="preview-logo" :key="'preview-logo-' + imageRefreshKey" @error="handleImageError" />
+                  <img v-if="config.logoBase64Img" :src="config.logoBase64Img" alt="LOGO" class="preview-logo" :key="'preview-logo-' + imageRefreshKey" @error="handleImageError" />
+                  <div v-else class="preview-logo-placeholder">LOGO</div>
                   <span class="preview-title">{{ config.headerTitle }}</span>
                 </div>
                 <div class="preview-company">{{ config.companyName }}</div>
@@ -167,6 +170,7 @@ import { ref, reactive, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Picture, Upload, Check, RefreshLeft, Refresh } from '@element-plus/icons-vue'
 import api from '@/utils/api'
+import axios from 'axios'
 
 // 响应式数据
 const isLoading = ref(false)
@@ -307,7 +311,7 @@ const uploadLogo = async (options) => {
     formData.append('file', options.file)
     formData.append('type', 'logo')
 
-    const response = await axios.post('/upload/site-image', formData, {
+    const response = await api.post('/upload/site-image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -342,7 +346,7 @@ const uploadFavicon = async (options) => {
     formData.append('file', options.file)
     formData.append('type', 'favicon')
 
-    const response = await axios.post('/upload/site-image', formData, {
+    const response = await api.post('/upload/site-image', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -373,7 +377,7 @@ const uploadFavicon = async (options) => {
 const handleImageError = (event) => {
   console.log('图片加载失败:', event.target.src)
   // 不隐藏图片，而是显示一个占位符
-  event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMTIwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjRjVGNUY1Ii8+CjxwYXRoIGQ9Ik02MCA0MEw3MCA1MEg1MEw2MCA0MFoiIGZpbGw9IiNEQ0RGRTYiLz4KPHN2Zz4K'
+  event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiB2aWV3Qm94PSIwIDAgMTIwIDgwIiBmaWxsPSJub25lIiB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciPgo8cmVjdCB3aWR0aD0iMTIwIiBoZWlnaHQ9IjgwIiBmaWxsPSIjRjVGNUY1Ii8+CjxwYXRoIGQ9Ik02MCA0MEw3MCA1MEg1MEw2MCA0MFoiIGZpbGw9IiNEQ0RGRTYiLz4KPHRleHQgeD0iNjAiIHk9IjUwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjOTA5Mzk5IiBmb250LXNpemU9IjEyIj5MT0dPPC90ZXh0Pgo8L3N2Zz4='
 }
 
 // 组件挂载时加载配置
@@ -459,10 +463,32 @@ onMounted(() => {
   object-fit: contain;
 }
 
+.logo-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c0c4cc;
+  font-size: 12px;
+  background: #fafafa;
+}
+
 .favicon-img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+.favicon-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c0c4cc;
+  font-size: 12px;
+  background: #fafafa;
 }
 
 .logo-controls,
@@ -505,6 +531,20 @@ onMounted(() => {
 .preview-logo {
   height: 32px;
   object-fit: contain;
+}
+
+.preview-logo-placeholder {
+  height: 32px;
+  width: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f5f5f5;
+  border: 1px dashed #dcdfe6;
+  border-radius: 4px;
+  color: #909399;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .preview-title {

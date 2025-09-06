@@ -4,13 +4,7 @@ const sql = require('mssql');
 const XLSX = require('xlsx');
 const { executeQuery } = require('../db');
 
-/**
- * 测试路由
- * 功能：验证材料价格路由是否正常工作
- */
-router.post('/test', (req, res) => {
-  res.json({ success: true, message: '测试路由工作正常' });
-});
+
 
 /**
  * 获取材料单价接口

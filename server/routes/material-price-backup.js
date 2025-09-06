@@ -4,11 +4,7 @@ const sql = require('mssql');
 const XLSX = require('xlsx');
 const { executeQuery } = require('../db');
 
-// 测试路由
-router.post('/test', (req, res) => {
-  console.log('测试路由被调用');
-  res.json({ success: true, message: '测试路由工作正常' });
-});
+
 
 // 获取材料价格列表（分页、搜索、排序）
 router.get('/', async (req, res) => {

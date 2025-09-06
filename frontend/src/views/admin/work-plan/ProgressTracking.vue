@@ -230,8 +230,7 @@
             :background="background"
             layout="total, sizes, prev, pager, next, jumper"
             :total="pagination.total"
-            @size-change="handleSizeChange"
-            @current-change="handleCurrentChange"
+
           />
         </div>
       </el-card>
@@ -1096,22 +1095,22 @@ const deleteMilestone = async (milestone) => {
 }
 
 /**
- * 处理页面大小变化
+ * 处理当前页更新事件
  */
-const handleSizeChange = (size) => {
-  pageSize4.value = size
-  currentPage4.value = 1
-  pagination.pageSize = size
-  pagination.page = 1
+const handleCurrentPageUpdate = (page) => {
+  pagination.page = page
+  currentPage4.value = page
   getPlanList()
 }
 
 /**
- * 处理当前页变化
+ * 处理页面大小更新事件
  */
-const handleCurrentChange = (page) => {
-  currentPage4.value = page
-  pagination.page = page
+const handlePageSizeUpdate = (size) => {
+  pagination.pageSize = size
+  pagination.page = 1 // 重置到第一页
+  currentPage4.value = 1
+  pageSize4.value = size
   getPlanList()
 }
 

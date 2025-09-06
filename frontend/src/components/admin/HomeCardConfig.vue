@@ -188,7 +188,7 @@
 import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Setting, Plus, Delete, ArrowDown, Tools, OfficeBuilding } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/utils/api'
 import draggable from 'vuedraggable'
 
 // 响应式数据
@@ -249,8 +249,8 @@ const loadWorkshopsAndDepartments = async () => {
   try {
     // 并行获取车间和部门数据
     const [workshopsRes, departmentsRes] = await Promise.all([
-      axios.get('/config/workshops'),
-      axios.get('/config/departments')
+      api.get('/config/workshops'),
+      api.get('/config/departments')
     ])
 
     if (workshopsRes.data.success) {
@@ -400,7 +400,7 @@ const removeUnit = (index) => {
 const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
-    const response = await axios.get('/config/home-cards')
+    const response = await api.get('/config/home-cards')
     if (response.data.success) {
       const data = response.data.data
       config.showTodayCount = data.showTodayCount !== false
@@ -427,7 +427,7 @@ const loadConfig = async (showMessage = false) => {
 const saveConfig = async (setAsDefault = false) => {
   isSubmitting.value = true
   try {
-    const response = await axios.put('/config/home-cards', {
+    const response = await api.put('/config/home-cards', {
       showTodayCount: config.showTodayCount,
       showMonthCount: config.showMonthCount,
       displayUnits: config.displayUnits,

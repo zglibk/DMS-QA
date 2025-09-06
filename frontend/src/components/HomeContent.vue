@@ -1289,7 +1289,7 @@
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
 import { Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning, DocumentCopy, Box, CircleClose, ChatLineRound, Coordinate, Avatar, Setting, Picture, Upload, Money, ArrowDown, User } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import api from '@/services/api'
 import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
 import QualityMetricsChart from '@/components/QualityMetricsChart.vue'
 import ComplaintAnalysisChart from '@/components/ComplaintAnalysisChart.vue'
@@ -1478,10 +1478,7 @@ const exportFields = ref([])
 // 获取字段信息
 const fetchExportFields = async () => {
   try {
-    const token = localStorage.getItem('token')
-    const res = await axios.get('/complaint/fields', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/complaint/fields')
 
     if (res.data.success) {
       exportFields.value = res.data.data
@@ -1717,8 +1714,6 @@ const formatDateSafe = (dateValue) => {
 const fetchTableData = async () => {
   tableLoading.value = true
   try {
-    const token = localStorage.getItem('token')
-
     // 构建查询参数
     const params = {
       page: page.value,
@@ -1759,9 +1754,8 @@ const fetchTableData = async () => {
       if (searchKeyword.value) params.search = searchKeyword.value
     }
 
-    const res = await axios.get('/complaint/list', {
-      params,
-      headers: { Authorization: `Bearer ${token}` }
+    const res = await api.get('/complaint/list', {
+      params
     })
 
     if (res.data.success) {
@@ -1814,19 +1808,13 @@ const handleTodayStatsToggle = (value) => {
 const fetchStats = async () => {
   try {
     statsLoading.value = true // 开始加载
-    const token = localStorage.getItem('token')
-    if (!token) {
-      window.location.href = '/login'
-      return
-    }
 
     // 添加月份参数
     const params = {
       month: selectedMonth.value
     }
 
-    const res = await axios.get('/complaint/month-stats', {
-      headers: { Authorization: `Bearer ${token}` },
+    const res = await api.get('/complaint/month-stats', {
       params: params
     })
 
@@ -1861,8 +1849,6 @@ const fetchStats = async () => {
 // 获取质量统计数据
 const fetchQualityStats = async () => {
   try {
-    const token = localStorage.getItem('token')
-
     // 计算正确的月末日期
     const [year, month] = selectedMonth.value.split('-').map(Number)
     const lastDay = new Date(year, month, 0).getDate() // 获取该月的最后一天
@@ -1872,8 +1858,7 @@ const fetchQualityStats = async () => {
     // 并行获取数据
     const [innerComplaintRes, outerComplaintRes, batchStatsRes] = await Promise.all([
       // 获取内诉数量（不合格数）
-      axios.get('/complaint/list', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/complaint/list', {
         params: {
           page: 1,
           pageSize: 1,
@@ -1883,8 +1868,7 @@ const fetchQualityStats = async () => {
         }
       }),
       // 获取客诉批次数量
-      axios.get('/complaint/list', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/complaint/list', {
         params: {
           page: 1,
           pageSize: 1,
@@ -1894,8 +1878,7 @@ const fetchQualityStats = async () => {
         }
       }),
       // 获取月度批次统计数据
-      axios.get('/quality-metrics/month-batch-stats', {
-        headers: { Authorization: `Bearer ${token}` },
+      api.get('/quality-metrics/month-batch-stats', {
         params: {
           month: selectedMonth.value
         }
@@ -1942,10 +1925,7 @@ const fetchQualityStats = async () => {
 
 const fetchChartOptions = async () => {
   try {
-    const token = localStorage.getItem('token')
-    const res = await axios.get('/complaint/options', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/complaint/options')
     // 转换数据格式：从 [{Name: "xxx"}] 转换为 ["xxx"]，与fetchOptions保持一致
     chartOptions.value.departments = res.data.departments?.map(item => item.Name) || []
     chartOptions.value.workshops = res.data.workshops?.map(item => item.Name) || []
@@ -2091,11 +2071,8 @@ const renderCharts = () => {
 }
 const fetchChartData = async () => {
   try {
-    const token = localStorage.getItem('token')
-
     // 获取车间统计数据
-    const workshopRes = await axios.get('/complaint/workshop-stats', {
-      headers: { Authorization: `Bearer ${token}` },
+    const workshopRes = await api.get('/complaint/workshop-stats', {
       params: {
         startDate: selectedMonth.value + '-01',
         endDate: selectedMonth.value + '-31'
@@ -2112,8 +2089,7 @@ const fetchChartData = async () => {
     }
 
     // 获取趋势数据（最近6个月）
-    const trendRes = await axios.get('/complaint/trend-stats', {
-      headers: { Authorization: `Bearer ${token}` },
+    const trendRes = await api.get('/complaint/trend-stats', {
       params: { months: 6 }
     }).catch(() => ({ data: { success: false } }))
 
@@ -2133,8 +2109,7 @@ const fetchChartData = async () => {
     }
 
     // 获取不良类别分布数据
-    const categoryRes = await axios.get('/complaint/category-stats', {
-      headers: { Authorization: `Bearer ${token}` },
+    const categoryRes = await api.get('/complaint/category-stats', {
       params: {
         startDate: selectedMonth.value + '-01',
         endDate: selectedMonth.value + '-31'
@@ -2228,10 +2203,7 @@ const toggleAdvancedQuery = () => {
 // 获取下拉选项数据
 const fetchOptions = async () => {
   try {
-    const token = localStorage.getItem('token')
-    const res = await axios.get('/complaint/options', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/complaint/options')
 
     workshopOptions.value = res.data.workshops.map(item => item.Name)
     complaintCategoryOptions.value = res.data.complaintCategories.map(item => item.Name)
@@ -2277,11 +2249,8 @@ const getUnitCardClass = (type, index) => {
 const viewDetail = async (row) => {
   try {
     detailLoading.value = true
-    const token = localStorage.getItem('token')
 
-    const response = await axios.get(`/complaint/detail/${row.ID}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const response = await api.get(`/complaint/detail/${row.ID}`)
 
     if (response.data.success) {
       detailData.value = response.data.data
@@ -2319,13 +2288,9 @@ const handleRowDoubleClick = (row) => {
  */
 const fetchEditOptions = async () => {
   try {
-    const token = localStorage.getItem('token')
-
     // 并行获取表单选项和材料名称
     const [optionsResponse] = await Promise.all([
-      axios.get('/complaint/options', {
-        headers: { Authorization: `Bearer ${token}` }
-      }),
+      api.get('/complaint/options'),
       fetchEditMaterialNames()
     ])
 
@@ -2351,10 +2316,7 @@ const fetchEditOptions = async () => {
 const fetchEditMaterialNames = async () => {
   try {
     editMaterialLoading.value = true;
-    const token = localStorage.getItem('token');
-    const res = await axios.get('/admin/material-prices/material-names', {
-      headers: { Authorization: `Bearer ${token}` }
-    });
+    const res = await api.get('/admin/material-prices/material-names');
 
     if (res.data.success) {
       editMaterialNames.value = res.data.data || [];
@@ -2391,10 +2353,8 @@ const handleEditMaterialChange = async (materialType, materialName) => {
   }
 
   try {
-    const token = localStorage.getItem('token');
-    const res = await axios.get('/admin/material-prices/get-price', {
-      params: { materialName },
-      headers: { Authorization: `Bearer ${token}` }
+    const res = await api.get('/admin/material-prices/get-price', {
+      params: { materialName }
     });
 
     if (res.data.success) {
@@ -2692,10 +2652,7 @@ const handleEditCategoryChange = async (categoryObj) => {
   }
 
   try {
-    const token = localStorage.getItem('token')
-    const response = await axios.get(`/complaint/defective-items/${categoryObj.ID}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const response = await api.get(`/complaint/defective-items/${categoryObj.ID}`)
 
     // 参考新增投诉的实现，后端直接返回字符串数组
     editOptions.defectiveItems = response.data || []
@@ -2709,15 +2666,12 @@ const handleEditCategoryChange = async (categoryObj) => {
 const editRecord = async (row) => {
   try {
     editFormLoading.value = true
-    const token = localStorage.getItem('token')
 
     // 先获取下拉选项数据
     await fetchEditOptions()
 
     // 获取记录详情
-    const response = await axios.get(`/complaint/detail/${row.ID}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const response = await api.get(`/complaint/detail/${row.ID}`)
 
     if (response.data.success) {
       const data = response.data.data
@@ -2888,13 +2842,6 @@ const saveEdit = async () => {
     // }
 
     editFormLoading.value = true
-    const token = localStorage.getItem('token')
-
-    if (!token) {
-      ElMessage.error('未找到登录令牌，请重新登录')
-      editFormLoading.value = false
-      return
-    }
 
     // 检查必要的数据
     if (!editFormData.value || !editFormData.value.ID) {
@@ -2978,12 +2925,7 @@ const saveEdit = async () => {
       }
     }
 
-    const response = await axios.put(`/complaint/${submitData.ID}`, submitData, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      }
-    })
+    const response = await api.put(`/complaint/${submitData.ID}`, submitData)
 
     if (response.data && response.data.success) {
       ElMessage.success('更新成功')
@@ -3190,13 +3132,11 @@ const generateEditFileName = async (originalFileName) => {
 
   // 获取流水号
   try {
-    const token = localStorage.getItem('token')
-    const response = await axios.get('/complaint/sequence-number', {
+    const response = await api.get('/complaint/sequence-number', {
       params: {
         date: formDate, // 使用表单中的日期
         editId: editFormData.value.ID // 编辑模式时排除当前记录
-      },
-      headers: { 'Authorization': `Bearer ${token}` }
+      }
     })
 
     const sequenceNumber = String(response.data.sequenceNumber).padStart(2, '0')
@@ -3245,16 +3185,9 @@ const uploadEditFileToServer = async (file, generatedFileName) => {
     const customPath = `${currentYear}年异常汇总\\不良图片&资料\\${customer}`
     formData.append('customPath', customPath)
 
-    // 获取token
-    const token = localStorage.getItem('token')
-    if (!token) {
-      throw new Error('未找到认证令牌，请重新登录')
-    }
-
     // 上传文件
-    const response = await axios.post('/upload/complaint-attachment', formData, {
+    const response = await api.post('/upload/complaint-attachment', formData, {
       headers: {
-        'Authorization': `Bearer ${token}`,
         'Content-Type': 'multipart/form-data'
       }
     })
@@ -3289,11 +3222,9 @@ const uploadFileToServer = async (file) => {
     formData.append('type', 'attachment') // 标识为附件文件
 
     // 上传文件到服务器
-    const token = localStorage.getItem('token')
-    const response = await axios.post('/upload/complaint-attachment', formData, {
+    const response = await api.post('/upload/complaint-attachment', formData, {
       headers: {
-        'Content-Type': 'multipart/form-data',
-        'Authorization': `Bearer ${token}`
+        'Content-Type': 'multipart/form-data'
       }
     })
 
@@ -3548,10 +3479,7 @@ const deleteRecord = async (row) => {
       }
     )
 
-    const token = localStorage.getItem('token')
-    const response = await axios.delete(`/complaint/${row.ID}`, {
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const response = await api.delete(`/complaint/${row.ID}`)
 
     if (response.data.success) {
       ElMessage.success('删除成功')
@@ -4049,8 +3977,6 @@ const confirmExport = () => {
 const exportToExcel = async () => {
   exportLoading.value = true
   try {
-    const token = localStorage.getItem('token')
-
     // 构建查询参数（不包含分页，获取所有数据）
     const params = {}
 
@@ -4092,9 +4018,8 @@ const exportToExcel = async () => {
     params.page = 1
     params.pageSize = 10000
 
-    const res = await axios.get('/complaint/list', {
-      params,
-      headers: { Authorization: `Bearer ${token}` }
+    const res = await api.get('/complaint/list', {
+      params
     })
 
     if (res.data.success && res.data.data.length > 0) {

@@ -159,7 +159,7 @@ import { ref, onMounted, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Refresh, DataAnalysis, Grid, CircleCheck, Document, Box, Flag, Goods } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
-import axios from 'axios'
+import api from '@/services/api'
 
 // 响应式数据
 const chartRef = ref(null)
@@ -600,12 +600,12 @@ const loadData = async () => {
   loading.value = true
   try {
     // 获取趋势数据
-    const trendsResponse = await axios.get('/quality-metrics/trends', {
+    const trendsResponse = await api.get('/quality-metrics/trends', {
       params: { year: selectedYear.value }
     })
 
     // 获取汇总数据
-    const summaryResponse = await axios.get('/quality-metrics/summary', {
+    const summaryResponse = await api.get('/quality-metrics/summary', {
       params: { year: selectedYear.value }
     })
 
