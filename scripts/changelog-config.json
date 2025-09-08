@@ -1,0 +1,158 @@
+{
+  "title": "DMS-QA 更新日志",
+  "description": "本文档记录了 DMS-QA 质量管理系统的版本更新历史。",
+  "categories": {
+    "features": {
+      "title": "✨ 新增功能",
+      "icon": "🎯",
+      "patterns": [
+        "^(feat|feature|新增|添加|增加|实现)",
+        "添加.*功能",
+        "实现.*模块",
+        "新增.*页面"
+      ],
+      "priority": 1
+    },
+    "fixes": {
+      "title": "🐛 问题修复",
+      "icon": "🔧",
+      "patterns": [
+        "^(fix|修复|解决|修正|bugfix)",
+        "修复.*问题",
+        "解决.*错误",
+        "修正.*bug"
+      ],
+      "priority": 2
+    },
+    "improvements": {
+      "title": "⚡ 优化改进",
+      "icon": "📈",
+      "patterns": [
+        "^(improve|优化|改进|提升|完善|增强)",
+        "优化.*性能",
+        "改进.*体验",
+        "提升.*效率"
+      ],
+      "priority": 3
+    },
+    "security": {
+      "title": "🔒 安全更新",
+      "icon": "🛡️",
+      "patterns": [
+        "^(security|安全|权限)",
+        "安全.*修复",
+        "权限.*控制",
+        "漏洞.*修复"
+      ],
+      "priority": 4
+    },
+    "performance": {
+      "title": "🚀 性能优化",
+      "icon": "⚡",
+      "patterns": [
+        "^(perf|performance|性能)",
+        "性能.*优化",
+        "加载.*优化",
+        "响应.*提升"
+      ],
+      "priority": 5
+    },
+    "refactor": {
+      "title": "♻️ 代码重构",
+      "icon": "🔄",
+      "patterns": [
+        "^(refactor|重构|重写|调整)",
+        "重构.*代码",
+        "调整.*结构",
+        "重写.*模块"
+      ],
+      "priority": 6
+    },
+    "docs": {
+      "title": "📚 文档更新",
+      "icon": "📝",
+      "patterns": [
+        "^(docs|文档|说明|readme)",
+        "更新.*文档",
+        "添加.*说明",
+        "完善.*注释"
+      ],
+      "priority": 7
+    },
+    "style": {
+      "title": "💄 样式调整",
+      "icon": "🎨",
+      "patterns": [
+        "^(style|样式|格式|美化|ui)",
+        "调整.*样式",
+        "美化.*界面",
+        "格式.*优化"
+      ],
+      "priority": 8
+    },
+    "test": {
+      "title": "✅ 测试相关",
+      "icon": "🧪",
+      "patterns": [
+        "^(test|测试|单元测试)",
+        "添加.*测试",
+        "测试.*用例",
+        "单元.*测试"
+      ],
+      "priority": 9
+    },
+    "chore": {
+      "title": "🔧 构建工具",
+      "icon": "⚙️",
+      "patterns": [
+        "^(chore|构建|工具|配置|依赖|build)",
+        "更新.*依赖",
+        "配置.*工具",
+        "构建.*脚本"
+      ],
+      "priority": 10
+    },
+    "other": {
+      "title": "📦 其他更改",
+      "icon": "📋",
+      "patterns": [],
+      "priority": 99
+    }
+  },
+  "templates": {
+    "header": "# {title}\n\n{description}\n\n",
+    "version": "## v{version} ({date})\n\n",
+    "overview": "### 📊 版本概述\n本版本包含 {totalCommits} 个提交，主要改进如下：\n\n",
+    "category": "### {title}\n\n",
+    "commit": "- {icon} {subject} ([{shortHash}](../../commit/{hash}))\n",
+    "contributors": "### 👥 贡献者\n\n感谢以下贡献者的努力：{contributors}\n\n",
+    "separator": "---\n\n"
+  },
+  "options": {
+    "includeHash": true,
+    "includeAuthor": true,
+    "includeDate": true,
+    "includeContributors": true,
+    "maxCommitLength": 100,
+    "dateFormat": "YYYY-MM-DD",
+    "linkCommits": true,
+    "groupByType": true,
+    "sortByPriority": true
+  },
+  "filters": {
+    "excludePatterns": [
+      "^Merge",
+      "^merge",
+      "^Initial commit",
+      "^Update .gitignore",
+      "^Add .gitignore"
+    ],
+    "includePatterns": [],
+    "minCommitLength": 5
+  },
+  "output": {
+    "defaultFile": "CHANGELOG.md",
+    "encoding": "utf8",
+    "lineEnding": "\n"
+  }
+}

@@ -9,7 +9,6 @@
   },
   "scripts": {
     "check-env": "node scripts/check-environment.js",
-
     "setup": "npm run check-env && cd frontend && npm install && cd ../server && npm install",
     "dev": "npm run check-env && concurrently \"cd frontend && npm run dev\" \"cd server && npm start\"",
     "build": "echo 'Building DMS-QA Project...' && cd frontend && npm run build && cd ../server && npm run build && echo 'Build completed successfully!'",
@@ -18,7 +17,16 @@
     "start": "cd server && npm start",
     "start:prod": "cd server && npm run prod",
     "clean": "rm -rf frontend/node_modules frontend/package-lock.json server/node_modules server/package-lock.json frontend/dist",
-    "reinstall": "npm run clean && npm run setup"
+    "reinstall": "npm run clean && npm run setup",
+    "changelog": "node scripts/generate-changelog.js",
+    "changelog:advanced": "node scripts/generate-changelog-advanced.js",
+    "changelog:preview": "node scripts/generate-changelog-advanced.js --preview",
+    "changelog:json": "node scripts/generate-changelog-advanced.js --format json",
+    "changelog:html": "node scripts/generate-changelog-advanced.js --format html",
+    "changelog:examples": "node scripts/changelog-examples.js",
+    "version:patch": "node scripts/generate-changelog-advanced.js --update-package",
+    "version:minor": "echo 'Please specify version manually: npm run changelog:advanced -- --version x.y.0 --update-package'",
+    "version:major": "echo 'Please specify version manually: npm run changelog:advanced -- --version x.0.0 --update-package'"
   },
   "keywords": [
     "dms",

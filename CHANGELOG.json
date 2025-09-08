@@ -1,0 +1,446 @@
+{
+  "version": "1.2.13",
+  "date": "2025-09-08",
+  "totalCommits": 50,
+  "contributors": [
+    "lbk168"
+  ],
+  "categories": {
+    "features": {
+      "title": "✨ 新增功能",
+      "icon": "🎯",
+      "commits": [
+        {
+          "hash": "5519467f4e08cf1f7cc922d2b7836b9bbbfe767c",
+          "shortHash": "5519467",
+          "subject": "feat: 完成用户权限系统集成",
+          "author": "lbk168",
+          "date": "2025-09-03",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "ae91195516ea0b2c1e82d21d0f989e94f9220072",
+          "shortHash": "ae91195",
+          "subject": "优化系统介绍模块：添加按钮切换功能、plain样式和经典颜色方案",
+          "author": "lbk168",
+          "date": "2025-09-02",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "87e3740b3a6a57a56fbcff8368d90e8eb079404f",
+          "shortHash": "87e3740",
+          "subject": "feat: 完善系统日志功能模块和数据库初始化脚本",
+          "author": "lbk168",
+          "date": "2025-09-02",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "8f6a4c5dd249b53d3d69c7805c681ec31939baf5",
+          "shortHash": "8f6a4c5",
+          "subject": "feat: 完善系统日志管理功能和UI优化",
+          "author": "lbk168",
+          "date": "2025-09-01",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "6146bce2ade740677f04ef5b1b6acb6a1380ea84",
+          "shortHash": "6146bce",
+          "subject": "feat: Update frontend components - 2025-08-30 15:31:11",
+          "author": "lbk168",
+          "date": "2025-08-30",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "02faef88eff80624dc2cb12a08074b96cd8876ca",
+          "shortHash": "02faef8",
+          "subject": "feat: 将前台铃铛组件复用到后台管理界面",
+          "author": "lbk168",
+          "date": "2025-08-29",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "8d01dfb3bdca2a1a47fd906851dcc06d18a534d2",
+          "shortHash": "8d01dfb",
+          "subject": "feat: Update frontend components - 2025-08-26 19:30:47",
+          "author": "lbk168",
+          "date": "2025-08-26",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "e0de146c7867f58bd5c04d38eb1a114c975da7b1",
+          "shortHash": "e0de146",
+          "subject": "feat: 实现ERP配置页面权限控制功能",
+          "author": "lbk168",
+          "date": "2025-08-26",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "579faef02ae77514e2dbed394eb860683651ff30",
+          "shortHash": "579faef",
+          "subject": "feat: 完成ERP管理模块开发，包含配置管理、同步日志、生产数据、交付数据和质量指标功能",
+          "author": "lbk168",
+          "date": "2025-08-26",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "63a35e81d04283a0f384f343e2cd4ad6102bf830",
+          "shortHash": "63a35e8",
+          "subject": "feat: Update frontend components - 2025-08-26 14:23:06",
+          "author": "lbk168",
+          "date": "2025-08-26",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "43c4c95cbd3ce2e68e2c30baa4a1779d4c0d0740",
+          "shortHash": "43c4c95",
+          "subject": "feat: 为禁用按钮添加自定义CSS样式，改善用户体验",
+          "author": "lbk168",
+          "date": "2025-08-26",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "e30d818c8ae3f957fe2f0aae0990ab38b900c828",
+          "shortHash": "e30d818",
+          "subject": "feat: 修复面包屑导航图标重复问题并添加用户权限管理页面中文映射",
+          "author": "lbk168",
+          "date": "2025-08-26",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "f4bdf5810943667e8c28df1ef6b9bd16ce1059c8",
+          "shortHash": "f4bdf58",
+          "subject": "优化样品承认书页面：添加工单号自动大写功能和筛选条件自动查询功能",
+          "author": "lbk168",
+          "date": "2025-08-25",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "6c1f08969430c61d007d661a4f2ad0da29649dee",
+          "shortHash": "6c1f089",
+          "subject": "添加导出对话框组件和样式，修复导出按钮无响应问题",
+          "author": "lbk168",
+          "date": "2025-08-25",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "4242b7eb24c3b3bc6554eabd2cad3574d2341eef",
+          "shortHash": "4242b7e",
+          "subject": "添加导出按钮调试日志以排查权限问题",
+          "author": "lbk168",
+          "date": "2025-08-25",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "f283cb815617160555bf86d476699f3c2cffa66f",
+          "shortHash": "f283cb8",
+          "subject": "feat: 添加出版异常内容组件和面包屑导航配置",
+          "author": "lbk168",
+          "date": "2025-08-23",
+          "email": "103929769@qq.com[0x7FFCF200E0A4] ANOMALY: use of REX.w is meaningless (default operand size is 64)\r"
+        }
+      ]
+    },
+    "fixes": {
+      "title": "🐛 问题修复",
+      "icon": "🔧",
+      "commits": [
+        {
+          "hash": "8c85ba10f180c99c9f17ea4c9c3b982ce8266cf2",
+          "shortHash": "8c85ba1",
+          "subject": "修复ERP同步日志功能：支持显示同步类型和记录数",
+          "author": "lbk168",
+          "date": "2025-09-08",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "ee9300d0f5819c913c8d51efab68a80c23e84b18",
+          "shortHash": "ee9300d",
+          "subject": "修复Element Plus按钮组件type属性问题，更新图标配置和清理无用文件",
+          "author": "lbk168",
+          "date": "2025-09-03",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "930d38bd927dce1814be8fd225fcccdd57089302",
+          "shortHash": "930d38b",
+          "subject": "优化侧边栏折叠功能：修复菜单激活状态显示、添加Tooltip提示、解决LOGO居中问题",
+          "author": "lbk168",
+          "date": "2025-09-03",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "75066055fd84afd31b457ce9556adbdfad055629",
+          "shortHash": "7506605",
+          "subject": "修复快捷操作卡片路由跳转 - 更正通知公告和客户签样的目标页面路径",
+          "author": "lbk168",
+          "date": "2025-09-03",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "a231800874769721545a909a49addf372216c003",
+          "shortHash": "a231800",
+          "subject": "修复后台主页布局问题并清理测试脚本",
+          "author": "lbk168",
+          "date": "2025-09-03",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "006a65ab9d87492e2aee64789f2c42b02cef6233",
+          "shortHash": "006a65a",
+          "subject": "修复仪表盘统计数据显示问题和控制台警告\\n\\n- 修复后端 dashboard.js 中 executeQuery 函数调用方式\\n- 修复前端 NewWelcome.vue 中缺少 List 图标导入\\n- 仪表盘统计数据现在正确显示待处理任务和质量预警数量\\n- 解决控制台 Vue 组件解析警告",
+          "author": "lbk168",
+          "date": "2025-09-03",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "8b0c0f76ae7f2affc9a3ca9153ab211a106c0e4f",
+          "shortHash": "8b0c0f7",
+          "subject": "fix: 修复系统日志面包屑导航显示错误问题",
+          "author": "lbk168",
+          "date": "2025-09-01",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "56d497dac0748361f8a9d6aa3e4b7aed25ff25fd",
+          "shortHash": "56d497d",
+          "subject": "修复通知编辑后铃铛未自动更新问题",
+          "author": "lbk168",
+          "date": "2025-08-30",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "3e51a846fe973b6613108cf93c939bfb89f92935",
+          "shortHash": "3e51a84",
+          "subject": "修复通知管理Content字段头尾部P标签问题\\n\\n- 在TinyMCE配置中添加P标签处理设置\\n- 在后端添加cleanPTags函数清理头尾部P标签\\n- 确保保存到数据库的内容不包含多余的P标签",
+          "author": "lbk168",
+          "date": "2025-08-30",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "2e84da2b9c1f98224dfc66cec281f3340a16d9f6",
+          "shortHash": "2e84da2",
+          "subject": "修复UserDropdown组件焦点样式问题和移除调试输出代码",
+          "author": "lbk168",
+          "date": "2025-08-30",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "323d6b9152ddf272a1d47349b7435f4612a3a25c",
+          "shortHash": "323d6b9",
+          "subject": "修复出版异常页面布局问题：调整内容区宽度自适应，解决右侧sidebar被隐藏的问题",
+          "author": "lbk168",
+          "date": "2025-08-29",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "b0b569a7a09a8ab68bcb4fe62b789773e8a8bb64",
+          "shortHash": "b0b569a",
+          "subject": "修复通知管理功能：移除标题徽标、修复表单验证、优化编辑器样式",
+          "author": "lbk168",
+          "date": "2025-08-27",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "5e5a4d7f9c542e3fe1b209bdc18be026abbcb620",
+          "shortHash": "5e5a4d7",
+          "subject": "修复数据库连接问题：将poolPromise替换为getConnection()以实现自动重连",
+          "author": "lbk168",
+          "date": "2025-08-26",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "350345aecadbc123b0cff185b4780119714734a2",
+          "shortHash": "350345a",
+          "subject": "修复侧边栏折叠菜单显示问题：移除v-show指令让Element Plus自动处理tooltip显示",
+          "author": "lbk168",
+          "date": "2025-08-25",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "0480d03bc17eee17b0333f7048661188f895a2a1",
+          "shortHash": "0480d03",
+          "subject": "修复PublishingExceptionsContent.vue中的重复函数声明错误，包括beforeUpload、getImageUrl、getImageList等函数",
+          "author": "lbk168",
+          "date": "2025-08-25",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "c6fe5c9c226833bb9216b7c74ec16f4a54b00851",
+          "shortHash": "c6fe5c9",
+          "subject": "修复PublishingExceptionsContent.vue页面不必要的垂直滚动条问题",
+          "author": "lbk168",
+          "date": "2025-08-25",
+          "email": "103929769@qq.com"
+        }
+      ]
+    },
+    "improvements": {
+      "title": "⚡ 优化改进",
+      "icon": "📈",
+      "commits": [
+        {
+          "hash": "e79939e433ca4cae3c1a805d0e164e8ab5b22e72",
+          "shortHash": "e79939e",
+          "subject": "优化消息通知管理权限控制和界面显示\\n\\n- 修复NoticeManagement.vue中按钮权限控制逻辑，将隐藏改为禁用显示\\n- 添加ImagePath字段到init.sql的Notices表定义\\n- 映射消息通知管理面包屑导航的中文名称\\n- 优化UserPermissions.vue权限显示\\n- 更新menus.js路由配置",
+          "author": "lbk168",
+          "date": "2025-08-30",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "6920e0377b346277fa9faef713df56db2fc5d98f",
+          "shortHash": "6920e03",
+          "subject": "优化用户名显示逻辑：优先显示姓名，统一用户显示名称处理",
+          "author": "lbk168",
+          "date": "2025-08-29",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "5a3d168891c51d063f61d6e7fe9e91bae38f8c2b",
+          "shortHash": "5a3d168",
+          "subject": "优化样品承认书页面：修复搜索功能、添加客户编号自动大写、调整列宽和表单宽度",
+          "author": "lbk168",
+          "date": "2025-08-25",
+          "email": "103929769@qq.com"
+        }
+      ]
+    },
+    "refactor": {
+      "title": "♻️ 代码重构",
+      "icon": "🔄",
+      "commits": [
+        {
+          "hash": "e5ad123595dc28f414ab272e5c46dc0a41479bd8",
+          "shortHash": "e5ad123",
+          "subject": "refactor: 删除临时测试脚本文件",
+          "author": "lbk168",
+          "date": "2025-09-03",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "95b5d3ebb2120e96df6cab4db5ccba96cd5e9e9a",
+          "shortHash": "95b5d3e",
+          "subject": "调整系统日志分析页面样式：优化标题栏Label宽度、下拉选项宽度和筛选条件选择器最小宽度",
+          "author": "lbk168",
+          "date": "2025-09-01",
+          "email": "103929769@qq.com"
+        }
+      ]
+    },
+    "docs": {
+      "title": "📚 文档更新",
+      "icon": "📝",
+      "commits": [
+        {
+          "hash": "90e74d9c2102fa5780dd9d4ed5c42c8ddbfdb63f",
+          "shortHash": "90e74d9",
+          "subject": "docs: 完善README.md权限验证系统文档",
+          "author": "lbk168",
+          "date": "2025-09-03",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "b52d6bb4f0eecdb91a3347b7fb59dfbe8156b7dc",
+          "shortHash": "b52d6bb",
+          "subject": "docs: 更新README.md文档，同步项目结构和v2.2.2版本功能",
+          "author": "lbk168",
+          "date": "2025-08-26",
+          "email": "103929769@qq.com"
+        }
+      ]
+    },
+    "other": {
+      "title": "📦 其他更改",
+      "icon": "📋",
+      "commits": [
+        {
+          "hash": "3f3bcebc21501d0c478590d0231b43d4a5c63e8d",
+          "shortHash": "3f3bceb",
+          "subject": "清理app.js中的非必须调试输出语句",
+          "author": "lbk168",
+          "date": "2025-09-06",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "823b4602a1ede20c1e4d26a9be8740cdf49ad695",
+          "shortHash": "823b460",
+          "subject": "完成ERP数据同步功能开发，包括前端界面、后端API和数据处理逻辑",
+          "author": "lbk168",
+          "date": "2025-09-06",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "96891f7731ecbea3180359baf9d65a403ff559ac",
+          "shortHash": "96891f7",
+          "subject": "清理调试输出代码并优化用户管理功能",
+          "author": "lbk168",
+          "date": "2025-09-05",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "9002c435d2502e2c27c76a46cdcfe446df345559",
+          "shortHash": "9002c43",
+          "subject": "移除页面顶级容器内边距和背景色样式 - 修复NewWelcome、Dashboard、Welcome、MaterialPriceList、PathAnalysis、SupplierComplaints、PublishingExceptions、CostStatistics页面的布局样式",
+          "author": "lbk168",
+          "date": "2025-09-03",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "b6535957535af13365c1c535bbcd9d66576ef209",
+          "shortHash": "b653595",
+          "subject": "清理调试输出和测试脚本，完善消息通知图片功能",
+          "author": "lbk168",
+          "date": "2025-08-30",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "bbbad3f5958db00c7ee3d6e3b2edf5a39e2e2860",
+          "shortHash": "bbbad3f",
+          "subject": "更新init.sql：添加通知公告管理表结构、扩展字段和权限配置",
+          "author": "lbk168",
+          "date": "2025-08-30",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "42ac8c91307ce6d24fcd722b1bebd3f2724b72d3",
+          "shortHash": "42ac8c9",
+          "subject": "移除为解决用户ID丢失问题而创建的测试脚本文件",
+          "author": "lbk168",
+          "date": "2025-08-30",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "d1e6ec46eed02d4128f60895512f879cff8cc2f8",
+          "shortHash": "d1e6ec4",
+          "subject": "scripts: Update automation scripts - 2025-08-30 10:31:58",
+          "author": "lbk168",
+          "date": "2025-08-30",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "804b4a687edb0c3f7bc9891be67fe5ff35c01bba",
+          "shortHash": "804b4a6",
+          "subject": "移除通知列表标题列右上角徽标",
+          "author": "lbk168",
+          "date": "2025-08-27",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "b58eac934d6db9b1fe4424c036895a848f33f6b0",
+          "shortHash": "b58eac9",
+          "subject": "更新ERP菜单名称：将'ERP管理'改为'ERP对接'",
+          "author": "lbk168",
+          "date": "2025-08-26",
+          "email": "103929769@qq.com"
+        },
+        {
+          "hash": "fb9f759c00145b449043e356743830d4f02bf859",
+          "shortHash": "fb9f759",
+          "subject": "清理PublishingExceptionsContent.vue中未使用的CSS样式",
+          "author": "lbk168",
+          "date": "2025-08-25",
+          "email": "103929769@qq.com"
+        }
+      ]
+    }
+  }
+}
