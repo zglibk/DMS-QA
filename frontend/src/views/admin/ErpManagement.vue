@@ -156,10 +156,12 @@
         <div class="search-section">
           <el-form :model="logSearchForm" inline>
             <el-form-item label="同步类型">
-              <el-select v-model="logSearchForm.sync_type" placeholder="请选择同步类型" clearable style="width: 120px;">
+              <el-select v-model="logSearchForm.sync_type" placeholder="请选择同步类型" clearable style="width: 150px;">
                 <el-option label="生产数据" value="production" />
                 <el-option label="交付数据" value="delivery" />
                 <el-option label="质量指标" value="quality" />
+                <el-option label="月度批次统计" value="monthly_batch_stats" />
+                <el-option label="批量月度统计" value="monthly_batch_stats_batch" />
               </el-select>
             </el-form-item>
             <el-form-item label="同步状态">
@@ -486,7 +488,9 @@ export default {
       const typeMap = {
         production: 'primary',
         delivery: 'success',
-        quality: 'warning'
+        quality: 'warning',
+        monthly_batch_stats: 'primary',
+        monthly_batch_stats_batch: 'success'
       }
       return typeMap[type] || 'info'
     }
@@ -500,7 +504,9 @@ export default {
       const typeMap = {
         production: '生产数据',
         delivery: '交付数据',
-        quality: '质量指标'
+        quality: '质量指标',
+        monthly_batch_stats: '月度批次统计',
+        monthly_batch_stats_batch: '批量月度统计'
       }
       return typeMap[type] || type
     }
@@ -704,36 +710,12 @@ export default {
     
     /**
      * 处理手动同步
+     * 切换到对接管理页面
      */
-    const handleManualSync = async () => {
-      try {
-        await ElMessageBox.confirm(
-          '确定要执行手动同步吗？这可能需要一些时间。',
-          '确认同步',
-          {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning'
-          }
-        )
-        
-        syncLoading.value = true
-        const response = await api.post('/api/erp-config/manual-sync')
-        
-        if (response.data.success) {
-          ElMessage.success('同步任务已启动，请查看日志了解进度')
-          loadSyncLogs()
-        } else {
-          ElMessage.error(response.data.message || '启动同步失败')
-        }
-      } catch (error) {
-        if (error !== 'cancel') {
-          console.error('手动同步失败:', error)
-          ElMessage.error('启动同步失败')
-        }
-      } finally {
-        syncLoading.value = false
-      }
+    const handleManualSync = () => {
+      // 切换到对接管理页面
+      activeTab.value = 'config'
+      ElMessage.info('已切换到对接管理页面，请在同步数据卡片中选择相应的同步操作')
     }
     
     /**

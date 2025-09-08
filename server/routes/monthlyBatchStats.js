@@ -713,6 +713,40 @@ router.post('/sync-erp-data', authenticateToken, async (req, res) => {
       }
     });
 
+    // 记录ERP同步日志
+    try {
+      const syncId = `sync_${Date.now()}_${userId}`;
+      const endTime = new Date();
+      const startTime = new Date(endTime.getTime() - 5000); // 假设同步耗时5秒
+      const duration = endTime.getTime() - startTime.getTime();
+      
+      const logRequest = pool.request();
+      logRequest.input('sync_id', syncId);
+      logRequest.input('start_time', startTime);
+      logRequest.input('end_time', endTime);
+      logRequest.input('duration', duration);
+      logRequest.input('status', 'success');
+      logRequest.input('sync_types', 'monthly_batch_stats');
+      logRequest.input('results', JSON.stringify({
+        operation: 'ERP同步',
+        year,
+        month,
+        inspectionBatches: erpStats.inspectionBatches,
+        deliveryBatches: erpStats.deliveryBatches,
+        isUpdate,
+        recordId
+      }));
+      
+      await logRequest.query(`
+        INSERT INTO erp_sync_logs 
+        (sync_id, start_time, end_time, duration, status, sync_types, results, created_at)
+        VALUES (@sync_id, @start_time, @end_time, @duration, @status, @sync_types, @results, GETDATE())
+      `);
+    } catch (logError) {
+      console.error('记录ERP同步日志失败:', logError);
+      // 不影响主要业务流程，只记录错误
+    }
+
     res.json({
       success: true,
       message: `${year}年${month}月数据同步成功`,
@@ -739,6 +773,38 @@ router.post('/sync-erp-data', authenticateToken, async (req, res) => {
       error: error.message,
       stack: error.stack
     });
+
+    // 记录ERP同步失败日志
+    try {
+      const syncId = `sync_failed_${Date.now()}_${req.user?.id}`;
+      const endTime = new Date();
+      const startTime = new Date(endTime.getTime() - 1000); // 假设失败前耗时1秒
+      const duration = endTime.getTime() - startTime.getTime();
+      
+      if (pool) {
+        const logRequest = pool.request();
+        logRequest.input('sync_id', syncId);
+        logRequest.input('start_time', startTime);
+        logRequest.input('end_time', endTime);
+        logRequest.input('duration', duration);
+        logRequest.input('status', 'failed');
+        logRequest.input('sync_types', 'monthly_batch_stats');
+        logRequest.input('results', JSON.stringify({
+          operation: 'ERP同步',
+          error: error.message,
+          year: req.body.year,
+          month: req.body.month
+        }));
+        
+        await logRequest.query(`
+          INSERT INTO erp_sync_logs 
+          (sync_id, start_time, end_time, duration, status, sync_types, results, created_at)
+          VALUES (@sync_id, @start_time, @end_time, @duration, @status, @sync_types, @results, GETDATE())
+        `);
+      }
+    } catch (logError) {
+      console.error('记录ERP同步失败日志失败:', logError);
+    }
 
     res.status(500).json({
       success: false,
@@ -891,6 +957,40 @@ router.post('/batch-sync-erp-data', authenticateToken, async (req, res) => {
       }
     });
 
+    // 记录批量ERP同步日志
+    try {
+      const syncId = `batch_sync_${Date.now()}_${userId}`;
+      const endTime = new Date();
+      const startTime = new Date(endTime.getTime() - (months.length * 2000)); // 假设每个月份同步耗时2秒
+      const duration = endTime.getTime() - startTime.getTime();
+      
+      const logRequest = pool.request();
+      logRequest.input('sync_id', syncId);
+      logRequest.input('start_time', startTime);
+      logRequest.input('end_time', endTime);
+      logRequest.input('duration', duration);
+      logRequest.input('status', errorCount === 0 ? 'success' : 'partial_success');
+      logRequest.input('sync_types', 'monthly_batch_stats_batch');
+      logRequest.input('results', JSON.stringify({
+        operation: '批量ERP同步',
+        totalCount: months.length,
+        successCount,
+        errorCount,
+        results,
+        errors,
+        remarks
+      }));
+      
+      await logRequest.query(`
+        INSERT INTO erp_sync_logs 
+        (sync_id, start_time, end_time, duration, status, sync_types, results, created_at)
+        VALUES (@sync_id, @start_time, @end_time, @duration, @status, @sync_types, @results, GETDATE())
+      `);
+    } catch (logError) {
+      console.error('记录批量ERP同步日志失败:', logError);
+      // 不影响主要业务流程，只记录错误
+    }
+
     res.json({
       success: errorCount === 0,
       message: `批量同步完成：成功${successCount}个，失败${errorCount}个`,
@@ -914,6 +1014,38 @@ router.post('/batch-sync-erp-data', authenticateToken, async (req, res) => {
       error: error.message,
       stack: error.stack
     });
+
+    // 记录批量ERP同步失败日志
+    try {
+      const syncId = `batch_sync_failed_${Date.now()}_${req.user?.id}`;
+      const endTime = new Date();
+      const startTime = new Date(endTime.getTime() - 1000); // 假设失败前耗时1秒
+      const duration = endTime.getTime() - startTime.getTime();
+      
+      if (pool) {
+        const logRequest = pool.request();
+        logRequest.input('sync_id', syncId);
+        logRequest.input('start_time', startTime);
+        logRequest.input('end_time', endTime);
+        logRequest.input('duration', duration);
+        logRequest.input('status', 'failed');
+        logRequest.input('sync_types', 'monthly_batch_stats_batch');
+        logRequest.input('results', JSON.stringify({
+          operation: '批量ERP同步',
+          error: error.message,
+          months: req.body.months,
+          remarks: req.body.remarks
+        }));
+        
+        await logRequest.query(`
+          INSERT INTO erp_sync_logs 
+          (sync_id, start_time, end_time, duration, status, sync_types, results, created_at)
+          VALUES (@sync_id, @start_time, @end_time, @duration, @status, @sync_types, @results, GETDATE())
+        `);
+      }
+    } catch (logError) {
+      console.error('记录批量ERP同步失败日志失败:', logError);
+    }
 
     res.status(500).json({
       success: false,

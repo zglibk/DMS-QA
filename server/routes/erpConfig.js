@@ -313,11 +313,59 @@ router.get('/sync-logs', authenticateToken, async (req, res) => {
             return await request.query(query);
         });
         
+        // 处理返回数据，解析results字段并提取记录数等信息
+        const processedList = result.recordset.map(log => {
+            let records_count = 0;
+            let sync_type = log.sync_types;
+            let error_message = '';
+            
+            try {
+                if (log.results) {
+                    const results = JSON.parse(log.results);
+                    
+                    // 提取记录数
+                    if (results.inspectionBatches !== undefined && results.deliveryBatches !== undefined) {
+                        // 月度批次统计类型
+                        records_count = (results.inspectionBatches || 0) + (results.deliveryBatches || 0);
+                    } else if (results.production && results.delivery) {
+                        // 生产和交付数据类型
+                        records_count = (results.production.records || 0) + (results.delivery.records || 0);
+                    } else if (results.successCount !== undefined) {
+                        // 批量同步类型
+                        records_count = results.successCount || 0;
+                    } else if (results.recordCount !== undefined) {
+                        // 单个记录类型
+                        records_count = results.recordCount || 0;
+                    }
+                    
+                    // 提取错误信息
+                    if (results.error) {
+                        error_message = results.error;
+                    } else if (results.errors && results.errors.length > 0) {
+                        error_message = results.errors.map(e => e.error).join('; ');
+                    }
+                }
+            } catch (parseError) {
+                console.warn('解析同步日志results字段失败:', parseError);
+            }
+            
+            // 转换持续时间为秒
+            const duration_seconds = log.duration ? Math.round(log.duration / 1000) : 0;
+            
+            return {
+                ...log,
+                sync_type,
+                records_count,
+                error_message,
+                duration: duration_seconds
+            };
+        });
+        
         res.json({
             success: true,
             message: '获取同步日志成功',
             data: {
-                list: result.recordset,
+                list: processedList,
                 total: total,
                 page: parseInt(page),
                 size: parseInt(size)
