@@ -13,6 +13,7 @@
 
 const express = require('express');
 const router = express.Router();
+const sql = require('mssql');
 const { getConnection } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -58,9 +59,13 @@ router.get('/', authenticateToken, async (req, res) => {
         
         // 添加参数
         params.forEach(param => {
-            request.input(param.name, request.types[param.type], param.value);
+            request.input(param.name, sql[param.type], param.value);
         });
         
+        // 添加分页参数
+        request.input('offset', sql.Int, offset);
+        request.input('pageSize', sql.Int, parseInt(pageSize));
+
         // 查询总数
         const countQuery = `
             SELECT COUNT(*) as total
@@ -69,32 +74,33 @@ router.get('/', authenticateToken, async (req, res) => {
         `;
         const countResult = await request.query(countQuery);
         const total = countResult.recordset[0].total;
-        
-        // 查询数据
+
+        // 查询数据 - 使用ROW_NUMBER()方式实现分页
         const dataQuery = `
-            SELECT 
-                vu.ID,
-                vu.Version,
-                vu.Title,
-                vu.Description,
-                vu.ReleaseDate,
-                vu.Status,
-                vu.IsMajorUpdate,
-                vu.TotalCommits,
-                vu.FeaturesCount,
-                vu.FixesCount,
-                vu.ImprovementsCount,
-                vu.OtherCount,
-                vu.NotificationSent,
-                vu.NotificationDate,
-                vu.CreatedAt,
-                u.Username as CreatedByName
-            FROM VersionUpdates vu
-            LEFT JOIN [User] u ON vu.CreatedBy = u.ID
-            ${whereClause}
-            ORDER BY vu.ReleaseDate DESC, vu.CreatedAt DESC
-            OFFSET ${offset} ROWS
-            FETCH NEXT ${pageSize} ROWS ONLY
+            SELECT * FROM (
+                SELECT 
+                    vu.ID,
+                    vu.Version,
+                    vu.Title,
+                    vu.Description,
+                    vu.ReleaseDate,
+                    vu.Status,
+                    vu.IsMajorUpdate,
+                    vu.TotalCommits,
+                    vu.FeaturesCount,
+                    vu.FixesCount,
+                    vu.ImprovementsCount,
+                    vu.OtherCount,
+                    vu.NotificationSent,
+                    vu.NotificationDate,
+                    vu.CreatedAt,
+                    COALESCE(u.RealName, u.Username) as CreatedByName,
+                    ROW_NUMBER() OVER (ORDER BY vu.ReleaseDate DESC, vu.CreatedAt DESC) as RowNum
+                FROM VersionUpdates vu
+                LEFT JOIN [User] u ON vu.CreatedBy = u.ID
+                ${whereClause}
+            ) AS PagedResults
+            WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize)
         `;
         
         const dataResult = await request.query(dataQuery);
@@ -134,13 +140,13 @@ router.get('/:id', authenticateToken, async (req, res) => {
         const versionQuery = `
             SELECT 
                 vu.*,
-                u.Username as CreatedByName
+                COALESCE(u.RealName, u.Username) as CreatedByName
             FROM VersionUpdates vu
             LEFT JOIN [User] u ON vu.CreatedBy = u.ID
             WHERE vu.ID = @id AND vu.IsActive = 1
         `;
         
-        request.input('id', request.types.Int, id);
+        request.input('id', sql.Int, id);
         const versionResult = await request.query(versionQuery);
         
         if (versionResult.recordset.length === 0) {
@@ -196,6 +202,44 @@ router.get('/:id', authenticateToken, async (req, res) => {
 });
 
 /**
+ * 检查版本号是否存在
+ * GET /api/version-updates/check-version/:version
+ */
+router.get('/check-version/:version', authenticateToken, async (req, res) => {
+    try {
+        const { version } = req.params;
+        const connection = await getConnection();
+        const request = connection.request();
+        
+        // 检查版本号是否已存在
+        const checkQuery = `
+            SELECT COUNT(*) as count
+            FROM VersionUpdates
+            WHERE Version = @version AND IsActive = 1
+        `;
+        
+        request.input('version', sql.NVarChar, version);
+        const checkResult = await request.query(checkQuery);
+        
+        const exists = checkResult.recordset[0].count > 0;
+        
+        res.json({
+            success: true,
+            exists: exists,
+            message: exists ? '该版本号已存在' : '版本号可用'
+        });
+        
+    } catch (error) {
+        console.error('检查版本号失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '检查版本号失败',
+            error: error.message
+        });
+    }
+});
+
+/**
  * 创建版本更新记录
  * POST /api/version-updates
  */
@@ -235,7 +279,7 @@ router.post('/', authenticateToken, async (req, res) => {
                 WHERE Version = @version AND IsActive = 1
             `;
             
-            request.input('version', request.types.NVarChar, version);
+            request.input('version', sql.NVarChar, version);
             const checkResult = await request.query(checkQuery);
             
             if (checkResult.recordset[0].count > 0) {
@@ -261,20 +305,20 @@ router.post('/', authenticateToken, async (req, res) => {
                 )
             `;
             
-            request.input('title', request.types.NVarChar, title);
-            request.input('description', request.types.NVarChar, description || null);
-            request.input('releaseDate', request.types.DateTime, new Date(releaseDate || Date.now()));
-            request.input('status', request.types.NVarChar, status);
-            request.input('isMajorUpdate', request.types.Bit, isMajorUpdate);
-            request.input('totalCommits', request.types.Int, totalCommits);
-            request.input('featuresCount', request.types.Int, featuresCount);
-            request.input('fixesCount', request.types.Int, fixesCount);
-            request.input('improvementsCount', request.types.Int, improvementsCount);
-            request.input('otherCount', request.types.Int, otherCount);
-            request.input('changelogMarkdown', request.types.NVarChar, changelogMarkdown || null);
-            request.input('changelogJson', request.types.NVarChar, changelogJson || null);
-            request.input('contributors', request.types.NVarChar, contributors || null);
-            request.input('userId', request.types.Int, userId);
+            request.input('title', sql.NVarChar, title);
+        request.input('description', sql.NVarChar, description || null);
+        request.input('releaseDate', sql.DateTime, new Date(releaseDate || Date.now()));
+        request.input('status', sql.NVarChar, status);
+        request.input('isMajorUpdate', sql.Bit, isMajorUpdate);
+        request.input('totalCommits', sql.Int, totalCommits);
+        request.input('featuresCount', sql.Int, featuresCount);
+        request.input('fixesCount', sql.Int, fixesCount);
+        request.input('improvementsCount', sql.Int, improvementsCount);
+        request.input('otherCount', sql.Int, otherCount);
+        request.input('changelogMarkdown', sql.NVarChar, changelogMarkdown || null);
+        request.input('changelogJson', sql.NVarChar, changelogJson || null);
+        request.input('contributors', sql.NVarChar, contributors || null);
+        request.input('userId', sql.Int, userId);
             
             const insertResult = await request.query(insertQuery);
             const versionUpdateId = insertResult.recordset[0].ID;
@@ -298,17 +342,17 @@ router.post('/', authenticateToken, async (req, res) => {
                         )
                     `;
                     
-                    itemRequest.input('versionUpdateId', itemRequest.types.Int, versionUpdateId);
-                    itemRequest.input('category', itemRequest.types.NVarChar, item.category || 'other');
-                    itemRequest.input('title', itemRequest.types.NVarChar, item.title);
-                    itemRequest.input('description', itemRequest.types.NVarChar, item.description || null);
-                    itemRequest.input('commitHash', itemRequest.types.NVarChar, item.commitHash || null);
-                    itemRequest.input('commitShortHash', itemRequest.types.NVarChar, item.commitShortHash || null);
-                    itemRequest.input('commitAuthor', itemRequest.types.NVarChar, item.commitAuthor || null);
-                    itemRequest.input('commitDate', itemRequest.types.DateTime, item.commitDate ? new Date(item.commitDate) : null);
-                    itemRequest.input('commitEmail', itemRequest.types.NVarChar, item.commitEmail || null);
-                    itemRequest.input('sortOrder', itemRequest.types.Int, item.sortOrder || i);
-                    itemRequest.input('isHighlight', itemRequest.types.Bit, item.isHighlight || false);
+                    itemRequest.input('versionUpdateId', sql.Int, versionUpdateId);
+                itemRequest.input('category', sql.NVarChar, item.category || 'other');
+                itemRequest.input('title', sql.NVarChar, item.title);
+                itemRequest.input('description', sql.NVarChar, item.description || null);
+                itemRequest.input('commitHash', sql.NVarChar, item.commitHash || null);
+                itemRequest.input('commitShortHash', sql.NVarChar, item.commitShortHash || null);
+                itemRequest.input('commitAuthor', sql.NVarChar, item.commitAuthor || null);
+                itemRequest.input('commitDate', sql.DateTime, item.commitDate ? new Date(item.commitDate) : null);
+                itemRequest.input('commitEmail', sql.NVarChar, item.commitEmail || null);
+                itemRequest.input('sortOrder', sql.Int, item.sortOrder || i);
+                itemRequest.input('isHighlight', sql.Bit, item.isHighlight || false);
                     
                     await itemRequest.query(itemInsertQuery);
                 }
@@ -346,11 +390,11 @@ router.post('/', authenticateToken, async (req, res) => {
                     )
                 `;
                 
-                noticeRequest.input('title', noticeRequest.types.NVarChar, noticeTitle);
-                noticeRequest.input('content', noticeRequest.types.NVarChar, noticeContent);
-                noticeRequest.input('priority', noticeRequest.types.NVarChar, isMajorUpdate ? 'high' : 'normal');
-                noticeRequest.input('userId', noticeRequest.types.Int, userId);
-                noticeRequest.input('isSticky', noticeRequest.types.Bit, isMajorUpdate);
+                noticeRequest.input('title', sql.NVarChar, noticeTitle);
+            noticeRequest.input('content', sql.NVarChar, noticeContent);
+            noticeRequest.input('priority', sql.NVarChar, isMajorUpdate ? 'high' : 'normal');
+            noticeRequest.input('userId', sql.Int, userId);
+            noticeRequest.input('isSticky', sql.Bit, isMajorUpdate);
                 
                 const noticeResult = await noticeRequest.query(insertNoticeQuery);
                 noticeId = noticeResult.recordset[0].ID;
@@ -363,8 +407,8 @@ router.post('/', authenticateToken, async (req, res) => {
                     WHERE ID = @versionUpdateId
                 `;
                 
-                updateVersionRequest.input('versionUpdateId', updateVersionRequest.types.Int, versionUpdateId);
-                updateVersionRequest.input('noticeId', updateVersionRequest.types.Int, noticeId);
+                updateVersionRequest.input('versionUpdateId', sql.Int, versionUpdateId);
+            updateVersionRequest.input('noticeId', sql.Int, noticeId);
                 
                 await updateVersionRequest.query(updateVersionQuery);
             }
@@ -450,9 +494,9 @@ router.put('/:id', authenticateToken, async (req, res) => {
         
         // 添加参数
         params.forEach(param => {
-            request.input(param.name, request.types[param.type], param.value);
+            request.input(param.name, sql[param.type], param.value);
         });
-        request.input('id', request.types.Int, id);
+        request.input('id', sql.Int, id);
         
         const updateQuery = `
             UPDATE VersionUpdates
@@ -500,7 +544,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
             WHERE ID = @id AND IsActive = 1
         `;
         
-        request.input('id', request.types.Int, id);
+        request.input('id', sql.Int, id);
         const result = await request.query(deleteQuery);
         
         if (result.rowsAffected[0] === 0) {
@@ -543,7 +587,7 @@ router.post('/:id/notify', authenticateToken, async (req, res) => {
             
             // 获取版本更新信息
             const versionRequest = transaction.request();
-            versionRequest.input('id', versionRequest.types.Int, id);
+            versionRequest.input('id', sql.Int, id);
             
             const versionQuery = `
                 SELECT *
@@ -593,11 +637,11 @@ router.post('/:id/notify', authenticateToken, async (req, res) => {
                 )
             `;
             
-            noticeRequest.input('title', noticeRequest.types.NVarChar, noticeTitle);
-            noticeRequest.input('content', noticeRequest.types.NVarChar, noticeContent);
-            noticeRequest.input('priority', noticeRequest.types.NVarChar, versionData.IsMajorUpdate ? 'high' : 'normal');
-            noticeRequest.input('userId', noticeRequest.types.Int, userId);
-            noticeRequest.input('isSticky', noticeRequest.types.Bit, versionData.IsMajorUpdate);
+            noticeRequest.input('title', sql.NVarChar, noticeTitle);
+        noticeRequest.input('content', sql.NVarChar, noticeContent);
+        noticeRequest.input('priority', sql.NVarChar, versionData.IsMajorUpdate ? 'high' : 'normal');
+        noticeRequest.input('userId', sql.Int, userId);
+        noticeRequest.input('isSticky', sql.Bit, versionData.IsMajorUpdate);
             
             const noticeResult = await noticeRequest.query(insertNoticeQuery);
             const noticeId = noticeResult.recordset[0].ID;
@@ -610,8 +654,8 @@ router.post('/:id/notify', authenticateToken, async (req, res) => {
                 WHERE ID = @id
             `;
             
-            updateVersionRequest.input('id', updateVersionRequest.types.Int, id);
-            updateVersionRequest.input('noticeId', updateVersionRequest.types.Int, noticeId);
+            updateVersionRequest.input('id', sql.Int, id);
+        updateVersionRequest.input('noticeId', sql.Int, noticeId);
             
             await updateVersionRequest.query(updateVersionQuery);
             
@@ -644,22 +688,25 @@ router.post('/:id/notify', authenticateToken, async (req, res) => {
 /**
  * 获取版本更新统计信息
  * GET /api/version-updates/stats
+ * 
+ * 功能说明：
+ * 1. 统计版本总数、发布状态等基础信息
+ * 2. 根据VersionUpdateItems表中的Category字段实际内容进行分类统计
+ * 3. 支持带图标的Category字段（如✨ 新增功能、🐛 问题修复、⚡ 优化改进等）
  */
 router.get('/stats/summary', authenticateToken, async (req, res) => {
     try {
         const connection = await getConnection();
         const request = connection.request();
         
-        const statsQuery = `
+        // 基础统计查询
+        const basicStatsQuery = `
             SELECT 
                 COUNT(*) as totalVersions,
                 SUM(CASE WHEN Status = 'published' THEN 1 ELSE 0 END) as publishedVersions,
                 SUM(CASE WHEN Status = 'draft' THEN 1 ELSE 0 END) as draftVersions,
                 SUM(CASE WHEN IsMajorUpdate = 1 THEN 1 ELSE 0 END) as majorUpdates,
                 SUM(TotalCommits) as totalCommits,
-                SUM(FeaturesCount) as totalFeatures,
-                SUM(FixesCount) as totalFixes,
-                SUM(ImprovementsCount) as totalImprovements,
                 MAX(ReleaseDate) as latestReleaseDate,
                 (
                     SELECT TOP 1 Version
@@ -671,11 +718,39 @@ router.get('/stats/summary', authenticateToken, async (req, res) => {
             WHERE IsActive = 1
         `;
         
-        const result = await request.query(statsQuery);
+        // 分类统计查询 - 根据实际Category字段内容进行统计
+        const categoryStatsQuery = `
+            SELECT 
+                SUM(CASE 
+                    WHEN vui.Category LIKE '%新增功能%' OR vui.Category LIKE '%新功能%' OR vui.Category = 'features' 
+                    THEN 1 ELSE 0 
+                END) as totalFeatures,
+                SUM(CASE 
+                    WHEN vui.Category LIKE '%问题修复%' OR vui.Category LIKE '%修复%' OR vui.Category = 'fixes' 
+                    THEN 1 ELSE 0 
+                END) as totalFixes,
+                SUM(CASE 
+                    WHEN vui.Category LIKE '%优化改进%' OR vui.Category LIKE '%改进%' OR vui.Category LIKE '%优化%' OR vui.Category = 'improvements' 
+                    THEN 1 ELSE 0 
+                END) as totalImprovements
+            FROM VersionUpdateItems vui
+            INNER JOIN VersionUpdates vu ON vui.VersionUpdateID = vu.ID
+            WHERE vu.IsActive = 1 AND vu.Status = 'published'
+        `;
+        
+        // 执行查询
+        const basicResult = await request.query(basicStatsQuery);
+        const categoryResult = await request.query(categoryStatsQuery);
+        
+        // 合并结果
+        const combinedStats = {
+            ...basicResult.recordset[0],
+            ...categoryResult.recordset[0]
+        };
         
         res.json({
             success: true,
-            data: result.recordset[0]
+            data: combinedStats
         });
         
     } catch (error) {
