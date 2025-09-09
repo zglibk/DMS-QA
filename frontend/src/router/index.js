@@ -54,6 +54,8 @@ const routes = [
   // 出版异常页面
   { path: '/publishing-exceptions', component: () => import('../views/PublishingExceptions.vue') },
 
+  // 版本更新日志页面
+  { path: '/version-updates', component: () => import('../views/VersionUpdates.vue') },
 
   // 个人资料页面（懒加载）
   {
@@ -282,6 +284,11 @@ const routes = [
         path: 'system/logs/analytics',
         component: () => import('../views/admin/SystemLogsAnalytics.vue'),
         meta: { title: '日志统计分析', requiresAuth: true }
+      },
+      {
+        path: 'version-updates',
+        component: () => import('../views/VersionUpdates.vue'), // 版本更新日志页面
+        meta: { title: '版本更新日志', requiresAuth: true }
       },
       {
         path: 'system/accordion-table-example',

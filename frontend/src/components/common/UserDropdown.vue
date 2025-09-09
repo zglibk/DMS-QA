@@ -76,11 +76,16 @@
               <el-icon><Setting /></el-icon>
               <span>登录后台</span>
             </div>
+            <div class="menu-item" @click="goVersionUpdates">
+              <el-icon><Notebook /></el-icon>
+              <span>更新日志</span>
+            </div>
             
             <div class="menu-item" @click="goDocs">
               <el-icon><Document /></el-icon>
               <span>使用文档</span>
             </div>
+            
             
             <div class="menu-item" @click="toggleFullscreen" v-if="showFullscreenToggle">
               <el-icon><FullScreen /></el-icon>
@@ -118,7 +123,8 @@ import {
   Setting, 
   Document, 
   FullScreen, 
-  SwitchButton 
+  SwitchButton,
+  Notebook 
 } from '@element-plus/icons-vue'
 import { useUserStore } from '../../store/user'
 
@@ -278,6 +284,20 @@ const goAdmin = async () => {
  */
 const goDocs = () => {
   window.open('https://docs.example.com', '_blank')
+}
+
+/**
+ * 跳转到版本更新日志页面
+ * 根据当前页面位置决定跳转方式
+ */
+const goVersionUpdates = () => {
+  if (isInAdmin.value) {
+    // 在后台管理页面中，正常跳转
+    router.push('/admin/version-updates')
+  } else {
+    // 在前台页面中，正常跳转
+    router.push('/version-updates')
+  }
 }
 
 /**

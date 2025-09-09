@@ -28,14 +28,15 @@ import AppFooter from './AppFooter.vue'
 }
 
 .main-content {
-  width: 100vw;
-  max-width: 100vw;
+  width: 100%;
+  max-width: 100%;
   margin: 0;
   padding: 0;
   flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  box-sizing: border-box;
 }
 
 .scrollable-content {
@@ -53,7 +54,7 @@ import AppFooter from './AppFooter.vue'
 .scrollable-content > * {
   /* max-width: 96%; 保持内容最大宽度 */
   margin: 0 auto;
-  padding: 20px 2%; /* 给内容添加左右内边距，而不是给容器 */
+  padding: 0; /* 移除内边距，让内容组件自己控制宽度 */
 }
 
 /* 全局样式重置 */

@@ -220,15 +220,38 @@ api.interceptors.request.use(
 // 响应拦截器
 api.interceptors.response.use(
   response => {
-    return response
+    console.log('🔍 [拦截器] 响应拦截器处理:', {
+      status: response.status,
+      statusText: response.statusText,
+      url: response.config?.url,
+      method: response.config?.method,
+      dataType: typeof response.data,
+      dataKeys: response.data ? Object.keys(response.data) : []
+    })
+    
+    // 特别处理304状态码
+    if (response.status === 304) {
+      console.log('📋 [拦截器] 检测到304状态码，数据未修改')
+    }
+    
+    console.log('📤 [拦截器] 返回response.data:', response.data)
+    return response.data
   },
   async error => {
-    console.error('响应错误:', error)
+    console.error('❌ [拦截器] 响应错误拦截器:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      url: error.config?.url,
+      method: error.config?.method,
+      data: error.response?.data
+    })
     
     // 处理不同的错误状态码
     if (error.response) {
       switch (error.response.status) {
         case 401:
+          console.log('🔐 [拦截器] 401错误处理：清除token并跳转登录')
           // Token过期或无效，保存当前页面状态
           savePageState()
           
@@ -309,4 +332,45 @@ export const workPlanApi = {
   createMilestone: (data) => api.post('/work-plan/milestones', data),
   updateMilestoneStatus: (id, data) => api.put(`/work-plan/milestones/${id}/status`, data),
   deleteMilestone: (id) => api.delete(`/work-plan/milestones/${id}`)
+}
+
+/**
+ * 版本更新管理API
+ * 提供版本更新信息的增删改查功能
+ */
+// 版本更新管理API
+export const versionUpdatesAPI = {
+  // 获取版本更新列表
+  getVersionUpdates: async (params) => {
+    console.log('🚀 [API] versionUpdatesAPI.getVersionUpdates 调用，参数:', params)
+    try {
+      const result = await api.get('/version-updates', { params })
+      console.log('📡 [API] 最终返回结果:', result)
+      return result
+    } catch (error) {
+      console.error('💥 [API] versionUpdatesAPI.getVersionUpdates 错误:', error)
+      throw error
+    }
+  },
+  
+  // 获取版本更新详情
+  getVersionUpdateDetail: (id) => api.get(`/version-updates/${id}`),
+  
+  // 创建版本更新记录
+  createVersionUpdate: (data) => api.post('/version-updates', data),
+  
+  // 更新版本更新记录
+  updateVersionUpdate: (id, data) => api.put(`/version-updates/${id}`, data),
+  
+  // 删除版本更新记录
+  deleteVersionUpdate: (id) => api.delete(`/version-updates/${id}`),
+  
+  // 发送版本更新通知
+  sendVersionNotification: (id, data) => api.post(`/version-updates/${id}/notify`, data),
+  
+  // 获取版本更新统计信息
+  getVersionStats: () => api.get('/version-updates/stats/summary'),
+  
+  // 检查版本号是否存在
+  checkVersionExists: (version) => api.get(`/version-updates/check-version/${version}`)
 }

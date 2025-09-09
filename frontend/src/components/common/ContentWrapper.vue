@@ -31,9 +31,9 @@
 }
 
 .content-container {
-  max-width: 1600px;
+  max-width: 95%;
   margin: 0 auto;
-  padding: 24px 12px;
+  padding: 12px 6px;
   min-height: calc(100vh - 7.5rem - 40px); /* 调整计算，减去头部底部高度和容器边距 */
   background: rgba(255, 255, 255, 0.95);
   border-radius: 12px;
@@ -46,8 +46,8 @@
 /* 响应式设计 */
 @media (max-width: 1200px) {
   .content-container {
-    max-width: 98%;
-    padding: 20px 16px;
+    max-width: 95%;
+    padding: 10px 8px;
     margin-top: 15px;
     margin-bottom: 15px;
   }
@@ -56,7 +56,7 @@
 @media (max-width: 768px) {
   .content-container {
     max-width: 100%;
-    padding: 16px 8px;
+    padding: 8px 4px;
     margin-top: 10px;
     margin-bottom: 10px;
     border-radius: 8px;
