@@ -32,7 +32,7 @@ const { sql, config, getDynamicConfig, executeQuery } = require('../db');
 // 创建路由实例
 const router = express.Router();
 // JWT密钥（生产环境应使用环境变量）
-const SECRET = 'dms-secret';
+const SECRET = process.env.JWT_SECRET || 'dms-secret';
 // 导入认证中间件
 const { authenticateToken } = require('../middleware/auth');
 // 导入svg-captcha库，用于生成验证码

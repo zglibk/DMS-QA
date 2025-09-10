@@ -1,7 +1,7 @@
 const jwt = require('jsonwebtoken');
 const sql = require('mssql');
 const { getDynamicConfig } = require('../db');
-const SECRET = 'dms-secret';
+const SECRET = process.env.JWT_SECRET || 'dms-secret';
 
 /**
  * JWT Token 验证中间件

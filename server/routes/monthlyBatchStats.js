@@ -73,22 +73,23 @@ router.get('/', authenticateToken, async (req, res) => {
     dataRequest.input('pageSize', parseInt(pageSize));
     
     const dataResult = await dataRequest.query(`
-      SELECT 
-        ID,
-        StatYear,
-        StatMonth,
-        InspectionBatches,
-        DeliveryBatches,
-        Remarks,
-        CreatedBy,
-        CreatedAt,
-        UpdatedBy,
-        UpdatedAt
-      FROM MonthlyBatchStats 
-      ${whereClause}
-      ORDER BY ${sortBy} ${sortOrder}
-      OFFSET @offset ROWS
-      FETCH NEXT @pageSize ROWS ONLY
+      SELECT * FROM (
+        SELECT 
+          ID,
+          StatYear,
+          StatMonth,
+          InspectionBatches,
+          DeliveryBatches,
+          Remarks,
+          CreatedBy,
+          CreatedAt,
+          UpdatedBy,
+          UpdatedAt,
+          ROW_NUMBER() OVER (ORDER BY ${sortBy} ${sortOrder}) as RowNum
+        FROM MonthlyBatchStats 
+        ${whereClause}
+      ) AS PagedResults
+      WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize)
     `);
     
     res.json({

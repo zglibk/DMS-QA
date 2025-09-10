@@ -429,11 +429,17 @@ class ErpService {
      * @param {Object} filters - 过滤条件
      * @param {string} filters.StartDate - 开始日期，格式为yyyy-MM-dd HH:mm:ss
      * @param {string} filters.EndDate - 结束日期，格式为yyyy-MM-dd HH:mm:ss
-     * @returns {Promise<Object>} 成品入库明细数据
+     * @returns {Promise<Array>} 成品入库明细数据数组
      */
     async getProductInSumList(filters = {}) {
         try {
             // 获取ERP成品入库明细列表
+            logger.info('开始获取ERP成品入库明细列表', {
+                category: LOG_CATEGORIES.BUSINESS,
+                module: MODULES.ERP,
+                operationType: 'QUERY',
+                details: filters
+            });
             
             // 构建查询参数
             const params = {};
@@ -444,12 +450,30 @@ class ErpService {
                 params.EndDate = filters.EndDate;
             }
             
-            // 调用ERP接口
+            // 调用ERP接口 - 根据接口文档使用GET方法和正确的端点
             const result = await this.makeRequest('/api/stock/productInSum/getList', 'GET', null, params);
-            // ERP入库接口返回数据结构日志已移除
+            
+            logger.info('成功获取ERP成品入库明细列表', {
+                category: LOG_CATEGORIES.BUSINESS,
+                module: MODULES.ERP,
+                operationType: 'QUERY',
+                details: {
+                    count: Array.isArray(result) ? result.length : 0,
+                    filters
+                }
+            });
+            
+            // 根据接口文档，返回的应该是数组格式
             return result;
         } catch (error) {
-            // 获取成品入库明细列表失败
+            logger.error('获取ERP成品入库明细列表失败', {
+                category: LOG_CATEGORIES.SYSTEM,
+                module: MODULES.ERP,
+                operationType: 'QUERY',
+                error: error.message,
+                stack: error.stack,
+                details: filters
+            });
             throw error;
         }
     }
@@ -505,14 +529,70 @@ class ErpService {
                 this.getProductOutSumList({ StartDate: startDate, EndDate: endDate })
             ]);
 
-            // 统计交检批次数（入库接口直接返回数组）
-            let inspectionBatches = 0;
+            // 添加原始数据结构调试日志
+            logger.info('ERP原始数据结构调试', {
+                category: LOG_CATEGORIES.BUSINESS,
+                module: MODULES.ERP,
+                operationType: 'QUERY',
+                details: {
+                    inDataType: typeof inData,
+                    inDataIsArray: Array.isArray(inData),
+                    inDataHasDataField: inData && typeof inData === 'object' && 'data' in inData,
+                    inDataKeys: inData && typeof inData === 'object' ? Object.keys(inData) : null,
+                    outDataType: typeof outData,
+                    outDataIsArray: Array.isArray(outData),
+                    outDataHasDataField: outData && typeof outData === 'object' && 'data' in outData,
+                    outDataKeys: outData && typeof outData === 'object' ? Object.keys(outData) : null,
+                    dateRange: `${startDate} - ${endDate}`
+                }
+            });
+
+            // 过滤出生产入库的数据（用于特定业务逻辑）
+            let filteredInData = [];
+            let originalInDataArray = [];
+            
             if (inData && Array.isArray(inData)) {
-                inspectionBatches = inData.length;
+                originalInDataArray = inData;
+                filteredInData = inData.filter(item => item.ProInTypeDes === '生产入库');
             } else if (inData && inData.data && Array.isArray(inData.data)) {
                 // 如果入库数据也是包装在data字段中
-                inspectionBatches = inData.data.length;
+                originalInDataArray = inData.data;
+                filteredInData = inData.data.filter(item => item.ProInTypeDes === '生产入库');
             }
+
+            // 添加详细的过滤调试日志
+            logger.info('数据过滤详细信息', {
+                category: LOG_CATEGORIES.BUSINESS,
+                module: MODULES.ERP,
+                operationType: 'QUERY',
+                details: {
+                    originalCount: originalInDataArray.length,
+                    filteredCount: filteredInData.length,
+                    sampleOriginalData: originalInDataArray.slice(0, 3).map(item => ({
+                        ProInTypeDes: item.ProInTypeDes,
+                        ProInCode: item.ProInCode || 'N/A'
+                    })),
+                    sampleFilteredData: filteredInData.slice(0, 3).map(item => ({
+                        ProInTypeDes: item.ProInTypeDes,
+                        ProInCode: item.ProInCode || 'N/A'
+                    })),
+                    dateRange: `${startDate} - ${endDate}`
+                }
+            });
+
+            // 统计交检批次数（只统计生产入库类型）
+            const inspectionBatches = filteredInData.length;
+            
+            logger.info('批次统计数据过滤结果', {
+                category: LOG_CATEGORIES.BUSINESS,
+                module: MODULES.ERP,
+                operationType: 'QUERY',
+                details: {
+                    originalInDataCount: (inData && Array.isArray(inData)) ? inData.length : (inData && inData.data && Array.isArray(inData.data)) ? inData.data.length : 0,
+                    filteredInDataCount: filteredInData.length,
+                    dateRange: `${startDate} - ${endDate}`
+                }
+            });
 
             // 统计交货批次数（出库接口返回带data字段的对象）
             let deliveryBatches = 0;
@@ -524,10 +604,10 @@ class ErpService {
             }
 
             const result = {
-                inspectionBatches: inspectionBatches,
-                deliveryBatches: deliveryBatches,
-                inDataCount: (inData && Array.isArray(inData)) ? inData.length : 0,
-                outDataCount: (outData && outData.data && Array.isArray(outData.data)) ? outData.data.length : 0,
+                inspectionBatches: inspectionBatches, // 生产入库批次数
+                deliveryBatches: deliveryBatches, // 交货批次数
+                inDataCount: (inData && Array.isArray(inData)) ? inData.length : (inData && inData.data && Array.isArray(inData.data)) ? inData.data.length : 0, // 原始入库数据总数
+                outDataCount: (outData && outData.data && Array.isArray(outData.data)) ? outData.data.length : (outData && Array.isArray(outData)) ? outData.length : 0, // 原始出库数据总数
                 dateRange: `${startDate} - ${endDate}`
             };
 
@@ -562,17 +642,19 @@ class ErpService {
      */
     async getMonthlyBatchStatistics(year, month) {
         try {
-            // 构建月份的开始和结束时间（修复时区问题）
+            // 构建月份的开始和结束时间（避免时区问题）
             const startDate = `${year}-${month.toString().padStart(2, '0')}-01 00:00:00`;
             
-            // 计算该月最后一天，避免时区偏差
+            // 计算该月最后一天，使用纯数学计算避免时区偏差
             let lastDay;
-            if (month === 12) {
-                // 12月的情况，下一年1月1日减1天
-                lastDay = new Date(year + 1, 0, 0).getDate();
+            const daysInMonth = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            
+            if (month === 2) {
+                // 2月需要判断闰年
+                const isLeapYear = (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+                lastDay = isLeapYear ? 29 : 28;
             } else {
-                // 其他月份，下个月1日减1天
-                lastDay = new Date(year, month, 0).getDate();
+                lastDay = daysInMonth[month - 1];
             }
             
             const endDateStr = `${year}-${month.toString().padStart(2, '0')}-${lastDay.toString().padStart(2, '0')} 23:59:59`;

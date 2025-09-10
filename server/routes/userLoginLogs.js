@@ -103,31 +103,33 @@ router.get('/', authenticateToken, async (req, res) => {
     dataRequest.input('PageSize', sql.Int, parseInt(pageSize));
     
     const dataResult = await dataRequest.query(`
-      SELECT 
-        ull.ID,
-        ull.UserID,
-        ull.Username,
-        ull.RealName,
-        ull.DepartmentID,
-        d.DepartmentName,
-        ull.SessionID,
-        ull.LoginTime,
-        ull.LogoutTime,
-        ull.IPAddress,
-        ull.UserAgent,
-        ull.Browser,
-        ull.OS,
-        ull.LoginStatus,
-        ull.FailureReason,
-        ull.IsOnline,
-        ull.LastActivity,
-        ull.CreatedAt
-      FROM [UserLoginLogs] ull
-      LEFT JOIN [Departments] d ON ull.DepartmentID = d.ID
-      ${whereClause}
-      ORDER BY ull.LoginTime DESC
-      OFFSET @Offset ROWS
-      FETCH NEXT @PageSize ROWS ONLY
+      SELECT * FROM (
+        SELECT 
+          ull.ID,
+          ull.UserID,
+          ull.Username,
+          ull.RealName,
+          ull.DepartmentID,
+          d.DepartmentName,
+          ull.SessionID,
+          ull.LoginTime,
+          ull.LogoutTime,
+          ull.IPAddress,
+          ull.UserAgent,
+          ull.Browser,
+          ull.OS,
+          ull.LoginStatus,
+          ull.FailureReason,
+          ull.IsOnline,
+          ull.LastActivity,
+          ull.CreatedAt,
+          ROW_NUMBER() OVER (ORDER BY ull.LoginTime DESC) as RowNum
+        FROM [UserLoginLogs] ull
+        LEFT JOIN [Departments] d ON ull.DepartmentID = d.ID
+        ${whereClause}
+      ) AS PagedResults
+      WHERE RowNum > @Offset AND RowNum <= (@Offset + @PageSize)
+      ORDER BY LoginTime DESC
     `);
     
     res.json({
