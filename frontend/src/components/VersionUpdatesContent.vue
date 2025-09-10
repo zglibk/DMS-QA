@@ -230,9 +230,23 @@
               </div>
             </div>
             
+            <!-- 版本描述 -->
+            <div v-if="selectedVersion.Description" class="detail-section">
+              <h3 class="section-title">版本描述</h3>
+              <div class="description-content">
+                {{ selectedVersion.Description }}
+              </div>
+            </div>
+            
             <!-- 更新内容 -->
-            <div v-if="selectedVersion.items && selectedVersion.items.length > 0" class="detail-section">
+            <div class="detail-section">
               <h3 class="section-title">更新内容</h3>
+              
+              <!-- 如果有ChangelogMarkdown字段，优先显示 -->
+              <MarkdownEditor v-if="selectedVersion.ChangelogMarkdown" :modelValue="selectedVersion.ChangelogMarkdown" :autoSave="false" :readonly="true" />
+              
+              <!-- 如果没有ChangelogMarkdown但有items，显示结构化内容 -->
+              <div v-else-if="selectedVersion.items && selectedVersion.items.length > 0" class="structured-content">
               
               <!-- 按类别分组显示 -->
               <div v-for="category in getCategories(selectedVersion.items)" :key="category" class="category-group">
@@ -264,12 +278,12 @@
                   </div>
                 </div>
               </div>
-            </div>
-            
-            <!-- 无更新内容时的提示 -->
-            <div v-else-if="selectedVersion" class="detail-section">
-              <h3 class="section-title">更新内容</h3>
-              <el-empty description="暂无详细更新信息" :image-size="60" />
+              </div>
+              
+              <!-- 无更新内容时的提示 -->
+              <div v-else class="no-content">
+                <el-empty description="暂无详细更新信息" :image-size="60" />
+              </div>
             </div>
           </div>
           
@@ -450,12 +464,13 @@
         </el-row>
         
         <el-form-item label="更新日志" prop="changelogMarkdown">
-          <el-input
-            v-model="versionForm.changelogMarkdown"
-            type="textarea"
-            :rows="6"
-            placeholder="请输入Markdown格式的更新日志"
-          />
+          <div class="dialog-markdown-editor">
+            <MarkdownEditor
+              v-model="versionForm.changelogMarkdown"
+              :autoSave="false"
+              placeholder="请输入Markdown格式的更新日志"
+            />
+          </div>
         </el-form-item>
         
         <el-form-item label="贡献者">
@@ -492,10 +507,11 @@
  * 3. 支持搜索和刷新功能
  */
 
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, nextTick } from 'vue'
 import { ElMessage } from 'element-plus'
 import { versionUpdatesAPI } from '@/utils/api'
 import { useUserStore } from '@/store/user'
+import MarkdownEditor from '@/components/MarkdownEditor.vue'
 import {
   Bell,
   Calendar,
@@ -752,6 +768,11 @@ const fetchVersionDetail = async (versionId) => {
       const versionIndex = versionList.value.findIndex(v => v.ID === versionId)
       if (versionIndex !== -1) {
         versionList.value[versionIndex] = { ...versionList.value[versionIndex], ...response.data }
+        
+        // 如果更新的是当前选中的版本，同步更新selectedVersion
+        if (selectedVersion.value && selectedVersion.value.ID === versionId) {
+          selectedVersion.value = versionList.value[versionIndex]
+        }
       }
       return response.data
     } else {
@@ -839,6 +860,8 @@ const getCategoryName = (category) => {
   }
   return categoryMap[category] || '其他更新'
 }
+
+
 
 /**
  * 发送版本更新通知
@@ -1053,11 +1076,30 @@ const saveVersion = async () => {
     if (response.success) {
       ElMessage.success(versionDialogMode.value === 'create' ? '版本创建成功' : '版本更新成功')
       closeVersionDialog()
+      
       // 刷新列表和统计数据
       await Promise.all([
         fetchVersionStats(),
         fetchVersionUpdates()
       ])
+      
+      // 等待DOM更新后再刷新版本详情
+      await nextTick()
+      
+      // 如果是编辑模式且有选中的版本，刷新版本详情
+      if (versionDialogMode.value === 'edit' && selectedVersion.value) {
+        await fetchVersionDetail(selectedVersion.value.ID)
+      }
+      // 如果是创建模式，选中新创建的版本
+      else if (versionDialogMode.value === 'create' && response.data?.ID) {
+        // 等待列表刷新完成后选中新版本
+        await nextTick()
+        const newVersion = versionList.value.find(v => v.ID === response.data.ID)
+        if (newVersion) {
+          selectedVersion.value = newVersion
+          await fetchVersionDetail(newVersion.ID)
+        }
+      }
     } else {
       ElMessage.error(response.message || '保存失败')
     }
@@ -1407,6 +1449,10 @@ defineExpose({
 
 .detail-section {
   margin-bottom: 32px;
+  padding: 16px;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .version-title-large {
@@ -1516,6 +1562,155 @@ defineExpose({
   gap: 8px;
 }
 
+/* 版本描述样式 */
+.version-description {
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border-left: 4px solid #67c23a;
+}
+
+.version-description p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #606266;
+  font-weight: normal;
+}
+
+/* Markdown内容样式 */
+.changelog-content {
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e4e7ed;
+  border-radius: 8px;
+}
+
+.markdown-content {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #303133;
+  font-weight: normal;
+}
+
+.markdown-content h1,
+.markdown-content h2,
+.markdown-content h3 {
+  margin: 12px 0 6px 0;
+  font-weight: 500;
+  color: #303133;
+}
+
+.markdown-content h1 {
+  font-size: 16px;
+  border-bottom: 1px solid #e4e7ed;
+  padding-bottom: 4px;
+}
+
+.markdown-content h2 {
+  font-size: 15px;
+  border-bottom: 1px solid #e4e7ed;
+  padding-bottom: 6px;
+}
+
+.markdown-content h3 {
+  font-size: 14px;
+}
+
+.markdown-content ul {
+  margin: 12px 0;
+  padding-left: 20px;
+}
+
+.markdown-content li {
+  margin: 6px 0;
+  line-height: 1.5;
+  font-weight: normal;
+}
+
+.markdown-content em {
+  font-style: italic;
+  color: #606266;
+  font-weight: normal;
+}
+
+.markdown-content code {
+  background: #f5f5f5;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 13px;
+  color: #e6a23c;
+  font-weight: normal;
+}
+
+.markdown-content a {
+  color: #409eff;
+  text-decoration: none;
+  font-weight: normal;
+}
+
+.markdown-content a:hover {
+  text-decoration: underline;
+}
+
+/* 结构化内容样式 */
+.structured-content {
+  margin-top: 16px;
+}
+
+.structured-content .item {
+  margin-bottom: 12px;
+  padding: 12px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border-left: 3px solid #28a745;
+}
+
+.structured-content .item-title {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.structured-content .item-content {
+  color: #666;
+  line-height: 1.6;
+  font-size: 14px;
+  font-weight: normal;
+}
+
+/* 确保所有文本内容都不使用粗体 */
+.version-details * {
+  font-weight: normal !important;
+}
+
+.version-details h1,
+.version-details h2,
+.version-details h3 {
+  font-weight: 500 !important;
+}
+
+.version-details .description-content,
+.version-details .markdown-content,
+.version-details .structured-content {
+  font-weight: normal !important;
+}
+
+.version-details .markdown-content p,
+.version-details .markdown-content li,
+.version-details .markdown-content span,
+.version-details .markdown-content div {
+  font-weight: normal !important;
+}
+
+/* 无内容提示样式 */
+.no-content {
+  padding: 40px 20px;
+  text-align: center;
+}
+
 .highlight-tag {
   font-size: 12px;
 }
@@ -1530,6 +1725,18 @@ defineExpose({
 .version-meta {
   display: flex;
   gap: 8px;
+}
+
+/* 版本描述内容样式 */
+.description-content {
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  color: #606266;
+  line-height: 1.6;
+  font-size: 14px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 /* 无数据状态 */
@@ -1566,5 +1773,19 @@ defineExpose({
 
 .el-input-number .el-input__inner {
   text-align: center;
+}
+
+/* 对话框中的 Markdown 编辑器样式 */
+.dialog-markdown-editor {
+  height: 350px;
+}
+
+.dialog-markdown-editor .markdown-editor {
+  height: 100%;
+}
+
+.dialog-markdown-editor .editor-container {
+  min-height: 320px;
+  height: 320px;
 }
 </style>
