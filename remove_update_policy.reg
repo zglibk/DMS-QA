@@ -1,0 +1,9 @@
+Windows Registry Editor Version 5.00
+
+; Remove Windows Update Group Policy settings
+[-HKEY_LOCAL_MACHINE\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU]
+
+; Enable Windows Update service
+[HKEY_LOCAL_MACHINE\SYSTEM\CurrentControlSet\Services\wuauserv]
+"Start"=dword:00000002
+"DelayedAutostart"=dword:00000001

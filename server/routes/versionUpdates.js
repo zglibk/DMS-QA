@@ -469,12 +469,26 @@ router.put('/:id', authenticateToken, async (req, res) => {
                 let value = updateData[camelField];
                 let type = 'NVarChar';
                 
-                // 根据字段类型设置正确的SQL类型
+                // 根据字段类型设置正确的SQL类型和值转换
                 if (field === 'ReleaseDate') {
-                    value = new Date(value);
+                    value = value ? new Date(value) : null;
                     type = 'DateTime';
-                } else if (field.includes('Count') || field === 'IsMajorUpdate') {
-                    type = field === 'IsMajorUpdate' ? 'Bit' : 'Int';
+                } else if (field === 'IsMajorUpdate') {
+                    // 确保布尔值正确转换
+                    value = Boolean(value);
+                    type = 'Bit';
+                } else if (field.includes('Count')) {
+                    // 确保数字类型正确转换
+                    value = parseInt(value) || 0;
+                    type = 'Int';
+                } else {
+                    // 字符串类型，确保不为null或undefined
+                    if (value === null || value === undefined) {
+                        value = '';
+                    } else {
+                        value = String(value);
+                    }
+                    type = 'NVarChar';
                 }
                 
                 params.push({ name: `param${paramIndex}`, type, value });
