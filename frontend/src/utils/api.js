@@ -137,7 +137,6 @@ export const restorePageState = (currentUserId = null) => {
       
       // 验证用户身份：只有同一用户才能恢复状态
       if (pageState.userId && currentUserId && pageState.userId !== currentUserId) {
-        console.log('用户身份不匹配，清除之前用户的页面状态')
         sessionStorage.removeItem('pageStateBeforeLogin')
         return null
       }
@@ -150,7 +149,6 @@ export const restorePageState = (currentUserId = null) => {
       } else {
         // 状态过期，清除
         sessionStorage.removeItem('pageStateBeforeLogin')
-        console.log('页面状态已过期，已清除')
       }
     }
   } catch (error) {
@@ -220,38 +218,23 @@ api.interceptors.request.use(
 // 响应拦截器
 api.interceptors.response.use(
   response => {
-    console.log('🔍 [拦截器] 响应拦截器处理:', {
-      status: response.status,
-      statusText: response.statusText,
-      url: response.config?.url,
-      method: response.config?.method,
-      dataType: typeof response.data,
-      dataKeys: response.data ? Object.keys(response.data) : []
-    })
-    
     // 特别处理304状态码
     if (response.status === 304) {
-      console.log('📋 [拦截器] 检测到304状态码，数据未修改')
+      // 数据未修改，直接返回
     }
     
-    console.log('📤 [拦截器] 返回response.data:', response.data)
+    // 对于blob响应类型，返回完整的response对象
+    if (response.config?.responseType === 'blob') {
+      return response
+    }
+    
     return response.data
   },
   async error => {
-    console.error('❌ [拦截器] 响应错误拦截器:', {
-      message: error.message,
-      status: error.response?.status,
-      statusText: error.response?.statusText,
-      url: error.config?.url,
-      method: error.config?.method,
-      data: error.response?.data
-    })
-    
     // 处理不同的错误状态码
     if (error.response) {
       switch (error.response.status) {
         case 401:
-          console.log('🔐 [拦截器] 401错误处理：清除token并跳转登录')
           // Token过期或无效，保存当前页面状态
           savePageState()
           
@@ -342,10 +325,8 @@ export const workPlanApi = {
 export const versionUpdatesAPI = {
   // 获取版本更新列表
   getVersionUpdates: async (params) => {
-    console.log('🚀 [API] versionUpdatesAPI.getVersionUpdates 调用，参数:', params)
     try {
       const result = await api.get('/version-updates', { params })
-      console.log('📡 [API] 最终返回结果:', result)
       return result
     } catch (error) {
       console.error('💥 [API] versionUpdatesAPI.getVersionUpdates 错误:', error)

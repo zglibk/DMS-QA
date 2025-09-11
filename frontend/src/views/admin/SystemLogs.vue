@@ -48,7 +48,7 @@
               <el-option
                 v-for="level in severityLevels"
                 :key="level"
-                :label="level"
+                :label="getSeverityLabel(level)"
                 :value="level"
               />
             </el-select>
@@ -208,7 +208,7 @@
         <el-table-column prop="Severity" label="级别" width="80">
           <template #default="{ row }">
             <el-tag :type="getSeverityTagType(row.Severity)" size="small">
-              {{ row.Severity }}
+              {{ getSeverityLabel(row.Severity) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -279,7 +279,7 @@
           </el-descriptions-item>
           <el-descriptions-item label="严重级别">
             <el-tag :type="getSeverityTagType(currentLog.Severity)">
-              {{ currentLog.Severity }}
+              {{ getSeverityLabel(currentLog.Severity) }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="状态">
@@ -514,7 +514,7 @@
 </template>
 
 <script>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download, Delete, View, TrendCharts, Check, Close, Star, Document, Warning, InfoFilled, User, Loading } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
@@ -599,7 +599,9 @@ export default {
       'QUERY_STATS': '查询统计',
       'SYSTEM_ERROR': '系统异常',
       'SECURITY': '安全相关',
-      'PERFORMANCE': '性能监控'
+      'PERFORMANCE': '性能监控',
+      'BUSINESS': '业务操作',
+      'SYSTEM': '系统操作'
     }
     
     // 模块标签映射
@@ -618,16 +620,60 @@ export default {
       'ERP': 'ERP',
       'MATERIAL': '材料',
       'SAMPLE': '样品',
-      'MENU': '菜单'
+      'MENU': '菜单',
+      'MONTHLY_BATCH_STATS': '月度批次统计',
+      'LOG_EXPORT': '日志导出',
+      'SYSTEM_LOG': '系统日志',
+      'UNKNOWN': '未知模块'
+    }
+    
+    // 严重级别标签映射
+    const severityLabels = {
+      'DEBUG': '调试',
+      'INFO': '信息',
+      'WARN': '警告',
+      'ERROR': '错误',
+      'FATAL': '致命'
     }
     
     // 方法
+    /**
+     * 获取分类标签
+     * @param {string} category - 分类代码
+     * @returns {string} 分类标签
+     */
     const getCategoryLabel = (category) => {
+      // 只在真正为空值时才返回"未知分类"
+      if (category === null || category === undefined || category === '') {
+        return '未知分类'
+      }
       return categoryLabels[category] || category
     }
     
+    /**
+     * 获取模块标签
+     * @param {string} module - 模块代码
+     * @returns {string} 模块标签
+     */
     const getModuleLabel = (module) => {
+      // 只在真正为空值时才返回"未知模块"
+      if (module === null || module === undefined || module === '') {
+        return '未知模块'
+      }
       return moduleLabels[module] || module
+    }
+    
+    /**
+     * 获取严重级别标签
+     * @param {string} severity - 严重级别代码
+     * @returns {string} 严重级别标签
+     */
+    const getSeverityLabel = (severity) => {
+      // 只在真正为空值时才返回"未知级别"
+      if (severity === null || severity === undefined || severity === '') {
+        return '未知级别'
+      }
+      return severityLabels[severity] || severity
     }
     
     const getCategoryTagType = (category) => {
@@ -674,10 +720,12 @@ export default {
     const fetchConfigOptions = async () => {
       try {
         const response = await api.get('/system-logs/config/options')
-        if (response.data.success) {
-          categories.value = response.data.data.categories
-          modules.value = response.data.data.modules
-          severityLevels.value = response.data.data.severityLevels
+        
+        // 注意：响应拦截器返回了response.data，所以这里的response实际上是后端的响应数据
+        if (response.success) {
+          categories.value = response.data.categories
+          modules.value = response.data.modules
+          severityLevels.value = response.data.severityLevels
         }
       } catch (error) {
         console.error('获取配置选项失败:', error)
@@ -695,11 +743,14 @@ export default {
         }
         
         const response = await api.get('/system-logs/list', { params })
-        if (response.data.success) {
-          logList.value = response.data.data.list
-          pagination.total = response.data.data.pagination.total
+        
+        // 注意：响应拦截器返回了response.data，所以这里的response实际上是后端的响应数据
+        if (response.success) {
+          logList.value = response.data.list
+          pagination.total = response.data.pagination.total
         }
       } catch (error) {
+        console.error('获取日志列表异常:', error)
         ElMessage.error('获取日志列表失败')
       } finally {
         loading.value = false
@@ -728,14 +779,18 @@ export default {
         })
         
         const response = await api.get('/system-logs/statistics', { params })
-        if (response.data.success) {
-          const stats = response.data.data.totalStats
+        
+        // 注意：响应拦截器返回了response.data，所以这里的response实际上是后端的响应数据
+        if (response.success) {
+          const stats = response.data.totalStats
+          
           totalLogs.value = stats.totalLogs || 0
           errorCount.value = stats.totalErrors || 0
           warningCount.value = stats.totalWarnings || 0
           uniqueUsers.value = stats.uniqueUsers || 0
         }
       } catch (error) {
+        console.error('获取统计信息失败:', error)
         // 静默处理统计信息获取失败，不影响主要功能
       }
     }
@@ -917,17 +972,12 @@ export default {
      * 参考样品承认书管理页面的实现方式
      */
     const handleExport = async () => {
-      console.log('🚀 [前端调试] handleExport 函数被调用')
-      console.log('📋 [前端调试] 选中的字段:', exportForm.columns)
-      
       if (exportForm.columns.length === 0) {
-        console.warn('⚠️ [前端调试] 未选择导出字段')
         ElMessage.warning('请选择要导出的字段')
         return
       }
       
       try {
-        console.log('🔄 [前端调试] 开始导出流程')
         exportLoading.value = true
         ElMessage.info('正在导出数据，请稍候...')
         
@@ -944,18 +994,8 @@ export default {
           endDate: searchForm.endDate
         }
         
-        console.log('⚙️ [前端调试] 导出设置:', {
-          format: exportForm.format,
-          maxRows: exportForm.maxRows,
-          selectedColumns: exportForm.columns.length,
-          columns: exportForm.columns
-        })
-        
-        console.log('📤 [前端调试] 准备发送导出请求:', params)
-        
         // 获取数据
         const response = await api.get('/system-logs/list', { params })
-        console.log('✅ [前端调试] 数据获取响应:', response.data)
         
         if (response.data.success && response.data.data) {
           const allData = response.data.data.list
@@ -967,19 +1007,15 @@ export default {
           
           // 验证数据行数是否超过设置的最大行数
           if (allData.length > exportForm.maxRows) {
-            console.warn('⚠️ [前端调试] 数据行数超过最大限制:', allData.length, '>', exportForm.maxRows)
             ElMessage.warning(`数据行数(${allData.length})超过设置的最大行数(${exportForm.maxRows})，将只导出前${exportForm.maxRows}行`)
           }
           
           // 严格按照最大行数限制数据
           const limitedData = allData.slice(0, exportForm.maxRows)
-          console.log('📊 [前端调试] 实际导出数据条数:', limitedData.length, '/ 获取到:', allData.length)
           
           // 动态导入XLSX库和样式库
           const XLSX = await import('xlsx-js-style')
           const { saveAs } = await import('file-saver')
-          
-          console.log('📚 [前端调试] XLSX库加载完成')
           
           // 准备导出数据，使用限制后的数据
           const exportData = limitedData.map((item, index) => {
@@ -1010,7 +1046,7 @@ export default {
                   row['模块'] = getModuleLabel(item.Module)
                   break
                 case 'Severity':
-                  row['级别'] = item.Severity
+                  row['级别'] = getSeverityLabel(item.Severity)
                   break
                 case 'Status':
                   row['状态'] = item.Status === 'SUCCESS' ? '成功' : '失败'
@@ -1030,8 +1066,7 @@ export default {
             return row
           })
           
-          console.log('📋 [前端调试] 导出数据准备完成，行数:', exportData.length)
-          console.log('📋 [前端调试] 导出格式:', exportForm.format)
+          // 导出数据准备完成
           
           // 创建工作簿和工作表
           const workbook = XLSX.utils.book_new()
@@ -1149,10 +1184,7 @@ export default {
           const timeStr = `${hours}${minutes}${seconds}`
           const fileName = `系统日志_${dateStr}_${timeStr}.xlsx`
           
-          console.log('💾 [前端调试] 准备生成文件:', fileName)
-          
           // 使用浏览器下载方式（直接下载到默认目录）
-          console.log('📥 [前端调试] 使用浏览器下载方式')
           const wbout = XLSX.write(workbook, { bookType: exportForm.format === 'excel' ? 'xlsx' : 'xlsx', type: 'array' })
           const blob = new Blob([wbout], { type: 'application/octet-stream' })
           saveAs(blob, fileName)
@@ -1161,22 +1193,13 @@ export default {
           exportDialogVisible.value = false
           
         } else {
-          console.error('❌ [前端调试] 后端返回数据格式异常:', response.data)
           ElMessage.error('后端返回数据格式异常')
         }
         
       } catch (error) {
-        console.error('❌ [前端调试] 导出失败:', error)
-        console.error('❌ [前端调试] 错误详情:', {
-          message: error.message,
-          status: error.response?.status,
-          statusText: error.response?.statusText,
-          data: error.response?.data,
-          config: error.config
-        })
+        console.error('导出失败:', error)
         ElMessage.error(`导出失败: ${error.message || '未知错误'}`)
       } finally {
-        console.log('🏁 [前端调试] 导出流程结束，设置loading为false')
         exportLoading.value = false
       }
     }
@@ -1213,6 +1236,19 @@ export default {
       router.push('/admin/system/logs/analytics')
     }
     
+    // 监听器
+    watch(logList, (newList, oldList) => {
+      // 日志列表数据变化处理
+    }, { deep: true })
+    
+    watch(() => pagination.total, (newTotal, oldTotal) => {
+      // 分页总数变化处理
+    })
+    
+    watch(loading, (newLoading, oldLoading) => {
+      // 加载状态变化处理
+    })
+
     // 生命周期
     onMounted(() => {
       fetchConfigOptions()
@@ -1248,6 +1284,7 @@ export default {
       // 方法
       getCategoryLabel,
       getModuleLabel,
+      getSeverityLabel,
       getCategoryTagType,
       getSeverityTagType,
       formatDateTime,

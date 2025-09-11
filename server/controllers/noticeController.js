@@ -525,7 +525,7 @@ const markAsRead = async (req, res) => {
         }
         
         const noticeId = parseInt(id);
-        console.log('标记已读 - NoticeID:', noticeId, '用户ID:', userId);
+      
         
         // 先检查是否已存在记录
         const existingRecord = await pool.request()

@@ -198,7 +198,6 @@ router.get('/list', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('获取系统日志列表失败:', error);
     
     // 记录错误日志
     await logger.logError(
@@ -373,7 +372,6 @@ router.get('/statistics', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('获取系统日志统计失败:', error);
     
     await logger.logError(
       req.user?.id || req.user?.ID,
@@ -456,7 +454,6 @@ router.get('/:id', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('获取日志详情失败:', error);
     
     await logger.logError(
       req.user?.id || req.user?.ID,
@@ -517,7 +514,6 @@ router.get('/config/options', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('获取日志配置选项失败:', error);
     
     await logger.logError(
       req.user?.id || req.user?.ID,
@@ -604,7 +600,6 @@ router.delete('/batch', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('批量删除日志失败:', error);
     
     await logger.logError(
       req.user?.id || req.user?.ID,
@@ -655,7 +650,6 @@ router.post('/cleanup', authenticateToken, checkPermission('system:logs:delete')
     });
     
   } catch (error) {
-    console.error('手动清理日志失败:', error);
     
     await logger.logError(
       req.user?.id || req.user?.ID,
@@ -695,7 +689,6 @@ router.get('/cleanup/stats', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('获取清理统计失败:', error);
     
     await logger.logError(
       req.user?.id || req.user?.ID,
@@ -728,7 +721,7 @@ router.post('/cleanup/execute', async (req, res) => {
     
     // 异步执行清理任务
     logCleanupService.performCleanup().catch(error => {
-      console.error('执行清理任务失败:', error);
+      // 清理任务执行失败，已记录到日志系统
     });
     
     // 记录操作日志
@@ -747,7 +740,6 @@ router.post('/cleanup/execute', async (req, res) => {
     });
     
   } catch (error) {
-    console.error('启动清理任务失败:', error);
     
     await logger.logError(
       req.user?.id || req.user?.ID,
@@ -795,19 +787,16 @@ router.get('/analytics/overview', async (req, res) => {
     if (endDate) {
       whereConditions.push('sl.CreatedAt <= @endDate');
       queryParams.endDate = endDate;
-      console.log('📊 [DEBUG] 添加结束日期过滤:', endDate);
     }
     
     if (category) {
       whereConditions.push('sl.Category = @category');
       queryParams.category = category;
-      console.log('📊 [DEBUG] 添加类别过滤:', category);
     }
     
     if (module) {
       whereConditions.push('sl.Module = @module');
       queryParams.module = module;
-      console.log('📊 [DEBUG] 添加模块过滤:', module);
     }
     
     const whereClause = whereConditions.join(' AND ');
@@ -828,10 +817,8 @@ router.get('/analytics/overview', async (req, res) => {
       request.input(key, queryParams[key]);
     });
     
-    console.log('📊 [DEBUG] 执行SQL查询:', overviewQuery);
     const result = await request.query(overviewQuery);
     const overview = result.recordset[0];
-    console.log('📊 [DEBUG] 查询结果:', overview);
     
     // 记录操作日志
     const queryDetails = JSON.stringify(req.query);
@@ -851,15 +838,12 @@ router.get('/analytics/overview', async (req, res) => {
       uniqueUsers: parseInt(overview.uniqueUsers) || 0
     };
     
-    console.log('✅ [DEBUG] 概览数据响应:', responseData);
-    
     res.json({
       success: true,
       data: responseData
     });
     
   } catch (error) {
-    console.error('❌ [DEBUG] 获取统计概览数据失败:', error);
     
     logger.log({
       action: '获取日志统计概览失败',
@@ -882,9 +866,7 @@ router.get('/analytics/overview', async (req, res) => {
  * 获取分类统计数据
  */
 router.get('/analytics/category', async (req, res) => {
-  console.log('📈 [DEBUG] /analytics/category API 被调用');
-  console.log('📈 [DEBUG] 请求参数:', req.query);
-  console.log('📈 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+
   
   let pool;
   const startTime = Date.now();
@@ -898,7 +880,7 @@ router.get('/analytics/category', async (req, res) => {
     } = req.query;
     
     pool = await sql.connect(await getDynamicConfig());
-    console.log('📈 [DEBUG] 数据库连接成功');
+
     
     // 构建查询条件
     let whereConditions = ['1=1'];
@@ -907,25 +889,21 @@ router.get('/analytics/category', async (req, res) => {
     if (startDate) {
       whereConditions.push('sl.CreatedAt >= @startDate');
       queryParams.startDate = startDate;
-      console.log('📈 [DEBUG] 添加开始日期过滤:', startDate);
     }
     
     if (endDate) {
       whereConditions.push('sl.CreatedAt <= @endDate');
       queryParams.endDate = endDate;
-      console.log('📈 [DEBUG] 添加结束日期过滤:', endDate);
     }
     
     if (category) {
       whereConditions.push('sl.Category = @category');
       queryParams.category = category;
-      console.log('📈 [DEBUG] 添加类别过滤:', category);
     }
     
     if (module) {
       whereConditions.push('sl.Module = @module');
       queryParams.module = module;
-      console.log('📈 [DEBUG] 添加模块过滤:', module);
     }
     
     const whereClause = whereConditions.join(' AND ');
@@ -949,9 +927,7 @@ router.get('/analytics/category', async (req, res) => {
       request.input(key, queryParams[key]);
     });
     
-    console.log('📈 [DEBUG] 执行SQL查询:', categoryQuery);
     const result = await request.query(categoryQuery);
-    console.log('📈 [DEBUG] 分类统计查询结果:', result.recordset);
     
     // 记录操作日志
     const queryDetails = JSON.stringify(req.query);
@@ -964,15 +940,13 @@ router.get('/analytics/category', async (req, res) => {
       duration: Date.now() - startTime
     });
     
-    console.log('✅ [DEBUG] 分类统计数据响应成功发送');
-    
+
     res.json({
       success: true,
       data: result.recordset
     });
     
   } catch (error) {
-    console.error('❌ [DEBUG] 获取分类统计数据失败:', error);
     
     logger.log({
       action: '获取日志分类统计失败',
@@ -995,9 +969,7 @@ router.get('/analytics/category', async (req, res) => {
  * 获取模块统计数据
  */
 router.get('/analytics/module', async (req, res) => {
-  console.log('🔧 [DEBUG] /analytics/module API 被调用');
-  console.log('🔧 [DEBUG] 请求参数:', req.query);
-  console.log('🔧 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+
   
   let pool;
   const startTime = Date.now();
@@ -1011,7 +983,7 @@ router.get('/analytics/module', async (req, res) => {
     } = req.query;
     
     pool = await sql.connect(await getDynamicConfig());
-    console.log('🔧 [DEBUG] 数据库连接成功');
+
     
     // 构建查询条件
     let whereConditions = ['1=1'];
@@ -1020,25 +992,25 @@ router.get('/analytics/module', async (req, res) => {
     if (startDate) {
       whereConditions.push('sl.CreatedAt >= @startDate');
       queryParams.startDate = startDate;
-      console.log('🔧 [DEBUG] 添加开始日期过滤:', startDate);
+
     }
     
     if (endDate) {
       whereConditions.push('sl.CreatedAt <= @endDate');
       queryParams.endDate = endDate;
-      console.log('🔧 [DEBUG] 添加结束日期过滤:', endDate);
+
     }
     
     if (category) {
       whereConditions.push('sl.Category = @category');
       queryParams.category = category;
-      console.log('🔧 [DEBUG] 添加类别过滤:', category);
+
     }
     
     if (module) {
       whereConditions.push('sl.Module = @module');
       queryParams.module = module;
-      console.log('🔧 [DEBUG] 添加模块过滤:', module);
+
     }
     
     const whereClause = whereConditions.join(' AND ');
@@ -1062,9 +1034,7 @@ router.get('/analytics/module', async (req, res) => {
       request.input(key, queryParams[key]);
     });
     
-    console.log('🔧 [DEBUG] 执行SQL查询:', moduleQuery);
     const result = await request.query(moduleQuery);
-    console.log('🔧 [DEBUG] 模块统计查询结果:', result.recordset);
     
     // 记录操作日志
     const queryDetails = JSON.stringify(req.query);
@@ -1082,15 +1052,12 @@ router.get('/analytics/module', async (req, res) => {
       avgDuration: item.avgDuration ? Math.round(item.avgDuration) : null
     }));
     
-    console.log('✅ [DEBUG] 模块统计数据响应成功发送');
-    
     res.json({
       success: true,
       data: responseData
     });
     
   } catch (error) {
-    console.error('❌ [DEBUG] 获取模块统计数据失败:', error);
     
     logger.log({
       action: '获取日志模块统计失败',
@@ -1113,9 +1080,7 @@ router.get('/analytics/module', async (req, res) => {
  * 获取用户统计数据
  */
 router.get('/analytics/user', async (req, res) => {
-  console.log('👤 [DEBUG] /analytics/user API 被调用');
-  console.log('👤 [DEBUG] 请求参数:', req.query);
-  console.log('👤 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+
   
   let pool;
   const startTime = Date.now();
@@ -1129,7 +1094,7 @@ router.get('/analytics/user', async (req, res) => {
     } = req.query;
     
     pool = await sql.connect(await getDynamicConfig());
-    console.log('👤 [DEBUG] 数据库连接成功');
+
     
     // 构建查询条件
     let whereConditions = ['1=1'];
@@ -1138,25 +1103,25 @@ router.get('/analytics/user', async (req, res) => {
     if (startDate) {
       whereConditions.push('sl.CreatedAt >= @startDate');
       queryParams.startDate = startDate;
-      console.log('👤 [DEBUG] 添加开始日期过滤:', startDate);
+
     }
     
     if (endDate) {
       whereConditions.push('sl.CreatedAt <= @endDate');
       queryParams.endDate = endDate;
-      console.log('👤 [DEBUG] 添加结束日期过滤:', endDate);
+
     }
     
     if (category) {
       whereConditions.push('sl.Category = @category');
       queryParams.category = category;
-      console.log('👤 [DEBUG] 添加类别过滤:', category);
+
     }
     
     if (module) {
       whereConditions.push('sl.Module = @module');
       queryParams.module = module;
-      console.log('👤 [DEBUG] 添加模块过滤:', module);
+
     }
     
     const whereClause = whereConditions.join(' AND ');
@@ -1182,9 +1147,7 @@ router.get('/analytics/user', async (req, res) => {
       request.input(key, queryParams[key]);
     });
     
-    console.log('👤 [DEBUG] 执行SQL查询:', userQuery);
     const result = await request.query(userQuery);
-    console.log('👤 [DEBUG] 用户统计查询结果:', result.recordset);
     
     // 记录操作日志
     const queryDetails = JSON.stringify(req.query);
@@ -1197,15 +1160,13 @@ router.get('/analytics/user', async (req, res) => {
       duration: Date.now() - startTime
     });
     
-    console.log('✅ [DEBUG] 用户统计数据响应成功发送');
-    
+
     res.json({
       success: true,
       data: result.recordset
     });
     
   } catch (error) {
-    console.error('❌ [DEBUG] 获取用户统计数据失败:', error);
     
     logger.log({
       action: '获取日志用户统计失败',
@@ -1228,9 +1189,7 @@ router.get('/analytics/user', async (req, res) => {
  * 获取趋势数据
  */
 router.get('/analytics/trend', async (req, res) => {
-  console.log('📈 [DEBUG] /analytics/trend API 被调用');
-  console.log('📈 [DEBUG] 请求参数:', req.query);
-  console.log('📈 [DEBUG] 用户认证信息:', { userId: req.user?.id, username: req.user?.username });
+
   
   let pool;
   const startTime = Date.now();
@@ -1245,7 +1204,7 @@ router.get('/analytics/trend', async (req, res) => {
     } = req.query;
     
     pool = await sql.connect(await getDynamicConfig());
-    console.log('📈 [DEBUG] 数据库连接成功');
+
     
     // 构建查询条件
     let whereConditions = ['1=1'];
@@ -1254,25 +1213,25 @@ router.get('/analytics/trend', async (req, res) => {
     if (startDate) {
       whereConditions.push('sl.CreatedAt >= @startDate');
       queryParams.startDate = startDate;
-      console.log('📈 [DEBUG] 添加开始日期过滤:', startDate);
+
     }
     
     if (endDate) {
       whereConditions.push('sl.CreatedAt <= @endDate');
       queryParams.endDate = endDate;
-      console.log('📈 [DEBUG] 添加结束日期过滤:', endDate);
+
     }
     
     if (category) {
       whereConditions.push('sl.Category = @category');
       queryParams.category = category;
-      console.log('📈 [DEBUG] 添加类别过滤:', category);
+
     }
     
     if (module) {
       whereConditions.push('sl.Module = @module');
       queryParams.module = module;
-      console.log('📈 [DEBUG] 添加模块过滤:', module);
+
     }
     
     const whereClause = whereConditions.join(' AND ');
@@ -1292,7 +1251,7 @@ router.get('/analytics/trend', async (req, res) => {
         break;
     }
     
-    console.log('📈 [DEBUG] 时间周期:', period, '日期格式:', dateFormat);
+
     
     // 获取趋势数据
     const trendQuery = `
@@ -1312,9 +1271,7 @@ router.get('/analytics/trend', async (req, res) => {
       request.input(key, queryParams[key]);
     });
     
-    console.log('📈 [DEBUG] 执行SQL查询:', trendQuery);
     const result = await request.query(trendQuery);
-    console.log('📈 [DEBUG] 趋势数据查询结果:', result.recordset);
     
     // 记录操作日志
     const queryDetails = JSON.stringify(req.query);
@@ -1327,15 +1284,13 @@ router.get('/analytics/trend', async (req, res) => {
       duration: Date.now() - startTime
     });
     
-    console.log('✅ [DEBUG] 趋势数据响应成功发送');
-    
+
     res.json({
       success: true,
       data: result.recordset
     });
     
   } catch (error) {
-    console.error('❌ [DEBUG] 获取趋势数据失败:', error);
     
     logger.log({
       action: '获取日志趋势数据失败',
@@ -1450,6 +1405,7 @@ router.get('/analytics/export', async (req, res) => {
     
     // 构建Excel数据
     const XLSX = require('xlsx');
+    
     const workbook = XLSX.utils.book_new();
     
     // 概览数据工作表
@@ -1460,6 +1416,7 @@ router.get('/analytics/export', async (req, res) => {
       ['警告日志数', overview.warningLogs || 0],
       ['活跃用户数', overview.uniqueUsers || 0]
     ];
+    
     const overviewSheet = XLSX.utils.aoa_to_sheet(overviewData);
     XLSX.utils.book_append_sheet(workbook, overviewSheet, '概览统计');
     
@@ -1469,13 +1426,14 @@ router.get('/analytics/export', async (req, res) => {
     ];
     categoryResult.recordset.forEach(item => {
       categoryData.push([
-        item.category,
-        item.count,
+        item.category || '未知',
+        item.count || 0,
         item.errorCount || 0,
         item.warningCount || 0,
         item.percentage || 0
       ]);
     });
+    
     const categorySheet = XLSX.utils.aoa_to_sheet(categoryData);
     XLSX.utils.book_append_sheet(workbook, categorySheet, '分类统计');
     
@@ -1485,18 +1443,24 @@ router.get('/analytics/export', async (req, res) => {
     ];
     moduleResult.recordset.forEach(item => {
       moduleData.push([
-        item.module,
-        item.count,
+        item.module || '未知',
+        item.count || 0,
         item.errorCount || 0,
         item.avgDuration ? Math.round(item.avgDuration) : 0,
         item.percentage || 0
       ]);
     });
+    
     const moduleSheet = XLSX.utils.aoa_to_sheet(moduleData);
     XLSX.utils.book_append_sheet(workbook, moduleSheet, '模块统计');
     
     // 生成Excel文件
     const excelBuffer = XLSX.write(workbook, { type: 'buffer', bookType: 'xlsx' });
+    
+    // 验证缓冲区内容
+    if (!excelBuffer || excelBuffer.length === 0) {
+      throw new Error('生成的Excel文件为空');
+    }
     
     // 记录操作日志
     const queryDetails = JSON.stringify(req.query);
@@ -1511,8 +1475,10 @@ router.get('/analytics/export', async (req, res) => {
     
     // 设置响应头
     const fileName = `系统日志分析报告_${new Date().toISOString().slice(0, 10)}.xlsx`;
+    
     res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(fileName)}"`);
+    res.setHeader('Content-Length', excelBuffer.length);
     
     res.send(excelBuffer);
     

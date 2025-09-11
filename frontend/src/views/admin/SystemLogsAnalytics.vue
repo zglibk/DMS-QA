@@ -336,7 +336,9 @@ const categoryLabels = {
   'QUERY_STATS': '查询统计',
   'SYSTEM_ERROR': '系统异常',
   'SECURITY': '安全相关',
-  'PERFORMANCE': '性能监控'
+  'PERFORMANCE': '性能监控',
+  'BUSINESS': '业务操作',
+  'SYSTEM': '系统操作'
 }
 
 // 模块标签映射
@@ -357,26 +359,57 @@ const moduleLabels = {
   'SAMPLE': '样品',
   'MENU': '菜单',
   'SYSTEM_LOG': '系统日志',
+  'MONTHLY_BATCH_STATS': '月度批次统计',
+  'LOG_EXPORT': '日志导出',
   'UNKNOWN': '未知模块'
 }
 
-/**
- * 获取分类标签
- * @param {string} category - 分类代码
- * @returns {string} 分类标签
- */
-const getCategoryLabel = (category) => {
-  return categoryLabels[category] || category
+// 严重级别标签映射
+const severityLabels = {
+  'INFO': '信息',
+  'WARN': '警告',
+  'ERROR': '错误',
+  'DEBUG': '调试'
 }
 
 /**
- * 获取模块标签
- * @param {string} module - 模块代码
- * @returns {string} 模块标签
- */
-const getModuleLabel = (module) => {
-  return moduleLabels[module] || module
-}
+     * 获取分类标签
+     * @param {string} category - 分类代码
+     * @returns {string} 分类标签
+     */
+    const getCategoryLabel = (category) => {
+      // 只在真正为空值时才返回"未知分类"
+      if (category === null || category === undefined || category === '') {
+        return '未知分类'
+      }
+      return categoryLabels[category] || category
+    }
+
+/**
+     * 获取模块标签
+     * @param {string} module - 模块代码
+     * @returns {string} 模块标签
+     */
+    const getModuleLabel = (module) => {
+      // 只在真正为空值时才返回"未知模块"
+      if (module === null || module === undefined || module === '') {
+        return '未知模块'
+      }
+      return moduleLabels[module] || module
+    }
+
+/**
+     * 获取严重级别标签
+     * @param {string} severity - 严重级别代码
+     * @returns {string} 严重级别标签
+     */
+    const getSeverityLabel = (severity) => {
+      // 只在真正为空值时才返回"未知级别"
+      if (severity === null || severity === undefined || severity === '') {
+        return '未知级别'
+      }
+      return severityLabels[severity] || severity
+    }
 
 /**
  * 获取分类标签类型
@@ -451,10 +484,14 @@ const resetFilters = () => {
  */
 const fetchConfigOptions = async () => {
   try {
-    const response = await api.get('/system-logs/config/options')
-    if (response.data.success) {
-      categories.value = response.data.data.categories
-      modules.value = response.data.data.modules
+    const configResponse = await api.get('/system-logs/config/options')
+    
+    if (configResponse.success) {
+      const data = configResponse.data
+      categories.value = data.categories || []
+      modules.value = data.modules || []
+    } else {
+      console.error('配置选项获取失败:', configResponse.message)
     }
   } catch (error) {
     console.error('获取配置选项失败:', error)
@@ -462,17 +499,10 @@ const fetchConfigOptions = async () => {
 }
 
 /**
- * 获取统计分析数据
+ * 获取统计分析数据 - 使用与系统日志管理页面相同的数据源
  */
 const fetchAnalyticsData = async () => {
   loading.value = true
-  console.log('🔍 [DEBUG] 开始获取统计分析数据')
-  console.log('🔍 [DEBUG] 当前筛选表单状态:', {
-    category: filterForm.category,
-    module: filterForm.module,
-    startDate: filterForm.startDate,
-    endDate: filterForm.endDate
-  })
   
   try {
     const params = {
@@ -481,54 +511,36 @@ const fetchAnalyticsData = async () => {
       category: filterForm.category,
       module: filterForm.module
     }
-    console.log('📋 [DEBUG] API调用参数:', params)
-    console.log('📋 [DEBUG] 参数类型检查:', {
-      startDate: typeof params.startDate,
-      endDate: typeof params.endDate,
-      category: typeof params.category,
-      module: typeof params.module
+    
+    // 过滤掉空值参数
+    Object.keys(params).forEach(key => {
+      if (!params[key]) {
+        delete params[key]
+      }
     })
 
-    // 获取概览数据
-    console.log('📊 [DEBUG] 正在获取概览数据...')
-    const overviewResponse = await api.get('/system-logs/analytics/overview', { params })
-    console.log('📊 [DEBUG] 概览数据响应:', {
-      status: overviewResponse.status,
-      success: overviewResponse.data.success,
-      data: overviewResponse.data.data
-    })
-    if (overviewResponse.data.success) {
-      Object.assign(overviewData, overviewResponse.data.data)
-      // 概览数据更新成功
+    // 获取统计数据 - 使用与管理页面相同的接口
+    const statisticsResponse = await api.get('/system-logs/statistics', { params })
+    
+    if (statisticsResponse.success) {
+      const data = statisticsResponse.data
+      
+      // 设置概览数据
+      const totalStats = data.totalStats || {}
+      Object.assign(overviewData, {
+        totalLogs: totalStats.totalLogs || 0,
+        errorLogs: totalStats.totalErrors || 0,
+        warningLogs: totalStats.totalWarnings || 0,
+        uniqueUsers: totalStats.uniqueUsers || 0
+      })
+      
+      // 获取各类统计数据
+      await fetchCategoryStatistics(params)
+      await fetchModuleStatistics(params)
+      await fetchUserStatistics(params)
+      
     } else {
-      // 概览数据获取失败
-    }
-
-    // 获取分类统计
-    const categoryResponse = await api.get('/system-logs/analytics/category', { params })
-    if (categoryResponse.data.success) {
-      categoryStats.value = categoryResponse.data.data
-      // 分类统计更新成功
-    } else {
-      // 分类统计获取失败
-    }
-
-    // 获取模块统计
-    const moduleResponse = await api.get('/system-logs/analytics/module', { params })
-    if (moduleResponse.data.success) {
-      moduleStats.value = moduleResponse.data.data
-      // 模块统计更新成功
-    } else {
-      // 模块统计获取失败
-    }
-
-    // 获取用户统计
-    const userResponse = await api.get('/system-logs/analytics/user', { params })
-    if (userResponse.data.success) {
-      userStats.value = userResponse.data.data
-      // 用户统计更新成功
-    } else {
-      // 用户统计获取失败
+      ElMessage.error('统计数据获取失败')
     }
 
     // 获取趋势数据
@@ -539,36 +551,188 @@ const fetchAnalyticsData = async () => {
     updateCharts()
 
   } catch (error) {
-    ElMessage.error(`获取统计数据失败: ${error.message || '未知错误'}`)
+    console.error('❌ [ERROR] 统计数据获取失败 - 完整错误信息:', error)
+    console.error('❌ [ERROR] 错误类型:', error.constructor.name)
+    console.error('❌ [ERROR] 错误消息:', error.message)
+    console.error('❌ [ERROR] 错误堆栈:', error.stack)
+    console.error('❌ [ERROR] 响应状态:', error.response?.status)
+    console.error('❌ [ERROR] 响应数据:', error.response?.data)
+    console.error('❌ [ERROR] 响应头:', error.response?.headers)
+    console.error('❌ [ERROR] 请求配置:', error.config)
+    
+    const errorMsg = error.response?.data?.message || error.message || '网络连接失败'
+    ElMessage.error(`获取统计数据失败: ${errorMsg}`)
   } finally {
     loading.value = false
   }
 }
 
 /**
- * 获取趋势数据
+ * 获取分类统计数据 - 通过分组查询获取各分类的日志数量
+ */
+const fetchCategoryStatistics = async (baseParams) => {
+  try {
+    const categoryResponse = await api.get('/system-logs/statistics', {
+      params: { ...baseParams, groupBy: 'category' }
+    });
+    
+    if (categoryResponse.success) {
+      const statistics = categoryResponse.data.statistics || [];
+      categoryStats.value = statistics.map(item => ({
+        category: item.groupKey,
+        count: item.count,
+        errorCount: item.errorCount || 0,
+        warningCount: item.warnCount || 0,
+        percentage: ((item.count / overviewData.totalLogs) * 100).toFixed(1)
+      }));
+    }
+  } catch (error) {
+    console.error('获取分类统计失败:', error);
+  }
+};
+
+/**
+ * 获取模块统计数据 - 通过分组查询获取各模块的日志数量
+ */
+const fetchModuleStatistics = async (baseParams) => {
+  try {
+    const moduleResponse = await api.get('/system-logs/statistics', {
+      params: { ...baseParams, groupBy: 'module' }
+    });
+    
+    if (moduleResponse.success) {
+      const statistics = moduleResponse.data.statistics || [];
+      moduleStats.value = statistics.map(item => ({
+        module: item.groupKey,
+        count: item.count,
+        errorCount: item.errorCount || 0,
+        percentage: ((item.count / overviewData.totalLogs) * 100).toFixed(1),
+        avgDuration: item.avgDuration || 0
+      }));
+    }
+  } catch (error) {
+    console.error('获取模块统计失败:', error);
+  }
+};
+
+/**
+ * 获取用户统计数据 - 通过日志列表查询获取用户活动统计
+ */
+const fetchUserStatistics = async (baseParams) => {
+  try {
+    // 获取用户日志数据，按用户分组统计
+    const userResponse = await api.get('/system-logs/list', {
+      params: { ...baseParams, pageSize: 1000 } // 获取足够多的数据用于统计
+    });
+    
+    if (userResponse.success) {
+      const logs = userResponse.data.list || [];
+      const userStatsMap = {};
+      
+      // 统计每个用户的日志数量
+      logs.forEach(log => {
+        if (log.UserID) {
+          const userId = log.UserID;
+          const username = log.Username || `用户${userId}`;
+          
+          if (!userStatsMap[userId]) {
+            userStatsMap[userId] = {
+              username: username,
+              count: 0,
+              errorCount: 0,
+              lastActivity: log.CreatedAt,
+              successRate: 0
+            };
+          }
+          
+          userStatsMap[userId].count++;
+          
+          if (log.Severity === 'ERROR') {
+            userStatsMap[userId].errorCount++;
+          }
+          
+          // 更新最后活跃时间
+          if (new Date(log.CreatedAt) > new Date(userStatsMap[userId].lastActivity)) {
+            userStatsMap[userId].lastActivity = log.CreatedAt;
+          }
+        }
+      });
+      
+      // 计算成功率并转换为数组
+      userStats.value = Object.values(userStatsMap)
+        .map(user => ({
+          ...user,
+          successRate: user.count > 0 ? (((user.count - user.errorCount) / user.count) * 100).toFixed(1) : 0
+        }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10); // 只取前10个用户
+    }
+  } catch (error) {
+    console.error('获取用户统计失败:', error);
+  }
+};
+
+/**
+ * 获取趋势数据 - 使用与系统日志管理页面相同的数据源
  */
 const fetchTrendData = async () => {
   try {
-    const params = {
-      startDate: filterForm.startDate,
-      endDate: filterForm.endDate,
-      category: filterForm.category,
-      module: filterForm.module,
-      period: trendPeriod.value
-    }
-
-    const response = await api.get('/system-logs/analytics/trend', { params })
-    if (response.data.success) {
-      trendData.value = response.data.data
-      // 更新趋势图表
-      await nextTick()
-      updateTrendChart()
-    } else {
-      // 趋势数据获取失败
-    }
+    // 构建查询参数
+     const params = {
+       startDate: filterForm.startDate,
+       endDate: filterForm.endDate,
+       category: filterForm.category,
+       module: filterForm.module,
+       severity: filterForm.severity,
+       userID: filterForm.userID,
+       keyword: filterForm.keyword,
+       groupBy: trendPeriod.value || 'day' // 按时间周期分组获取趋势数据
+     }
+    
+    // 过滤掉空值参数
+    Object.keys(params).forEach(key => {
+      if (!params[key]) {
+        delete params[key]
+      }
+    })
+    
+    // 获取趋势数据 - 使用统计接口按时间分组
+    const trendResponse = await api.get('/system-logs/statistics', { params })
+    
+    if (trendResponse.success) {
+       const statistics = trendResponse.data.statistics || []
+       
+       // 转换数据格式以适配图表
+       trendData.value = statistics.map(item => ({
+         date: item.timeGroup,
+         total: item.count,
+         error: item.errorCount || 0,
+         warning: item.warnCount || 0,
+         info: item.infoCount || 0,
+         avgDuration: item.avgDuration || 0
+       }))
+       
+       // 更新趋势图表
+       await nextTick()
+       updateTrendChart()
+     } else {
+       console.error('❌ [ERROR] 趋势数据获取失败:', trendResponse.message)
+       ElMessage.error('趋势数据获取失败')
+     }
   } catch (error) {
-    ElMessage.error('获取趋势数据失败')
+    console.error('❌ [ERROR] 趋势数据获取失败 - 完整错误信息:', error)
+    console.error('❌ [ERROR] 错误类型:', error.constructor.name)
+    console.error('❌ [ERROR] 错误消息:', error.message)
+    console.error('❌ [ERROR] 错误堆栈:', error.stack)
+    console.error('❌ [ERROR] 响应状态:', error.response?.status)
+    console.error('❌ [ERROR] 响应数据:', error.response?.data)
+    console.error('❌ [ERROR] 响应头:', error.response?.headers)
+    console.error('❌ [ERROR] 请求URL:', error.config?.url)
+    console.error('❌ [ERROR] 请求方法:', error.config?.method)
+    console.error('❌ [ERROR] 请求参数:', error.config?.params)
+    
+    const errorMsg = error.response?.data?.message || error.message || '网络连接失败'
+    ElMessage.error(`获取趋势数据失败: ${errorMsg}`)
   }
 }
 
@@ -872,14 +1036,7 @@ const updateTrendChart = () => {
  * 更新分类分布图
  */
 const updateCategoryChart = () => {
-  console.log('🥧 [DEBUG] updateCategoryChart 被调用')
-  console.log('🥧 [DEBUG] 分类图状态检查:', {
-    chartExists: !!categoryChart.value,
-    dataLength: categoryStats.value?.length || 0,
-    data: categoryStats.value
-  })
   if (!categoryChart.value || !categoryStats.value.length) {
-    console.log('⚠️ [DEBUG] 分类图更新跳过 - 图表实例或数据不存在')
     return
   }
 
@@ -1182,10 +1339,32 @@ const exportAnalytics = async () => {
       params,
       responseType: 'blob'
     })
+    
+    // 验证响应数据
+    if (!response.data) {
+      throw new Error('服务器返回的数据为空')
+    }
+    
+    if (response.data.size === 0) {
+      throw new Error('服务器返回的文件为空')
+    }
+    
+    if (response.data.size < 1000) {
+      // 尝试读取文件内容查看是否为错误信息
+      const text = await response.data.text()
+      if (text.includes('error') || text.includes('Error')) {
+        throw new Error('服务器返回错误: ' + text)
+      }
+    }
 
     const blob = new Blob([response.data], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
     })
+    
+    // 验证Blob对象
+    if (blob.size === 0) {
+      throw new Error('创建的Blob对象为空')
+    }
 
     const url = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
@@ -1193,7 +1372,9 @@ const exportAnalytics = async () => {
     // 使用本地时间格式生成文件名，避免时区偏差
     const now = new Date()
     const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-    link.download = `系统日志分析报告_${localDate}.xlsx`
+    const fileName = `系统日志分析报告_${localDate}.xlsx`
+    link.download = fileName
+    
     document.body.appendChild(link)
     link.click()
     document.body.removeChild(link)
@@ -1201,17 +1382,16 @@ const exportAnalytics = async () => {
 
     ElMessage.success('导出成功')
   } catch (error) {
-    console.error('导出失败:', error)
-    ElMessage.error('导出失败')
+    ElMessage.error('导出失败: ' + error.message)
   }
 }
 
 // 生命周期钩子
 onMounted(async () => {
-  // 设置默认时间范围（前一天同一时间到当前时间）
+  // 设置默认时间范围（前7天到当前时间）
   const endDate = new Date()
   const startDate = new Date()
-  startDate.setDate(startDate.getDate() - 1) // 设置为前一天的同一时间
+  startDate.setDate(startDate.getDate() - 7) // 设置为前7天的同一时间
   
   // 使用本地时间格式，避免时区偏差
   const formatLocalDateTime = (date) => {
