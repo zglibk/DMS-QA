@@ -890,7 +890,7 @@ const sendNotification = async () => {
       recipients: notificationForm.value.recipients
     }
     
-    console.log('🔔 [发送通知] 通知数据:', notificationData)
+    
     
     // 调用发送通知API
     const response = await versionUpdatesAPI.sendVersionNotification(selectedVersion.value.ID, notificationData)

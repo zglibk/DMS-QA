@@ -896,14 +896,22 @@ function initQualityTrendChart() {
 
     // 调试输出：系列配置信息
     console.log('=== 图表系列配置调试信息 ===')
-    option.series.forEach((series, index) => {
-      console.log(`系列 ${index + 1}:`)
-      console.log('  - 系列名称:', series.name)
-      console.log('  - 系列类型:', series.type)
-      console.log('  - Y轴索引:', series.yAxisIndex)
-      console.log('  - 系列数据:', series.data)
-      console.log('  - 数据长度:', series.data ? series.data.length : 0)
-    })
+    if (option.series && Array.isArray(option.series)) {
+      option.series.forEach((series, index) => {
+        if (series) {
+          console.log(`系列 ${index + 1}:`)
+          console.log('  - 系列名称:', series.name || '未定义')
+          console.log('  - 系列类型:', series.type || '未定义')
+          console.log('  - Y轴索引:', series.yAxisIndex || 0)
+          console.log('  - 系列数据:', series.data || [])
+          console.log('  - 数据长度:', series.data ? series.data.length : 0)
+        } else {
+          console.warn(`系列 ${index + 1}: 数据为空或undefined`)
+        }
+      })
+    } else {
+      console.warn('option.series 不存在或不是数组')
+    }
     console.log('=========================')
     
     // 强制重新渲染图表

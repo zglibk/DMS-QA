@@ -424,20 +424,21 @@
             </el-button>
           </h2>
           <div class="notifications-list">
-            <div 
-              class="notification-item" 
-              v-for="notification in notifications" 
-              :key="notification.id"
-              @click="viewNotification(notification)"
-            >
-              <div class="notification-icon" :class="notification.type">
-                <el-icon><component :is="notification.icon" /></el-icon>
+            <template v-for="notification in notifications" :key="notification.id">
+              <div 
+                class="notification-item" 
+                @click="viewNotification(notification)"
+                v-if="notification && notification.type && notification.icon"
+              >
+                <div class="notification-icon" :class="notification.type || 'default'">
+                  <el-icon><component :is="notification.icon || 'Bell'" /></el-icon>
+                </div>
+                <div class="notification-content">
+                  <div class="notification-title">{{ notification.title || '无标题' }}</div>
+                  <div class="notification-time">{{ notification.time || '未知时间' }}</div>
+                </div>
               </div>
-              <div class="notification-content">
-                <div class="notification-title">{{ notification.title }}</div>
-                <div class="notification-time">{{ notification.time }}</div>
-              </div>
-            </div>
+            </template>
             <div v-if="notifications.length === 0" class="no-notifications">
               <el-empty description="暂无系统通知" :image-size="80" />
             </div>
@@ -584,13 +585,33 @@ const getCurrentWeekday = () => {
 const fetchModuleCounts = async () => {
   try {
     const response = await api.get('/menus/module-counts')
-    if (response.data.success) {
-      moduleCounts.value = response.data.data
+    console.log('模块计数API响应:', response)
+    
+    // 由于axios拦截器返回response.data，所以response就是实际的数据
+    // 检查是否是标准的API响应格式 {success: true, data: {...}}
+    if (response && typeof response === 'object' && response.success !== undefined) {
+      // 标准API响应格式
+      if (response.success) {
+        moduleCounts.value = response.data
+        console.log('模块计数数据:', moduleCounts.value)
+      } else {
+        console.error('获取模块计数失败:', response.message || '服务器返回失败状态')
+      }
+    } else if (response && typeof response === 'object') {
+      // 直接的数据对象格式（由于拦截器处理）
+      moduleCounts.value = response
+      console.log('模块计数数据:', moduleCounts.value)
     } else {
-      console.error('获取模块计数失败:', response.data.message)
+      console.error('获取模块计数失败: 响应数据格式不正确')
     }
   } catch (error) {
-    console.error('获取模块计数失败:', error)
+    console.error('获取模块计数请求失败:', {
+      message: error.message,
+      status: error.response?.status,
+      statusText: error.response?.statusText,
+      data: error.response?.data,
+      url: error.config?.url
+    })
   }
 }
 
@@ -994,7 +1015,6 @@ const systemModulesConfig = [
     description: '投诉处理、返工管理、质量目标等',
     icon: 'mdi:quality-high',
     color: '#409EFF',
-    count: calculateModuleCount('quality'),
     path: '/admin/quality/targets',
     // 权限检查：需要质量管理相关权限
     requiredPermissions: ['quality:targets:view', 'quality:complaint:view'],
@@ -1007,7 +1027,6 @@ const systemModulesConfig = [
     description: '用户、角色、菜单、日志管理等',
     icon: 'mdi:cog',
     color: '#909399',
-    count: calculateModuleCount('system'),
     path: '/admin/system/logs',
     // 权限检查：需要系统管理权限或管理员角色
     requiredPermissions: ['system:user:view', 'system:role:view', 'system:menu:view'],
@@ -1020,7 +1039,6 @@ const systemModulesConfig = [
     description: '计划管理、进度跟踪、统计分析等',
     icon: 'mdi:calendar-check',
     color: '#67C23A',
-    count: calculateModuleCount('work-plan'),
     path: '/admin/work-plan',
     // 权限检查：需要工作计划管理权限
     requiredPermissions: ['work-plan:dashboard:view', 'work-plan:plans:view'],
@@ -1032,7 +1050,6 @@ const systemModulesConfig = [
     description: '供应商信息维护和管理等',
     icon: 'mdi:store',
     color: '#E6A23C',
-    count: calculateModuleCount('supplier'),
     path: '/admin/supplier/basic-info',
     // 权限检查：需要供应商管理权限
     requiredPermissions: ['supplier:basic:view', 'supplier:complaints:view'],
@@ -1044,7 +1061,6 @@ const systemModulesConfig = [
     description: '物料单价、成本统计分析等',
     icon: 'mdi:currency-usd',
     color: '#F56C6C',
-    count: calculateModuleCount('copq'),
     path: '/admin/copq/quality-cost-statistics',
     // 权限检查：需要质量成本管理权限
     requiredPermissions: ['copq:material:view', 'copq:statistics:view'],
@@ -1056,7 +1072,6 @@ const systemModulesConfig = [
     description: '样品承认书、内部色卡管理等',
     icon: 'mdi:palette',
     color: '#9C27B0',
-    count: calculateModuleCount('sample'),
     path: '/admin/sample',
     // 权限检查：需要样版管理权限
     requiredPermissions: ['sample:approval:view', 'sample:color:view'],
@@ -1493,16 +1508,19 @@ const fetchNotifications = async () => {
       }
     })
     
-    if (response.data.success) {
-      // 转换数据格式
-      notifications.value = response.data.data.map(notice => ({
+    if (response && response.success && response.data) {
+      // 转换数据格式，添加安全检查
+      notifications.value = response.data.filter(notice => notice && notice.ID).map(notice => ({
         id: notice.ID,
-        title: notice.Title,
-        time: formatNoticeTime(notice.PublishDate),
-        type: getNoticeTypeClass(notice.Type, notice.Priority),
-        icon: getNoticeIcon(notice.Type, notice.Priority),
+        title: notice.Title || '无标题',
+        time: formatNoticeTime(notice.PublishDate) || '未知时间',
+        type: getNoticeTypeClass(notice.Type, notice.Priority) || 'info',
+        icon: getNoticeIcon(notice.Type, notice.Priority) || 'Info',
         originalData: notice // 保存原始数据用于后续操作
       }))
+    } else {
+      console.warn('获取通知数据格式异常:', response)
+      notifications.value = []
     }
   } catch (error) {
     console.error('获取系统通知失败:', error)
@@ -1615,6 +1633,12 @@ const getNoticeIcon = (type, priority) => {
  */
 const viewNotification = async (notification) => {
   try {
+    // 安全检查：确保notification对象存在
+    if (!notification) {
+      console.warn('viewNotification: notification参数为空')
+      return
+    }
+    
     // 如果是未读通知，先标记为已读
     if (notification.originalData && !notification.originalData.IsRead) {
       await api.post(`/notice/${notification.originalData.ID}/read`)

@@ -26,6 +26,8 @@
           <el-icon><Check /></el-icon>
           全部已读
         </el-button>
+        <!-- 测试按钮 -->
+
       </div>
     </div>
 
@@ -86,7 +88,6 @@
         stripe 
         border
         :header-cell-style="{ background: '#f5f7fa', color: '#606266', fontWeight: 'bold' }"
-
         class="enhanced-table"
       >
         <!-- 序号列 -->
@@ -241,8 +242,12 @@
     <el-dialog 
       v-model="showDetailDialog" 
       :title="currentNotice?.Title" 
-      width="60%"
+      width="45%"
+      top="5vh"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
       @close="handleDetailClose"
+      class="notice-detail-dialog"
     >
       <div class="notice-detail" v-if="currentNotice">
         <div class="detail-header">
@@ -274,7 +279,16 @@
     </el-dialog>
 
     <!-- 编辑通知对话框 -->
-    <el-dialog v-model="showEditDialog" :title="isEditing ? '编辑通知' : '发布通知'" width="60%" @close="handleEditDialogClose">
+    <el-dialog 
+      v-model="showEditDialog" 
+      :title="isEditing ? '编辑通知' : '发布通知'" 
+      width="45%" 
+      top="5vh"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      @close="handleEditDialogClose"
+      class="notice-edit-dialog"
+    >
       <el-form :model="noticeForm" :rules="noticeRules" ref="editFormRef" label-width="100px">
         <el-form-item label="标题" prop="Title">
           <el-input v-model="noticeForm.Title" placeholder="请输入通知标题" />
@@ -329,7 +343,16 @@
     </el-dialog>
 
     <!-- 创建通知对话框 -->
-    <el-dialog v-model="showCreateDialog" title="发布通知" width="60%" @close="handleCreateDialogClose">
+    <el-dialog 
+      v-model="showCreateDialog" 
+      title="发布通知" 
+      width="45%" 
+      top="5vh"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+      @close="handleCreateDialogClose"
+      class="notice-create-dialog"
+    >
       <el-form :model="noticeForm" :rules="noticeRules" ref="noticeFormRef" label-width="100px">
         <el-form-item label="标题" prop="Title">
           <el-input v-model="noticeForm.Title" placeholder="请输入通知标题" />
@@ -428,6 +451,8 @@ const permissions = reactive({
   canMarkRead: false,
   canMarkAllRead: false
 })
+
+
 
 /**
  * 检查用户权限
@@ -729,7 +754,14 @@ const getNoticeList = async () => {
     
     const response = await api.get('/notice', { params })
     
-    if (response.data.success) {
+    // 检查数据结构，兼容不同的返回格式
+    if (Array.isArray(response.data)) {
+      // 如果直接返回数组，说明是代理转发的数据
+      noticeList.value = response.data
+      // 从数组中获取分页信息（如果有的话）
+      pagination.total = response.data.length
+    } else if (response.data.success) {
+      // 标准的API响应格式
       noticeList.value = response.data.data || []
       // 后端返回的分页信息在pagination对象中
       if (response.data.pagination) {
@@ -737,6 +769,9 @@ const getNoticeList = async () => {
       } else {
         pagination.total = response.data.total || 0
       }
+    } else {
+      noticeList.value = []
+      pagination.total = 0
     }
   } catch (error) {
     console.error('获取通知列表失败:', error)
@@ -926,9 +961,20 @@ const insertImagesIntoContent = (content, imagePath) => {
  */
 const viewNotice = async (notice) => {
   try {
+    console.log('=== 标题列点击事件触发 ===')
+    console.log('点击的通知对象:', notice)
+    console.log('通知ID:', notice.ID)
+    console.log('通知标题:', notice.Title)
+    
     const response = await api.get(`/notice/${notice.ID}`)
-    if (response.data.success) {
-      const noticeData = response.data.data
+    console.log('API响应完成:', response.data)
+        console.log('通知数据是否存在:', !!response.data)
+        console.log('通知ID是否存在:', !!response.data.ID)
+        
+        // API返回的response.data直接就是通知数据，不需要检查success字段
+        if (response.data && response.data.ID) {
+          const noticeData = response.data
+          console.log('获取到的通知数据:', noticeData)
       
       // 处理图片插入
       if (noticeData.imagePath && Array.isArray(noticeData.imagePath)) {
@@ -936,7 +982,31 @@ const viewNotice = async (notice) => {
       }
       
       currentNotice.value = noticeData
+      console.log('设置currentNotice完成:', currentNotice.value)
+      
       showDetailDialog.value = true
+      console.log('详情对话框应该显示，showDetailDialog值:', showDetailDialog.value)
+      
+      // 使用nextTick检查DOM更新
+      await nextTick()
+      console.log('nextTick后showDetailDialog值:', showDetailDialog.value)
+      
+      // 检查DOM中的对话框元素
+      const dialogElements = document.querySelectorAll('.el-dialog')
+      const overlayElements = document.querySelectorAll('.el-overlay')
+      console.log('DOM中对话框数量:', dialogElements.length)
+      console.log('DOM中遮罩层数量:', overlayElements.length)
+      
+      if (dialogElements.length > 0) {
+        const dialog = dialogElements[dialogElements.length - 1]
+        const computedStyle = window.getComputedStyle(dialog)
+        console.log('对话框样式:', {
+          display: computedStyle.display,
+          visibility: computedStyle.visibility,
+          opacity: computedStyle.opacity,
+          zIndex: computedStyle.zIndex
+        })
+      }
       
       // 如果是未读通知，自动标记为已读（不显示确认对话框）
       if (!notice.IsRead) {
@@ -1035,8 +1105,10 @@ const editNotice = async (notice) => {
     
     // 获取完整的通知详情，包括图片信息
     const response = await api.get(`/notice/${notice.ID}`)
-    if (response.data.success) {
-      const noticeData = response.data.data
+    
+    // API返回的response.data直接就是通知数据，不需要检查success字段
+    if (response.data && response.data.ID) {
+      const noticeData = response.data
       
       // 处理图片插入到内容中
       let contentWithImages = noticeData.Content
@@ -1046,7 +1118,6 @@ const editNotice = async (notice) => {
       
       // 保存原始图片信息，用于编辑时的图片数据处理
       originalImagePath.value = noticeData.imagePath || []
-      console.log('📷 [编辑通知] 保存原始图片信息:', originalImagePath.value)
       
       // 设置表单数据
       Object.assign(noticeForm, {
@@ -1063,11 +1134,9 @@ const editNotice = async (notice) => {
       showEditDialog.value = true
       
       // 等待对话框渲染完成后初始化编辑器
-      nextTick(() => {
-        setTimeout(() => {
-          initEditEditor()
-        }, 100)
-      })
+      setTimeout(() => {
+        initEditEditor()
+      }, 100)
     }
   } catch (error) {
     console.error('获取通知详情失败:', error)
@@ -1092,7 +1161,9 @@ const deleteNotice = async (notice) => {
     )
     
     const response = await api.delete(`/notice/${notice.ID}`)
-    if (response.data.success) {
+    
+    // API直接返回{success: true, message: '通知公告删除成功'}格式
+    if (response && response.success) {
       ElMessage.success('删除成功')
       await getNoticeList()
       // 如果删除的是未读通知，减少全局未读数量
@@ -1470,7 +1541,7 @@ const saveNotice = async () => {
     // 处理内容中的base64图片，上传并替换为服务器URL
     // 在编辑模式下，传递原有的图片信息
     const existingImages = isEditing.value ? originalImagePath.value : []
-    console.log('📷 [保存通知] 编辑模式:', isEditing.value, '原有图片数量:', existingImages.length)
+
     const { content: processedContent, imagePath } = await processContentImages(noticeForm.Content, existingImages)
     const submitData = {
       ...noticeForm,
@@ -1478,11 +1549,7 @@ const saveNotice = async () => {
       imagePath: imagePath // 添加图片信息数组
     }
     
-    console.log('📤 [保存通知] 提交数据:', {
-      ...submitData,
-      Content: `${submitData.Content?.substring(0, 100)}...`, // 只显示内容前100字符
-      imagePath: submitData.imagePath
-    })
+
     
     const url = isEditing.value ? `/notice/${noticeForm.ID}` : '/notice'
     const method = isEditing.value ? 'put' : 'post'
@@ -1537,11 +1604,7 @@ const createNotice = async () => {
       imagePath: imagePath // 添加图片信息数组
     }
     
-    console.log('📤 [创建通知] 提交数据:', {
-      ...submitData,
-      content: `${submitData.content?.substring(0, 100)}...`, // 只显示内容前100字符
-      imagePath: submitData.imagePath
-    })
+
     
     const response = await api.post('/notice', submitData)
     if (response.data.success) {
@@ -2709,6 +2772,60 @@ onBeforeUnmount(() => {
 :deep(.el-icon) {
   pointer-events: auto !important;
   cursor: pointer !important;
+}
+
+/* 对话框样式优化 - 防止滚动时移动和高度问题 */
+.notice-detail-dialog :deep(.el-dialog),
+.notice-edit-dialog :deep(.el-dialog),
+.notice-create-dialog :deep(.el-dialog) {
+  position: fixed !important;
+  top: 5vh !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  margin: 0 !important;
+  max-height: 90vh !important;
+  overflow: hidden !important;
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+.notice-detail-dialog :deep(.el-dialog__body),
+.notice-edit-dialog :deep(.el-dialog__body),
+.notice-create-dialog :deep(.el-dialog__body) {
+  flex: 1 !important;
+  overflow-y: auto !important;
+  max-height: calc(90vh - 120px) !important;
+  padding: 20px 24px !important;
+}
+
+.notice-detail-dialog :deep(.el-dialog__header),
+.notice-edit-dialog :deep(.el-dialog__header),
+.notice-create-dialog :deep(.el-dialog__header) {
+  flex-shrink: 0 !important;
+  padding: 20px 24px 16px 24px !important;
+}
+
+.notice-detail-dialog :deep(.el-dialog__footer),
+.notice-edit-dialog :deep(.el-dialog__footer),
+.notice-create-dialog :deep(.el-dialog__footer) {
+  flex-shrink: 0 !important;
+  padding: 16px 24px 20px 24px !important;
+}
+
+/* 防止body滚动 */
+body.el-popup-parent--hidden {
+  overflow: hidden !important;
+  padding-right: 0 !important;
+}
+
+/* 遮罩层固定定位 */
+:deep(.el-overlay) {
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: hidden !important;
 }
 
 </style>
