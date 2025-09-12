@@ -378,37 +378,6 @@
 
       <!-- 右侧区域 -->
       <div class="dashboard-right">
-        <!-- 功能模块导航 -->
-        <div class="modules-section">
-          <h2 class="section-title">
-            <el-icon><Grid /></el-icon>
-            功能模块
-          </h2>
-          <div class="modules-grid">
-            <div 
-              class="module-card" 
-              v-for="module in systemModules" 
-              :key="module.key"
-              :class="{ 'module-disabled': !module.enabled }"
-              @click="navigateToModule(module)"
-              :style="{ cursor: module.enabled ? 'pointer' : 'not-allowed' }"
-            >
-              <div class="module-icon">
-                <Icon :icon="module.icon" :style="{ color: module.color, fontSize: '40px' }" />
-                <!-- 禁用状态遮罩层 -->
-                <div v-if="!module.enabled" class="module-disabled-overlay">
-                  <Icon icon="mdi:lock" class="module-disabled-icon" />
-                </div>
-              </div>
-              <div class="module-content">
-                <div class="module-title">{{ module.title }}</div>
-                <div class="module-desc">{{ module.description }}</div>
-                <div class="module-count"><span class="module-count-number">{{ module.count }}</span> 个功能</div>
-              </div>
-            </div>
-          </div>
-        </div>
-
         <!-- 系统通知 -->
         <div class="notifications-section">
           <h2 class="section-title section-title-with-more">
@@ -441,6 +410,37 @@
             </template>
             <div v-if="notifications.length === 0" class="no-notifications">
               <el-empty description="暂无系统通知" :image-size="80" />
+            </div>
+          </div>
+        </div>
+
+        <!-- 功能模块导航 -->
+        <div class="modules-section">
+          <h2 class="section-title">
+            <el-icon><Grid /></el-icon>
+            功能模块
+          </h2>
+          <div class="modules-grid">
+            <div 
+              class="module-card" 
+              v-for="module in systemModules" 
+              :key="module.key"
+              :class="{ 'module-disabled': !module.enabled }"
+              @click="navigateToModule(module)"
+              :style="{ cursor: module.enabled ? 'pointer' : 'not-allowed' }"
+            >
+              <div class="module-icon">
+                <Icon :icon="module.icon" :style="{ color: module.color, fontSize: '40px' }" />
+                <!-- 禁用状态遮罩层 -->
+                <div v-if="!module.enabled" class="module-disabled-overlay">
+                  <Icon icon="mdi:lock" class="module-disabled-icon" />
+                </div>
+              </div>
+              <div class="module-content">
+                <div class="module-title">{{ module.title }}</div>
+                <div class="module-desc">{{ module.description }}</div>
+                <div class="module-count"><span class="module-count-number">{{ module.count }}</span> 个功能</div>
+              </div>
             </div>
           </div>
         </div>
@@ -1650,7 +1650,7 @@ const viewNotification = async (notification) => {
     }
     
     // 跳转到通知管理页面
-    router.push('/admin/notice-management')
+    router.push('/admin/system/notices')
   } catch (error) {
     console.error('查看通知失败:', error)
     ElMessage.error('查看通知失败')
