@@ -24,6 +24,13 @@
             @change="handleDateRangeChange"  style="width: 240px"
           />
         </el-form-item>
+        <el-form-item label="成本类型">
+          <el-select v-model="filterForm.costType" @change="handleCostTypeChange" style="width: 120px">
+            <el-option label="全部" value="all" />
+            <el-option label="外部成本" value="external" />
+            <el-option label="内部成本" value="internal" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="统计维度">
           <el-select v-model="filterForm.dimension" @change="handleDimensionChange" style="width: 120px">
             <el-option label="按月统计" value="month" />
@@ -72,6 +79,17 @@
               <el-icon><component :is="overviewData.totalTrend >= 0 ? 'ArrowUp' : 'ArrowDown'" /></el-icon>
               {{ isNaN(overviewData.totalTrend) ? '0.0' : Math.abs(overviewData.totalTrend) }}%
             </div>
+            <!-- 内外部成本分解 -->
+            <div class="cost-breakdown" v-if="filterForm.costType === 'all'">
+              <div class="breakdown-item external">
+                <el-tag type="danger" size="small" class="breakdown-label">外部</el-tag>
+                <span class="breakdown-value">¥{{ formatCurrency(overviewData.externalCost || 0) }}</span>
+              </div>
+              <div class="breakdown-item internal">
+                <el-tag type="success" size="small" class="breakdown-label">内部</el-tag>
+                <span class="breakdown-value">¥{{ formatCurrency(overviewData.internalCost || 0) }}</span>
+              </div>
+            </div>
           </div>
         </div>
       </el-card>
@@ -111,6 +129,35 @@
             <div class="card-value">¥{{ formatCurrency(overviewData.reworkCost) }}</div>
             <div class="card-label">返工成本</div>
             <div class="card-ratio">{{ overviewData.totalCost > 0 ? ((overviewData.reworkCost / overviewData.totalCost) * 100).toFixed(1) : '0.0' }}%</div>
+          </div>
+        </div>
+      </el-card>
+    </div>
+
+    <!-- 内部成本详细卡片 (仅在显示内部成本或全部成本时显示) -->
+    <div class="overview-cards internal-cards" v-loading="loading" v-if="filterForm.costType === 'internal' || filterForm.costType === 'all'">
+      <el-card class="overview-card internal-complaint" shadow="hover">
+        <div class="card-content">
+          <div class="card-icon">
+            <el-icon size="32"><ChatDotSquare /></el-icon>
+          </div>
+          <div class="card-info">
+            <div class="card-value">¥{{ formatCurrency(overviewData.internalComplaintCost || 0) }}</div>
+            <div class="card-label">内诉成本</div>
+            <div class="card-ratio">{{ overviewData.totalCost > 0 ? ((overviewData.internalComplaintCost / overviewData.totalCost) * 100).toFixed(1) : '0.0' }}%</div>
+          </div>
+        </div>
+      </el-card>
+
+      <el-card class="overview-card publishing-exception" shadow="hover">
+        <div class="card-content">
+          <div class="card-icon">
+            <el-icon size="32"><Document /></el-icon>
+          </div>
+          <div class="card-info">
+            <div class="card-value">¥{{ formatCurrency(overviewData.publishingExceptionCost || 0) }}</div>
+            <div class="card-label">出版异常成本</div>
+            <div class="card-ratio">{{ overviewData.totalCost > 0 ? ((overviewData.publishingExceptionCost / overviewData.totalCost) * 100).toFixed(1) : '0.0' }}%</div>
           </div>
         </div>
       </el-card>
@@ -283,7 +330,9 @@ import {
   Histogram,
   Grid,
   ArrowUp,
-  ArrowDown
+  ArrowDown,
+  ChatDotSquare,
+  Document
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import apiService from '../../../services/apiService'
@@ -295,7 +344,8 @@ const loading = ref(false)
 const filterForm = reactive({
   dateRange: [],
   dimension: 'month',
-  customerId: null
+  customerId: null,
+  costType: 'all'
 })
 
 // 客户选项
@@ -307,7 +357,11 @@ const overviewData = reactive({
   penaltyCost: 0,
   compensationCost: 0,
   reworkCost: 0,
-  totalTrend: 0
+  totalTrend: 0,
+  externalCost: 0,
+  internalCost: 0,
+  internalComplaintCost: 0,
+  publishingExceptionCost: 0
 })
 
 // 统计数据
@@ -368,6 +422,7 @@ const loadStatistics = async () => {
       endDate: filterForm.dateRange?.[1],
       dimension: filterForm.dimension,
       customerId: filterForm.customerId,
+      costType: filterForm.costType,
       page: pagination.currentPage,
       pageSize: pagination.pageSize
     }
@@ -378,6 +433,15 @@ const loadStatistics = async () => {
       
       // 更新概览数据
       Object.assign(overviewData, data.overview)
+      
+      // 更新内外部成本数据
+      overviewData.externalCost = data.overview?.external?.totalCost || 0
+      overviewData.internalCost = data.overview?.internal?.totalCost || 0
+      overviewData.penaltyCost = data.overview?.external?.qualityPenalty || 0
+      overviewData.compensationCost = data.overview?.external?.customerCompensation || 0
+      overviewData.reworkCost = data.overview?.internal?.reworkCost || 0
+      overviewData.internalComplaintCost = data.overview?.internal?.internalComplaintCost || 0
+      overviewData.publishingExceptionCost = data.overview?.internal?.publishingExceptionCost || 0
       
       // 更新统计数据
       statisticsData.value = data.statistics
@@ -412,21 +476,558 @@ const updateCharts = (data) => {
  * @param {Array} trendData - 趋势数据
  */
 const updateTrendChart = (trendData) => {
-  if (!trendChart || !trendData) return
+  if (!trendChart || !trendData || trendData.length === 0) return
+  
+  // 对趋势数据进行去重和排序处理
+  const periodMap = new Map()
+  trendData.forEach(item => {
+    const period = item.period
+    if (!periodMap.has(period)) {
+      periodMap.set(period, item)
+    } else {
+      // 如果存在重复period，合并数据
+      const existing = periodMap.get(period)
+      existing.externalCost = (existing.externalCost || 0) + (item.externalCost || 0)
+      existing.internalCost = (existing.internalCost || 0) + (item.internalCost || 0)
+      existing.totalCost = (existing.totalCost || 0) + (item.totalCost || 0)
+      if (existing.external && item.external) {
+        existing.external.qualityPenalty = (existing.external.qualityPenalty || 0) + (item.external.qualityPenalty || 0)
+        existing.external.customerCompensation = (existing.external.customerCompensation || 0) + (item.external.customerCompensation || 0)
+        existing.external.totalCost = (existing.external.totalCost || 0) + (item.external.totalCost || 0)
+      }
+      if (existing.internal && item.internal) {
+        existing.internal.complaintCost = (existing.internal.complaintCost || 0) + (item.internal.complaintCost || 0)
+        existing.internal.reworkCost = (existing.internal.reworkCost || 0) + (item.internal.reworkCost || 0)
+        existing.internal.totalCost = (existing.internal.totalCost || 0) + (item.internal.totalCost || 0)
+      }
+    }
+  })
+  
+  // 转换为数组并排序
+  const processedTrendData = Array.from(periodMap.values()).sort((a, b) => a.period.localeCompare(b.period))
+  
+  // 根据成本类型构建图例和系列数据
+  let legendData = []
+  let seriesData = []
+  
+  if (filterForm.costType === 'all') {
+    legendData = ['外部成本', '内部成本', '总成本']
+    seriesData = [
+      {
+        name: '外部成本',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 2,
+          color: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
+              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 3
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#f56c6c',
+            shadowBlur: 15,
+            shadowColor: 'rgba(245, 108, 108, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.externalCost || 0)
+      },
+      {
+        name: '内部成本',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 2,
+          color: '#67c23a',
+          shadowColor: 'rgba(103, 194, 58, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#67c23a',
+          shadowColor: 'rgba(103, 194, 58, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(103, 194, 58, 0.4)' },
+              { offset: 1, color: 'rgba(103, 194, 58, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 3
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#67c23a',
+            shadowBlur: 15,
+            shadowColor: 'rgba(103, 194, 58, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.internalCost || 0)
+      },
+      {
+        name: '总成本',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 3,
+          color: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
+              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 18,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 4
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#f56c6c',
+            shadowBlur: 15,
+            shadowColor: 'rgba(245, 108, 108, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.totalCost || 0)
+      }
+    ]
+  } else if (filterForm.costType === 'external') {
+    legendData = ['质量罚款', '客户赔偿', '外部总成本']
+    seriesData = [
+      {
+        name: '质量罚款',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 4,
+          color: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
+              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 5
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#f56c6c',
+            shadowBlur: 15,
+            shadowColor: 'rgba(245, 108, 108, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.external?.qualityPenalty || 0)
+      },
+      {
+        name: '客户赔偿',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 2,
+          color: '#ff7875',
+          shadowColor: 'rgba(255, 120, 117, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#ff7875',
+          shadowColor: 'rgba(255, 120, 117, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(255, 120, 117, 0.4)' },
+              { offset: 1, color: 'rgba(255, 120, 117, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 5
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#ff7875',
+            shadowBlur: 15,
+            shadowColor: 'rgba(255, 120, 117, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.external?.customerCompensation || 0)
+      },
+      {
+        name: '外部总成本',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 5,
+          color: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
+              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 18,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 6
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#f56c6c',
+            shadowBlur: 15,
+            shadowColor: 'rgba(245, 108, 108, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.externalCost || 0)
+      }
+    ]
+  } else if (filterForm.costType === 'internal') {
+    legendData = ['返工成本', '内诉成本', '出版异常成本', '内部总成本']
+    seriesData = [
+      {
+        name: '返工成本',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 4,
+          color: '#67c23a',
+          shadowColor: 'rgba(103, 194, 58, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#67c23a',
+          shadowColor: 'rgba(103, 194, 58, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(103, 194, 58, 0.4)' },
+              { offset: 1, color: 'rgba(103, 194, 58, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 5
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#67c23a',
+            shadowBlur: 15,
+            shadowColor: 'rgba(103, 194, 58, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.internal?.reworkCost || 0)
+      },
+      {
+        name: '内诉成本',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 2,
+          color: '#95de64',
+          shadowColor: 'rgba(149, 222, 100, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#95de64',
+          shadowColor: 'rgba(149, 222, 100, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(149, 222, 100, 0.4)' },
+              { offset: 1, color: 'rgba(149, 222, 100, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 5
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#95de64',
+            shadowBlur: 15,
+            shadowColor: 'rgba(149, 222, 100, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.internal?.complaintCost || 0)
+      },
+      {
+        name: '出版异常成本',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 2,
+          color: '#b7eb8f',
+          shadowColor: 'rgba(183, 235, 143, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#b7eb8f',
+          shadowColor: 'rgba(183, 235, 143, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(183, 235, 143, 0.4)' },
+              { offset: 1, color: 'rgba(183, 235, 143, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 16,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 5
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#b7eb8f',
+            shadowBlur: 15,
+            shadowColor: 'rgba(183, 235, 143, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.internal?.publishingCost || 0)
+      },
+      {
+        name: '内部总成本',
+        type: 'line',
+        smooth: true,
+        smoothMonotone: 'x',
+        lineStyle: {
+          width: 5,
+          color: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          shadowBlur: 10,
+          shadowOffsetY: 3
+        },
+        itemStyle: {
+          color: '#ffffff',
+          borderWidth: 3,
+          borderColor: '#f56c6c',
+          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          shadowBlur: 8
+        },
+        areaStyle: {
+          color: {
+            type: 'linear',
+            x: 0, y: 0, x2: 0, y2: 1,
+            colorStops: [
+              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
+              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+            ]
+          }
+        },
+        symbol: 'circle',
+        symbolSize: 18,
+        showSymbol: true,
+        emphasis: {
+          focus: 'series',
+          lineStyle: {
+            width: 6
+          },
+          itemStyle: {
+            color: '#ffffff',
+            borderWidth: 4,
+            borderColor: '#f56c6c',
+            shadowBlur: 15,
+            shadowColor: 'rgba(245, 108, 108, 0.6)'
+          }
+        },
+        data: processedTrendData.map(item => item.internalCost || 0)
+      }
+    ]
+  }
 
   const option = {
+    title: {
+      text: filterForm.costType === 'all' ? '内外部质量成本趋势' : 
+            filterForm.costType === 'external' ? '外部质量成本趋势' : '内部质量成本趋势',
+      left: 'center',
+      textStyle: {
+        fontSize: 16,
+        fontWeight: 'bold'
+      }
+    },
     tooltip: {
       trigger: 'axis',
-      formatter: (params) => {
-        let result = `${params[0].axisValue}<br/>`
+      axisPointer: {
+        type: 'cross',
+        label: {
+          backgroundColor: '#6a7985'
+        }
+      },
+      formatter: function(params) {
+        let result = params[0].name + '<br/>'
         params.forEach(param => {
-          result += `${param.seriesName}: ¥${formatCurrency(param.value)}<br/>`
+          result += param.marker + param.seriesName + ': ¥' + param.value.toLocaleString() + '<br/>'
         })
         return result
       }
     },
     legend: {
-      data: ['质量罚款', '返工成本', '客户赔偿', '总成本']
+      data: legendData,
+      top: 30
+    },
+    toolbox: {
+      feature: {
+        saveAsImage: {}
+      }
     },
     grid: {
       left: '3%',
@@ -436,41 +1037,16 @@ const updateTrendChart = (trendData) => {
     },
     xAxis: {
       type: 'category',
-      data: trendData.map(item => item.period)
+      boundaryGap: false,
+      data: processedTrendData.map(item => item.period)
     },
     yAxis: {
       type: 'value',
       axisLabel: {
-        formatter: (value) => `¥${formatCurrency(value)}`
+        formatter: '¥{value}'
       }
     },
-    series: [
-      {
-        name: '质量罚款',
-        type: 'line',
-        data: trendData.map(item => item.qualityPenalty),
-        itemStyle: { color: '#f56c6c' }
-      },
-      {
-        name: '返工成本',
-        type: 'line',
-        data: trendData.map(item => item.reworkCost),
-        itemStyle: { color: '#e6a23c' }
-      },
-      {
-        name: '客户赔偿',
-        type: 'line',
-        data: trendData.map(item => item.customerCompensation),
-        itemStyle: { color: '#909399' }
-      },
-      {
-        name: '总成本',
-        type: 'line',
-        data: trendData.map(item => item.totalCost),
-        itemStyle: { color: '#409eff' },
-        lineStyle: { width: 3 }
-      }
-    ]
+    series: seriesData
   }
 
   trendChart.setOption(option)
@@ -481,23 +1057,60 @@ const updateTrendChart = (trendData) => {
  * @param {Array} compositionData - 构成数据
  */
 const updatePieChart = (compositionData) => {
-  if (!pieChart || !compositionData) return
-
+  if (!pieChart) return
+  
+  // 根据成本类型筛选数据
+  let chartData = []
+  
+  if (filterForm.costType === 'all') {
+    // 显示内外部成本分类
+    chartData = [
+      { name: '外部成本', value: overviewData.externalCost, itemStyle: { color: '#f56c6c' } },
+      { name: '内部成本', value: overviewData.internalCost, itemStyle: { color: '#67c23a' } }
+    ]
+  } else if (filterForm.costType === 'external') {
+    // 显示外部成本详细构成
+    chartData = [
+      { name: '质量罚款', value: overviewData.penaltyCost, itemStyle: { color: '#f56c6c' } },
+      { name: '客户赔偿', value: overviewData.compensationCost, itemStyle: { color: '#ff7875' } }
+    ]
+  } else if (filterForm.costType === 'internal') {
+    // 显示内部成本详细构成
+    chartData = [
+      { name: '返工成本', value: overviewData.reworkCost, itemStyle: { color: '#67c23a' } },
+      { name: '内诉成本', value: overviewData.internalComplaintCost, itemStyle: { color: '#95de64' } },
+      { name: '出版异常成本', value: overviewData.publishingExceptionCost, itemStyle: { color: '#b7eb8f' } }
+    ]
+  }
+  
+  // 过滤掉值为0的项目
+  chartData = chartData.filter(item => item.value > 0)
+  
   const option = {
+    title: {
+      text: filterForm.costType === 'all' ? '内外部成本构成' : 
+            filterForm.costType === 'external' ? '外部成本构成' : '内部成本构成',
+      left: 'center',
+      textStyle: {
+        fontSize: 16,
+        fontWeight: 'bold'
+      }
+    },
     tooltip: {
       trigger: 'item',
       formatter: '{a} <br/>{b}: ¥{c} ({d}%)'
     },
     legend: {
       orient: 'vertical',
-      left: 'left'
+      left: 'left',
+      data: chartData.map(item => item.name)
     },
     series: [
       {
         name: '成本构成',
         type: 'pie',
         radius: '50%',
-        data: compositionData,
+        data: chartData,
         emphasis: {
           itemStyle: {
             shadowBlur: 10,
@@ -508,7 +1121,7 @@ const updatePieChart = (compositionData) => {
       }
     ]
   }
-
+  
   pieChart.setOption(option)
 }
 
@@ -517,18 +1130,81 @@ const updatePieChart = (compositionData) => {
  * @param {Array} customerData - 客户数据
  */
 const updateCustomerChart = (customerData) => {
-  if (!customerChart || !customerData) return
+  if (!customerChart || !customerData || customerData.length === 0) return
+
+  // 根据成本类型构建系列数据
+  let seriesData = []
+  
+  if (filterForm.costType === 'all') {
+    // 显示内外部成本堆叠
+    seriesData = [
+      {
+        name: '外部成本',
+        type: 'bar',
+        stack: 'total',
+        data: customerData.map(item => item.external?.totalCost || 0),
+        itemStyle: { color: '#f56c6c' }
+      },
+      {
+        name: '内部成本',
+        type: 'bar',
+        stack: 'total',
+        data: customerData.map(item => item.internal?.totalCost || 0),
+        itemStyle: { color: '#67c23a' }
+      }
+    ]
+  } else {
+    // 显示单一类型成本
+    seriesData = [
+      {
+        name: filterForm.costType === 'external' ? '外部成本' : '内部成本',
+        type: 'bar',
+        data: customerData.map(item => item.totalCost || 0),
+        itemStyle: {
+          color: filterForm.costType === 'external' ? 
+            new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              {offset: 0, color: '#ff9a9e'},
+              {offset: 1, color: '#f56c6c'}
+            ]) :
+            new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+              {offset: 0, color: '#95de64'},
+              {offset: 1, color: '#67c23a'}
+            ])
+        }
+      }
+    ]
+  }
 
   const option = {
+    title: {
+      text: filterForm.costType === 'all' ? '客户内外部质量成本排行' : 
+            filterForm.costType === 'external' ? '客户外部质量成本排行' : '客户内部质量成本排行',
+      left: 'center',
+      textStyle: {
+        fontSize: 16,
+        fontWeight: 'bold'
+      }
+    },
     tooltip: {
       trigger: 'axis',
       axisPointer: {
         type: 'shadow'
       },
-      formatter: (params) => {
-        const data = params[0]
-        return `${data.axisValue}<br/>总成本: ¥${formatCurrency(data.value)}`
+      formatter: function(params) {
+        let result = params[0].name + '<br/>'
+        params.forEach(param => {
+          result += param.marker + param.seriesName + ': ¥' + param.value.toLocaleString() + '<br/>'
+        })
+        if (filterForm.costType === 'all' && params.length > 1) {
+          const total = params.reduce((sum, param) => sum + param.value, 0)
+          result += '总计: ¥' + total.toLocaleString()
+        }
+        return result
       }
+    },
+    legend: {
+      data: seriesData.map(item => item.name),
+      top: 30
     },
     grid: {
       left: '3%',
@@ -538,28 +1214,20 @@ const updateCustomerChart = (customerData) => {
     },
     xAxis: {
       type: 'value',
+      boundaryGap: [0, 0.01],
       axisLabel: {
         formatter: (value) => `¥${formatCurrency(value)}`
       }
     },
     yAxis: {
       type: 'category',
-      data: customerData.map(item => item.customerName)
-    },
-    series: [
-      {
-        name: '质量成本',
-        type: 'bar',
-        data: customerData.map(item => item.totalCost),
-        itemStyle: {
-          color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-            { offset: 0, color: '#83bff6' },
-            { offset: 0.5, color: '#188df0' },
-            { offset: 1, color: '#188df0' }
-          ])
-        }
+      data: customerData.map(item => item.customerName),
+      axisLabel: {
+        interval: 0,
+        rotate: 0
       }
-    ]
+    },
+    series: seriesData
   }
 
   customerChart.setOption(option)
@@ -602,12 +1270,20 @@ const handleDimensionChange = () => {
 }
 
 /**
+ * 处理成本类型变化
+ */
+const handleCostTypeChange = () => {
+  loadStatistics()
+}
+
+/**
  * 重置筛选条件
  */
 const resetFilter = () => {
   filterForm.dateRange = []
   filterForm.dimension = 'month'
   filterForm.customerId = null
+  filterForm.costType = 'all'
   loadStatistics()
 }
 
@@ -621,6 +1297,7 @@ const exportData = async () => {
       endDate: filterForm.dateRange?.[1],
       dimension: filterForm.dimension,
       customerId: filterForm.customerId,
+      costType: filterForm.costType,
       export: true
     }
 
@@ -797,6 +1474,10 @@ onMounted(async () => {
   font-weight: 700;
   color: #303133;
   margin-bottom: 4px;
+  /* 西文数字字体样式 - 与后台主页数据概览保持一致 */
+  font-family: 'Bahnschrift';
+  font-variant-numeric: tabular-nums lining-nums;
+  letter-spacing: -0.02em;
 }
 
 .card-label {
@@ -823,6 +1504,60 @@ onMounted(async () => {
 .card-ratio {
   font-size: 12px;
   color: #909399;
+}
+
+.cost-breakdown {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.breakdown-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+
+.breakdown-label {
+  color: #909399;
+  font-weight: 500;
+}
+
+/* el-tag标签样式调整 */
+.breakdown-item .el-tag.breakdown-label {
+  margin-right: 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border: none;
+}
+
+.breakdown-value {
+  color: #303133;
+  font-weight: 600;
+}
+
+.breakdown-item.external .breakdown-value {
+  color: #f56c6c;
+}
+
+.breakdown-item.internal .breakdown-value {
+  color: #67c23a;
+}
+
+.internal-cards {
+  margin-top: 20px;
+}
+
+.internal-complaint .card-icon {
+  background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%);
+  color: white;
+}
+
+.publishing-exception .card-icon {
+  background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%);
+  color: white;
 }
 
 .charts-section {

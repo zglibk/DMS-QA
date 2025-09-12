@@ -543,9 +543,12 @@ router.get('/customers', async (req, res) => {
 });
 
 /**
- * 获取质量成本统计数据
+ * 获取质量成本统计数据（重构版）
  * GET /api/customer-complaints/cost-statistics
- * 功能：提供质量成本的多维度统计分析
+ * 功能：提供内外部质量成本的多维度统计分析
+ * 数据源：
+ * 1. 外部质量成本：CustomerComplaints表（客诉）
+ * 2. 内部质量成本：ComplaintRegister表（内诉）、ProductionReworkRegister表（返工）、publishing_exceptions表（出版异常）
  */
 router.get('/cost-statistics', async (req, res) => {
   try {
@@ -554,6 +557,7 @@ router.get('/cost-statistics', async (req, res) => {
       endDate,
       dimension = 'month',
       customerId,
+      costType = 'all', // 新增：all(全部), internal(内部), external(外部)
       page = 1,
       pageSize = 20
     } = req.query;
@@ -570,39 +574,184 @@ router.get('/cost-statistics', async (req, res) => {
       let whereConditions = ['1=1'];
       
       if (startDate) {
-        whereConditions.push('Date >= @startDate');
         request.input('startDate', sql.Date, startDate);
       }
       
       if (endDate) {
-        whereConditions.push('Date <= @endDate');
         request.input('endDate', sql.Date, endDate);
       }
       
       if (customerId) {
-        whereConditions.push('CustomerCode = @customerId');
         request.input('customerId', sql.NVarChar, customerId);
       }
       
-      const whereClause = whereConditions.join(' AND ');
+      // 获取外部质量成本概览数据（客诉）
+      let externalOverview = { totalCost: 0, penaltyCost: 0, compensationCost: 0, reworkCost: 0, totalComplaints: 0 };
+      if (costType === 'all' || costType === 'external') {
+        // 1. 从CustomerComplaints表获取外部成本数据
+        let externalWhereConditions = ['1=1'];
+        if (startDate) externalWhereConditions.push('Date >= @startDate');
+        if (endDate) externalWhereConditions.push('Date <= @endDate');
+        if (customerId) externalWhereConditions.push('CustomerCode = @customerId');
+        
+        const externalOverviewQuery = `
+          SELECT 
+            ISNULL(SUM(TotalQualityCost), 0) as totalCost,
+            ISNULL(SUM(QualityPenalty), 0) as penaltyCost,
+            ISNULL(SUM(CustomerCompensation), 0) as compensationCost,
+            ISNULL(SUM(ReworkCost), 0) as reworkCost,
+            COUNT(*) as totalComplaints
+          FROM CustomerComplaints 
+          WHERE ${externalWhereConditions.join(' AND ')}
+        `;
+        
+        console.log('🔍 [调试] 外部质量成本查询SQL:', externalOverviewQuery);
+        console.log('🔍 [调试] 查询参数:', { startDate, endDate, customerId });
+        
+        const externalResult = await request.query(externalOverviewQuery);
+        externalOverview = externalResult.recordset[0];
+        console.log('📊 [调试] CustomerComplaints表外部质量成本查询结果:', externalOverview);
+        
+        // 2. 从ComplaintRegister表获取"客诉"类型的成本数据并添加到外部成本中
+        let complaintRegisterWhereConditions = ['ComplaintCategory = N\'客诉\''];
+        if (startDate) complaintRegisterWhereConditions.push('Date >= @startDate');
+        if (endDate) complaintRegisterWhereConditions.push('Date <= @endDate');
+        if (customerId) complaintRegisterWhereConditions.push('Customer = @customerId');
+        
+        const complaintRegisterQuery = `
+          SELECT 
+            ISNULL(SUM(TotalCost), 0) as additionalCost,
+            COUNT(*) as additionalComplaints
+          FROM ComplaintRegister 
+          WHERE ${complaintRegisterWhereConditions.join(' AND ')}
+        `;
+        
+        console.log('🔍 [调试] ComplaintRegister表客诉成本查询SQL:', complaintRegisterQuery);
+        
+        const complaintRegisterResult = await request.query(complaintRegisterQuery);
+        const additionalData = complaintRegisterResult.recordset[0];
+        console.log('📊 [调试] ComplaintRegister表客诉成本查询结果:', additionalData);
+        
+        // 3. 将ComplaintRegister表的客诉成本添加到外部成本总计中
+        externalOverview.totalCost += additionalData.additionalCost;
+        externalOverview.totalComplaints += additionalData.additionalComplaints;
+        
+        console.log('📊 [调试] 合并后的外部质量成本总计:', externalOverview);
+      }
       
-      // 获取概览数据
-      const overviewQuery = `
-        SELECT 
-          ISNULL(SUM(TotalQualityCost), 0) as totalCost,
-          ISNULL(SUM(QualityPenalty), 0) as penaltyCost,
-          ISNULL(SUM(CustomerCompensation), 0) as compensationCost,
-          ISNULL(SUM(ReworkCost), 0) as reworkCost,
-          COUNT(*) as totalComplaints
-        FROM CustomerComplaints 
-        WHERE ${whereClause}
-      `;
+      // 获取内部质量成本概览数据
+      let internalOverview = { 
+        totalCost: 0, 
+        complaintCost: 0, // 内诉成本
+        reworkCost: 0,    // 返工成本
+        publishingCost: 0, // 出版异常成本
+        totalComplaints: 0 
+      };
       
-      const overviewResult = await request.query(overviewQuery);
-      const overview = overviewResult.recordset[0];
+      if (costType === 'all' || costType === 'internal') {
+        // 1. 内诉成本（ComplaintRegister表中ComplaintCategory为"内诉"的记录）
+        let internalComplaintWhereConditions = ['ComplaintCategory = N\'内诉\''];
+        if (startDate) internalComplaintWhereConditions.push('Date >= @startDate');
+        if (endDate) internalComplaintWhereConditions.push('Date <= @endDate');
+        if (customerId) internalComplaintWhereConditions.push('Customer = @customerId');
+        
+        const internalComplaintQuery = `
+          SELECT 
+            ISNULL(SUM(TotalCost), 0) as complaintCost,
+            COUNT(*) as complaintCount
+          FROM ComplaintRegister 
+          WHERE ${internalComplaintWhereConditions.join(' AND ')}
+        `;
+        
+        console.log('🔍 [调试] 内诉成本查询SQL:', internalComplaintQuery);
+        
+        const internalComplaintResult = await request.query(internalComplaintQuery);
+        const internalComplaintData = internalComplaintResult.recordset[0];
+        console.log('📊 [调试] 内诉成本查询结果:', internalComplaintData);
+        
+        // 2. 返工成本（ProductionReworkRegister表）
+        let reworkWhereConditions = ['1=1'];
+        if (startDate) reworkWhereConditions.push('ReworkDate >= @startDate');
+        if (endDate) reworkWhereConditions.push('ReworkDate <= @endDate');
+        if (customerId) reworkWhereConditions.push('CustomerCode = @customerId');
+        
+        const reworkQuery = `
+          SELECT 
+            ISNULL(SUM(TotalCost), 0) as reworkCost,
+            COUNT(*) as reworkCount
+          FROM ProductionReworkRegister 
+          WHERE ${reworkWhereConditions.join(' AND ')}
+        `;
+        
+        console.log('🔍 [调试] 返工成本查询SQL:', reworkQuery);
+        
+        const reworkResult = await request.query(reworkQuery);
+        const reworkData = reworkResult.recordset[0];
+        console.log('📊 [调试] 返工成本查询结果:', reworkData);
+        
+        // 3. 出版异常成本（publishing_exceptions表）
+        let publishingWhereConditions = ['isDeleted = 0'];
+        if (startDate) publishingWhereConditions.push('registration_date >= @startDate');
+        if (endDate) publishingWhereConditions.push('registration_date <= @endDate');
+        if (customerId) publishingWhereConditions.push('customer_code = @customerId');
+        
+        const publishingQuery = `
+          SELECT 
+            ISNULL(SUM(amount), 0) as publishingCost,
+            COUNT(*) as publishingCount
+          FROM publishing_exceptions 
+          WHERE ${publishingWhereConditions.join(' AND ')}
+        `;
+        
+        console.log('🔍 [调试] 出版异常成本查询SQL:', publishingQuery);
+        
+        const publishingResult = await request.query(publishingQuery);
+        const publishingData = publishingResult.recordset[0];
+        console.log('📊 [调试] 出版异常成本查询结果:', publishingData);
+        
+        // 汇总内部质量成本
+        internalOverview = {
+          complaintCost: internalComplaintData.complaintCost || 0,
+          reworkCost: reworkData.reworkCost || 0,
+          publishingCost: publishingData.publishingCost || 0,
+          totalCost: (internalComplaintData.complaintCost || 0) + (reworkData.reworkCost || 0) + (publishingData.publishingCost || 0),
+          totalComplaints: (internalComplaintData.complaintCount || 0) + (reworkData.reworkCount || 0) + (publishingData.publishingCount || 0)
+        };
+        
+        console.log('📊 [调试] 内部质量成本汇总结果:', internalOverview);
+      }
+      
+      // 合并概览数据
+      const overview = {
+        // 总成本
+        totalCost: externalOverview.totalCost + internalOverview.totalCost,
+        // 外部成本明细
+        external: {
+          totalCost: externalOverview.totalCost,
+          qualityPenalty: externalOverview.penaltyCost,
+          customerCompensation: externalOverview.compensationCost,
+          reworkCost: externalOverview.reworkCost,
+          totalComplaints: externalOverview.totalComplaints
+        },
+        // 内部成本明细
+        internal: {
+          totalCost: internalOverview.totalCost,
+          internalComplaintCost: internalOverview.complaintCost,
+          reworkCost: internalOverview.reworkCost,
+          publishingExceptionCost: internalOverview.publishingCost,
+          totalComplaints: internalOverview.totalComplaints
+        }
+      };
+      
+      console.log('📊 [调试] 最终概览数据汇总:', {
+        costType,
+        totalCost: overview.totalCost,
+        external: overview.external,
+        internal: overview.internal
+      });
       
       // 计算趋势（与上期对比）
-      let trendQuery = '';
+      let trend = null;
       if (startDate && endDate) {
         const startDateObj = new Date(startDate);
         const endDateObj = new Date(endDate);
@@ -616,108 +765,490 @@ router.get('/cost-statistics', async (req, res) => {
         request.input('prevStartDate', sql.Date, prevStartDate.toISOString().slice(0, 10));
         request.input('prevEndDate', sql.Date, prevEndDate.toISOString().slice(0, 10));
         
-        trendQuery = `
-          SELECT ISNULL(SUM(TotalQualityCost), 0) as prevTotalCost
-          FROM CustomerComplaints 
-          WHERE Date >= @prevStartDate AND Date <= @prevEndDate
-          ${customerId ? 'AND CustomerCode = @customerId' : ''}
-        `;
+        // 计算上期外部成本
+        let prevExternalCost = 0;
+        if (costType === 'all' || costType === 'external') {
+          const externalTrendQuery = `
+            SELECT ISNULL(SUM(TotalQualityCost), 0) as prevTotalCost
+            FROM CustomerComplaints 
+            WHERE Date >= @prevStartDate AND Date <= @prevEndDate
+            ${customerId ? 'AND CustomerCode = @customerId' : ''}
+          `;
+          
+          const externalTrendResult = await request.query(externalTrendQuery);
+          prevExternalCost = externalTrendResult.recordset[0].prevTotalCost;
+        }
         
-        const trendResult = await request.query(trendQuery);
-        const prevTotalCost = trendResult.recordset[0].prevTotalCost;
+        // 计算上期内部成本
+        let prevInternalCost = 0;
+        if (costType === 'all' || costType === 'internal') {
+          // 上期内诉成本
+          const internalComplaintTrendQuery = `
+            SELECT ISNULL(SUM(TotalCost), 0) as prevComplaintCost
+            FROM ComplaintRegister 
+            WHERE (ComplaintCategory = N'内诉' OR ComplaintCategory = N'客诉') AND Date >= @prevStartDate AND Date <= @prevEndDate
+            ${customerId ? 'AND Customer = @customerId' : ''}
+          `;
+          
+          const internalComplaintTrendResult = await request.query(internalComplaintTrendQuery);
+          const prevComplaintCost = internalComplaintTrendResult.recordset[0].prevComplaintCost;
+          
+          // 上期返工成本
+          const reworkTrendQuery = `
+            SELECT ISNULL(SUM(TotalCost), 0) as prevReworkCost
+            FROM ProductionReworkRegister 
+            WHERE ReworkDate >= @prevStartDate AND ReworkDate <= @prevEndDate
+            ${customerId ? 'AND CustomerCode = @customerId' : ''}
+          `;
+          
+          const reworkTrendResult = await request.query(reworkTrendQuery);
+          const prevReworkCost = reworkTrendResult.recordset[0].prevReworkCost;
+          
+          // 上期出版异常成本
+          const publishingTrendQuery = `
+            SELECT ISNULL(SUM(amount), 0) as prevPublishingCost
+            FROM publishing_exceptions 
+            WHERE isDeleted = 0 AND registration_date >= @prevStartDate AND registration_date <= @prevEndDate
+            ${customerId ? 'AND customer_code = @customerId' : ''}
+          `;
+          
+          const publishingTrendResult = await request.query(publishingTrendQuery);
+          const prevPublishingCost = publishingTrendResult.recordset[0].prevPublishingCost;
+          
+          prevInternalCost = prevComplaintCost + prevReworkCost + prevPublishingCost;
+        }
         
+        const prevTotalCost = prevExternalCost + prevInternalCost;
+        
+        // 计算趋势
         if (prevTotalCost > 0) {
           const trendValue = ((overview.totalCost - prevTotalCost) / prevTotalCost * 100);
           overview.totalTrend = isNaN(trendValue) ? 0 : parseFloat(trendValue.toFixed(1));
+          
+          trend = {
+            percentage: overview.totalTrend,
+            direction: overview.totalCost >= prevTotalCost ? 'up' : 'down',
+            previousValue: prevTotalCost,
+            external: {
+              percentage: prevExternalCost > 0 ? parseFloat(((overview.external.totalCost - prevExternalCost) / prevExternalCost * 100).toFixed(1)) : 0,
+              direction: overview.external.totalCost >= prevExternalCost ? 'up' : 'down',
+              previousValue: prevExternalCost
+            },
+            internal: {
+              percentage: prevInternalCost > 0 ? parseFloat(((overview.internal.totalCost - prevInternalCost) / prevInternalCost * 100).toFixed(1)) : 0,
+              direction: overview.internal.totalCost >= prevInternalCost ? 'up' : 'down',
+              previousValue: prevInternalCost
+            }
+          };
         } else {
           overview.totalTrend = 0;
+          trend = {
+            percentage: 0,
+            direction: 'up',
+            previousValue: 0,
+            external: { percentage: 0, direction: 'up', previousValue: 0 },
+            internal: { percentage: 0, direction: 'up', previousValue: 0 }
+          };
         }
       } else {
         overview.totalTrend = 0;
+        trend = {
+          percentage: 0,
+          direction: 'up',
+          previousValue: 0,
+          external: { percentage: 0, direction: 'up', previousValue: 0 },
+          internal: { percentage: 0, direction: 'up', previousValue: 0 }
+        };
       }
       
       // 获取趋势数据
       let periodFormat = '';
+      let periodFormatRework = '';
+      let periodFormatPublishing = '';
+      
       switch (dimension) {
         case 'month':
           periodFormat = "CONVERT(VARCHAR(7), Date, 120)";
+          periodFormatRework = "CONVERT(VARCHAR(7), ReworkDate, 120)";
+          periodFormatPublishing = "CONVERT(VARCHAR(7), registration_date, 120)";
           break;
         case 'quarter':
           periodFormat = "CAST(YEAR(Date) AS VARCHAR) + '-Q' + CAST(DATEPART(QUARTER, Date) AS VARCHAR)";
+          periodFormatRework = "CAST(YEAR(ReworkDate) AS VARCHAR) + '-Q' + CAST(DATEPART(QUARTER, ReworkDate) AS VARCHAR)";
+          periodFormatPublishing = "CAST(YEAR(registration_date) AS VARCHAR) + '-Q' + CAST(DATEPART(QUARTER, registration_date) AS VARCHAR)";
           break;
         case 'year':
           periodFormat = "YEAR(Date)";
+          periodFormatRework = "YEAR(ReworkDate)";
+          periodFormatPublishing = "YEAR(registration_date)";
           break;
         default:
           periodFormat = "CONVERT(VARCHAR(7), Date, 120)";
+          periodFormatRework = "CONVERT(VARCHAR(7), ReworkDate, 120)";
+          periodFormatPublishing = "CONVERT(VARCHAR(7), registration_date, 120)";
       }
       
-      const trendDataQuery = `
-        SELECT 
-          ${periodFormat} as period,
-          ISNULL(SUM(QualityPenalty), 0) as qualityPenalty,
-          ISNULL(SUM(ReworkCost), 0) as reworkCost,
-          ISNULL(SUM(CustomerCompensation), 0) as customerCompensation,
-          ISNULL(SUM(TotalQualityCost), 0) as totalCost
-        FROM CustomerComplaints 
-        WHERE ${whereClause}
-        GROUP BY ${periodFormat}
-        ORDER BY ${periodFormat}
-      `;
+      let trendData = [];
       
-      const trendDataResult = await request.query(trendDataQuery);
+      // 获取外部质量成本趋势数据（客诉）
+      if (costType === 'all' || costType === 'external') {
+        let externalTrendWhereConditions = ['1=1'];
+        if (startDate) externalTrendWhereConditions.push('Date >= @startDate');
+        if (endDate) externalTrendWhereConditions.push('Date <= @endDate');
+        if (customerId) externalTrendWhereConditions.push('CustomerCode = @customerId');
+        
+        const externalTrendDataQuery = `
+          SELECT 
+            ${periodFormat} as period,
+            'external' as costType,
+            ISNULL(SUM(QualityPenalty), 0) as qualityPenalty,
+            ISNULL(SUM(ReworkCost), 0) as reworkCost,
+            ISNULL(SUM(CustomerCompensation), 0) as customerCompensation,
+            ISNULL(SUM(TotalQualityCost), 0) as totalCost
+          FROM CustomerComplaints 
+          WHERE ${externalTrendWhereConditions.join(' AND ')}
+          GROUP BY ${periodFormat}
+        `;
+        
+        const externalTrendResult = await request.query(externalTrendDataQuery);
+        trendData = trendData.concat(externalTrendResult.recordset);
+      }
+      
+      // 获取内部质量成本趋势数据
+      if (costType === 'all' || costType === 'internal') {
+        // 内诉趋势数据
+        let internalComplaintTrendWhereConditions = ['ComplaintCategory = N\'内诉\''];
+        if (startDate) internalComplaintTrendWhereConditions.push('Date >= @startDate');
+        if (endDate) internalComplaintTrendWhereConditions.push('Date <= @endDate');
+        if (customerId) internalComplaintTrendWhereConditions.push('Customer = @customerId');
+        
+        const internalComplaintTrendQuery = `
+          SELECT 
+            ${periodFormat} as period,
+            'internal_complaint' as costType,
+            0 as qualityPenalty,
+            0 as reworkCost,
+            0 as customerCompensation,
+            ISNULL(SUM(TotalCost), 0) as totalCost
+          FROM ComplaintRegister 
+          WHERE ${internalComplaintTrendWhereConditions.join(' AND ')}
+          GROUP BY ${periodFormat}
+        `;
+        
+        const internalComplaintTrendResult = await request.query(internalComplaintTrendQuery);
+        trendData = trendData.concat(internalComplaintTrendResult.recordset);
+        
+        // 返工趋势数据
+        let reworkTrendWhereConditions = ['1=1'];
+        if (startDate) reworkTrendWhereConditions.push('ReworkDate >= @startDate');
+        if (endDate) reworkTrendWhereConditions.push('ReworkDate <= @endDate');
+        if (customerId) reworkTrendWhereConditions.push('CustomerCode = @customerId');
+        
+        const reworkTrendQuery = `
+          SELECT 
+            ${periodFormatRework} as period,
+            'internal_rework' as costType,
+            0 as qualityPenalty,
+            ISNULL(SUM(TotalCost), 0) as reworkCost,
+            0 as customerCompensation,
+            ISNULL(SUM(TotalCost), 0) as totalCost
+          FROM ProductionReworkRegister 
+          WHERE ${reworkTrendWhereConditions.join(' AND ')}
+          GROUP BY ${periodFormatRework}
+        `;
+        
+        const reworkTrendResult = await request.query(reworkTrendQuery);
+        trendData = trendData.concat(reworkTrendResult.recordset);
+        
+        // 出版异常趋势数据
+        let publishingTrendWhereConditions = ['isDeleted = 0'];
+        if (startDate) publishingTrendWhereConditions.push('registration_date >= @startDate');
+        if (endDate) publishingTrendWhereConditions.push('registration_date <= @endDate');
+        if (customerId) publishingTrendWhereConditions.push('customer_code = @customerId');
+        
+        const publishingTrendQuery = `
+          SELECT 
+            ${periodFormatPublishing} as period,
+            'internal_publishing' as costType,
+            0 as qualityPenalty,
+            0 as reworkCost,
+            0 as customerCompensation,
+            ISNULL(SUM(amount), 0) as totalCost
+          FROM publishing_exceptions 
+          WHERE ${publishingTrendWhereConditions.join(' AND ')}
+          GROUP BY ${periodFormatPublishing}
+        `;
+        
+        const publishingTrendResult = await request.query(publishingTrendQuery);
+        trendData = trendData.concat(publishingTrendResult.recordset);
+      }
+      
+      // 合并同期数据
+      const trendDataMap = new Map();
+      trendData.forEach(item => {
+        const key = item.period;
+        if (!trendDataMap.has(key)) {
+          trendDataMap.set(key, {
+            period: key,
+            external: { qualityPenalty: 0, reworkCost: 0, customerCompensation: 0, totalCost: 0 },
+            internal: { complaintCost: 0, reworkCost: 0, publishingCost: 0, totalCost: 0 },
+            totalCost: 0
+          });
+        }
+        
+        const periodData = trendDataMap.get(key);
+        if (item.costType === 'external') {
+          periodData.external.qualityPenalty += item.qualityPenalty;
+          periodData.external.reworkCost += item.reworkCost;
+          periodData.external.customerCompensation += item.customerCompensation;
+          periodData.external.totalCost += item.totalCost;
+        } else if (item.costType === 'internal_complaint') {
+          periodData.internal.complaintCost += item.totalCost;
+          periodData.internal.totalCost += item.totalCost;
+        } else if (item.costType === 'internal_rework') {
+          periodData.internal.reworkCost += item.totalCost;
+          periodData.internal.totalCost += item.totalCost;
+        } else if (item.costType === 'internal_publishing') {
+          periodData.internal.publishingCost += item.totalCost;
+          periodData.internal.totalCost += item.totalCost;
+        }
+        
+        periodData.totalCost = periodData.external.totalCost + periodData.internal.totalCost;
+      });
+      
+      const trendDataResult = Array.from(trendDataMap.values()).sort((a, b) => a.period.localeCompare(b.period));
       
       // 获取成本构成数据
-      const compositionQuery = `
-        SELECT 
-          '质量罚款' as name, ISNULL(SUM(QualityPenalty), 0) as value
-        FROM CustomerComplaints WHERE ${whereClause}
-        UNION ALL
-        SELECT 
-          '返工成本' as name, ISNULL(SUM(ReworkCost), 0) as value
-        FROM CustomerComplaints WHERE ${whereClause}
-        UNION ALL
-        SELECT 
-          '客户赔偿' as name, ISNULL(SUM(CustomerCompensation), 0) as value
-        FROM CustomerComplaints WHERE ${whereClause}
-        UNION ALL
-        SELECT 
-          '质量损失' as name, ISNULL(SUM(QualityLossCost), 0) as value
-        FROM CustomerComplaints WHERE ${whereClause}
-        UNION ALL
-        SELECT 
-          '检验成本' as name, ISNULL(SUM(InspectionCost), 0) as value
-        FROM CustomerComplaints WHERE ${whereClause}
-        UNION ALL
-        SELECT 
-          '运输成本' as name, ISNULL(SUM(TransportationCost), 0) as value
-        FROM CustomerComplaints WHERE ${whereClause}
-        UNION ALL
-        SELECT 
-          '预防成本' as name, ISNULL(SUM(PreventionCost), 0) as value
-        FROM CustomerComplaints WHERE ${whereClause}
-      `;
+      let costComposition = [];
       
-      const compositionResult = await request.query(compositionQuery);
-      const costComposition = compositionResult.recordset.filter(item => item.value > 0);
+      // 外部质量成本构成
+      if (costType === 'all' || costType === 'external') {
+        let externalCompositionWhereConditions = ['1=1'];
+        if (startDate) externalCompositionWhereConditions.push('Date >= @startDate');
+        if (endDate) externalCompositionWhereConditions.push('Date <= @endDate');
+        if (customerId) externalCompositionWhereConditions.push('CustomerCode = @customerId');
+        
+        const externalCompositionQuery = `
+          SELECT 
+            '外部-质量罚款' as name, 'external' as category, ISNULL(SUM(QualityPenalty), 0) as value
+          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
+          UNION ALL
+          SELECT 
+            '外部-返工成本' as name, 'external' as category, ISNULL(SUM(ReworkCost), 0) as value
+          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
+          UNION ALL
+          SELECT 
+            '外部-客户赔偿' as name, 'external' as category, ISNULL(SUM(CustomerCompensation), 0) as value
+          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
+          UNION ALL
+          SELECT 
+            '外部-质量损失' as name, 'external' as category, ISNULL(SUM(QualityLossCost), 0) as value
+          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
+          UNION ALL
+          SELECT 
+            '外部-检验成本' as name, 'external' as category, ISNULL(SUM(InspectionCost), 0) as value
+          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
+          UNION ALL
+          SELECT 
+            '外部-运输成本' as name, 'external' as category, ISNULL(SUM(TransportationCost), 0) as value
+          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
+          UNION ALL
+          SELECT 
+            '外部-预防成本' as name, 'external' as category, ISNULL(SUM(PreventionCost), 0) as value
+          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
+        `;
+        
+        const externalCompositionResult = await request.query(externalCompositionQuery);
+        costComposition = costComposition.concat(externalCompositionResult.recordset.filter(item => item.value > 0));
+      }
+      
+      // 内部质量成本构成
+      if (costType === 'all' || costType === 'internal') {
+        // 内诉成本
+        let internalComplaintCompositionWhereConditions = ['ComplaintCategory = N\'内诉\''];
+        if (startDate) internalComplaintCompositionWhereConditions.push('Date >= @startDate');
+        if (endDate) internalComplaintCompositionWhereConditions.push('Date <= @endDate');
+        if (customerId) internalComplaintCompositionWhereConditions.push('Customer = @customerId');
+        
+        const internalComplaintCompositionQuery = `
+          SELECT 
+            '内部-内诉成本' as name, 'internal' as category, ISNULL(SUM(TotalCost), 0) as value
+          FROM ComplaintRegister WHERE ${internalComplaintCompositionWhereConditions.join(' AND ')}
+        `;
+        
+        const internalComplaintCompositionResult = await request.query(internalComplaintCompositionQuery);
+        if (internalComplaintCompositionResult.recordset[0].value > 0) {
+          costComposition.push(internalComplaintCompositionResult.recordset[0]);
+        }
+        
+        // 返工成本
+        let reworkCompositionWhereConditions = ['1=1'];
+        if (startDate) reworkCompositionWhereConditions.push('ReworkDate >= @startDate');
+        if (endDate) reworkCompositionWhereConditions.push('ReworkDate <= @endDate');
+        if (customerId) reworkCompositionWhereConditions.push('CustomerCode = @customerId');
+        
+        const reworkCompositionQuery = `
+          SELECT 
+            '内部-返工成本' as name, 'internal' as category, ISNULL(SUM(TotalCost), 0) as value
+          FROM ProductionReworkRegister WHERE ${reworkCompositionWhereConditions.join(' AND ')}
+        `;
+        
+        const reworkCompositionResult = await request.query(reworkCompositionQuery);
+        if (reworkCompositionResult.recordset[0].value > 0) {
+          costComposition.push(reworkCompositionResult.recordset[0]);
+        }
+        
+        // 出版异常成本
+        let publishingCompositionWhereConditions = ['isDeleted = 0'];
+        if (startDate) publishingCompositionWhereConditions.push('registration_date >= @startDate');
+        if (endDate) publishingCompositionWhereConditions.push('registration_date <= @endDate');
+        if (customerId) publishingCompositionWhereConditions.push('customer_code = @customerId');
+        
+        const publishingCompositionQuery = `
+          SELECT 
+            '内部-出版异常' as name, 'internal' as category, ISNULL(SUM(amount), 0) as value
+          FROM publishing_exceptions WHERE ${publishingCompositionWhereConditions.join(' AND ')}
+        `;
+        
+        const publishingCompositionResult = await request.query(publishingCompositionQuery);
+        if (publishingCompositionResult.recordset[0].value > 0) {
+          costComposition.push(publishingCompositionResult.recordset[0]);
+        }
+      }
       
       // 获取客户排行数据
-      const customerRankingQuery = `
-        SELECT TOP 10
-          CustomerCode as customerName,
-          ISNULL(SUM(TotalQualityCost), 0) as totalCost,
-          COUNT(*) as complaintCount
-        FROM CustomerComplaints 
-        WHERE ${whereClause} AND CustomerCode IS NOT NULL AND CustomerCode != ''
-        GROUP BY CustomerCode
-        ORDER BY SUM(TotalQualityCost) DESC
-      `;
+      let customerRanking = [];
       
-      const customerRankingResult = await request.query(customerRankingQuery);
+      // 外部质量成本客户排行（客诉）
+      if (costType === 'all' || costType === 'external') {
+        let externalRankingWhereConditions = ['CustomerCode IS NOT NULL', 'CustomerCode != \'\'']; 
+        if (startDate) externalRankingWhereConditions.push('Date >= @startDate');
+        if (endDate) externalRankingWhereConditions.push('Date <= @endDate');
+        if (customerId) externalRankingWhereConditions.push('CustomerCode = @customerId');
+        
+        const externalRankingQuery = `
+          SELECT TOP 10
+            CustomerCode as customerName,
+            'external' as costType,
+            ISNULL(SUM(TotalQualityCost), 0) as totalCost,
+            COUNT(*) as complaintCount
+          FROM CustomerComplaints 
+          WHERE ${externalRankingWhereConditions.join(' AND ')}
+          GROUP BY CustomerCode
+          ORDER BY SUM(TotalQualityCost) DESC
+        `;
+        
+        const externalRankingResult = await request.query(externalRankingQuery);
+        customerRanking = customerRanking.concat(externalRankingResult.recordset);
+      }
+      
+      // 内部质量成本客户排行
+      if (costType === 'all' || costType === 'internal') {
+        // 内诉客户排行
+        let internalComplaintRankingWhereConditions = ['ComplaintCategory = N\'内诉\'', 'Customer IS NOT NULL', 'Customer != \'\'']; 
+        if (startDate) internalComplaintRankingWhereConditions.push('Date >= @startDate');
+        if (endDate) internalComplaintRankingWhereConditions.push('Date <= @endDate');
+        if (customerId) internalComplaintRankingWhereConditions.push('Customer = @customerId');
+        
+        const internalComplaintRankingQuery = `
+          SELECT TOP 10
+            Customer as customerName,
+            'internal_complaint' as costType,
+            ISNULL(SUM(TotalCost), 0) as totalCost,
+            COUNT(*) as complaintCount
+          FROM ComplaintRegister 
+          WHERE ${internalComplaintRankingWhereConditions.join(' AND ')}
+          GROUP BY Customer
+          ORDER BY SUM(TotalCost) DESC
+        `;
+        
+        const internalComplaintRankingResult = await request.query(internalComplaintRankingQuery);
+        customerRanking = customerRanking.concat(internalComplaintRankingResult.recordset);
+        
+        // 返工客户排行
+        let reworkRankingWhereConditions = ['CustomerCode IS NOT NULL', 'CustomerCode != \'\'']; 
+        if (startDate) reworkRankingWhereConditions.push('ReworkDate >= @startDate');
+        if (endDate) reworkRankingWhereConditions.push('ReworkDate <= @endDate');
+        if (customerId) reworkRankingWhereConditions.push('CustomerCode = @customerId');
+        
+        const reworkRankingQuery = `
+          SELECT TOP 10
+            CustomerCode as customerName,
+            'internal_rework' as costType,
+            ISNULL(SUM(TotalCost), 0) as totalCost,
+            COUNT(*) as complaintCount
+          FROM ProductionReworkRegister 
+          WHERE ${reworkRankingWhereConditions.join(' AND ')}
+          GROUP BY CustomerCode
+          ORDER BY SUM(TotalCost) DESC
+        `;
+        
+        const reworkRankingResult = await request.query(reworkRankingQuery);
+        customerRanking = customerRanking.concat(reworkRankingResult.recordset);
+        
+        // 出版异常客户排行
+        let publishingRankingWhereConditions = ['isDeleted = 0', 'customer_code IS NOT NULL', 'customer_code != \'\'']; 
+        if (startDate) publishingRankingWhereConditions.push('registration_date >= @startDate');
+        if (endDate) publishingRankingWhereConditions.push('registration_date <= @endDate');
+        if (customerId) publishingRankingWhereConditions.push('customer_code = @customerId');
+        
+        const publishingRankingQuery = `
+          SELECT TOP 10
+            customer_code as customerName,
+            'internal_publishing' as costType,
+            ISNULL(SUM(amount), 0) as totalCost,
+            COUNT(*) as complaintCount
+          FROM publishing_exceptions 
+          WHERE ${publishingRankingWhereConditions.join(' AND ')}
+          GROUP BY customer_code
+          ORDER BY SUM(amount) DESC
+        `;
+        
+        const publishingRankingResult = await request.query(publishingRankingQuery);
+        customerRanking = customerRanking.concat(publishingRankingResult.recordset);
+      }
+      
+      // 合并同客户的数据并排序
+      const customerRankingMap = new Map();
+      customerRanking.forEach(item => {
+        const key = item.customerName;
+        if (!customerRankingMap.has(key)) {
+          customerRankingMap.set(key, {
+            customerName: key,
+            totalCost: 0,
+            complaintCount: 0,
+            external: { totalCost: 0, complaintCount: 0 },
+            internal: { totalCost: 0, complaintCount: 0 }
+          });
+        }
+        
+        const customerData = customerRankingMap.get(key);
+        customerData.totalCost += item.totalCost;
+        customerData.complaintCount += item.complaintCount;
+        
+        if (item.costType === 'external') {
+          customerData.external.totalCost += item.totalCost;
+          customerData.external.complaintCount += item.complaintCount;
+        } else {
+          customerData.internal.totalCost += item.totalCost;
+          customerData.internal.complaintCount += item.complaintCount;
+        }
+      });
+      
+      const customerRankingResult = Array.from(customerRankingMap.values())
+        .sort((a, b) => b.totalCost - a.totalCost)
+        .slice(0, 10);
       
       // 获取详细统计数据（分页）
       request.input('offset', sql.Int, offset);
       request.input('pageSize', sql.Int, validPageSize);
+      
+      // 构建详细统计查询的WHERE条件
+      let statisticsWhereConditions = ['1=1'];
+      if (startDate) statisticsWhereConditions.push('Date >= @startDate');
+      if (endDate) statisticsWhereConditions.push('Date <= @endDate');
+      if (customerId) statisticsWhereConditions.push('CustomerCode = @customerId');
+      const whereClause = statisticsWhereConditions.join(' AND ');
       
       const statisticsQuery = `
         SELECT 
@@ -738,7 +1269,9 @@ router.get('/cost-statistics', async (req, res) => {
         ORDER BY SUM(TotalQualityCost) DESC
       `;
       
+      console.log('🔍 [调试] 详细统计查询SQL:', statisticsQuery);
       const statisticsResult = await request.query(statisticsQuery);
+      console.log('📊 [调试] 详细统计查询结果数量:', statisticsResult.recordset.length);
       
       // 获取总记录数
       const countQuery = `
@@ -748,14 +1281,40 @@ router.get('/cost-statistics', async (req, res) => {
       `;
       
       const countResult = await request.query(countQuery);
+      console.log('📊 [调试] 总记录数查询结果:', countResult.recordset[0]);
       
       return {
-        overview,
-        trendData: trendDataResult.recordset,
-        costComposition,
-        customerRanking: customerRankingResult.recordset,
-        statistics: statisticsResult.recordset,
-        total: countResult.recordset[0].total
+        overview: {
+          totalCost: overview.totalCost, // 添加总质量成本字段
+          totalQualityCost: overview.totalQualityCost,
+          qualityPenalty: overview.qualityPenalty,
+          customerCompensation: overview.customerCompensation,
+          reworkCost: overview.reworkCost,
+          publishingExceptionCost: overview.publishingExceptionCost || 0,
+          internalComplaintCost: overview.internalComplaintCost || 0,
+          external: {
+            totalCost: overview.external?.totalCost || 0,
+            qualityPenalty: overview.external?.qualityPenalty || 0,
+            customerCompensation: overview.external?.customerCompensation || 0
+          },
+          internal: {
+            totalCost: overview.internal?.totalCost || 0,
+            reworkCost: overview.internal?.reworkCost || 0,
+            publishingExceptionCost: overview.internal?.publishingExceptionCost || 0,
+            internalComplaintCost: overview.internal?.internalComplaintCost || 0
+          },
+          trend: trend
+        },
+        trendData: trendDataResult,
+        costComposition: costComposition,
+        customerRanking: customerRankingResult,
+        detailData: statisticsResult.recordset,
+        pagination: {
+          current: page,
+          pageSize: pageSize,
+          total: countResult.recordset[0].total
+        },
+        costType: costType
       };
     });
     
@@ -774,6 +1333,15 @@ router.get('/cost-statistics', async (req, res) => {
         }
       });
     }
+    
+    console.log('🎯 [调试] API最终返回数据概览:', {
+      totalCost: result.overview?.totalCost || 0,
+      externalCost: result.overview?.external?.totalCost || 0,
+      internalCost: result.overview?.internal?.totalCost || 0,
+      trendDataLength: result.trendData?.length || 0,
+      costCompositionLength: result.costComposition?.length || 0,
+      customerRankingLength: result.customerRanking?.length || 0
+    });
     
     res.json({ success: true, data: result });
   } catch (error) {
