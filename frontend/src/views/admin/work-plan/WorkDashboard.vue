@@ -1021,45 +1021,33 @@ const updateBarChart = () => {
     return isNaN(num) ? 0 : num
   }
   
-  const data = [
-    {
-      name: '进行中',
-      value: safeValue(stats.inProgressPlans),
-      itemStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-          { offset: 0, color: '#4A90E2' },
-          { offset: 1, color: '#8EC1F7' }
-        ])
-      }
-    },
-    {
-       name: '已完成',
-       value: safeValue(stats.completedPlans),
-       itemStyle: {
-         color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-           { offset: 0, color: '#67C23A' },
-           { offset: 1, color: '#95D475' }
-         ])
-       }
-     },
-    {
-      name: '已逾期',
-      value: safeValue(stats.overduePlans),
-      itemStyle: {
-        color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-          { offset: 0, color: '#D0021B' },
-          { offset: 1, color: '#F78B9B' }
-        ])
-      }
-    }
+  // 准备图表数据和配置
+  const categories = ['进行中', '已完成', '已逾期']
+  const values = [
+    safeValue(stats.inProgressPlans),
+    safeValue(stats.completedPlans), 
+    safeValue(stats.overduePlans)
+  ]
+  
+  // 定义每个柱子的颜色
+  const colors = [
+    new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+      { offset: 0, color: '#4A90E2' },
+      { offset: 1, color: '#8EC1F7' }
+    ]),
+    new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+      { offset: 0, color: '#67C23A' },
+      { offset: 1, color: '#95D475' }
+    ]),
+    new echarts.graphic.LinearGradient(0, 0, 1, 0, [
+      { offset: 0, color: '#D0021B' },
+      { offset: 1, color: '#F78B9B' }
+    ])
   ]
   
   // 验证数据完整性
-  const hasValidData = data.every(item => 
-    item.name && 
-    typeof item.value === 'number' && 
-    !isNaN(item.value) &&
-    item.itemStyle
+  const hasValidData = values.every(value => 
+    typeof value === 'number' && !isNaN(value)
   )
   
   if (!hasValidData) {
@@ -1077,7 +1065,7 @@ const updateBarChart = () => {
       },
       xAxis: {
         type: 'category',
-        data: data.map(item => item.name),
+        data: categories,
         axisLine: {
           show: true,
           lineStyle: {
@@ -1118,7 +1106,12 @@ const updateBarChart = () => {
       },
       series: [{
         type: 'bar',
-        data: data,
+        data: values.map((value, index) => ({
+          value: value,
+          itemStyle: {
+            color: colors[index]
+          }
+        })),
         barWidth: '40%',
         label: {
           show: true,

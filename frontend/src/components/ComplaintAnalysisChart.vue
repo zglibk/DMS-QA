@@ -763,8 +763,8 @@ const handleDetailRowDoubleClick = async (row) => {
 // 数据钻取方法
 const drillDownToTimeDetail = async (row) => {
   try {
-    // 使用现有的投诉列表API进行数据钻取
-    const response = await axios.get('/complaint/list', {
+    // 使用api实例进行数据钻取，确保通过拦截器处理
+    const response = await api.get('/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,
@@ -788,8 +788,8 @@ const drillDownToTimeDetail = async (row) => {
 
 const drillDownToWorkshopDetail = async (row) => {
   try {
-    // 使用现有的投诉列表API进行数据钻取
-    const response = await axios.get('/complaint/list', {
+    // 使用api实例进行数据钻取，确保通过拦截器处理
+    const response = await api.get('/complaint/list', {
       params: {
         page: 1,
         pageSize: 50,

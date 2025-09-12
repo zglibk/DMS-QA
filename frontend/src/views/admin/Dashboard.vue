@@ -361,7 +361,7 @@ async function fetchDashboardData() {
       })
     ])
 
-    if (currentRes.success) {
+    if (currentRes && currentRes.success) {
       monthStats.value = {
         todayCount: currentRes.todayCount || 0,
         monthCount: currentRes.monthCount || 0,
@@ -373,7 +373,7 @@ async function fetchDashboardData() {
       console.error('❌ 当前月份数据获取失败:', currentRes)
     }
 
-    if (lastMonthRes.success) {
+    if (lastMonthRes && lastMonthRes.success) {
       lastMonthStats.value = {
         monthCount: lastMonthRes.monthCount || 0,
         monthInnerCount: lastMonthRes.monthInnerCount || 0,
@@ -384,13 +384,13 @@ async function fetchDashboardData() {
     }
 
     // 处理批次统计数据
-    if (currentBatchRes.success) {
+    if (currentBatchRes && currentBatchRes.success) {
       batchStats.value.currentDeliveryBatches = currentBatchRes.data.deliveryBatches || 0
     } else {
       console.error('❌ 当前批次数据获取失败:', currentBatchRes)
     }
 
-    if (lastBatchRes.success) {
+    if (lastBatchRes && lastBatchRes.success) {
       batchStats.value.lastDeliveryBatches = lastBatchRes.data.deliveryBatches || 0
     } else {
       console.error('❌ 上月批次数据获取失败:', lastBatchRes)
@@ -437,7 +437,7 @@ async function fetchQualityStats(token) {
     const complaintBatches = monthStats.value.monthOuterCount || 0
 
     // 从API获取真实的批次数据
-    const batchData = batchStatsRes.data || null
+    const batchData = (batchStatsRes && batchStatsRes.success) ? batchStatsRes.data || null : null
     const totalInspections = batchData ? batchData.inspectionBatches || 0 : 0
     const totalDeliveries = batchData ? batchData.deliveryBatches || 0 : 0
 
@@ -509,9 +509,9 @@ async function fetchLastQualityStats(token) {
       })
     ])
 
-    const failedInspections = innerComplaintRes.data ? innerComplaintRes.data.total || 0 : 0
-    const complaintBatches = outerComplaintRes.data ? outerComplaintRes.data.total || 0 : 0
-    const batchData = batchStatsRes.data || null
+    const failedInspections = (innerComplaintRes && innerComplaintRes.success) ? innerComplaintRes.total || 0 : 0
+    const complaintBatches = (outerComplaintRes && outerComplaintRes.success) ? outerComplaintRes.total || 0 : 0
+    const batchData = (batchStatsRes && batchStatsRes.success) ? batchStatsRes.data || null : null
     
     const totalInspections = batchData ? batchData.inspectionBatches || 0 : 0
     const totalDeliveries = batchData ? batchData.deliveryBatches || 0 : 0
@@ -583,7 +583,7 @@ async function fetchTrendData(token) {
       fetchQualityTarget(token, selectedYear, '一次交检合格率')
     ])
 
-    if (trendResponse.data && Array.isArray(trendResponse.data)) {
+    if (trendResponse && trendResponse.success && Array.isArray(trendResponse.data)) {
        const data = trendResponse.data
       trendData.value = {
         months: data.map(item => item && item.StatMonth ? `${item.StatMonth}月` : ''),
@@ -650,6 +650,11 @@ function initCharts() {
 // 初始化质量趋势图表
 function initQualityTrendChart() {
   if (qualityTrendChart.value && trendData.value) {
+    // 如果已存在图表实例，先销毁
+    if (qualityChartInstance) {
+      qualityChartInstance.dispose()
+      qualityChartInstance = null
+    }
     qualityChartInstance = echarts.init(qualityTrendChart.value)
 
     // 确保数据存在，避免 undefined 错误
@@ -885,6 +890,11 @@ function initQualityTrendChart() {
 // 初始化投诉趋势图表
 function initComplaintTrendChart() {
   if (complaintTrendChart.value && trendData.value) {
+    // 如果已存在图表实例，先销毁
+    if (complaintChartInstance) {
+      complaintChartInstance.dispose()
+      complaintChartInstance = null
+    }
     complaintChartInstance = echarts.init(complaintTrendChart.value)
 
     // 确保数据存在，避免 undefined 错误
@@ -1018,6 +1028,11 @@ function initComplaintTrendChart() {
 // 初始化单位统计横道图
 function initUnitStatsChart() {
   if (unitStatsChart.value && unitStats.value) {
+    // 如果已存在图表实例，先销毁
+    if (unitStatsChartInstance) {
+      unitStatsChartInstance.dispose()
+      unitStatsChartInstance = null
+    }
     unitStatsChartInstance = echarts.init(unitStatsChart.value)
 
     // 确保数据存在，避免 undefined 错误
