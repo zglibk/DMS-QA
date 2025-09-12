@@ -602,7 +602,6 @@ const getPlanOptions = async () => {
         // 移除状态筛选，允许选择所有状态的计划
       }
     })
-    console.log('API响应数据:', response.data)
     if (response.data.success) {
       // 使用真正的工作计划数据
       planOptions.value = response.data.data.list.map(plan => ({
@@ -610,7 +609,6 @@ const getPlanOptions = async () => {
         Title: plan.PlanName || plan.Title,
         Description: plan.Description
       })) || []
-      console.log('获取到的计划选项:', planOptions.value)
     } else {
       console.error('API返回失败:', response.data.message)
     }

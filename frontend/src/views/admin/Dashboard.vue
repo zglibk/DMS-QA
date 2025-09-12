@@ -336,17 +336,15 @@ function getArrowColor(trend, trendType) {
 // 获取仪表盘数据
 async function fetchDashboardData() {
   try {
-    console.log('=== 开始获取仪表盘数据 ===')
     loading.value = true
     const token = localStorage.getItem('token')
 
     if (!token) {
+      console.error('❌ Token不存在，请先登录')
       ElMessage.error('请先登录')
       return
     }
     
-    console.log('Token验证通过，开始获取数据...')
-
     // 并行获取当前月份和上月数据，以及批次统计数据
     const [currentRes, lastMonthRes, currentBatchRes, lastBatchRes] = await Promise.all([
       api.get('/complaint/month-stats', {
@@ -363,31 +361,39 @@ async function fetchDashboardData() {
       })
     ])
 
-    if (currentRes.data.success) {
+    if (currentRes.success) {
       monthStats.value = {
-        todayCount: currentRes.data.todayCount || 0,
-        monthCount: currentRes.data.monthCount || 0,
-        monthInnerCount: currentRes.data.monthInnerCount || 0,
-        monthOuterCount: currentRes.data.monthOuterCount || 0
+        todayCount: currentRes.todayCount || 0,
+        monthCount: currentRes.monthCount || 0,
+        monthInnerCount: currentRes.monthInnerCount || 0,
+        monthOuterCount: currentRes.monthOuterCount || 0
       }
-      unitStats.value = currentRes.data.units || []
+      unitStats.value = currentRes.units || []
+    } else {
+      console.error('❌ 当前月份数据获取失败:', currentRes)
     }
 
-    if (lastMonthRes.data.success) {
+    if (lastMonthRes.success) {
       lastMonthStats.value = {
-        monthCount: lastMonthRes.data.monthCount || 0,
-        monthInnerCount: lastMonthRes.data.monthInnerCount || 0,
-        monthOuterCount: lastMonthRes.data.monthOuterCount || 0
+        monthCount: lastMonthRes.monthCount || 0,
+        monthInnerCount: lastMonthRes.monthInnerCount || 0,
+        monthOuterCount: lastMonthRes.monthOuterCount || 0
       }
+    } else {
+      console.error('❌ 上月数据获取失败:', lastMonthRes)
     }
 
     // 处理批次统计数据
-    if (currentBatchRes.data.success) {
-      batchStats.value.currentDeliveryBatches = currentBatchRes.data.data.deliveryBatches || 0
+    if (currentBatchRes.success) {
+      batchStats.value.currentDeliveryBatches = currentBatchRes.data.deliveryBatches || 0
+    } else {
+      console.error('❌ 当前批次数据获取失败:', currentBatchRes)
     }
 
-    if (lastBatchRes.data.success) {
-      batchStats.value.lastDeliveryBatches = lastBatchRes.data.data.deliveryBatches || 0
+    if (lastBatchRes.success) {
+      batchStats.value.lastDeliveryBatches = lastBatchRes.data.deliveryBatches || 0
+    } else {
+      console.error('❌ 上月批次数据获取失败:', lastBatchRes)
     }
 
     // 获取质量统计数据和趋势数据
@@ -398,14 +404,13 @@ async function fetchDashboardData() {
     ])
 
     // 初始化图表
-    console.log('=== 数据获取完成，准备初始化图表 ===')
-    console.log('trendData.value:', trendData.value)
     await nextTick()
     initCharts()
-    console.log('=== 图表初始化完成 ===')
 
   } catch (error) {
-    ElMessage.error('获取仪表盘数据失败')
+    console.error('❌ 获取仪表盘数据时发生错误:', error)
+    console.error('错误堆栈:', error.stack)
+    ElMessage.error('获取仪表盘数据失败: ' + (error.message || '未知错误'))
   } finally {
     loading.value = false
   }
@@ -420,43 +425,21 @@ async function fetchQualityStats(token) {
     const startDate = `${selectedMonth.value}-01`
     const endDate = `${selectedMonth.value}-${lastDay.toString().padStart(2, '0')}`
 
-    // 并行获取数据
-    const [innerComplaintRes, outerComplaintRes, batchStatsRes] = await Promise.all([
-      // 获取内诉数量（不合格数）
-      api.get('/complaint/list', {
-        params: {
-          page: 1,
-          pageSize: 1,
-          complaintCategory: '内诉',
-          startDate: startDate,
-          endDate: endDate
-        }
-      }),
-      // 获取客诉批次数量
-      api.get('/complaint/list', {
-        params: {
-          page: 1,
-          pageSize: 1,
-          complaintCategory: '客诉',
-          startDate: startDate,
-          endDate: endDate
-        }
-      }),
-      // 获取月度批次统计数据
-      api.get('/quality-metrics/month-batch-stats', {
-        params: {
-          month: selectedMonth.value
-        }
-      })
-    ])
+    // 获取月度批次统计数据
+    const batchStatsRes = await api.get('/quality-metrics/month-batch-stats', {
+      params: {
+        month: selectedMonth.value
+      }
+    })
 
-    const failedInspections = innerComplaintRes.data.total || 0
-    const complaintBatches = outerComplaintRes.data.total || 0
+    // 使用统计卡片相同的数据源（monthStats中的内诉数和客诉数）
+    const failedInspections = monthStats.value.monthInnerCount || 0
+    const complaintBatches = monthStats.value.monthOuterCount || 0
 
     // 从API获取真实的批次数据
-    const batchData = batchStatsRes.data.success ? batchStatsRes.data.data : null
-    const totalInspections = batchData ? batchData.inspectionBatches : 0
-    const totalDeliveries = batchData ? batchData.deliveryBatches : 0
+    const batchData = batchStatsRes.data || null
+    const totalInspections = batchData ? batchData.inspectionBatches || 0 : 0
+    const totalDeliveries = batchData ? batchData.deliveryBatches || 0 : 0
 
     // 计算合格率和客诉率
     const passRate = totalInspections > 0 ?
@@ -473,6 +456,8 @@ async function fetchQualityStats(token) {
       complaintBatches
     }
   } catch (error) {
+    console.error('❌ fetchQualityStats发生错误:', error)
+    console.error('错误堆栈:', error.stack)
     // 设置默认值
     qualityStats.value = {
       passRate: 0,
@@ -524,21 +509,23 @@ async function fetchLastQualityStats(token) {
       })
     ])
 
-    if (innerComplaintRes.data.success && outerComplaintRes.data.success && batchStatsRes.data.success) {
-      const failedInspections = innerComplaintRes.data.total || 0
-      const totalInspections = batchStatsRes.data.data.inspectionBatches || 0
-      const passRate = totalInspections > 0 ? parseFloat(((totalInspections - failedInspections) / totalInspections * 100).toFixed(2)) : 0
+    const failedInspections = innerComplaintRes.data ? innerComplaintRes.data.total || 0 : 0
+    const complaintBatches = outerComplaintRes.data ? outerComplaintRes.data.total || 0 : 0
+    const batchData = batchStatsRes.data || null
+    
+    const totalInspections = batchData ? batchData.inspectionBatches || 0 : 0
+    const totalDeliveries = batchData ? batchData.deliveryBatches || 0 : 0
+    
+    const passRate = totalInspections > 0 ? parseFloat(((totalInspections - failedInspections) / totalInspections * 100).toFixed(2)) : 0
+    const complaintRate = totalDeliveries > 0 ? parseFloat((complaintBatches / totalDeliveries * 100).toFixed(2)) : 0
 
-      const complaintBatches = outerComplaintRes.data.total || 0
-      const totalDeliveries = batchStatsRes.data.data.deliveryBatches || 0
-      const complaintRate = totalDeliveries > 0 ? parseFloat((complaintBatches / totalDeliveries * 100).toFixed(2)) : 0
-
-      lastQualityStats.value = {
-        passRate,
-        complaintRate
-      }
+    lastQualityStats.value = {
+      passRate,
+      complaintRate
     }
   } catch (error) {
+    console.error('❌ 获取上月质量统计数据时发生错误:', error)
+    console.error('错误堆栈:', error.stack)
     // 设置默认值
     lastQualityStats.value = {
       passRate: 0,
@@ -596,8 +583,8 @@ async function fetchTrendData(token) {
       fetchQualityTarget(token, selectedYear, '一次交检合格率')
     ])
 
-    if (trendResponse.data.success && trendResponse.data.data && Array.isArray(trendResponse.data.data)) {
-      const data = trendResponse.data.data
+    if (trendResponse.data && Array.isArray(trendResponse.data)) {
+       const data = trendResponse.data
       trendData.value = {
         months: data.map(item => item && item.StatMonth ? `${item.StatMonth}月` : ''),
         passRates: data.map(item => item && item.FirstPassRate ? parseFloat(item.FirstPassRate) : 0),
@@ -672,13 +659,7 @@ function initQualityTrendChart() {
     const qualityTarget = trendData.value.qualityTarget || 98.5
     const targetLineData = new Array(months.length).fill(qualityTarget)
     
-    // 调试输出：图表加载时的关键信息
-    console.log('=== 图表加载调试信息 ===')
-    console.log('目标值 (qualityTarget):', qualityTarget)
-    console.log('目标线数据 (targetLineData):', targetLineData)
-    console.log('月份数据 (months):', months)
-    console.log('合格率数据 (passRates):', passRates)
-    console.log('客诉率数据 (complaintRates):', complaintRates)
+
     
     const option = {
       title: {
@@ -894,26 +875,6 @@ function initQualityTrendChart() {
       ]
     }
 
-    // 调试输出：系列配置信息
-    console.log('=== 图表系列配置调试信息 ===')
-    if (option.series && Array.isArray(option.series)) {
-      option.series.forEach((series, index) => {
-        if (series) {
-          console.log(`系列 ${index + 1}:`)
-          console.log('  - 系列名称:', series.name || '未定义')
-          console.log('  - 系列类型:', series.type || '未定义')
-          console.log('  - Y轴索引:', series.yAxisIndex || 0)
-          console.log('  - 系列数据:', series.data || [])
-          console.log('  - 数据长度:', series.data ? series.data.length : 0)
-        } else {
-          console.warn(`系列 ${index + 1}: 数据为空或undefined`)
-        }
-      })
-    } else {
-      console.warn('option.series 不存在或不是数组')
-    }
-    console.log('=========================')
-    
     // 强制重新渲染图表
     qualityChartInstance.clear()
     qualityChartInstance.setOption(option, true)
@@ -1177,13 +1138,7 @@ function handleBottomMonthChange(value) {
 
 // 组件挂载时获取数据
 onMounted(() => {
-  console.log('=== Dashboard页面开始加载 ===')
-  console.log('当前时间:', new Date().toLocaleString())
-  console.log('当前选择月份:', selectedMonth.value)
-  
   fetchDashboardData()
-  
-  console.log('=== Dashboard页面加载完成 ===')
 })
 
 // 组件卸载时销毁图表

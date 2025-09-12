@@ -192,8 +192,8 @@ const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
     const response = await api.get('/config/db-list')
-    if (response.data.success && response.data.data.length > 0) {
-      const config = response.data.data[0] // 获取当前配置
+    if (response.success && response.data.length > 0) {
+      const config = response.data[0] // 获取当前配置
       currentConfigId.value = config.ID
       currentConfig.value = config // 保存完整配置
       if (config.FileStoragePath) storageConfig.FileStoragePath = config.FileStoragePath
@@ -248,12 +248,12 @@ const saveConfig = async () => {
           NetworkSharePath: storageConfig.NetworkSharePath
         })
 
-        if (response.data.success) {
+        if (response.success) {
           ElMessage.success('存储配置保存成功')
           // 重新加载配置以确保数据同步
           await loadConfig()
         } else {
-          ElMessage.error(response.data.message || '保存失败')
+          ElMessage.error(response.message || '保存失败')
         }
       } catch (error) {
         ElMessage.error('保存存储配置失败')
@@ -272,10 +272,10 @@ const testStorage = async () => {
       path: storageConfig.FileStoragePath
     })
     
-    if (response.data.success) {
+    if (response.success) {
       ElMessage.success('存储路径测试成功')
     } else {
-      ElMessage.error(response.data.message || '存储路径测试失败')
+      ElMessage.error(response.message || '存储路径测试失败')
     }
   } catch (error) {
     ElMessage.error('测试存储失败')

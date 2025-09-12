@@ -905,8 +905,6 @@ const loadTemplateData = async (templateId) => {
     const response = await api.get(`/work-plan/templates/${templateId}`)
     const template = response.data.data
     
-    console.log('原始模板数据:', template)
-    
     // 解析模板数据中的阶段信息
     let phases = []
     let milestones = []
@@ -928,9 +926,6 @@ const loadTemplateData = async (templateId) => {
         estimatedDays: phase.estimatedDays || phase.days || 1
       }))
     }
-    
-    console.log('解析的phases:', phases)
-    console.log('转换的milestones:', milestones)
     
     // 根据模板的分类（category）找到对应的工作类型ID
     let workTypeID = template.WorkTypeID || template.workTypeID || ''
@@ -958,8 +953,6 @@ const loadTemplateData = async (templateId) => {
       phases: phases, // 加载模板的阶段信息（已隐藏展示）
       milestones: milestones // 加载模板的阶段信息（用于编辑）
     })
-    
-    console.log('填充后的表单数据:', planForm)
     
     // 显示新建对话框
     isEdit.value = false

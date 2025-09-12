@@ -599,7 +599,7 @@ const getDashboardData = async (timeRange = null) => {
       params.timeRange = timeRange
     }
     const response = await api.get('/work-plan/dashboard', { params })
-    if (response.data.success) {
+    if (response.data?.success) {
       dashboardData.value = response.data.data
     }
   } catch (error) {
@@ -638,11 +638,11 @@ const getTodoList = async (timeRange = null) => {
       params.timeRange = timeRange
     }
     const response = await api.get('/work-plan/dashboard/todos', { params })
-    if (response.data.success) {
-      todoList.value = response.data.data
-      displayedTodos.value = [...response.data.data]
+    if (response.data?.success) {
+      todoList.value = response.data.data || []
+      displayedTodos.value = [...(response.data.data || [])]
       // 检查是否还有更多数据
-      hasMoreTodos.value = response.data.data.length === todoPageSize.value
+      hasMoreTodos.value = (response.data.data || []).length === todoPageSize.value
     }
   } catch (error) {
     console.error('获取待办事项失败:', error)
@@ -746,8 +746,8 @@ const loadMoreTodos = async () => {
     
     const response = await api.get('/work-plan/dashboard/todos', { params })
     
-    if (response.data.success) {
-      const newTodos = response.data.data
+    if (response.success) {
+      const newTodos = response.data
       todoList.value = [...todoList.value, ...newTodos]
       displayedTodos.value = [...displayedTodos.value, ...newTodos]
       // 检查是否还有更多数据
@@ -789,11 +789,11 @@ const getRecentLogs = async (timeRange = null) => {
       params.timeRange = timeRange
     }
     const response = await api.get('/work-plan/dashboard/recent-logs', { params })
-    if (response.data.success) {
-      recentLogs.value = response.data.data
-      displayedLogs.value = [...response.data.data]
+    if (response.success) {
+      recentLogs.value = response.data.data || []
+      displayedLogs.value = [...(response.data.data || [])]
       // 检查是否还有更多数据
-      hasMoreLogs.value = response.data.data.length === pageSize.value
+      hasMoreLogs.value = (response.data.data || []).length === pageSize.value
     }
   } catch (error) {
     console.error('获取最近工作日志失败:', error)
@@ -863,9 +863,9 @@ const getNoticeList = async (timeRange = null) => {
       params.timeRange = timeRange
     }
     const response = await api.get('/notice', { params })
-    if (response.data.success) {
-      // 后端返回的数据结构是 { success: true, data: [...], message: '...' }
-      // 其中 data 直接是通知数组，不是 { list: [...] } 结构
+    if (response.success) {
+      // 后端返回的数据结构是 { success: true, data: {...}, message: '...' }
+      // 需要从 response.data.data 获取实际数据
       noticeList.value = response.data.data || []
     }
   } catch (error) {
@@ -881,9 +881,9 @@ const getNoticeList = async (timeRange = null) => {
 const getUnreadNoticeCount = async () => {
   try {
     const response = await api.get('/notice/unread/count')
-    if (response.data.success) {
+    if (response.success) {
       // 这里可以用于更新全局未读数量状态
-      return response.data.data || 0
+      return response.data || 0
     }
   } catch (error) {
     console.error('获取未读通知数量失败:', error)
@@ -1376,9 +1376,9 @@ const loadMoreLogs = async () => {
     
     const response = await api.get('/work-plan/dashboard/recent-logs', { params })
     
-    if (response.data.success && response.data.data.length > 0) {
-      displayedLogs.value.push(...response.data.data)
-      hasMoreLogs.value = response.data.data.length === pageSize.value
+    if (response.success && response.data.length > 0) {
+      displayedLogs.value.push(...response.data)
+      hasMoreLogs.value = response.data.length === pageSize.value
     } else {
       hasMoreLogs.value = false
     }

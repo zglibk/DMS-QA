@@ -401,8 +401,8 @@ const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
     const response = await api.get('/config/home-cards')
-    if (response.data.success) {
-      const data = response.data.data
+    if (response.success) {
+      const data = response.data
       config.showTodayCount = data.showTodayCount !== false
       config.showMonthCount = data.showMonthCount !== false
       config.displayUnits = data.displayUnits || config.displayUnits
@@ -434,7 +434,7 @@ const saveConfig = async (setAsDefault = false) => {
       setAsDefault: setAsDefault
     })
 
-    if (response.data.success) {
+    if (response.success) {
       if (setAsDefault) {
         ElMessage.success('主页卡片配置已保存并设为默认')
       } else {

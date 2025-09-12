@@ -882,14 +882,14 @@ async function loadTableData() {
     
     const response = await api.get('/sample/list', { params })
     
-    if (response.data.code === 200) {
-      tableData.value = response.data.data.list
-      pagination.total = response.data.data.total
+    if (response.code === 200) {
+      tableData.value = response.data.list
+      pagination.total = response.data.total
       
       // 加载统计数据
       await loadStatistics()
     } else {
-      ElMessage.error(response.data.message || '加载数据失败')
+      ElMessage.error(response.message || '加载数据失败')
     }
   } catch (error) {
     console.error('加载数据失败:', error)
@@ -906,15 +906,15 @@ async function loadStatistics() {
   try {
     const response = await api.get('/sample/statistics')
     
-    if (response.data.code === 200) {
-      const data = response.data.data
+    if (response.code === 200) {
+      const data = response.data
       
       statistics.total = data.total || 0
       statistics.signed = data.signed || 0
       statistics.unsigned = data.unsigned || 0
       statistics.cancelled = data.cancelled || 0
     } else {
-      ElMessage.error(response.data.message || '获取统计数据失败')
+      ElMessage.error(response.message || '获取统计数据失败')
     }
   } catch (error) {
     console.error('加载统计数据失败:', error)
@@ -963,8 +963,8 @@ async function handleAdd() {
   try {
     // 获取下一个样版编号预览
     const response = await api.get('/sample/next-certificate-no')
-    if (response.data.code === 200) {
-      formData.certificateNo = response.data.data.certificateNo
+    if (response.code === 200) {
+      formData.certificateNo = response.data.certificateNo
     } else {
       formData.certificateNo = '获取编号失败'
       ElMessage.warning('获取样版编号失败，请重试')
@@ -1033,11 +1033,11 @@ async function handleDelete(row) {
     
     const response = await api.delete(`/sample/delete/${row.id}`)
     
-    if (response.data.code === 200) {
+    if (response.code === 200) {
       ElMessage.success('删除成功')
       loadTableData()
     } else {
-      ElMessage.error(response.data.message || '删除失败')
+      ElMessage.error(response.message || '删除失败')
     }
   } catch (error) {
     console.error('删除失败:', error)
@@ -1113,8 +1113,8 @@ async function handleExportList() {
     // 获取数据
     const response = await api.get('/sample/list', { params })
     
-    if (response.data.code === 200) {
-      const allData = response.data.data.list
+    if (response.code === 200) {
+      const allData = response.data.list
       
       if (allData.length === 0) {
         ElMessage.warning('没有符合条件的数据可导出')
@@ -1302,12 +1302,12 @@ async function handleBatchDelete() {
     const ids = selectedRows.value.map(row => row.id)
     const response = await api.delete('/sample/batch-delete', { data: { ids } })
     
-    if (response.data.code === 200) {
+    if (response.code === 200) {
       ElMessage.success('批量删除成功')
       selectedRows.value = []
       loadTableData()
     } else {
-      ElMessage.error(response.data.message || '批量删除失败')
+      ElMessage.error(response.message || '批量删除失败')
     }
   } catch (error) {
     console.error('批量删除失败:', error)
@@ -1525,12 +1525,12 @@ async function handleSubmit() {
       response = await api.post('/sample/create', submitData)
     }
     
-    if (response.data.code === 200) {
+    if (response.code === 200) {
       ElMessage.success(formData.id ? '更新成功' : '新增成功')
       dialogVisible.value = false
       loadTableData()
     } else {
-      ElMessage.error(response.data.message || '保存失败')
+      ElMessage.error(response.message || '保存失败')
     }
   } catch (error) {
     console.error('保存失败:', error)

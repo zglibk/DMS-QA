@@ -843,9 +843,7 @@ const saveTemplate = async () => {
       return
     }
     
-    // 调试信息：输出当前表单数据
-    console.log('当前表单数据:', templateForm)
-    console.log('模板名称值:', templateForm.templateName)
+    // 执行表单验证前的数据检查
     
     // 执行表单验证
     const isValid = await new Promise((resolve) => {

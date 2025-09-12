@@ -1517,9 +1517,9 @@ const fetchUsers = async () => {
     
     const res = await api.get('/auth/user-list', { params })
     
-    if (res.data && res.data.success) {
-      users.value = res.data.data
-      total.value = res.data.total
+    if (res && res.success) {
+      users.value = res.data
+      total.value = res.total
     }
   } catch (error) {
     console.error('获取用户列表失败:', error)

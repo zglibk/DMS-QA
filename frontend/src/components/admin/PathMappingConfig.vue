@@ -405,11 +405,11 @@ const testConversion = async () => {
       config: conversionConfig
     })
     
-    if (response.data.success) {
-      testResult.value = response.data.data.convertedPath || '无匹配的映射规则'
+    if (response.success) {
+      testResult.value = response.data.convertedPath || '无匹配的映射规则'
       ElMessage.success('路径转换测试完成')
     } else {
-      testResult.value = response.data.message || '转换失败'
+      testResult.value = response.message || '转换失败'
       ElMessage.error('路径转换测试失败')
     }
   } catch (error) {
@@ -425,8 +425,8 @@ const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
     const response = await api.get('/import/path-mapping-config')
-    if (response.data.success) {
-      const config = response.data.data
+    if (response.success) {
+      const config = response.data
       if (config.pathMappings) {
         // 过滤掉服务器存储路径映射（这是动态生成的，不需要用户编辑）
         const userMappings = config.pathMappings.filter(mapping => mapping.id !== 'server-storage')
@@ -493,12 +493,12 @@ const saveConfig = async () => {
       conversionConfig: conversionConfig
     })
 
-    if (response.data.success) {
+    if (response.success) {
       ElMessage.success('路径映射配置保存成功')
       // 重新加载配置以确保数据同步
       await loadConfig()
     } else {
-      ElMessage.error(response.data.message || '保存失败')
+      ElMessage.error(response.message || '保存失败')
     }
   } catch (error) {
     ElMessage.error('保存路径映射配置失败: ' + (error.response?.data?.message || error.message))

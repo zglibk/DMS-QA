@@ -196,8 +196,8 @@ const loadConfig = async (showMessage = false) => {
   isLoading.value = true
   try {
     const response = await api.get('/config/site-config')
-    if (response.data.success) {
-      const data = response.data.data
+    if (response.success) {
+      const data = response.data
       Object.assign(config, data)
       
       if (showMessage) {
@@ -219,7 +219,7 @@ const saveConfig = async () => {
   try {
     const response = await api.put('/config/site-config', config)
 
-    if (response.data.success) {
+    if (response.success) {
       ElMessage.success('网站配置保存成功')
 
       // 更新页面标题和图标
@@ -233,7 +233,7 @@ const saveConfig = async () => {
         detail: config
       }))
     } else {
-      ElMessage.error(response.data.message || '保存失败')
+      ElMessage.error(response.message || '保存失败')
     }
   } catch (error) {
     ElMessage.error('保存配置失败')
@@ -317,9 +317,9 @@ const uploadLogo = async (options) => {
       }
     })
 
-    if (response.data.success) {
+    if (response.success) {
       // 直接使用返回的BASE64数据URL
-      config.logoBase64Img = response.data.data.url
+      config.logoBase64Img = response.data.url
 
       // 强制刷新图片组件
       imageRefreshKey.value++
@@ -329,7 +329,7 @@ const uploadLogo = async (options) => {
       // 强制更新预览
       await nextTick()
     } else {
-      ElMessage.error(response.data.message || 'LOGO上传失败')
+      ElMessage.error(response.message || 'LOGO上传失败')
     }
   } catch (error) {
     ElMessage.error('LOGO上传失败')
@@ -352,9 +352,9 @@ const uploadFavicon = async (options) => {
       }
     })
 
-    if (response.data.success) {
+    if (response.success) {
       // 直接使用返回的BASE64数据URL
-      config.faviconBase64Img = response.data.data.url
+      config.faviconBase64Img = response.data.url
 
       // 强制刷新图片组件
       imageRefreshKey.value++
@@ -364,7 +364,7 @@ const uploadFavicon = async (options) => {
       // 强制更新预览
       await nextTick()
     } else {
-      ElMessage.error(response.data.message || '网站图标上传失败')
+      ElMessage.error(response.message || '网站图标上传失败')
     }
   } catch (error) {
     ElMessage.error('网站图标上传失败')

@@ -193,8 +193,10 @@ const loadConfigs = async () => {
   isLoadingConfigs.value = true
   try {
     const response = await api.get('/config/db-list')
-    if (response.data.success) {
-      dbConfigs.value = response.data.data
+    if (response.success) {
+      dbConfigs.value = response.data
+    } else {
+      ElMessage.error(response.message || '加载配置失败')
     }
   } catch (error) {
     ElMessage.error('加载配置失败')
@@ -273,15 +275,15 @@ const saveConfig = async () => {
         
         const response = await api[method](url, dbConfig)
         
-        if (response.data.success) {
+        if (response.success) {
           ElMessage.success(selectedConfigId.value ? '配置更新成功' : '配置保存成功')
           await loadConfigs()
           
-          if (!selectedConfigId.value && response.data.data?.ID) {
-            selectedConfigId.value = response.data.data.ID
+          if (!selectedConfigId.value && response.data?.ID) {
+            selectedConfigId.value = response.data.ID
           }
         } else {
-          ElMessage.error(response.data.message || '保存失败')
+          ElMessage.error(response.message || '保存失败')
         }
       } catch (error) {
         ElMessage.error('保存配置失败')
@@ -299,10 +301,10 @@ const testConnection = async () => {
       isTesting.value = true
       try {
         const response = await api.post('/config/test-connection', dbConfig)
-        if (response.data.success) {
+        if (response.success) {
           ElMessage.success('连接测试成功')
         } else {
-          ElMessage.error(response.data.message || '连接测试失败')
+          ElMessage.error(response.message || '连接测试失败')
         }
       } catch (error) {
         ElMessage.error('连接测试失败')
@@ -323,13 +325,13 @@ const deleteConfig = async () => {
     })
 
     const response = await api.delete(`/config/db/${selectedConfigId.value}`)
-    if (response.data.success) {
+    if (response.success) {
       ElMessage.success('配置删除成功')
       selectedConfigId.value = null
       onConfigChange(null)
       await loadConfigs()
     } else {
-      ElMessage.error(response.data.message || '删除失败')
+      ElMessage.error(response.message || '删除失败')
     }
   } catch (error) {
     if (error !== 'cancel') {

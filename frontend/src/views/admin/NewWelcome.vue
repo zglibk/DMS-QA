@@ -1283,11 +1283,12 @@ const fetchSystemStats = async () => {
   try {
     const response = await api.get('/dashboard/stats')
     
-    if (response.data.success) {
+    // 由于 utils/api.js 的响应拦截器返回 response.data，所以直接访问 response.success
+    if (response.success) {
       todayStats.value = {
-        loginCount: response.data.data.todayLoginCount,
-        taskCount: response.data.data.taskCount,
-        alertCount: response.data.data.alertCount
+        loginCount: response.data.todayLoginCount,
+        taskCount: response.data.taskCount,
+        alertCount: response.data.alertCount
       }
     }
     
@@ -1311,9 +1312,10 @@ const fetchLoginLogs = async () => {
       }
     })
     
-    if (response.data.success) {
+    // 由于 utils/api.js 的响应拦截器返回 response.data，所以直接访问 response.success
+    if (response.success) {
       // 转换数据格式
-      loginLogs.value = response.data.data.list.map(log => ({
+      loginLogs.value = response.data.list.map(log => ({
         id: log.id,
         username: log.username || '未知用户',
         loginTime: new Date(log.loginTime).toLocaleString('zh-CN'),
@@ -1339,9 +1341,10 @@ const fetchOnlineUsers = async () => {
       }
     })
     
-    if (response.data.success) {
+    // 由于 utils/api.js 的响应拦截器返回 response.data，所以直接访问 response.success
+    if (response.success) {
       // 转换数据格式
-      onlineUsers.value = response.data.data.list.map(user => ({
+      onlineUsers.value = response.data.list.map(user => ({
         id: user.id,
         username: user.username,
         role: user.role || '用户',
@@ -1371,8 +1374,9 @@ const fetchOverviewData = async () => {
     // 获取客诉数据
     const complaintResponse = await api.get('/dashboard/stats')
     
-    if (qualityResponse.data.success) {
-      const qualityData = qualityResponse.data.data
+    // 由于 utils/api.js 的响应拦截器返回 response.data，所以直接访问 response.success
+    if (qualityResponse.success) {
+      const qualityData = qualityResponse.data
       
       // 计算趋势（这里简化处理，实际可以通过对比历史数据计算）
       const qualityTrend = qualityData.YearlyFirstPassRate >= 95 ? 'up' : 'down'
@@ -1380,8 +1384,8 @@ const fetchOverviewData = async () => {
       
       // 获取质量成本数据
       let costData = { totalCost: 0, totalTrend: 0 }
-      if (costResponse.data.success && costResponse.data.data.overview) {
-        costData = costResponse.data.data.overview
+      if (costResponse.success && costResponse.data.overview) {
+        costData = costResponse.data.overview
       }
       
       // 更新概览数据
@@ -1535,10 +1539,11 @@ const fetchSystemInfo = async () => {
   try {
     const response = await api.get('/system-info')
     
-    if (response.data && response.data.success) {
+    // 由于 utils/api.js 的响应拦截器返回 response.data，所以直接访问 response.success
+    if (response && response.success) {
       systemInfo.value = {
         ...systemInfo.value,
-        ...response.data.data
+        ...response.data
       }
     }
   } catch (error) {

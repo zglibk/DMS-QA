@@ -796,17 +796,20 @@ router.get('/user-list', authenticateToken, async (req, res) => {
     let pool = await sql.connect(await getDynamicConfig())
     let where = "WHERE u.Username != 'admin'" // 过滤系统管理员账号
     if (search) {
-      where += ` AND (u.Username LIKE N'%${search}%' OR u.Email LIKE N'%${search}%' OR u.Phone LIKE N'%${search}%')`
+      where += ` AND (u.Username LIKE N'%${search}%' OR u.RealName LIKE N'%${search}%' OR u.Email LIKE N'%${search}%' OR u.Phone LIKE N'%${search}%' OR d.Name LIKE N'%${search}%')`
     }
-    const countResult = await pool.request().query(`SELECT COUNT(*) AS total FROM [User] u ${where}`)
+    const countResult = await pool.request().query(`SELECT COUNT(*) AS total FROM [User] u LEFT JOIN [Department] d ON u.DepartmentID = d.ID ${where}`)
     const total = countResult.recordset[0].total
     const offset = (page - 1) * pageSize
     const sqlQuery = `
       SELECT * FROM (
         SELECT 
-          u.ID, u.Username, u.RealName, u.Department, u.Email, u.Phone, 
+          u.ID, u.Username, u.RealName, 
+          ISNULL(d.Name, '未分配') AS Department, 
+          u.Email, u.Phone, 
           u.Avatar, ISNULL(u.Status, 1) AS Status, u.CreatedAt, u.LastLoginTime,
           u.Gender, u.Birthday, u.Address, u.Remark, u.UpdatedAt,
+          u.DepartmentID,
           p.PositionName AS Position,
           STUFF((
             SELECT ', ' + r.RoleName 
@@ -823,6 +826,7 @@ router.get('/user-list', authenticateToken, async (req, res) => {
           ROW_NUMBER() OVER (ORDER BY u.Username) AS RowNum
         FROM [User] u
         LEFT JOIN [Positions] p ON u.PositionID = p.ID
+        LEFT JOIN [Department] d ON u.DepartmentID = d.ID
         ${where}
       ) AS T
       WHERE T.RowNum BETWEEN ${offset + 1} AND ${offset + pageSize}

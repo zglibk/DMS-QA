@@ -738,12 +738,8 @@ const getPlanList = async () => {
       ...filterForm
     }
     const response = await api.get('/work-plan/plans', { params })
-    // console.log('API响应数据:', response.data)
     if (response.data.success) {
       planList.value = response.data.data.list || []
-      // console.log('计划列表数据:', planList.value)
-      // console.log('API返回的total:', response.data.data.total)
-      // console.log('列表长度:', planList.value.length)
       
       // 如果API没有返回total，使用列表长度作为总数
       if (response.data.data.total !== undefined) {
@@ -751,7 +747,6 @@ const getPlanList = async () => {
       } else {
         pagination.total = planList.value.length
       }
-      // console.log('设置的pagination.total:', pagination.total)
     } else {
       planList.value = []
       pagination.total = 0

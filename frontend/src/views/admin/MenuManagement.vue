@@ -470,7 +470,13 @@ const fetchMenus = async () => {
     
     // 获取菜单列表数据
     const response = await api.get('/menus', { params })
-    const allMenus = response.data.data.list || []
+    
+    // 检查响应是否成功
+    if (!response.success) {
+      throw new Error(response.message || '获取菜单列表失败')
+    }
+    
+    const allMenus = response.data.list || []
     
     // 构建树形结构
     const buildMenuTree = (menuList) => {
@@ -506,7 +512,7 @@ const fetchMenus = async () => {
     // 设置数据（后端已处理分页）
     menuList.value = flatMenus // 保存完整列表用于其他操作
     filteredMenuList.value = topLevelMenus // 用于树形显示的数据
-    pagination.total = response.data.data.total || topLevelMenus.length
+    pagination.total = response.data.total || topLevelMenus.length
     
     // 数据加载完成后，设置默认展开状态
     nextTick(() => {

@@ -736,25 +736,16 @@ const flattenDepartmentTree = (tree, prefix = '') => {
  */
 const loadBasicData = async () => {
   try {
-    console.log('开始加载基础数据...')
-    
     // 检查token是否存在
     const token = localStorage.getItem('token')
-    console.log('Token存在:', !!token)
     
-    // 分别加载基础数据，便于调试
-    console.log('正在加载可分配用户...')
+    // 分别加载基础数据
     const assignableUsersRes = await api.get('/work-plan/assignable-users')
-    console.log('可分配用户响应:', assignableUsersRes.data)
-    
-    console.log('正在加载部门列表...')
     const departmentsRes = await api.get('/departments')
-    console.log('部门列表响应:', departmentsRes.data)
     
     // 处理可分配用户数据
     if (assignableUsersRes.data.success) {
       assignableUsers.value = assignableUsersRes.data.data || []
-      console.log('可分配用户数据:', assignableUsers.value)
     } else {
       console.error('获取可分配用户失败:', assignableUsersRes.data.message)
     }
@@ -764,19 +755,15 @@ const loadBasicData = async () => {
        const departmentTree = departmentsRes.data.data || []
        // 将树形结构扁平化为适合下拉选择的格式
        departments.value = flattenDepartmentTree(departmentTree)
-       console.log('部门数据:', departments.value)
      } else {
        console.error('获取部门列表失败:', departmentsRes.data.message)
      }
     
     // 尝试获取工作类型
     try {
-      console.log('正在加载工作类型...')
       const workTypeResponse = await api.get('/work-plan/work-types')
-      console.log('工作类型响应:', workTypeResponse.data)
       if (workTypeResponse.data.success) {
         workTypes.value = workTypeResponse.data.data || []
-        console.log('工作类型数据:', workTypes.value)
       } else {
         console.error('获取工作类型失败:', workTypeResponse.data.message)
         workTypes.value = []
@@ -790,11 +777,8 @@ const loadBasicData = async () => {
         { ID: 3, Name: '临时任务' }
       ]
     }
-    
-    console.log('基础数据加载完成')
   } catch (error) {
     console.error('加载基础数据失败:', error)
-    console.error('错误详情:', error.response?.data || error.message)
     throw error
   }
 }
