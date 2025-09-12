@@ -643,7 +643,7 @@ router.get('/cost-statistics', async (req, res) => {
           periodFormat = "CONVERT(VARCHAR(7), Date, 120)";
           break;
         case 'quarter':
-          periodFormat = "CONCAT(YEAR(Date), '-Q', DATEPART(QUARTER, Date))";
+          periodFormat = "CAST(YEAR(Date) AS VARCHAR) + '-Q' + CAST(DATEPART(QUARTER, Date) AS VARCHAR)";
           break;
         case 'year':
           periodFormat = "YEAR(Date)";
@@ -742,7 +742,7 @@ router.get('/cost-statistics', async (req, res) => {
       
       // 获取总记录数
       const countQuery = `
-        SELECT COUNT(DISTINCT CONCAT(${periodFormat}, '-', CustomerCode)) as total
+        SELECT COUNT(DISTINCT (${periodFormat} + '-' + CustomerCode)) as total
         FROM CustomerComplaints 
         WHERE ${whereClause}
       `;
@@ -826,7 +826,7 @@ router.get('/cost-statistics/export', async (req, res) => {
           periodFormat = "CONVERT(VARCHAR(7), Date, 120)";
           break;
         case 'quarter':
-          periodFormat = "CONCAT(YEAR(Date), '-Q', DATEPART(QUARTER, Date))";
+          periodFormat = "CAST(YEAR(Date) AS VARCHAR) + '-Q' + CAST(DATEPART(QUARTER, Date) AS VARCHAR)";
           break;
         case 'year':
           periodFormat = "YEAR(Date)";
