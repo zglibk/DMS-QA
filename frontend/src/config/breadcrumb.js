@@ -526,6 +526,12 @@ export const breadcrumbConfig = {
   '/publishing-exceptions': {
     title: '出版异常',
     icon: 'DocumentRemove'
+  },
+
+  // 版本更新管理
+  '/admin/version-updates': {
+    title: '版本更新',
+    icon: 'Upgrade'
   }
 }
 

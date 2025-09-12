@@ -218,7 +218,7 @@ onMounted(async () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 5rem;
+  height: 4rem;
   box-shadow: 0 0.125rem 0.5rem #f0f1f2;
   padding: 0 1.5rem;
   position: sticky;
@@ -406,8 +406,8 @@ onMounted(async () => {
 }
 .admin-main {
   background: #fafbfc;
-  /* 修复高度计算，头部实际高度为5rem（80px） */
-  height: calc(100vh - 5rem);
+  /* 修复高度计算，头部实际高度为4rem（64px） */
+  height: calc(100vh - 4rem);
   padding: 1.5rem;
   overflow-y: auto;
   overflow-x: hidden;

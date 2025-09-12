@@ -777,4 +777,257 @@ router.get('/stats/summary', authenticateToken, async (req, res) => {
     }
 });
 
+/**
+ * 执行高级版本更新日志生成器脚本
+ * POST /api/version-updates/generate-changelog
+ * 
+ * 功能说明：
+ * 1. 安全执行generate-changelog-advanced.js脚本
+ * 2. 使用连接池管理，避免服务崩溃
+ * 3. 支持自定义版本号和配置选项
+ * 4. 返回详细的执行结果和统计信息
+ */
+router.post('/generate-changelog', authenticateToken, async (req, res) => {
+    try {
+        console.log('🚀 [API] 开始执行版本更新日志生成器...');
+        
+        const {
+            version,
+            from,
+            to = 'HEAD',
+            saveToDb = true,
+            format = 'markdown',
+            sendNotification = true
+        } = req.body;
+        
+        // 验证用户权限（可选：只允许管理员执行）
+        if (req.user.role !== 'admin' && req.user.role !== 'super_admin') {
+            return res.status(403).json({
+                success: false,
+                message: '权限不足，只有管理员可以执行此操作'
+            });
+        }
+        
+        // 动态导入脚本模块
+        const changelogGenerator = require('../../scripts/generate-changelog-advanced');
+        
+        // 准备执行选项
+        const options = {
+            version,
+            from,
+            to,
+            saveToDb,
+            format,
+            preview: false,
+            sendNotification
+        };
+        
+        console.log('⚙️  [API] 执行选项:', options);
+        
+        // 执行脚本
+        const result = await changelogGenerator.executeChangelogGeneration(options);
+        
+        console.log('📊 [API] 脚本执行结果:', result);
+        
+        if (result.success) {
+            res.json({
+                success: true,
+                message: result.message,
+                data: {
+                    version: result.data.version,
+                    totalCommits: result.data.totalCommits,
+                    categories: result.data.categories,
+                    stats: result.data.stats,
+                    dbSaved: result.data.dbSaved,
+                    changelog: result.data.changelog
+                }
+            });
+        } else {
+            res.status(400).json({
+                success: false,
+                message: result.message,
+                error: result.data?.error
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ [API] 执行版本更新日志生成器失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '执行版本更新日志生成器失败',
+            error: error.message,
+            details: {
+                stack: error.stack,
+                timestamp: new Date().toISOString()
+            }
+        });
+    }
+});
+
+/**
+ * 获取Git提交记录列表
+ * GET /api/version-updates/git/commits
+ * 查询参数：
+ * - limit: 限制返回数量（默认50）
+ * - branch: 指定分支（默认当前分支）
+ */
+router.get('/git/commits', authenticateToken, async (req, res) => {
+    try {
+        const { limit = 50, branch = 'HEAD' } = req.query;
+        const { execSync } = require('child_process');
+        
+        console.log('🔍 [API] 获取Git提交记录...');
+        
+        // 获取Git提交记录
+        const gitCommand = `git log -${limit} ${branch} --pretty=format:"%H|%h|%s|%an|%ad|%ae" --date=short`;
+        
+        try {
+            const output = execSync(gitCommand, { 
+                encoding: 'utf8',
+                cwd: process.cwd() // 确保在项目根目录执行
+            });
+            
+            const commits = output.split('\n').filter(line => line.trim()).map(line => {
+                const [hash, shortHash, subject, author, date, email] = line.split('|');
+                return {
+                    hash,
+                    shortHash,
+                    subject,
+                    author,
+                    date,
+                    email,
+                    display: `${shortHash} - ${subject} (${author}, ${date})`
+                };
+            });
+            
+            res.json({
+                success: true,
+                data: commits,
+                total: commits.length
+            });
+            
+        } catch (gitError) {
+            console.error('❌ [API] Git命令执行失败:', gitError.message);
+            res.status(400).json({
+                success: false,
+                message: 'Git命令执行失败',
+                error: gitError.message
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ [API] 获取Git提交记录失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取Git提交记录失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 获取Git标签列表
+ * GET /api/version-updates/git/tags
+ * 查询参数：
+ * - limit: 限制返回数量（默认20）
+ */
+router.get('/git/tags', authenticateToken, async (req, res) => {
+    try {
+        const { limit = 20 } = req.query;
+        const { execSync } = require('child_process');
+        
+        console.log('🏷️  [API] 获取Git标签列表...');
+        
+        // 获取Git标签，按版本号排序
+        const gitCommand = `git tag --sort=-version:refname -l`;
+        
+        try {
+            const output = execSync(gitCommand, { 
+                encoding: 'utf8',
+                cwd: process.cwd()
+            });
+            
+            const allTags = output.split('\n').filter(line => line.trim());
+            const tags = allTags.slice(0, parseInt(limit)).map(tag => ({
+                name: tag,
+                display: tag
+            }));
+            
+            res.json({
+                success: true,
+                data: tags,
+                total: tags.length
+            });
+            
+        } catch (gitError) {
+            console.error('❌ [API] Git标签获取失败:', gitError.message);
+            res.status(400).json({
+                success: false,
+                message: 'Git标签获取失败',
+                error: gitError.message
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ [API] 获取Git标签失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取Git标签失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 获取Git分支列表
+ * GET /api/version-updates/git/branches
+ */
+router.get('/git/branches', authenticateToken, async (req, res) => {
+    try {
+        const { execSync } = require('child_process');
+        
+        console.log('🌿 [API] 获取Git分支列表...');
+        
+        // 获取本地和远程分支
+        const gitCommand = `git branch -a --format="%(refname:short)"`;
+        
+        try {
+            const output = execSync(gitCommand, { 
+                encoding: 'utf8',
+                cwd: process.cwd()
+            });
+            
+            const branches = output.split('\n')
+                .filter(line => line.trim())
+                .filter(branch => !branch.includes('HEAD')) // 过滤HEAD引用
+                .map(branch => ({
+                    name: branch.trim(),
+                    display: branch.trim()
+                }));
+            
+            res.json({
+                success: true,
+                data: branches,
+                total: branches.length
+            });
+            
+        } catch (gitError) {
+            console.error('❌ [API] Git分支获取失败:', gitError.message);
+            res.status(400).json({
+                success: false,
+                message: 'Git分支获取失败',
+                error: gitError.message
+            });
+        }
+        
+    } catch (error) {
+        console.error('❌ [API] 获取Git分支失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取Git分支失败',
+            error: error.message
+        });
+    }
+});
+
 module.exports = router;

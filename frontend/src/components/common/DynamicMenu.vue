@@ -149,7 +149,9 @@ import {
   TrendCharts,
   Coordinate as CoordinateIcon,
   Briefcase as Suitcase,
-  Search
+  Search,
+  TopRight,
+  Promotion as Upgrade
 } from '@element-plus/icons-vue'
 
 // 定义props
@@ -228,7 +230,8 @@ const iconMap = {
     Promotion: TrendCharts,
     Coordinate: CoordinateIcon,
     Suitcase,
-    Search
+    Search,
+    Upgrade
   }
 
 // 获取图标组件

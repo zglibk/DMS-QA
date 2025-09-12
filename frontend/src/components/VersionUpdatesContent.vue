@@ -101,6 +101,16 @@
                   <el-icon><Refresh /></el-icon>
                   刷新数据
                 </el-button>
+                <el-button 
+                  type="success" 
+                  size="small" 
+                  @click="showGenerateChangelogDialog"
+                  :loading="generateLoading"
+                  style="margin-left: 8px;"
+                >
+                  <el-icon><DocumentAdd /></el-icon>
+                  生成日志
+                </el-button>
               </div>
             </div>
           </template>
@@ -149,17 +159,20 @@
         <el-card class="version-detail-card" shadow="never">
           <template #header>
             <div class="card-header">
-              <span class="card-title">版本详情</span>
-              <div v-if="selectedVersion" class="version-meta">
-                <el-tag type="info" size="small">
-                  <el-icon><Calendar /></el-icon>
-                  {{ formatDate(selectedVersion.ReleaseDate) }}
-                </el-tag>
-                <el-tag type="success" size="small" v-if="selectedVersion.CommitHash">
-                  <el-icon><Link /></el-icon>
-                  {{ selectedVersion.CommitHash.substring(0, 8) }}
-                </el-tag>
-                <div class="action-buttons">
+              <div class="title-and-meta">
+                <span class="card-title">版本详情</span>
+                <div v-if="selectedVersion" class="version-meta">
+                  <el-tag type="info" size="small">
+                    <el-icon><Calendar /></el-icon>
+                    {{ formatDate(selectedVersion.ReleaseDate) }}
+                  </el-tag>
+                  <el-tag type="success" size="small" v-if="selectedVersion.CommitHash">
+                    <el-icon><Link /></el-icon>
+                    {{ selectedVersion.CommitHash.substring(0, 8) }}
+                  </el-tag>
+                </div>
+              </div>
+              <div v-if="selectedVersion" class="action-buttons">
                   <el-button 
                     type="success" 
                     size="small" 
@@ -197,7 +210,6 @@
                     发送通知
                   </el-button>
                 </div>
-              </div>
             </div>
           </template>
           
@@ -494,6 +506,149 @@
         </div>
       </template>
     </el-dialog>
+    
+    <!-- 生成版本更新日志对话框 -->
+    <el-dialog
+      v-model="showGenerateDialog"
+      title="生成版本更新日志"
+      width="600px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+    >
+      <el-form
+        ref="generateFormRef"
+        :model="generateForm"
+        :rules="generateRules"
+        label-width="120px"
+        label-position="left"
+      >
+        <el-form-item label="版本号" prop="version">
+          <el-input
+            v-model="generateForm.version"
+            placeholder="请输入版本号，如：2.3.1"
+            style="width: 100%;"
+            @input="handleVersionInput"
+          >
+            <template #prepend>v</template>
+          </el-input>
+          <div class="form-tip">版本号格式：主版本.次版本.修订版本（无需输入v前缀）</div>
+        </el-form-item>
+        
+        <el-form-item label="起始提交" prop="from">
+          <el-select
+            v-model="generateForm.from"
+            placeholder="选择起始提交（可选）"
+            style="width: 100%;"
+            filterable
+            clearable
+            remote
+            :remote-method="searchCommits"
+            :loading="commitsLoading"
+            @focus="loadCommitOptions"
+          >
+            <el-option-group label="最近提交">
+              <el-option
+                v-for="commit in commitOptions"
+                :key="commit.hash"
+                :label="commit.display"
+                :value="commit.hash"
+              />
+            </el-option-group>
+            <el-option-group label="标签" v-if="tagOptions.length > 0">
+              <el-option
+                v-for="tag in tagOptions"
+                :key="tag.name"
+                :label="tag.display"
+                :value="tag.name"
+              />
+            </el-option-group>
+          </el-select>
+          <div class="form-tip">留空将自动从上一个版本标签开始</div>
+        </el-form-item>
+        
+        <el-form-item label="结束提交" prop="to">
+          <el-select
+            v-model="generateForm.to"
+            placeholder="选择结束提交"
+            style="width: 100%;"
+            filterable
+            remote
+            :remote-method="searchCommits"
+            :loading="commitsLoading"
+            @focus="loadCommitOptions"
+          >
+            <el-option label="HEAD（最新提交）" value="HEAD" />
+            <el-option-group label="最近提交">
+              <el-option
+                v-for="commit in commitOptions"
+                :key="commit.hash"
+                :label="commit.display"
+                :value="commit.hash"
+              />
+            </el-option-group>
+            <el-option-group label="标签" v-if="tagOptions.length > 0">
+              <el-option
+                v-for="tag in tagOptions"
+                :key="tag.name"
+                :label="tag.display"
+                :value="tag.name"
+              />
+            </el-option-group>
+            <el-option-group label="分支" v-if="branchOptions.length > 0">
+              <el-option
+                v-for="branch in branchOptions"
+                :key="branch.name"
+                :label="branch.display"
+                :value="branch.name"
+              />
+            </el-option-group>
+          </el-select>
+          <div class="form-tip">默认为HEAD（最新提交）</div>
+        </el-form-item>
+        
+        <el-form-item label="输出格式">
+          <el-select v-model="generateForm.format" style="width: 100%;">
+            <el-option label="Markdown" value="markdown" />
+            <el-option label="纯文本" value="text" />
+            <el-option label="JSON" value="json" />
+          </el-select>
+        </el-form-item>
+        
+        <el-form-item label="选项配置">
+          <el-checkbox v-model="generateForm.saveToDb">保存到数据库</el-checkbox>
+          <el-checkbox v-model="generateForm.sendNotification" style="margin-left: 20px;">发送通知</el-checkbox>
+        </el-form-item>
+        
+        <el-alert
+          title="注意事项"
+          type="info"
+          :closable="false"
+          show-icon
+        >
+          <template #default>
+            <div>
+              <p>• 脚本将分析Git提交历史并生成结构化的版本更新日志</p>
+              <p>• 使用优化的连接池管理，确保不会导致后端服务崩溃</p>
+              <p>• 生成过程可能需要几秒钟，请耐心等待</p>
+            </div>
+          </template>
+        </el-alert>
+      </el-form>
+      
+      <template #footer>
+        <div class="dialog-footer">
+          <el-button @click="closeGenerateDialog">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="executeGenerateChangelog" 
+            :loading="generateLoading"
+          >
+            <el-icon><DocumentAdd /></el-icon>
+            开始生成
+          </el-button>
+        </div>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -516,6 +671,7 @@ import {
   Bell,
   Calendar,
   Document,
+  DocumentAdd,
   Plus,
   Tools,
   TrendCharts,
@@ -538,6 +694,26 @@ const selectedVersionId = ref(null)
 const selectedVersion = ref(null)
 const searchKeyword = ref('')
 const statusFilter = ref('')
+
+// 生成日志相关数据
+const generateLoading = ref(false)
+const showGenerateDialog = ref(false)
+const generateFormRef = ref(null)
+const generateForm = ref({
+  version: '',
+  from: '',
+  to: 'HEAD',
+  saveToDb: true,
+  format: 'markdown',
+  sendNotification: true
+})
+
+// Git选项相关数据
+const commitOptions = ref([])
+const tagOptions = ref([])
+const branchOptions = ref([])
+const commitsLoading = ref(false)
+const gitDataLoaded = ref(false)
 
 // 通知相关数据
 const showNotificationDialog = ref(false)
@@ -599,6 +775,64 @@ const notificationRules = {
   type: [{ required: true, message: '请选择通知类型', trigger: 'change' }],
   priority: [{ required: true, message: '请选择优先级', trigger: 'change' }],
   content: [{ required: true, message: '请输入通知内容', trigger: 'blur' }]
+}
+
+// 生成日志表单验证规则
+const generateRules = {
+  version: [
+    { required: true, message: '请输入版本号', trigger: 'blur' },
+    { 
+      pattern: /^\d+\.\d+\.\d+$/, 
+      message: '版本号格式不正确，只能包含数字和小数点，如：2.3.1', 
+      trigger: 'blur' 
+    },
+    {
+      validator: (rule, value, callback) => {
+        // 检查是否包含v前缀
+        if (value && value.toLowerCase().includes('v')) {
+          callback(new Error('版本号无需输入v前缀，系统会自动添加'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'blur'
+    }
+  ],
+  to: [
+    { required: true, message: '请选择结束提交', trigger: 'change' },
+    {
+      validator: (rule, value, callback) => {
+        // 验证结束提交不能为空
+        if (!value || value.trim() === '') {
+          callback(new Error('结束提交不能为空，请选择一个有效的提交或使用HEAD'))
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
+  ],
+  from: [
+    {
+      validator: (rule, value, callback) => {
+        // 起始提交可以为空，但如果有值则需要验证格式
+        if (value && value.trim() !== '') {
+          // 检查是否为有效的Git哈希或标签格式
+          const isValidHash = /^[a-f0-9]{7,40}$/i.test(value)
+          const isValidTag = /^v?\d+\.\d+\.\d+/.test(value) || /^[a-zA-Z][a-zA-Z0-9._-]*$/.test(value)
+          
+          if (!isValidHash && !isValidTag) {
+            callback(new Error('请选择有效的提交哈希或标签'))
+          } else {
+            callback()
+          }
+        } else {
+          callback()
+        }
+      },
+      trigger: 'change'
+    }
+  ]
 }
 
 // 计算属性
@@ -1155,21 +1389,249 @@ const deleteVersion = async () => {
 
 /**
  * 处理版本号输入限制
- * 功能：只允许输入数字和小圆点分隔符
+ * 功能：只允许输入数字和小圆点分隔符，自动清除'v'前缀并提醒
  * @param {string} value - 输入的值
  */
+/**
+ * 处理版本号输入
+ * 功能：自动清除非法字符，只保留数字和小数点，并提醒用户不要输入v前缀
+ * @param {string} value - 输入的版本号值
+ */
 const handleVersionInput = (value) => {
-  // 只保留数字和小圆点
-  const filteredValue = value.replace(/[^0-9.]/g, '')
+  // 检测是否包含'v'或'V'前缀
+  if (value.toLowerCase().includes('v')) {
+    ElMessage.warning('版本号无需输入v前缀，系统会自动添加')
+  }
   
-  // 防止多个连续的小圆点
-  const cleanedValue = filteredValue.replace(/\.{2,}/g, '.')
+  // 移除所有非数字和非小数点的字符（包括v前缀）
+  let filteredValue = value.replace(/[^0-9.]/g, '')
   
-  // 防止以小圆点开头
-  const finalValue = cleanedValue.replace(/^\./g, '')
+  // 防止多个连续的小数点
+  filteredValue = filteredValue.replace(/\.{2,}/g, '.')
   
-  // 更新表单值
-  versionForm.value.version = finalValue
+  // 防止以小数点开头
+  filteredValue = filteredValue.replace(/^\./g, '')
+  
+  // 防止以小数点结尾（如果有多个小数点）
+  const parts = filteredValue.split('.')
+  if (parts.length > 3) {
+    // 版本号格式应该是 x.y.z，最多3个部分
+    filteredValue = parts.slice(0, 3).join('.')
+  }
+  
+  // 更新对应的表单值
+  if (versionForm.value) {
+    versionForm.value.version = filteredValue
+  }
+  if (generateForm.value) {
+    generateForm.value.version = filteredValue
+  }
+}
+
+/**
+ * 显示生成日志对话框
+ * 功能：打开生成版本更新日志的配置对话框
+ */
+const showGenerateChangelogDialog = () => {
+  // 重置表单
+  generateForm.value = {
+    version: '',
+    from: '',
+    to: 'HEAD',
+    saveToDb: true,
+    format: 'markdown',
+    sendNotification: true
+  }
+  
+  // 清除表单验证状态
+  nextTick(() => {
+    generateFormRef.value?.clearValidate()
+  })
+  
+  showGenerateDialog.value = true
+}
+
+/**
+ * 关闭生成日志对话框
+ */
+const closeGenerateDialog = () => {
+  showGenerateDialog.value = false
+  generateForm.value = {
+    version: '',
+    from: '',
+    to: 'HEAD',
+    saveToDb: true,
+    format: 'markdown',
+    sendNotification: true
+  }
+  
+  // 清除表单验证状态
+  nextTick(() => {
+    generateFormRef.value?.clearValidate()
+  })
+}
+
+/**
+ * 加载Git提交选项
+ * 功能：获取Git提交记录、标签和分支信息用于下拉选择
+ */
+const loadCommitOptions = async () => {
+  if (gitDataLoaded.value) return // 避免重复加载
+  
+  try {
+    commitsLoading.value = true
+    
+    // 并行获取提交记录、标签和分支
+    const [commitsRes, tagsRes, branchesRes] = await Promise.all([
+      versionUpdatesAPI.getGitCommits({ limit: 20 }),
+      versionUpdatesAPI.getGitTags({ limit: 10 }),
+      versionUpdatesAPI.getGitBranches()
+    ])
+    
+    // 处理提交记录
+    if (commitsRes.success && commitsRes.data) {
+      commitOptions.value = commitsRes.data.map(commit => ({
+        hash: commit.hash,
+        display: `${commit.hash.substring(0, 8)} - ${commit.message}`,
+        message: commit.message,
+        author: commit.author,
+        date: commit.date
+      }))
+    }
+    
+    // 处理标签
+    if (tagsRes.success && tagsRes.data) {
+      tagOptions.value = tagsRes.data.map(tag => ({
+        name: tag.name,
+        display: `${tag.name} - ${tag.message || '标签'}`,
+        message: tag.message,
+        date: tag.date
+      }))
+    }
+    
+    // 处理分支
+    if (branchesRes.success && branchesRes.data) {
+      branchOptions.value = branchesRes.data.map(branch => ({
+        name: branch.name,
+        display: `${branch.name}${branch.current ? ' (当前)' : ''}`,
+        current: branch.current
+      }))
+    }
+    
+    gitDataLoaded.value = true
+    
+  } catch (error) {
+    console.error('加载Git选项失败:', error)
+    ElMessage.error('加载Git信息失败')
+  } finally {
+    commitsLoading.value = false
+  }
+}
+
+/**
+ * 搜索提交记录
+ * 功能：根据关键词搜索Git提交记录
+ * @param {string} query - 搜索关键词
+ */
+const searchCommits = async (query) => {
+  if (!query || query.length < 2) {
+    return // 搜索关键词太短，不执行搜索
+  }
+  
+  try {
+    commitsLoading.value = true
+    
+    const response = await versionUpdatesAPI.getGitCommits({ 
+      limit: 10,
+      search: query 
+    })
+    
+    if (response.success && response.data) {
+      // 更新提交选项，保留原有选项并添加搜索结果
+      const searchResults = response.data.map(commit => ({
+        hash: commit.hash,
+        display: `${commit.hash.substring(0, 8)} - ${commit.message}`,
+        message: commit.message,
+        author: commit.author,
+        date: commit.date
+      }))
+      
+      // 合并搜索结果，去重
+      const existingHashes = new Set(commitOptions.value.map(c => c.hash))
+      const newCommits = searchResults.filter(c => !existingHashes.has(c.hash))
+      commitOptions.value = [...commitOptions.value, ...newCommits]
+    }
+    
+  } catch (error) {
+    console.error('搜索提交记录失败:', error)
+  } finally {
+    commitsLoading.value = false
+  }
+}
+
+/**
+ * 执行生成日志
+ * 功能：调用后端API执行高级版本更新日志生成器脚本
+ */
+const executeGenerateChangelog = async () => {
+  try {
+    // 验证表单
+    const valid = await generateFormRef.value.validate().catch(() => false)
+    if (!valid) {
+      ElMessage.error('请检查表单输入')
+      return
+    }
+    
+    generateLoading.value = true
+    
+    // 准备API参数，为版本号添加'v'前缀
+    const apiParams = {
+      ...generateForm.value,
+      version: `v${generateForm.value.version}` // 前端渲染已显示v前缀，后端需要完整版本号
+    }
+    
+    // 调用API
+    const response = await versionUpdatesAPI.generateChangelog(apiParams)
+    
+    if (response.success) {
+      ElMessage.success('版本更新日志生成成功！')
+      
+      // 显示生成结果
+      const result = response.data
+      ElMessageBox.alert(
+        `版本：${result.version}\n` +
+        `总提交数：${result.totalCommits}\n` +
+        `新功能：${result.stats?.features || 0}\n` +
+        `问题修复：${result.stats?.fixes || 0}\n` +
+        `功能改进：${result.stats?.improvements || 0}\n` +
+        `其他更新：${result.stats?.other || 0}\n` +
+        `数据库保存：${result.dbSaved ? '是' : '否'}`,
+        '生成结果',
+        {
+          confirmButtonText: '确定',
+          type: 'success'
+        }
+      )
+      
+      // 关闭对话框
+      closeGenerateDialog()
+      
+      // 刷新版本列表和统计数据
+      await Promise.all([
+        fetchVersionStats(),
+        fetchVersionUpdates()
+      ])
+      
+    } else {
+      ElMessage.error(response.message || '生成失败')
+    }
+    
+  } catch (error) {
+    console.error('生成版本更新日志失败:', error)
+    ElMessage.error('生成失败，请稍后重试')
+  } finally {
+    generateLoading.value = false
+  }
 }
 
 // 组件挂载时获取数据
@@ -1206,6 +1668,12 @@ defineExpose({
   versionFormRef,
   versionRules,
   
+  // 生成日志相关
+  generateLoading,
+  showGenerateDialog,
+  generateFormRef,
+  generateForm,
+  
   // 方法
   fetchVersionStats,
   fetchVersionUpdates,
@@ -1217,6 +1685,9 @@ defineExpose({
   closeVersionDialog,
   saveVersion,
   deleteVersion,
+  showGenerateChangelogDialog,
+  closeGenerateDialog,
+  executeGenerateChangelog,
   formatDate,
   getStatusType,
   getStatusText,
@@ -1681,6 +2152,14 @@ defineExpose({
   font-weight: normal;
 }
 
+/* 表单提示样式 */
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
 /* 确保所有文本内容都不使用粗体 */
 .version-details * {
   font-weight: normal !important;
@@ -1719,6 +2198,13 @@ defineExpose({
   font-size: 13px;
   color: #606266;
   line-height: 1.5;
+}
+
+/* 标题和元信息容器 */
+.title-and-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* 版本元信息 */
@@ -1787,5 +2273,22 @@ defineExpose({
 .dialog-markdown-editor .editor-container {
   min-height: 320px;
   height: 320px;
+}
+
+/* 对话框内边距样式 */
+:deep(.el-dialog__body) {
+  padding: 24px 32px !important;
+}
+
+/* 对话框底部按钮区域样式 */
+.dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 8px;
+}
+
+.dialog-footer .el-button {
+  min-width: 80px;
 }
 </style>

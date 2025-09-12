@@ -353,5 +353,13 @@ export const versionUpdatesAPI = {
   getVersionStats: () => api.get('/version-updates/stats/summary'),
   
   // 检查版本号是否存在
-  checkVersionExists: (version) => api.get(`/version-updates/check-version/${version}`)
+  checkVersionExists: (version) => api.get(`/version-updates/check-version/${version}`),
+  
+  // 生成版本更新日志
+  generateChangelog: (data) => api.post('/version-updates/generate-changelog', data),
+  
+  // Git信息相关API
+  getGitCommits: (params) => api.get('/version-updates/git/commits', { params }),
+  getGitTags: (params) => api.get('/version-updates/git/tags', { params }),
+  getGitBranches: () => api.get('/version-updates/git/branches')
 }

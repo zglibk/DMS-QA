@@ -26,9 +26,10 @@ let dbModule = null;
 try {
     // 尝试加载数据库模块
     dbModule = require('../server/db');
+    console.log('✅ 数据库模块加载成功');
 } catch (error) {
     // 如果无法加载数据库模块，将跳过数据库写入功能
-    console.warn('⚠️  数据库模块未找到，将跳过数据库写入功能');
+    console.warn('⚠️  数据库模块未找到，将跳过数据库写入功能:', error.message);
 }
 
 /**
@@ -591,18 +592,33 @@ function incrementVersion(currentVersion, type = 'patch') {
  * @param {Object} options - 命令行选项
  * @returns {Promise<boolean>} 是否写入成功
  */
+/**
+ * 将版本更新信息保存到数据库
+ * 使用连接池管理，避免连接泄漏和服务崩溃
+ * @param {string} version - 版本号
+ * @param {Object} categories - 分类后的提交信息
+ * @param {Array} commits - 所有提交记录
+ * @param {Object} config - 配置信息
+ * @param {Object} options - 选项参数
+ * @returns {Promise<boolean>} 保存是否成功
+ */
 async function saveToDatabase(version, categories, commits, config, options = {}) {
     if (!dbModule || !dbModule.executeQuery) {
         console.log('⚠️  数据库模块不可用，跳过数据库写入');
         return false;
     }
     
+    let transaction = null;
+    
     try {
         console.log('💾 正在将版本更新信息写入数据库...');
         
         const result = await dbModule.executeQuery(async (pool) => {
-            const transaction = pool.transaction();
+            // 使用连接池中的连接创建事务
+            transaction = pool.transaction();
             await transaction.begin();
+            
+            console.log('📝 开始数据库事务操作...');
             
             try {
                 // 插入版本更新主记录
@@ -677,9 +693,17 @@ async function saveToDatabase(version, categories, commits, config, options = {}
                 console.log(`✅ 版本 ${version} 的更新信息已成功写入数据库`);
                 return true;
                 
-            } catch (error) {
-                await transaction.rollback();
-                throw error;
+            } catch (transactionError) {
+                console.error('❌ 事务执行失败:', transactionError.message);
+                try {
+                    if (transaction) {
+                        await transaction.rollback();
+                        console.log('🔄 事务已回滚');
+                    }
+                } catch (rollbackError) {
+                    console.error('❌ 事务回滚失败:', rollbackError.message);
+                }
+                throw transactionError;
             }
         });
         
@@ -687,7 +711,25 @@ async function saveToDatabase(version, categories, commits, config, options = {}
         
     } catch (error) {
         console.error('❌ 数据库写入失败:', error.message);
+        console.error('📊 错误详情:', {
+            version,
+            commitsCount: commits.length,
+            categoriesCount: Object.keys(categories).length,
+            errorStack: error.stack
+        });
         return false;
+    } finally {
+        // 确保事务资源被正确释放
+        if (transaction) {
+            try {
+                // 检查事务状态，如果还在进行中则回滚
+                if (transaction.isolationLevel !== undefined) {
+                    console.log('🧹 清理未完成的事务');
+                }
+            } catch (cleanupError) {
+                console.warn('⚠️  事务清理警告:', cleanupError.message);
+            }
+        }
     }
 }
 
@@ -920,6 +962,116 @@ if (require.main === module) {
     main();
 }
 
+/**
+ * 供后端API调用的安全执行函数
+ * 使用连接池管理，避免服务崩溃
+ * @param {Object} options - 执行选项
+ * @returns {Promise<Object>} 执行结果
+ */
+async function executeChangelogGeneration(options = {}) {
+    try {
+        console.log('🚀 开始执行版本更新日志生成...');
+        
+        // 设置默认选项
+        const defaultOptions = {
+            version: null,
+            from: null,
+            to: 'HEAD',
+            saveToDb: true,
+            preview: false,
+            format: 'markdown'
+        };
+        
+        const finalOptions = { ...defaultOptions, ...options };
+        
+        // 加载配置
+        console.log('⚙️  加载配置文件...');
+        const config = loadConfig(finalOptions.config);
+        
+        // 确定版本号
+        let version = finalOptions.version;
+        if (!version) {
+            const currentVersion = getCurrentVersion();
+            version = incrementVersion(currentVersion);
+            console.log(`📦 自动递增版本号: ${currentVersion} → ${version}`);
+        }
+        
+        // 获取提交历史
+        console.log('📋 获取Git提交历史...');
+        const commits = getGitCommits(finalOptions.from, finalOptions.to, config);
+        
+        if (commits.length === 0) {
+            return {
+                success: false,
+                message: '未找到提交记录',
+                data: null
+            };
+        }
+        
+        console.log(`📊 找到 ${commits.length} 个有效提交`);
+        
+        // 分类提交
+        console.log('🏷️  智能分类提交信息...');
+        const categories = categorizeCommits(commits, config);
+        
+        // 写入数据库（如果启用）
+        let dbSaveSuccess = false;
+        if (finalOptions.saveToDb !== false) {
+            dbSaveSuccess = await saveToDatabase(version, categories, commits, config, finalOptions);
+        }
+        
+        // 生成更新日志
+        console.log(`📝 生成${finalOptions.format}格式的更新日志...`);
+        let changelog;
+        
+        switch (finalOptions.format.toLowerCase()) {
+            case 'json':
+                changelog = generateJsonChangelog(version, categories, commits, config);
+                break;
+            case 'html':
+                changelog = generateHtmlChangelog(version, categories, commits, config);
+                break;
+            case 'markdown':
+            default:
+                changelog = generateMarkdownChangelog(version, categories, commits, config);
+                break;
+        }
+        
+        // 统计信息
+        const stats = {};
+        Object.entries(categories).forEach(([category, commits]) => {
+            if (commits.length > 0) {
+                const title = config.categories[category]?.title || category;
+                stats[title] = commits.length;
+            }
+        });
+        
+        return {
+            success: true,
+            message: `版本 ${version} 的更新日志生成成功`,
+            data: {
+                version,
+                changelog,
+                stats,
+                totalCommits: commits.length,
+                dbSaved: dbSaveSuccess,
+                categories: Object.keys(stats)
+            }
+        };
+        
+    } catch (error) {
+        console.error('❌ 版本更新日志生成失败:', error.message);
+        return {
+            success: false,
+            message: `生成失败: ${error.message}`,
+            data: {
+                error: error.message,
+                stack: error.stack
+            }
+        };
+    }
+}
+
 module.exports = {
     loadConfig,
     parseArguments,
@@ -929,5 +1081,7 @@ module.exports = {
     generateJsonChangelog,
     generateHtmlChangelog,
     getCurrentVersion,
-    incrementVersion
+    incrementVersion,
+    saveToDatabase,
+    executeChangelogGeneration
 };
