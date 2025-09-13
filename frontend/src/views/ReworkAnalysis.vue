@@ -575,17 +575,15 @@ const trendData = ref([])
 const deptData = ref([])
 const categoryData = ref([])
 const costData = ref([])
-// 计算上个月的年份和月份
+// 计算当前年份
 const now = new Date()
-const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1)
-
-const selectedYear = ref(lastMonth.getFullYear())
-const currentYear = ref(new Date().getFullYear())
+const currentYear = ref(now.getFullYear())
+const selectedYear = ref(currentYear.value)
 
 // 时间筛选相关数据
-const timeType = ref('month') // 默认设置为月份，显示上个月数据
-const selectedQuarter = ref(Math.ceil((new Date().getMonth() + 1) / 3)) // 当前季度
-const selectedMonth = ref(lastMonth.getMonth() + 1) // 上个月
+const timeType = ref('year') // 默认设置为年度，显示当前年份所有月份的趋势数据
+const selectedQuarter = ref(Math.ceil((now.getMonth() + 1) / 3)) // 当前季度
+const selectedMonth = ref(now.getMonth() + 1) // 当前月份
 const selectedWeek = ref(1) // 当前周次
 
 // 筛选条件相关
@@ -861,7 +859,7 @@ const loadTrendData = async () => {
       params: {
         startDate: timeRange.startDate,
         endDate: timeRange.endDate,
-        groupBy: timeType.value,
+        groupBy: timeType.value === 'year' ? 'month' : timeType.value, // 年度数据按月份分组显示趋势
         timeType: timeType.value,
         department: selectedDepartment.value,
         workshop: selectedWorkshop.value,
@@ -1108,7 +1106,7 @@ const updateTrendChart = (data) => {
   
   const option = {
     title: {
-      text: '返工趋势',
+      text: `返工趋势 (${selectedYear.value}年)`,
       left: 'center',
       textStyle: { fontSize: 14 }
     },
@@ -1121,6 +1119,13 @@ const updateTrendChart = (data) => {
       bottom: 10,
       itemGap: 15
     },
+    grid: {
+      left: '2%',
+      right: '1%',
+      top: '15%',
+      bottom: '15%',
+      containLabel: true
+    },
     xAxis: {
       type: 'category',
       data: data.map(item => item.DateLabel),
@@ -1129,22 +1134,39 @@ const updateTrendChart = (data) => {
     yAxis: [
       {
         type: 'value',
-        name: '数量',
+        name: '返工次数',
         position: 'left',
-        splitLine: { show: false }
+        splitLine: { show: false },
+        axisLabel: {
+          formatter: '{value}次'
+        }
+      },
+      {
+        type: 'value',
+        name: '不良数量',
+        position: 'right',
+        splitLine: { show: false },
+        axisLabel: {
+          formatter: '{value}个'
+        }
       },
       {
         type: 'value',
         name: '不良率(%)',
         position: 'right',
-        splitLine: { show: false }
+        offset: 60,
+        splitLine: { show: false },
+        axisLabel: {
+          formatter: '{value}%'
+        }
       }
     ],
     series: [
       {
         name: '返工次数',
         type: 'bar',
-        barMaxWidth: 60,
+        yAxisIndex: 0,
+        barMaxWidth: 25,
         data: data.map(item => {
           const count = item.ReworkCount
           return (count !== null && count !== undefined && !isNaN(count)) ? Number(count) : 0
@@ -1154,7 +1176,8 @@ const updateTrendChart = (data) => {
       {
         name: '不良数量',
         type: 'bar',
-        barMaxWidth: 50,
+        yAxisIndex: 1,
+        barMaxWidth: 25,
         data: data.map(item => {
           const qty = item.TotalDefectiveQty
           return (qty !== null && qty !== undefined && !isNaN(qty)) ? Number(qty) : 0
@@ -1164,7 +1187,11 @@ const updateTrendChart = (data) => {
       {
         name: '不良率',
         type: 'line',
-        yAxisIndex: 1,
+        yAxisIndex: 2,
+        symbolSize: 10,
+        lineStyle: {
+          width: 3
+        },
         data: data.map(item => {
           const rate = item.AvgDefectiveRate
           if (rate !== null && rate !== undefined && !isNaN(rate)) {
@@ -1305,7 +1332,7 @@ const updateCostChart = (data) => {
   
   const option = {
     title: {
-      text: '返工成本分析',
+      text: `返工成本分析 (${selectedYear.value}年)`,
       left: 'center',
       textStyle: { fontSize: 14 }
     },

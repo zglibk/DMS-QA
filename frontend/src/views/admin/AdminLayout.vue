@@ -458,6 +458,40 @@ onMounted(async () => {
   background: #409EFF !important;
   color: #fff !important;
 }
+
+/* 折叠状态下菜单图标居中 */
+.el-menu--collapse :deep(.el-menu-item) {
+  text-align: center !important;
+  justify-content: center !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 20px !important;
+}
+
+.el-menu--collapse :deep(.el-sub-menu > .el-sub-menu__title) {
+  text-align: center !important;
+  justify-content: center !important;
+  display: flex !important;
+  align-items: center !important;
+  padding: 0 20px !important;
+}
+
+.el-menu--collapse :deep(.el-menu-item .el-icon),
+.el-menu--collapse :deep(.el-sub-menu__title .el-icon) {
+  margin: 0 auto !important;
+}
+
+.el-menu--collapse :deep(.el-menu-item span),
+.el-menu--collapse :deep(.el-sub-menu__title span) {
+  display: none !important;
+}
+
+/* 针对Iconify图标的特殊处理 */
+.el-menu--collapse :deep(.el-menu-item .iconify),
+.el-menu--collapse :deep(.el-sub-menu__title .iconify) {
+  margin: 0 auto !important;
+  display: block !important;
+}
 /* 用户下拉触发器样式 */
 .user-dropdown-trigger {
   display: flex;

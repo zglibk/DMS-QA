@@ -71,8 +71,8 @@
         :header-cell-style="{ background: '#f8f9fa', color: '#606266' }"
       >
       <el-table-column label="#" type="index" width="60" fixed="left" />
-      <el-table-column prop="Name" label="角色名称" min-width="120" resizable show-overflow-tooltip />
-      <el-table-column prop="Code" label="角色编码" min-width="120" resizable show-overflow-tooltip />
+      <el-table-column prop="Name" label="角色名称" width="120" resizable show-overflow-tooltip />
+      <el-table-column prop="Code" label="角色编码" width="150" resizable show-overflow-tooltip />
       <el-table-column prop="Description" label="角色描述" min-width="200" resizable show-overflow-tooltip />
       <el-table-column prop="Status" label="状态" width="80" resizable>
         <template #default="{ row }">
@@ -82,12 +82,12 @@
         </template>
       </el-table-column>
       <el-table-column prop="SortOrder" label="排序" width="80" resizable />
-      <el-table-column prop="CreatedAt" label="创建时间" min-width="160" resizable>
+      <el-table-column prop="CreatedAt" label="创建时间" width="160" resizable>
         <template #default="{ row }">
           {{ formatDate(row.CreatedAt) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="240" fixed="right">
+      <el-table-column label="操作" width="270" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
             <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
@@ -117,7 +117,7 @@
         <el-pagination
           :current-page="pagination.page"
           :page-size="pagination.size"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[5, 10, 20, 50, 100]"
           :total="pagination.total"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="handleSizeChange"
@@ -340,7 +340,7 @@ const searchForm = reactive({
 // 分页数据
 const pagination = reactive({
   page: 1,
-  size: 20,
+  size: 5,
   total: 0
 })
 
@@ -831,7 +831,6 @@ onMounted(async () => {
 
 <style scoped>
 .role-management {
-  padding: 20px;
   background: #f5f7fa;
   height: auto;
 }
@@ -1044,8 +1043,22 @@ onMounted(async () => {
 }
 
 :deep(.el-table .el-table__cell) {
-  padding: 12px 0;
   border-bottom: 1px solid #f5f7fa;
+  text-align: center;
+  vertical-align: middle;
+}
+
+:deep(.el-table .el-table__cell .cell) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 角色编码和角色描述列左对齐 */
+:deep(.el-table .el-table__body .el-table__row .el-table__cell:nth-child(3) .cell),
+:deep(.el-table .el-table__body .el-table__row .el-table__cell:nth-child(4) .cell) {
+  justify-content: flex-start;
+  text-align: left;
 }
 
 :deep(.el-table__header) {
@@ -1132,6 +1145,8 @@ onMounted(async () => {
   gap: 4px;
   flex-wrap: nowrap;
   white-space: nowrap;
+  justify-content: center;
+  align-items: center;
 }
 
 .action-buttons .el-button {

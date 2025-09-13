@@ -796,16 +796,16 @@ router.get('/user-list', authenticateToken, async (req, res) => {
     let pool = await sql.connect(await getDynamicConfig())
     let where = "WHERE u.Username != 'admin'" // 过滤系统管理员账号
     if (search) {
-      where += ` AND (u.Username LIKE N'%${search}%' OR u.RealName LIKE N'%${search}%' OR u.Email LIKE N'%${search}%' OR u.Phone LIKE N'%${search}%' OR d.Name LIKE N'%${search}%')`
+      where += ` AND (u.Username LIKE N'%${search}%' OR u.RealName LIKE N'%${search}%' OR u.Email LIKE N'%${search}%' OR u.Phone LIKE N'%${search}%' OR u.Department LIKE N'%${search}%')`
     }
-    const countResult = await pool.request().query(`SELECT COUNT(*) AS total FROM [User] u LEFT JOIN [Department] d ON u.DepartmentID = d.ID ${where}`)
+    const countResult = await pool.request().query(`SELECT COUNT(*) AS total FROM [User] u ${where}`)
     const total = countResult.recordset[0].total
     const offset = (page - 1) * pageSize
     const sqlQuery = `
       SELECT * FROM (
         SELECT 
           u.ID, u.Username, u.RealName, 
-          ISNULL(d.Name, '未分配') AS Department, 
+          ISNULL(u.Department, '未分配') AS Department, 
           u.Email, u.Phone, 
           u.Avatar, ISNULL(u.Status, 1) AS Status, u.CreatedAt, u.LastLoginTime,
           u.Gender, u.Birthday, u.Address, u.Remark, u.UpdatedAt,
@@ -826,7 +826,6 @@ router.get('/user-list', authenticateToken, async (req, res) => {
           ROW_NUMBER() OVER (ORDER BY u.Username) AS RowNum
         FROM [User] u
         LEFT JOIN [Positions] p ON u.PositionID = p.ID
-        LEFT JOIN [Department] d ON u.DepartmentID = d.ID
         ${where}
       ) AS T
       WHERE T.RowNum BETWEEN ${offset + 1} AND ${offset + pageSize}
@@ -941,8 +940,28 @@ router.post('/user-status', authenticateToken, async (req, res) => {
 // 参数: Username, Password, Role, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark
 router.post('/add-user', authenticateToken, async (req, res) => {
   const { Username, Password, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
-  if (!Username || !Password || !Department || !RealName || !Phone) {
-    return res.json({ success: false, message: '请填写所有必填项' });
+  
+  // 检查必填字段并返回具体缺失字段信息
+  const requiredFields = {
+    'Username': { value: Username, label: '用户名' },
+    'Password': { value: Password, label: '密码' },
+    'Department': { value: Department, label: '所属部门' },
+    'RealName': { value: RealName, label: '真实姓名' }
+  };
+  
+  const missingFields = [];
+  for (const [field, config] of Object.entries(requiredFields)) {
+    if (!config.value || config.value.trim() === '') {
+      missingFields.push(config.label);
+    }
+  }
+  
+  if (missingFields.length > 0) {
+    return res.json({ 
+      success: false, 
+      message: `请填写以下必填项：${missingFields.join('、')}`,
+      missingFields: missingFields
+    });
   }
   try {
     let pool = await sql.connect(await getDynamicConfig());
@@ -995,8 +1014,27 @@ router.post('/add-user', authenticateToken, async (req, res) => {
 // 更新用户信息（管理员功能）
 router.put('/update-user', authenticateToken, async (req, res) => {
   const { Username, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
-  if (!Username || !Department || !RealName) {
-    return res.json({ success: false, message: '请填写所有必填项' });
+  
+  // 检查必填字段并返回具体缺失字段信息
+  const requiredFields = {
+    'Username': { value: Username, label: '用户名' },
+    'Department': { value: Department, label: '所属部门' },
+    'RealName': { value: RealName, label: '真实姓名' }
+  };
+  
+  const missingFields = [];
+  for (const [field, config] of Object.entries(requiredFields)) {
+    if (!config.value || config.value.trim() === '') {
+      missingFields.push(config.label);
+    }
+  }
+  
+  if (missingFields.length > 0) {
+    return res.json({ 
+      success: false, 
+      message: `请填写以下必填项：${missingFields.join('、')}`,
+      missingFields: missingFields
+    });
   }
   try {
     // 校验头像类型和长度

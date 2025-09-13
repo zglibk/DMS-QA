@@ -1297,9 +1297,33 @@ const addUserRules = {
     { required: true, message: '请输入真实姓名', trigger: 'blur' },
     { min: 2, max: 10, message: '姓名长度在 2 到 10 个字符', trigger: 'blur' }
   ],
-  Email: [{ type: 'email', message: '邮箱格式不正确', trigger: 'blur' }],
+  Email: [
+    { 
+      validator: (rule, value, callback) => {
+        if (!value || value.trim() === '') {
+          callback() // 空值时通过验证
+        } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)) {
+          callback(new Error('邮箱格式不正确'))
+        } else {
+          callback()
+        }
+      }, 
+      trigger: 'blur' 
+    }
+  ],
   Phone: [
-    { pattern: /^1[3-9]\d{9}$/, message: '请输入正确的手机号码', trigger: 'blur' }
+    { 
+      validator: (rule, value, callback) => {
+        if (!value || value.trim() === '') {
+          callback() // 空值时通过验证
+        } else if (!/^1[3-9]\d{9}$/.test(value)) {
+          callback(new Error('请输入正确的手机号码'))
+        } else {
+          callback()
+        }
+      }, 
+      trigger: 'blur' 
+    }
   ],
   PositionID: [{ required: false, message: '请选择职位', trigger: 'change' }],
   Gender: [{ required: false, message: '请选择性别', trigger: 'change' }],
@@ -1378,14 +1402,24 @@ const refreshData = async () => {
  * 直接将头像base64数据保存到数据库中
  */
 const submitAddUser = () => {
+  console.log('🚀 [DEBUG] 开始提交用户表单')
+  console.log('🚀 [DEBUG] 表单数据:', addUserForm.value)
+  console.log('🚀 [DEBUG] 是否编辑模式:', isEdit.value)
+  
   addUserRef.value.validate(async (valid, fields) => {
+    console.log('🚀 [DEBUG] 表单验证结果:', valid)
+    if (fields) {
+      console.log('🚀 [DEBUG] 验证失败字段:', fields)
+    }
+    
     if (!valid) {
       // 获取第一个验证失败的字段错误信息
       if (fields) {
         const firstFieldKey = Object.keys(fields)[0]
         const firstFieldErrors = fields[firstFieldKey]
+        console.log('🚀 [DEBUG] 第一个失败字段:', firstFieldKey, firstFieldErrors)
         if (firstFieldErrors && firstFieldErrors.length > 0) {
-          ElMessage.error(firstFieldErrors[0].message)
+          ElMessage.error(firstFieldErrors[0]?.message || '表单验证失败')
         } else {
           ElMessage.error('请填写所有必填项')
         }
@@ -1395,11 +1429,15 @@ const submitAddUser = () => {
       return
     }
     
+    console.log('🚀 [DEBUG] 表单验证通过，开始提交')
     submitLoading.value = true
     try {
       const token = localStorage.getItem('token')
+      console.log('🚀 [DEBUG] Token存在:', !!token)
+      
       const url = isEdit.value ? '/auth/update-user' : '/auth/add-user'
       const method = isEdit.value ? 'put' : 'post'
+      console.log('🚀 [DEBUG] API URL:', url, 'Method:', method)
       
       const formData = { ...addUserForm.value }
       if (isEdit.value) {
@@ -1411,19 +1449,32 @@ const submitAddUser = () => {
       if (avatarBase64.value) {
         // 有新裁剪的头像数据
         formData.Avatar = avatarBase64.value
+        console.log('🚀 [DEBUG] 使用新头像数据')
       } else if (addUserForm.value.Avatar) {
         // 保持表单中现有的头像数据
         formData.Avatar = addUserForm.value.Avatar
+        console.log('🚀 [DEBUG] 保持原有头像数据')
       } else {
         // 没有头像数据
         formData.Avatar = ''
+        console.log('🚀 [DEBUG] 无头像数据')
       }
+      
+      console.log('🚀 [DEBUG] 最终提交数据:', formData)
       
       const res = await api[method](url, formData, {
       headers: { Authorization: `Bearer ${token}` }
     })
       
-      if (res.data && res.data.success) {
+      console.log('🚀 [DEBUG] API响应:', res)
+      console.log('🚀 [DEBUG] API响应类型:', typeof res)
+      console.log('🚀 [DEBUG] API响应是否为对象:', res && typeof res === 'object')
+      console.log('🚀 [DEBUG] API响应success字段:', res?.success)
+      console.log('🚀 [DEBUG] API响应success类型:', typeof res?.success)
+      
+      // 修正：@/utils/api的响应拦截器返回response.data，所以res就是后端返回的数据
+      if (res && res.success) {
+        console.log('🚀 [DEBUG] API调用成功')
         // 根据是否有头像更新显示不同的成功消息
         let successMessage = isEdit.value ? '修改成功' : '添加成功'
         if (formData.Avatar && formData.Avatar !== (isEdit.value ? originalUserData.value?.Avatar : '')) {
@@ -1432,9 +1483,9 @@ const submitAddUser = () => {
         ElMessage.success(successMessage)
         
         // 如果编辑的是当前登录用户，重新从后端获取用户数据
-         if (isEdit.value && res.data.data && currentLoginUser.value && 
-             (res.data.data.Username === currentLoginUser.value.username || 
-              res.data.data.ID === currentLoginUser.value.id)) {           
+         if (isEdit.value && res.data?.data && currentLoginUser.value && 
+             (res.data.data?.Username === currentLoginUser.value.username || 
+              res.data.data?.ID === currentLoginUser.value.id)) {           
            // 重新从后端获取完整的用户信息
            await userStore.fetchProfile(true) // 强制刷新
            
@@ -1453,12 +1504,24 @@ const submitAddUser = () => {
         fetchUsers()
         resetAddUser()
       } else {
-        ElMessage.error(res.data.message || (isEdit.value ? '修改失败' : '添加失败'))
+        console.log('🚀 [DEBUG] API调用失败 - 响应数据:', res)
+        console.log('🚀 [DEBUG] 失败原因:', res?.message)
+        console.log('🚀 [DEBUG] 缺失字段:', res?.missingFields)
+        
+        // 如果后端返回了具体的缺失字段信息，显示详细错误
+        if (res?.missingFields && res.missingFields.length > 0) {
+          ElMessage.error(res.message || `请填写以下必填项：${res.missingFields.join('、')}`)
+        } else {
+          ElMessage.error(res?.message || (isEdit.value ? '修改失败' : '添加失败'))
+        }
       }
     } catch (error) {
-      console.error('用户操作失败:', error)
+      console.error('🚀 [DEBUG] API请求异常:', error)
+      console.error('🚀 [DEBUG] 错误详情:', error.response?.data)
+      console.error('🚀 [DEBUG] 错误状态码:', error.response?.status)
       ElMessage.error('操作失败，请重试')
     } finally {
+      console.log('🚀 [DEBUG] 提交流程结束，重置loading状态')
       submitLoading.value = false
     }
   })
@@ -1471,12 +1534,17 @@ const positions = ref([])
  * 获取部门列表
  */
 const fetchDepartments = async () => {
-  const token = localStorage.getItem('token')
-  const res = await api.get('/complaint/options', {
-    headers: { Authorization: `Bearer ${token}` }
-  })
-  if (res.data && res.data.departments) {
-    departments.value = res.data.departments
+  try {
+    const token = localStorage.getItem('token')
+    const res = await api.get('/complaint/options', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+    // 修复数据结构：API响应拦截器返回response.data，所以直接访问res.departments
+    if (res && res.departments) {
+      departments.value = res.departments
+    }
+  } catch (error) {
+    console.error('获取部门列表失败:', error)
   }
 }
 
@@ -1486,8 +1554,9 @@ const fetchDepartments = async () => {
 const fetchPositions = async () => {
   try {
     const res = await api.get('/positions')
-    if (res.data && res.data.success) {
-      positions.value = res.data.data.list || []
+    // 修复数据结构：API响应拦截器返回response.data，所以直接访问res.data.list
+    if (res && res.success && res.data) {
+      positions.value = res.data.list || []
     }
   } catch (error) {
     console.error('获取职位列表失败:', error)
@@ -1839,7 +1908,8 @@ const fetchAllRoles = async () => {
     const response = await api.get('/roles', {
       params: { page: 1, size: 1000 } // 获取所有角色
     })
-    availableRoles.value = response.data.data?.list || []
+    // 修复数据结构：API响应拦截器返回response.data，所以直接访问response.data?.list
+    availableRoles.value = response.data?.list || []
   } catch (error) {
     console.error('获取角色列表失败:', error)
     ElMessage.error('获取角色列表失败')
