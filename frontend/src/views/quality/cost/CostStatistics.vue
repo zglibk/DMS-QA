@@ -315,7 +315,7 @@
  * 4. 提供详细的统计数据表格和导出功能
  */
 
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Money,
@@ -384,6 +384,16 @@ let trendChart = null
 let pieChart = null
 let customerChart = null
 
+// ResizeObserver实例
+let resizeObserver = null
+
+// 窗口resize处理函数
+const handleResize = () => {
+  trendChart?.resize()
+  pieChart?.resize()
+  customerChart?.resize()
+}
+
 /**
  * 格式化货币显示
  * @param {number} value - 金额值
@@ -428,6 +438,7 @@ const loadStatistics = async () => {
     }
 
     const response = await apiService.get('/customer-complaints/cost-statistics', { params })
+    
     if (response.data.success) {
       const data = response.data.data
       
@@ -444,8 +455,8 @@ const loadStatistics = async () => {
       overviewData.publishingExceptionCost = data.overview?.internal?.publishingExceptionCost || 0
       
       // 更新统计数据
-      statisticsData.value = data.statistics
-      pagination.total = data.total
+      statisticsData.value = data.detailData || []
+      pagination.total = data.pagination?.total || data.total || 0
       
       // 更新图表
       await nextTick()
@@ -520,16 +531,16 @@ const updateTrendChart = (trendData) => {
         smoothMonotone: 'x',
         lineStyle: {
           width: 2,
-          color: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          color: '#DC3C37',
+          shadowColor: 'rgba(220, 60, 55, 0.3)',
           shadowBlur: 10,
           shadowOffsetY: 3
         },
         itemStyle: {
           color: '#ffffff',
           borderWidth: 3,
-          borderColor: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          borderColor: '#DC3C37',
+          shadowColor: 'rgba(220, 60, 55, 0.4)',
           shadowBlur: 8
         },
         areaStyle: {
@@ -537,8 +548,8 @@ const updateTrendChart = (trendData) => {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
-              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+              { offset: 0, color: 'rgba(220, 60, 55, 0.4)' },
+              { offset: 1, color: 'rgba(220, 60, 55, 0.1)' }
             ]
           }
         },
@@ -553,9 +564,9 @@ const updateTrendChart = (trendData) => {
           itemStyle: {
             color: '#ffffff',
             borderWidth: 4,
-            borderColor: '#f56c6c',
+            borderColor: '#DC3C37',
             shadowBlur: 15,
-            shadowColor: 'rgba(245, 108, 108, 0.6)'
+            shadowColor: 'rgba(220, 60, 55, 0.6)'
           }
         },
         data: processedTrendData.map(item => item.externalCost || 0)
@@ -567,16 +578,16 @@ const updateTrendChart = (trendData) => {
         smoothMonotone: 'x',
         lineStyle: {
           width: 2,
-          color: '#67c23a',
-          shadowColor: 'rgba(103, 194, 58, 0.3)',
+          color: '#FFA753',
+          shadowColor: 'rgba(255, 167, 83, 0.3)',
           shadowBlur: 10,
           shadowOffsetY: 3
         },
         itemStyle: {
           color: '#ffffff',
           borderWidth: 3,
-          borderColor: '#67c23a',
-          shadowColor: 'rgba(103, 194, 58, 0.4)',
+          borderColor: '#FFA753',
+          shadowColor: 'rgba(255, 167, 83, 0.4)',
           shadowBlur: 8
         },
         areaStyle: {
@@ -584,8 +595,8 @@ const updateTrendChart = (trendData) => {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(103, 194, 58, 0.4)' },
-              { offset: 1, color: 'rgba(103, 194, 58, 0.1)' }
+              { offset: 0, color: 'rgba(255, 167, 83, 0.4)' },
+              { offset: 1, color: 'rgba(255, 167, 83, 0.1)' }
             ]
           }
         },
@@ -600,9 +611,9 @@ const updateTrendChart = (trendData) => {
           itemStyle: {
             color: '#ffffff',
             borderWidth: 4,
-            borderColor: '#67c23a',
+            borderColor: '#FFA753',
             shadowBlur: 15,
-            shadowColor: 'rgba(103, 194, 58, 0.6)'
+            shadowColor: 'rgba(255, 167, 83, 0.6)'
           }
         },
         data: processedTrendData.map(item => item.internalCost || 0)
@@ -667,16 +678,16 @@ const updateTrendChart = (trendData) => {
         smoothMonotone: 'x',
         lineStyle: {
           width: 4,
-          color: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          color: '#DC3C37',
+          shadowColor: 'rgba(220, 60, 55, 0.3)',
           shadowBlur: 10,
           shadowOffsetY: 3
         },
         itemStyle: {
           color: '#ffffff',
           borderWidth: 3,
-          borderColor: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          borderColor: '#DC3C37',
+          shadowColor: 'rgba(220, 60, 55, 0.4)',
           shadowBlur: 8
         },
         areaStyle: {
@@ -684,8 +695,8 @@ const updateTrendChart = (trendData) => {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
-              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+              { offset: 0, color: 'rgba(220, 60, 55, 0.4)' },
+              { offset: 1, color: 'rgba(220, 60, 55, 0.1)' }
             ]
           }
         },
@@ -700,9 +711,9 @@ const updateTrendChart = (trendData) => {
           itemStyle: {
             color: '#ffffff',
             borderWidth: 4,
-            borderColor: '#f56c6c',
+            borderColor: '#DC3C37',
             shadowBlur: 15,
-            shadowColor: 'rgba(245, 108, 108, 0.6)'
+            shadowColor: 'rgba(220, 60, 55, 0.6)'
           }
         },
         data: processedTrendData.map(item => item.external?.qualityPenalty || 0)
@@ -761,16 +772,16 @@ const updateTrendChart = (trendData) => {
         smoothMonotone: 'x',
         lineStyle: {
           width: 5,
-          color: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          color: '#DC3C37',
+          shadowColor: 'rgba(220, 60, 55, 0.3)',
           shadowBlur: 10,
           shadowOffsetY: 3
         },
         itemStyle: {
           color: '#ffffff',
           borderWidth: 3,
-          borderColor: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          borderColor: '#DC3C37',
+          shadowColor: 'rgba(220, 60, 55, 0.4)',
           shadowBlur: 8
         },
         areaStyle: {
@@ -778,8 +789,8 @@ const updateTrendChart = (trendData) => {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
-              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+              { offset: 0, color: 'rgba(220, 60, 55, 0.4)' },
+              { offset: 1, color: 'rgba(220, 60, 55, 0.1)' }
             ]
           }
         },
@@ -794,9 +805,9 @@ const updateTrendChart = (trendData) => {
           itemStyle: {
             color: '#ffffff',
             borderWidth: 4,
-            borderColor: '#f56c6c',
+            borderColor: '#DC3C37',
             shadowBlur: 15,
-            shadowColor: 'rgba(245, 108, 108, 0.6)'
+            shadowColor: 'rgba(220, 60, 55, 0.6)'
           }
         },
         data: processedTrendData.map(item => item.externalCost || 0)
@@ -997,15 +1008,6 @@ const updateTrendChart = (trendData) => {
   }
 
   const option = {
-    title: {
-      text: filterForm.costType === 'all' ? '内外部质量成本趋势' : 
-            filterForm.costType === 'external' ? '外部质量成本趋势' : '内部质量成本趋势',
-      left: 'center',
-      textStyle: {
-        fontSize: 16,
-        fontWeight: 'bold'
-      }
-    },
     tooltip: {
       trigger: 'axis',
       axisPointer: {
@@ -1024,7 +1026,9 @@ const updateTrendChart = (trendData) => {
     },
     legend: {
       data: legendData,
-      top: 30,
+      bottom: 10,
+      left: 'center',
+      orient: 'horizontal',
       // 设置图例的默认选中状态
       selected: filterForm.costType === 'all' ? {
         '外部成本': true,
@@ -1040,7 +1044,8 @@ const updateTrendChart = (trendData) => {
     grid: {
       left: '3%',
       right: '4%',
-      bottom: '3%',
+      bottom: '15%',
+      top: '10%',
       containLabel: true
     },
     xAxis: {
@@ -1073,19 +1078,19 @@ const updatePieChart = (compositionData) => {
   if (filterForm.costType === 'all') {
     // 显示内外部成本分类
     chartData = [
-      { name: '外部成本', value: overviewData.externalCost, itemStyle: { color: '#f56c6c' } },
-      { name: '内部成本', value: overviewData.internalCost, itemStyle: { color: '#67c23a' } }
+      { name: '外部成本', value: overviewData.externalCost, itemStyle: { color: '#DC3C37' } },
+      { name: '内部成本', value: overviewData.internalCost, itemStyle: { color: '#FFA753' } }
     ]
   } else if (filterForm.costType === 'external') {
     // 显示外部成本详细构成
     chartData = [
-      { name: '质量罚款', value: overviewData.penaltyCost, itemStyle: { color: '#f56c6c' } },
+      { name: '质量罚款', value: overviewData.penaltyCost, itemStyle: { color: '#DC3C37' } },
       { name: '客户赔偿', value: overviewData.compensationCost, itemStyle: { color: '#ff7875' } }
     ]
   } else if (filterForm.costType === 'internal') {
     // 显示内部成本详细构成
     chartData = [
-      { name: '返工成本', value: overviewData.reworkCost, itemStyle: { color: '#67c23a' } },
+      { name: '返工成本', value: overviewData.reworkCost, itemStyle: { color: '#FFA753' } },
       { name: '内诉成本', value: overviewData.internalComplaintCost, itemStyle: { color: '#95de64' } },
       { name: '出版异常成本', value: overviewData.publishingExceptionCost, itemStyle: { color: '#b7eb8f' } }
     ]
@@ -1160,15 +1165,21 @@ const updateCustomerChart = (customerData) => {
         type: 'bar',
         stack: 'total',
         data: customerData.map(item => item.external?.totalCost || 0),
-        itemStyle: { color: '#f56c6c' }
+        itemStyle: { 
+          color: '#DC3C37',
+          borderRadius: [0, 10, 10, 0]  // 右侧半圆形末端
+        }
       },
-      {
-        name: '内部成本',
-        type: 'bar',
-        stack: 'total',
-        data: customerData.map(item => item.internal?.totalCost || 0),
-        itemStyle: { color: '#67c23a' }
-      }
+      { 
+         name: '内部成本',
+         type: 'bar',
+         stack: 'total',
+         data: customerData.map(item => item.internal?.totalCost || 0),
+         itemStyle: {
+          color: '#FFA753',
+          borderRadius: [10, 0, 0, 10]  // 左侧半圆形末端
+          }
+        }
     ]
   } else {
     // 显示单一类型成本
@@ -1180,28 +1191,20 @@ const updateCustomerChart = (customerData) => {
         itemStyle: {
           color: filterForm.costType === 'external' ? 
             new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-              {offset: 0, color: '#ff9a9e'},
-              {offset: 1, color: '#f56c6c'}
+              {offset: 0, color: '#FF6B6B'},
+              {offset: 1, color: '#DC3C37'}
             ]) :
             new echarts.graphic.LinearGradient(0, 0, 1, 0, [
-              {offset: 0, color: '#95de64'},
-              {offset: 1, color: '#67c23a'}
-            ])
+              {offset: 0, color: '#FFD19A'},
+              {offset: 1, color: '#FFA753'}
+            ]),
+          borderRadius: [0, 10, 10, 0]  // 右侧半圆形末端
         }
       }
     ]
   }
 
   const option = {
-    title: {
-      text: filterForm.costType === 'all' ? '客户内外部质量成本排行' : 
-            filterForm.costType === 'external' ? '客户外部质量成本排行' : '客户内部质量成本排行',
-      left: 'center',
-      textStyle: {
-        fontSize: 16,
-        fontWeight: 'bold'
-      }
-    },
     tooltip: {
       trigger: 'axis',
       axisPointer: {
@@ -1221,12 +1224,15 @@ const updateCustomerChart = (customerData) => {
     },
     legend: {
       data: seriesData.map(item => item.name),
-      top: 30
+      bottom: 10,
+      left: 'center',
+      orient: 'horizontal'
     },
     grid: {
       left: '3%',
       right: '4%',
-      bottom: '3%',
+      bottom: '15%',
+      top: '10%',
       containLabel: true
     },
     xAxis: {
@@ -1265,11 +1271,20 @@ const initCharts = () => {
   }
 
   // 监听窗口大小变化
-  window.addEventListener('resize', () => {
-    trendChart?.resize()
-    pieChart?.resize()
-    customerChart?.resize()
-  })
+  window.addEventListener('resize', handleResize)
+  
+  // 使用ResizeObserver监听容器尺寸变化
+  if (window.ResizeObserver) {
+    resizeObserver = new ResizeObserver(() => {
+      // 延迟执行resize，确保DOM更新完成
+      setTimeout(handleResize, 100)
+    })
+    
+    // 监听所有图表容器
+    if (trendChartRef.value) resizeObserver.observe(trendChartRef.value)
+    if (pieChartRef.value) resizeObserver.observe(pieChartRef.value)
+    if (customerChartRef.value) resizeObserver.observe(customerChartRef.value)
+  }
 }
 
 /**
@@ -1382,15 +1397,40 @@ onMounted(async () => {
   startDate.setFullYear(startDate.getFullYear(), 0, 1) // 设置为当前年份的1月1号
   startDate.setHours(0, 0, 0, 0) // 设置为0点0分0秒
   
+  // 使用本地时间格式化，避免时区问题
+  const formatDate = (date) => {
+    const year = date.getFullYear()
+    const month = String(date.getMonth() + 1).padStart(2, '0')
+    const day = String(date.getDate()).padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  
   filterForm.dateRange = [
-    startDate.toISOString().slice(0, 10),
-    endDate.toISOString().slice(0, 10)
+    formatDate(startDate),
+    formatDate(endDate)
   ]
 
   await loadCustomerOptions()
   await nextTick()
   initCharts()
   await loadStatistics()
+})
+
+// 组件卸载时清理
+onUnmounted(() => {
+  // 清理窗口resize监听器
+  window.removeEventListener('resize', handleResize)
+  
+  // 清理ResizeObserver
+  if (resizeObserver) {
+    resizeObserver.disconnect()
+    resizeObserver = null
+  }
+  
+  // 销毁图表实例
+  trendChart?.dispose()
+  pieChart?.dispose()
+  customerChart?.dispose()
 })
 </script>
 
@@ -1512,7 +1552,7 @@ onMounted(async () => {
 }
 
 .trend-up {
-  color: #f56c6c;
+  color: #DC3C37;
 }
 
 .trend-down {
@@ -1557,11 +1597,11 @@ onMounted(async () => {
 }
 
 .breakdown-item.external .breakdown-value {
-  color: #f56c6c;
+  color: #DC3C37;
 }
 
 .breakdown-item.internal .breakdown-value {
-  color: #67c23a;
+  color: #FFA753;
 }
 
 .internal-cards {
@@ -1635,7 +1675,7 @@ onMounted(async () => {
 
 .cost-value {
   font-weight: 600;
-  color: #f56c6c;
+  color: #DC3C37;
 }
 
 .pagination-section {

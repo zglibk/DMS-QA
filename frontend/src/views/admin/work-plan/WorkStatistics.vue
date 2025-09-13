@@ -641,25 +641,37 @@ const drawTypeChart = (data) => {
         name: '总数',
         type: 'bar',
         data: data.map(item => item.TotalPlans) || [],
-        itemStyle: { color: '#909399' }
+        itemStyle: { 
+          color: '#909399',
+          borderRadius: [10, 10, 0, 0]  // 顶部半圆形末端
+        }
       },
       {
         name: '完成',
         type: 'bar',
         data: data.map(item => item.CompletedPlans) || [],
-        itemStyle: { color: '#67c23a' }
+        itemStyle: { 
+          color: '#67c23a',
+          borderRadius: [10, 10, 0, 0]  // 顶部半圆形末端
+        }
       },
       {
         name: '进行中',
         type: 'bar',
         data: data.map(item => item.InProgressPlans) || [],
-        itemStyle: { color: '#e6a23c' }
+        itemStyle: { 
+          color: '#e6a23c',
+          borderRadius: [10, 10, 0, 0]  // 顶部半圆形末端
+        }
       },
       {
         name: '逾期',
         type: 'bar',
         data: data.map(item => item.OverduePlans) || [],
-        itemStyle: { color: '#f56c6c' }
+        itemStyle: { 
+          color: '#f56c6c',
+          borderRadius: [10, 10, 0, 0]  // 顶部半圆形末端
+        }
       }
     ]
   }
@@ -704,14 +716,20 @@ const drawDepartmentChart = (data) => {
         name: '完成率',
         type: 'bar',
         data: data.map(item => item.CompletionRate) || [],
-        itemStyle: { color: '#409eff' },
+        itemStyle: { 
+          color: '#409eff',
+          borderRadius: [10, 10, 0, 0]  // 顶部半圆形末端
+        },
         barMaxWidth: 60  // 设置柱形最大宽度为60px
       },
       {
         name: '平均进度',
         type: 'bar',
         data: data.map(item => item.AvgProgress) || [],
-        itemStyle: { color: '#67c23a' },
+        itemStyle: { 
+          color: '#67c23a',
+          borderRadius: [10, 10, 0, 0]  // 顶部半圆形末端
+        },
         barMaxWidth: 60  // 设置柱形最大宽度为60px
       }
     ]

@@ -588,31 +588,9 @@ router.get('/cost-statistics', async (req, res) => {
       // 获取外部质量成本概览数据（客诉）
       let externalOverview = { totalCost: 0, penaltyCost: 0, compensationCost: 0, reworkCost: 0, totalComplaints: 0 };
       if (costType === 'all' || costType === 'external') {
-        // 1. 从CustomerComplaints表获取外部成本数据
-        let externalWhereConditions = ['1=1'];
-        if (startDate) externalWhereConditions.push('Date >= @startDate');
-        if (endDate) externalWhereConditions.push('Date <= @endDate');
-        if (customerId) externalWhereConditions.push('CustomerCode = @customerId');
+        // 外部成本计算：ComplaintRegister表中ComplaintCategory为'客诉'的TotalCost + CustomerComplaints表的TotalQualityCost
         
-        const externalOverviewQuery = `
-          SELECT 
-            ISNULL(SUM(TotalQualityCost), 0) as totalCost,
-            ISNULL(SUM(QualityPenalty), 0) as penaltyCost,
-            ISNULL(SUM(CustomerCompensation), 0) as compensationCost,
-            ISNULL(SUM(ReworkCost), 0) as reworkCost,
-            COUNT(*) as totalComplaints
-          FROM CustomerComplaints 
-          WHERE ${externalWhereConditions.join(' AND ')}
-        `;
-        
-        console.log('🔍 [调试] 外部质量成本查询SQL:', externalOverviewQuery);
-        console.log('🔍 [调试] 查询参数:', { startDate, endDate, customerId });
-        
-        const externalResult = await request.query(externalOverviewQuery);
-        externalOverview = externalResult.recordset[0];
-        console.log('📊 [调试] CustomerComplaints表外部质量成本查询结果:', externalOverview);
-        
-        // 2. 从ComplaintRegister表获取"客诉"类型的成本数据并添加到外部成本中
+        // 1. 从ComplaintRegister表获取"客诉"类型的成本数据
         let complaintRegisterWhereConditions = ['ComplaintCategory = N\'客诉\''];
         if (startDate) complaintRegisterWhereConditions.push('Date >= @startDate');
         if (endDate) complaintRegisterWhereConditions.push('Date <= @endDate');
@@ -620,8 +598,8 @@ router.get('/cost-statistics', async (req, res) => {
         
         const complaintRegisterQuery = `
           SELECT 
-            ISNULL(SUM(TotalCost), 0) as additionalCost,
-            COUNT(*) as additionalComplaints
+            ISNULL(SUM(TotalCost), 0) as complaintCost,
+            COUNT(*) as complaintCount
           FROM ComplaintRegister 
           WHERE ${complaintRegisterWhereConditions.join(' AND ')}
         `;
@@ -629,12 +607,37 @@ router.get('/cost-statistics', async (req, res) => {
         console.log('🔍 [调试] ComplaintRegister表客诉成本查询SQL:', complaintRegisterQuery);
         
         const complaintRegisterResult = await request.query(complaintRegisterQuery);
-        const additionalData = complaintRegisterResult.recordset[0];
-        console.log('📊 [调试] ComplaintRegister表客诉成本查询结果:', additionalData);
+        const complaintData = complaintRegisterResult.recordset[0];
+        console.log('📊 [调试] ComplaintRegister表客诉成本查询结果:', complaintData);
         
-        // 3. 将ComplaintRegister表的客诉成本添加到外部成本总计中
-        externalOverview.totalCost += additionalData.additionalCost;
-        externalOverview.totalComplaints += additionalData.additionalComplaints;
+        // 2. 从CustomerComplaints表获取外部成本数据
+        let externalWhereConditions = ['1=1'];
+        if (startDate) externalWhereConditions.push('Date >= @startDate');
+        if (endDate) externalWhereConditions.push('Date <= @endDate');
+        if (customerId) externalWhereConditions.push('CustomerCode = @customerId');
+        
+        const externalOverviewQuery = `
+          SELECT 
+            ISNULL(SUM(TotalQualityCost), 0) as customerComplaintCost,
+            COUNT(*) as customerComplaintCount
+          FROM CustomerComplaints 
+          WHERE ${externalWhereConditions.join(' AND ')}
+        `;
+        
+        console.log('🔍 [调试] CustomerComplaints表外部质量成本查询SQL:', externalOverviewQuery);
+        console.log('🔍 [调试] 查询参数:', { startDate, endDate, customerId });
+        
+        const externalResult = await request.query(externalOverviewQuery);
+        const customerComplaintData = externalResult.recordset[0];
+        console.log('📊 [调试] CustomerComplaints表外部质量成本查询结果:', customerComplaintData);
+        
+        // 3. 合并外部成本数据
+        externalOverview = {
+          totalCost: complaintData.complaintCost + customerComplaintData.customerComplaintCost,
+          totalComplaints: complaintData.complaintCount + customerComplaintData.customerComplaintCount,
+          complaintRegisterCost: complaintData.complaintCost,
+          customerComplaintsCost: customerComplaintData.customerComplaintCost
+        };
         
         console.log('📊 [调试] 合并后的外部质量成本总计:', externalOverview);
       }
@@ -725,20 +728,19 @@ router.get('/cost-statistics', async (req, res) => {
       const overview = {
         // 总成本
         totalCost: externalOverview.totalCost + internalOverview.totalCost,
-        // 外部成本明细
+        // 外部成本明细（ComplaintRegister客诉 + CustomerComplaints总质量成本）
         external: {
           totalCost: externalOverview.totalCost,
-          qualityPenalty: externalOverview.penaltyCost,
-          customerCompensation: externalOverview.compensationCost,
-          reworkCost: externalOverview.reworkCost,
+          complaintRegisterCost: externalOverview.complaintRegisterCost || 0,
+          customerComplaintCost: externalOverview.customerComplaintsCost || 0,
           totalComplaints: externalOverview.totalComplaints
         },
-        // 内部成本明细
+        // 内部成本明细（ComplaintRegister内诉 + 返工成本 + 出版异常成本）
         internal: {
           totalCost: internalOverview.totalCost,
-          internalComplaintCost: internalOverview.complaintCost,
-          reworkCost: internalOverview.reworkCost,
-          publishingExceptionCost: internalOverview.publishingCost,
+          internalComplaintCost: internalOverview.complaintCost || 0,
+          reworkCost: internalOverview.reworkCost || 0,
+          publishingExceptionCost: internalOverview.publishingCost || 0,
           totalComplaints: internalOverview.totalComplaints
         }
       };
@@ -1068,45 +1070,41 @@ router.get('/cost-statistics', async (req, res) => {
       // 获取成本构成数据
       let costComposition = [];
       
-      // 外部质量成本构成
+      // 外部质量成本构成（ComplaintRegister客诉 + CustomerComplaints总质量成本）
       if (costType === 'all' || costType === 'external') {
-        let externalCompositionWhereConditions = ['1=1'];
-        if (startDate) externalCompositionWhereConditions.push('Date >= @startDate');
-        if (endDate) externalCompositionWhereConditions.push('Date <= @endDate');
-        if (customerId) externalCompositionWhereConditions.push('CustomerCode = @customerId');
+        // 1. ComplaintRegister表中ComplaintCategory为'客诉'的成本
+        let complaintRegisterWhereConditions = ['ComplaintCategory = N\'客诉\''];
+        if (startDate) complaintRegisterWhereConditions.push('Date >= @startDate');
+        if (endDate) complaintRegisterWhereConditions.push('Date <= @endDate');
+        if (customerId) complaintRegisterWhereConditions.push('Customer = @customerId');
         
-        const externalCompositionQuery = `
+        const complaintRegisterCompositionQuery = `
           SELECT 
-            '外部-质量罚款' as name, 'external' as category, ISNULL(SUM(QualityPenalty), 0) as value
-          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
-          UNION ALL
-          SELECT 
-            '外部-返工成本' as name, 'external' as category, ISNULL(SUM(ReworkCost), 0) as value
-          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
-          UNION ALL
-          SELECT 
-            '外部-客户赔偿' as name, 'external' as category, ISNULL(SUM(CustomerCompensation), 0) as value
-          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
-          UNION ALL
-          SELECT 
-            '外部-质量损失' as name, 'external' as category, ISNULL(SUM(QualityLossCost), 0) as value
-          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
-          UNION ALL
-          SELECT 
-            '外部-检验成本' as name, 'external' as category, ISNULL(SUM(InspectionCost), 0) as value
-          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
-          UNION ALL
-          SELECT 
-            '外部-运输成本' as name, 'external' as category, ISNULL(SUM(TransportationCost), 0) as value
-          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
-          UNION ALL
-          SELECT 
-            '外部-预防成本' as name, 'external' as category, ISNULL(SUM(PreventionCost), 0) as value
-          FROM CustomerComplaints WHERE ${externalCompositionWhereConditions.join(' AND ')}
+            '外部-客诉损失' as name, 'external' as category, ISNULL(SUM(TotalCost), 0) as value
+          FROM ComplaintRegister WHERE ${complaintRegisterWhereConditions.join(' AND ')}
         `;
         
-        const externalCompositionResult = await request.query(externalCompositionQuery);
-        costComposition = costComposition.concat(externalCompositionResult.recordset.filter(item => item.value > 0));
+        const complaintRegisterCompositionResult = await request.query(complaintRegisterCompositionQuery);
+        if (complaintRegisterCompositionResult.recordset[0].value > 0) {
+          costComposition.push(complaintRegisterCompositionResult.recordset[0]);
+        }
+        
+        // 2. CustomerComplaints表的总质量成本
+        let customerComplaintsWhereConditions = ['1=1'];
+        if (startDate) customerComplaintsWhereConditions.push('Date >= @startDate');
+        if (endDate) customerComplaintsWhereConditions.push('Date <= @endDate');
+        if (customerId) customerComplaintsWhereConditions.push('CustomerCode = @customerId');
+        
+        const customerComplaintsCompositionQuery = `
+          SELECT 
+            '外部-客户投诉成本' as name, 'external' as category, ISNULL(SUM(TotalQualityCost), 0) as value
+          FROM CustomerComplaints WHERE ${customerComplaintsWhereConditions.join(' AND ')}
+        `;
+        
+        const customerComplaintsCompositionResult = await request.query(customerComplaintsCompositionQuery);
+        if (customerComplaintsCompositionResult.recordset[0].value > 0) {
+          costComposition.push(customerComplaintsCompositionResult.recordset[0]);
+        }
       }
       
       // 内部质量成本构成
@@ -1168,6 +1166,7 @@ router.get('/cost-statistics', async (req, res) => {
       
       // 外部质量成本客户排行（客诉）
       if (costType === 'all' || costType === 'external') {
+        // 1. CustomerComplaints表的外部成本
         let externalRankingWhereConditions = ['CustomerCode IS NOT NULL', 'CustomerCode != \'\'']; 
         if (startDate) externalRankingWhereConditions.push('Date >= @startDate');
         if (endDate) externalRankingWhereConditions.push('Date <= @endDate');
@@ -1187,6 +1186,27 @@ router.get('/cost-statistics', async (req, res) => {
         
         const externalRankingResult = await request.query(externalRankingQuery);
         customerRanking = customerRanking.concat(externalRankingResult.recordset);
+        
+        // 2. ComplaintRegister表中客诉类型的外部成本
+        let complaintRegisterRankingWhereConditions = ['ComplaintCategory = N\'客诉\'', 'Customer IS NOT NULL', 'Customer != \'\'']; 
+        if (startDate) complaintRegisterRankingWhereConditions.push('Date >= @startDate');
+        if (endDate) complaintRegisterRankingWhereConditions.push('Date <= @endDate');
+        if (customerId) complaintRegisterRankingWhereConditions.push('Customer = @customerId');
+        
+        const complaintRegisterRankingQuery = `
+          SELECT TOP 10
+            Customer as customerName,
+            'external' as costType,
+            ISNULL(SUM(TotalCost), 0) as totalCost,
+            COUNT(*) as complaintCount
+          FROM ComplaintRegister 
+          WHERE ${complaintRegisterRankingWhereConditions.join(' AND ')}
+          GROUP BY Customer
+          ORDER BY SUM(TotalCost) DESC
+        `;
+        
+        const complaintRegisterRankingResult = await request.query(complaintRegisterRankingQuery);
+        customerRanking = customerRanking.concat(complaintRegisterRankingResult.recordset);
       }
       
       // 内部质量成本客户排行
@@ -1302,13 +1322,6 @@ router.get('/cost-statistics', async (req, res) => {
           ${periodFormat} as period,
           CustomerCode as customerName,
           COUNT(*) as complaintCount,
-          ISNULL(SUM(QualityPenalty), 0) as qualityPenalty,
-          ISNULL(SUM(ReworkCost), 0) as reworkCost,
-          ISNULL(SUM(CustomerCompensation), 0) as customerCompensation,
-          ISNULL(SUM(QualityLossCost), 0) as qualityLossCost,
-          ISNULL(SUM(InspectionCost), 0) as inspectionCost,
-          ISNULL(SUM(TransportationCost), 0) as transportationCost,
-          ISNULL(SUM(PreventionCost), 0) as preventionCost,
           ISNULL(SUM(TotalQualityCost), 0) as totalCost
         FROM CustomerComplaints 
         WHERE ${whereClause}
@@ -1332,23 +1345,17 @@ router.get('/cost-statistics', async (req, res) => {
       
       return {
         overview: {
-          totalCost: overview.totalCost, // 添加总质量成本字段
-          totalQualityCost: overview.totalQualityCost,
-          qualityPenalty: overview.qualityPenalty,
-          customerCompensation: overview.customerCompensation,
-          reworkCost: overview.reworkCost,
-          publishingExceptionCost: overview.publishingExceptionCost || 0,
-          internalComplaintCost: overview.internalComplaintCost || 0,
+          totalCost: overview.totalCost, // 总质量成本
           external: {
-            totalCost: overview.external?.totalCost || 0,
-            qualityPenalty: overview.external?.qualityPenalty || 0,
-            customerCompensation: overview.external?.customerCompensation || 0
+            totalCost: overview.external?.totalCost || 0, // 外部成本：客诉登记成本 + 客户投诉成本
+            complaintRegisterCost: overview.external?.complaintRegisterCost || 0, // 客诉登记成本
+            customerComplaintCost: overview.external?.customerComplaintCost || 0 // 客户投诉成本
           },
           internal: {
-            totalCost: overview.internal?.totalCost || 0,
-            reworkCost: overview.internal?.reworkCost || 0,
-            publishingExceptionCost: overview.internal?.publishingExceptionCost || 0,
-            internalComplaintCost: overview.internal?.internalComplaintCost || 0
+            totalCost: overview.internal?.totalCost || 0, // 内部成本：内诉成本 + 返工成本 + 出版异常成本
+            internalComplaintCost: overview.internal?.internalComplaintCost || 0, // 内诉成本
+            reworkCost: overview.internal?.reworkCost || 0, // 返工成本
+            publishingExceptionCost: overview.internal?.publishingExceptionCost || 0 // 出版异常成本
           },
           trend: trend
         },

@@ -155,8 +155,26 @@
             <div class="details-header">
               <h3>最新投诉记录</h3>
               <el-button size="small" @click="refreshDetails">刷新</el-button>
+              <el-button size="small" type="info" @click="debugData">调试数据</el-button>
             </div>
-            <div class="scrolling-list">
+            
+            <!-- 调试信息显示 -->
+            <div v-if="showDebugInfo" class="debug-info">
+              <h4>调试信息:</h4>
+              <p>数据数量: {{ recentComplaints.length }}</p>
+              <p>数据状态: {{ dataStatus }}</p>
+              <pre>{{ JSON.stringify(recentComplaints.slice(0, 2), null, 2) }}</pre>
+            </div>
+            
+            <!-- 数据为空时的提示 -->
+            <div v-if="recentComplaints.length === 0" class="empty-data">
+              <el-empty description="暂无投诉记录数据">
+                <el-button type="primary" @click="refreshDetails">重新加载</el-button>
+              </el-empty>
+            </div>
+            
+            <!-- 数据列表 -->
+            <div v-else class="scrolling-list">
               <div v-for="item in recentComplaints" :key="item.ID" class="list-item">
                 <div class="item-date">{{ formatDate(item.Date) }}</div>
                 <div class="item-content">
@@ -217,6 +235,10 @@ const statsData = ref({
 // 最新投诉记录
 const recentComplaints = ref([])
 
+// 调试相关
+const showDebugInfo = ref(false)
+const dataStatus = ref('未加载')
+
 // 图表实例
 let trendChart = null
 let workshopChart = null
@@ -247,6 +269,17 @@ const handleTabChange = (tabName) => {
 
 const refreshDetails = () => {
   fetchRecentComplaints()
+}
+
+// 调试数据功能
+const debugData = () => {
+  showDebugInfo.value = !showDebugInfo.value
+  console.log('=== 调试信息 ===')
+  console.log('投诉记录数量:', recentComplaints.value.length)
+  console.log('投诉记录数据:', recentComplaints.value)
+  console.log('数据状态:', dataStatus.value)
+  console.log('统计数据:', statsData.value)
+  console.log('===============')
 }
 
 // 安全的日期格式化函数，避免时区转换问题
@@ -318,16 +351,54 @@ const fetchStatsData = async () => {
 }
 
 // 获取最新投诉记录
+/**
+ * 获取最新投诉记录数据
+ * 从后端API获取投诉列表并更新前端状态
+ */
 const fetchRecentComplaints = async () => {
   try {
+    dataStatus.value = '加载中...'
     const token = localStorage.getItem('token')
+    console.log('=== 开始获取最新投诉记录 ===')
+    console.log('当前token:', token ? '存在' : '不存在')
+    
     const res = await api.get('/complaint/list', {
       params: { page: 1, pageSize: 10 }
     })
     
-    recentComplaints.value = res.data.data || []
+    console.log('=== API响应详细信息 ===')
+    console.log('完整响应对象:', res)
+    console.log('响应数据类型:', typeof res)
+    console.log('响应数据内容:', res)
+    console.log('res.success值:', res?.success)
+    console.log('res.success类型:', typeof res?.success)
+    
+    // 修正：@/utils/api的响应拦截器已经返回了response.data，所以res就是后端返回的数据
+    if (res && res.success) {
+      recentComplaints.value = res.data || []
+      dataStatus.value = `成功加载 ${recentComplaints.value.length} 条记录`
+      console.log('=== 成功获取数据 ===')
+      console.log('投诉记录数量:', recentComplaints.value.length)
+      console.log('投诉记录数据类型:', typeof recentComplaints.value)
+      console.log('前3条记录详情:', recentComplaints.value.slice(0, 3))
+    } else {
+      console.log('=== API返回失败分析 ===')
+      console.log('res存在:', !!res)
+      console.log('res.success存在:', 'success' in (res || {}))
+      console.log('res.success值:', res?.success)
+      console.log('完整错误数据:', res)
+      
+      recentComplaints.value = []
+      const errorMsg = res.data?.message || '数据格式错误'
+      dataStatus.value = 'API返回失败: ' + errorMsg
+      ElMessage.error('获取投诉记录失败: ' + errorMsg)
+    }
   } catch (error) {
-    // 获取最新投诉记录失败，使用空数组
+    console.error('获取最新投诉记录失败:', error)
+    console.error('错误详情:', error.response?.data || error.message)
+    recentComplaints.value = []
+    dataStatus.value = '加载失败: ' + (error.response?.data?.message || error.message || '网络错误')
+    ElMessage.error('获取投诉记录失败: ' + (error.response?.data?.message || error.message || '网络错误'))
   }
 }
 

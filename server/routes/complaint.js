@@ -512,14 +512,22 @@ router.get('/list', async (req, res) => {
       });
     }
 
-    res.json({
+    const responseData = {
       success: true,
       data: result.recordset,
       total,
       page,
       pageSize,
       search
-    });
+    };
+    
+    console.log('=== 后端返回数据调试 ===');
+    console.log('响应数据类型:', typeof responseData);
+    console.log('响应数据内容:', JSON.stringify(responseData, null, 2));
+    console.log('success字段:', responseData.success);
+    console.log('data字段长度:', responseData.data?.length);
+    
+    res.json(responseData);
   } catch (err) {
     console.error('获取投诉列表失败:', err);
     res.status(500).json({ success: false, message: err.message });

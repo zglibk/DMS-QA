@@ -1280,7 +1280,8 @@ const updateCategoryChart = (data) => {
             { offset: 0, color: '#409EFF' },
             { offset: 0.5, color: '#337ecc' },
             { offset: 1, color: '#337ecc' }
-          ])
+          ]),
+          borderRadius: [10, 10, 0, 0]  // 顶部半圆形末端
         }
       }
     ]
@@ -1536,7 +1537,8 @@ const renderGanttChart = (data) => {
           percentage: (item.percentage || 0).toFixed(1),
           itemStyle: {
             color: item.percentage >= 30 ? '#F56C6C' : 
-                   item.percentage >= 15 ? '#E6A23C' : '#67C23A'
+                   item.percentage >= 15 ? '#E6A23C' : '#67C23A',
+            borderRadius: [0, 10, 10, 0]  // 右侧半圆形末端
           }
         })),
         label: {

@@ -804,8 +804,8 @@ const dialogTitle = computed(() => {
 async function loadPersonList() {
   try {
     const response = await api.get('/person/list?pageSize=1000&includeInactive=false')
-    if (response.data.success) {
-      personList.value = response.data.data
+    if (response.success) {
+      personList.value = response.data
     }
   } catch (error) {
     console.error('获取人员列表失败:', error)
@@ -818,8 +818,8 @@ async function loadPersonList() {
 async function loadDepartmentTree() {
   try {
     const response = await api.get('/departments/tree')
-    if (response.data.success) {
-      departmentTree.value = response.data.data
+    if (response.success) {
+      departmentTree.value = response.data
     }
   } catch (error) {
     console.error('获取部门树失败:', error)
