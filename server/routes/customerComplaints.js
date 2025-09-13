@@ -892,6 +892,7 @@ router.get('/cost-statistics', async (req, res) => {
       
       // 获取外部质量成本趋势数据（客诉）
       if (costType === 'all' || costType === 'external') {
+        // 1. 从CustomerComplaints表获取外部趋势数据
         let externalTrendWhereConditions = ['1=1'];
         if (startDate) externalTrendWhereConditions.push('Date >= @startDate');
         if (endDate) externalTrendWhereConditions.push('Date <= @endDate');
@@ -910,8 +911,34 @@ router.get('/cost-statistics', async (req, res) => {
           GROUP BY ${periodFormat}
         `;
         
+        console.log('🔍 [调试] CustomerComplaints表外部趋势数据查询SQL:', externalTrendDataQuery);
         const externalTrendResult = await request.query(externalTrendDataQuery);
+        console.log('📊 [调试] CustomerComplaints表外部趋势数据查询结果:', externalTrendResult.recordset);
         trendData = trendData.concat(externalTrendResult.recordset);
+        
+        // 2. 从ComplaintRegister表获取客诉类型的趋势数据
+        let complaintRegisterTrendWhereConditions = ['ComplaintCategory = N\'客诉\''];
+        if (startDate) complaintRegisterTrendWhereConditions.push('Date >= @startDate');
+        if (endDate) complaintRegisterTrendWhereConditions.push('Date <= @endDate');
+        if (customerId) complaintRegisterTrendWhereConditions.push('Customer = @customerId');
+        
+        const complaintRegisterTrendQuery = `
+          SELECT 
+            ${periodFormat} as period,
+            'external_complaint' as costType,
+            0 as qualityPenalty,
+            0 as reworkCost,
+            0 as customerCompensation,
+            ISNULL(SUM(TotalCost), 0) as totalCost
+          FROM ComplaintRegister 
+          WHERE ${complaintRegisterTrendWhereConditions.join(' AND ')}
+          GROUP BY ${periodFormat}
+        `;
+        
+        console.log('🔍 [调试] ComplaintRegister表客诉趋势数据查询SQL:', complaintRegisterTrendQuery);
+        const complaintRegisterTrendResult = await request.query(complaintRegisterTrendQuery);
+        console.log('📊 [调试] ComplaintRegister表客诉趋势数据查询结果:', complaintRegisterTrendResult.recordset);
+        trendData = trendData.concat(complaintRegisterTrendResult.recordset);
       }
       
       // 获取内部质量成本趋势数据
@@ -935,7 +962,9 @@ router.get('/cost-statistics', async (req, res) => {
           GROUP BY ${periodFormat}
         `;
         
+        console.log('🔍 [调试] 内诉趋势数据查询SQL:', internalComplaintTrendQuery);
         const internalComplaintTrendResult = await request.query(internalComplaintTrendQuery);
+        console.log('📊 [调试] 内诉趋势数据查询结果:', internalComplaintTrendResult.recordset);
         trendData = trendData.concat(internalComplaintTrendResult.recordset);
         
         // 返工趋势数据
@@ -957,7 +986,9 @@ router.get('/cost-statistics', async (req, res) => {
           GROUP BY ${periodFormatRework}
         `;
         
+        console.log('🔍 [调试] 返工趋势数据查询SQL:', reworkTrendQuery);
         const reworkTrendResult = await request.query(reworkTrendQuery);
+        console.log('📊 [调试] 返工趋势数据查询结果:', reworkTrendResult.recordset);
         trendData = trendData.concat(reworkTrendResult.recordset);
         
         // 出版异常趋势数据
@@ -985,6 +1016,8 @@ router.get('/cost-statistics', async (req, res) => {
       
       // 合并同期数据
       const trendDataMap = new Map();
+      console.log('🔍 [调试] 开始合并趋势数据，原始数据条数:', trendData.length);
+      
       trendData.forEach(item => {
         const key = item.period;
         if (!trendDataMap.has(key)) {
@@ -997,10 +1030,15 @@ router.get('/cost-statistics', async (req, res) => {
         }
         
         const periodData = trendDataMap.get(key);
+        console.log(`🔍 [调试] 处理${key}期间的${item.costType}数据:`, item);
+        
         if (item.costType === 'external') {
           periodData.external.qualityPenalty += item.qualityPenalty;
           periodData.external.reworkCost += item.reworkCost;
           periodData.external.customerCompensation += item.customerCompensation;
+          periodData.external.totalCost += item.totalCost;
+        } else if (item.costType === 'external_complaint') {
+          // ComplaintRegister表中的客诉数据也属于外部成本
           periodData.external.totalCost += item.totalCost;
         } else if (item.costType === 'internal_complaint') {
           periodData.internal.complaintCost += item.totalCost;
@@ -1016,7 +1054,16 @@ router.get('/cost-statistics', async (req, res) => {
         periodData.totalCost = periodData.external.totalCost + periodData.internal.totalCost;
       });
       
-      const trendDataResult = Array.from(trendDataMap.values()).sort((a, b) => a.period.localeCompare(b.period));
+      // 转换趋势数据格式，添加前端需要的字段
+      const trendDataResult = Array.from(trendDataMap.values())
+        .sort((a, b) => a.period.localeCompare(b.period))
+        .map(item => ({
+          ...item,
+          // 添加前端趋势图需要的字段
+          externalCost: item.external.totalCost,
+          internalCost: item.internal.totalCost
+        }));
+      console.log('📊 [调试] 最终趋势数据结果:', trendDataResult);
       
       // 获取成本构成数据
       let costComposition = [];

@@ -612,18 +612,20 @@ const updateTrendChart = (trendData) => {
         type: 'line',
         smooth: true,
         smoothMonotone: 'x',
+        // 默认隐藏总成本系列
+        selected: false,
         lineStyle: {
           width: 3,
-          color: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          color: '#409eff',
+          shadowColor: 'rgba(64, 158, 255, 0.3)',
           shadowBlur: 10,
           shadowOffsetY: 3
         },
         itemStyle: {
           color: '#ffffff',
           borderWidth: 3,
-          borderColor: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          borderColor: '#409eff',
+          shadowColor: 'rgba(64, 158, 255, 0.4)',
           shadowBlur: 8
         },
         areaStyle: {
@@ -631,8 +633,8 @@ const updateTrendChart = (trendData) => {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
-              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+              { offset: 0, color: 'rgba(64, 158, 255, 0.4)' },
+              { offset: 1, color: 'rgba(64, 158, 255, 0.1)' }
             ]
           }
         },
@@ -647,9 +649,9 @@ const updateTrendChart = (trendData) => {
           itemStyle: {
             color: '#ffffff',
             borderWidth: 4,
-            borderColor: '#f56c6c',
+            borderColor: '#409eff',
             shadowBlur: 15,
-            shadowColor: 'rgba(245, 108, 108, 0.6)'
+            shadowColor: 'rgba(64, 158, 255, 0.6)'
           }
         },
         data: processedTrendData.map(item => item.totalCost || 0)
@@ -951,16 +953,16 @@ const updateTrendChart = (trendData) => {
         smoothMonotone: 'x',
         lineStyle: {
           width: 5,
-          color: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.3)',
+          color: '#52c41a',
+          shadowColor: 'rgba(82, 196, 26, 0.3)',
           shadowBlur: 10,
           shadowOffsetY: 3
         },
         itemStyle: {
           color: '#ffffff',
           borderWidth: 3,
-          borderColor: '#f56c6c',
-          shadowColor: 'rgba(245, 108, 108, 0.4)',
+          borderColor: '#52c41a',
+          shadowColor: 'rgba(82, 196, 26, 0.4)',
           shadowBlur: 8
         },
         areaStyle: {
@@ -968,8 +970,8 @@ const updateTrendChart = (trendData) => {
             type: 'linear',
             x: 0, y: 0, x2: 0, y2: 1,
             colorStops: [
-              { offset: 0, color: 'rgba(245, 108, 108, 0.4)' },
-              { offset: 1, color: 'rgba(245, 108, 108, 0.1)' }
+              { offset: 0, color: 'rgba(82, 196, 26, 0.4)' },
+              { offset: 1, color: 'rgba(82, 196, 26, 0.1)' }
             ]
           }
         },
@@ -984,9 +986,9 @@ const updateTrendChart = (trendData) => {
           itemStyle: {
             color: '#ffffff',
             borderWidth: 4,
-            borderColor: '#f56c6c',
+            borderColor: '#52c41a',
             shadowBlur: 15,
-            shadowColor: 'rgba(245, 108, 108, 0.6)'
+            shadowColor: 'rgba(82, 196, 26, 0.6)'
           }
         },
         data: processedTrendData.map(item => item.internalCost || 0)
@@ -1022,7 +1024,13 @@ const updateTrendChart = (trendData) => {
     },
     legend: {
       data: legendData,
-      top: 30
+      top: 30,
+      // 设置图例的默认选中状态
+      selected: filterForm.costType === 'all' ? {
+        '外部成本': true,
+        '内部成本': true,
+        '总成本': false  // 默认隐藏总成本
+      } : {}
     },
     toolbox: {
       feature: {
@@ -1087,15 +1095,6 @@ const updatePieChart = (compositionData) => {
   chartData = chartData.filter(item => item.value > 0)
   
   const option = {
-    title: {
-      text: filterForm.costType === 'all' ? '内外部成本构成' : 
-            filterForm.costType === 'external' ? '外部成本构成' : '内部成本构成',
-      left: 'center',
-      textStyle: {
-        fontSize: 16,
-        fontWeight: 'bold'
-      }
-    },
     tooltip: {
       trigger: 'item',
       formatter: '{a} <br/>{b}: ¥{c} ({d}%)'
@@ -1109,13 +1108,31 @@ const updatePieChart = (compositionData) => {
       {
         name: '成本构成',
         type: 'pie',
-        radius: '50%',
+        radius: ['40%', '70%'],  // 设置内外半径，形成圆环图
+        center: ['50%', '50%'],  // 图表中心位置
+        avoidLabelOverlap: false,
         data: chartData,
+        itemStyle: {
+          borderRadius: 8,        // 添加圆角样式
+          borderColor: '#fff',    // 设置边框颜色为白色
+          borderWidth: 8          // 设置边框宽度，形成间距效果
+        },
+        label: {
+          show: false,  // 隐藏标签，保持简洁
+          position: 'center'
+        },
         emphasis: {
+          label: {
+            show: true,
+            fontSize: '18',
+            fontWeight: 'bold'
+          },
           itemStyle: {
             shadowBlur: 10,
             shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.5)'
+            shadowColor: 'rgba(0, 0, 0, 0.5)',
+            borderRadius: 10,      // 悬停时增加圆角
+            borderWidth: 12        // 悬停时增加边框宽度
           }
         }
       }
@@ -1359,10 +1376,11 @@ const handleCurrentChange = (page) => {
 
 // 组件挂载时初始化
 onMounted(async () => {
-  // 设置默认日期范围（最近3个月）
+  // 设置默认日期范围（从当前年份1月1号到当前日期）
   const endDate = new Date()
   const startDate = new Date()
-  startDate.setMonth(startDate.getMonth() - 3)
+  startDate.setFullYear(startDate.getFullYear(), 0, 1) // 设置为当前年份的1月1号
+  startDate.setHours(0, 0, 0, 0) // 设置为0点0分0秒
   
   filterForm.dateRange = [
     startDate.toISOString().slice(0, 10),
