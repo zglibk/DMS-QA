@@ -273,7 +273,7 @@ const goAdmin = async () => {
 
   // 权限验证 - 只检查一次
   if (hasAdminPermission.value) {
-    router.push('/admin')
+    router.push('/admin/')
   } else {
     ElMessage.error('您没有后台访问权限，请联系管理员')
   }
