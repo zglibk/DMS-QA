@@ -1029,20 +1029,17 @@
               @selection-change="handleRoleSelectionChange"
               ref="roleTable"
               border
-              resizable
             >
               <el-table-column 
                 type="selection" 
                 width="55"
                 :selectable="(row) => row.Status"
-                resizable
               />
               <el-table-column 
                 prop="Name" 
                 label="角色名称" 
                 min-width="120"
                 show-overflow-tooltip
-                resizable
               >
                 <template #default="scope">
                   <div class="role-name-cell">
@@ -1055,14 +1052,12 @@
                 label="角色编码" 
                 min-width="100"
                 show-overflow-tooltip
-                resizable
               />
               <el-table-column 
                 prop="Description" 
                 label="角色描述" 
                 min-width="150"
                 show-overflow-tooltip
-                resizable
               >
                 <template #default="scope">
                   <span>{{ scope.row.Description || '暂无描述' }}</span>
@@ -1073,7 +1068,6 @@
                 label="状态" 
                 min-width="70" 
                 align="center"
-                resizable
               >
                 <template #default="scope">
                   <el-tag 
@@ -1920,7 +1914,7 @@ const fetchAllRoles = async () => {
 const fetchUserRoles = async (userId) => {
   try {
     const response = await api.get(`/auth/user/${userId}/roles-permissions`)
-    const userRoles = response.data.data?.roles || []
+    const userRoles = response.data.roles || []
     selectedRoleIds.value = userRoles.map(role => role.ID)
     
     // 设置表格中的选中状态
@@ -1949,9 +1943,11 @@ const handleRoleSelectionChange = (selection) => {
 const saveUserRoles = async () => {
   try {
     permissionLoading.value = true
+    
     await api.post(`/auth/user/${currentPermissionUser.value.ID}/assign-roles`, {
       roleIds: selectedRoleIds.value
     })
+    
     ElMessage.success('角色分配成功')
     showPermissionDialog.value = false
     await fetchUsers() // 刷新用户列表
@@ -1969,10 +1965,14 @@ const setPermission = async (row) => {
   showPermissionDialog.value = true
   
   // 并行获取角色列表和用户当前角色
-  await Promise.all([
-    fetchAllRoles(),
-    fetchUserRoles(row.ID)
-  ])
+  try {
+    await Promise.all([
+      fetchAllRoles(),
+      fetchUserRoles(row.ID)
+    ])
+  } catch (error) {
+    console.error('权限设置对话框数据加载失败:', error)
+  }
 }
 
 /**
@@ -3060,7 +3060,7 @@ const getUserIdTagStyle = (userId) => {
 
 /* 移动端优化 */
 @media (max-width: 1200px) {
-  .modern-table :deep(.el-table .el-table__cell) {
+  .table-container .modern-table :deep(.el-table .el-table__cell) {
     padding: 12px 8px;
   }
   
@@ -3642,7 +3642,7 @@ const getUserIdTagStyle = (userId) => {
   background: #F8F9FA !important;
 }
 
-.modern-table :deep(.el-table__header .el-table__cell) {
+.table-container .modern-table :deep(.el-table__header .el-table__cell) {
   background: #F8F9FA !important;
   white-space: nowrap !important;
   padding: 12px 8px !important;
@@ -3651,58 +3651,58 @@ const getUserIdTagStyle = (userId) => {
   font-size: 16px !important;
 }
 
-.modern-table :deep(.el-table__header th .cell) {
+.table-container .modern-table :deep(.el-table__header th .cell) {
   white-space: nowrap !important;
   font-size: 16px !important;
 }
 
-.modern-table :deep(.el-table__header .el-table__cell .cell) {
+.table-container .modern-table :deep(.el-table__header .el-table__cell .cell) {
   white-space: nowrap !important;
   font-size: 16px !important;
 }
 
-.modern-table :deep(.el-table__body .el-table__cell) {
+.table-container .modern-table :deep(.el-table__body .el-table__cell) {
   vertical-align: middle !important;
   font-size: 15px !important;
 }
 
-.modern-table :deep(.el-table__body .el-table__row .el-table__cell) {
+.table-container .modern-table :deep(.el-table__body .el-table__row .el-table__cell) {
   vertical-align: middle !important;
   font-size: 15px !important;
 }
 
-.modern-table :deep(.el-table__body .el-table__row .el-table__cell .cell) {
+.table-container .modern-table :deep(.el-table__body .el-table__row .el-table__cell .cell) {
   font-size: 15px !important;
 }
 
-.modern-table :deep(.el-table__body td.el-table__cell) {
+.table-container .modern-table :deep(.el-table__body td.el-table__cell) {
   font-size: 15px !important;
 }
 
-.modern-table :deep(.el-table__body tr td) {
+.table-container .modern-table :deep(.el-table__body tr td) {
   font-size: 15px !important;
 }
 
-.modern-table :deep(.el-table__body tr td .cell) {
+.table-container .modern-table :deep(.el-table__body tr td .cell) {
   font-size: 15px !important;
 }
 
-.modern-table :deep(.el-table) {
+.table-container .modern-table :deep(.el-table) {
   font-size: 15px !important;
 }
 
-.modern-table :deep(.el-table *) {
+.table-container .modern-table :deep(.el-table *) {
   font-size: inherit !important;
 }
 
 /* 操作列单元格居中 */
-.modern-table :deep(.el-table__body .el-table__row .el-table__cell:last-child) {
+.table-container .modern-table :deep(.el-table__body .el-table__row .el-table__cell:last-child) {
   text-align: center !important;
   vertical-align: middle !important;
 }
 
 /* 操作列内容居中 */
-.modern-table :deep(.el-table__body .el-table__row .el-table__cell:last-child .cell) {
+.table-container .modern-table :deep(.el-table__body .el-table__row .el-table__cell:last-child .cell) {
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
@@ -4298,10 +4298,12 @@ const getUserIdTagStyle = (userId) => {
 .role-table-container :deep(.el-table th) {
   background-color: #f8f9fa;
   border-bottom: 1px solid #e4e7ed;
+  padding: 8px 12px !important;
 }
 
 .role-table-container :deep(.el-table td) {
   border-bottom: 1px solid #f0f0f0;
+  padding: 8px 12px !important;
 }
 
 .role-table-container :deep(.el-table__body tr:hover td) {
