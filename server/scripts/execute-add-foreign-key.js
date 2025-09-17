@@ -12,7 +12,7 @@ const { config: dbConfig } = require('../db');
 // 创建迁移专用的数据库配置
 const config = {
     ...dbConfig,
-    database: 'DMS_QA'  // 确保使用正确的数据库名称
+    database: 'DMS-QA'  // 确保使用正确的数据库名称
 };
 
 /**

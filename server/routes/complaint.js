@@ -852,13 +852,39 @@ router.get('/month-stats', async (req, res) => {
     // 设置默认值
     const showTodayCount = config.showTodayCount !== false;
     const showMonthCount = config.showMonthCount !== false;
-    const displayUnits = config.displayUnits || [
-      { name: '数码印刷', type: 'workshop', enabled: true },
-      { name: '轮转机', type: 'workshop', enabled: true },
-      { name: '跟单', type: 'department', enabled: true },
-      { name: '设计', type: 'department', enabled: true },
-      { name: '品检', type: 'department', enabled: true }
-    ];
+    
+    // 动态获取Workshop单位列表，如果配置中有displayUnits则使用配置，否则从数据库获取
+    let displayUnits = config.displayUnits;
+    if (!displayUnits || displayUnits.length === 0) {
+      try {
+        // 从ComplaintRegister表获取所有不同的Workshop单位名称
+        const workshopResult = await pool.request().query(`
+          SELECT DISTINCT Workshop
+          FROM ComplaintRegister
+          WHERE Workshop IS NOT NULL AND Workshop != ''
+          ORDER BY Workshop
+        `);
+        
+        // 将获取到的Workshop转换为displayUnits格式
+        displayUnits = workshopResult.recordset.map(row => ({
+          name: row.Workshop,
+          type: 'workshop',
+          enabled: true
+        }));
+        
+        console.log('从数据库动态获取的单位列表:', displayUnits);
+      } catch (workshopError) {
+        console.error('获取Workshop单位列表失败，使用默认配置:', workshopError);
+        // 如果获取失败，使用默认配置
+        displayUnits = [
+          { name: '数码印刷', type: 'workshop', enabled: true },
+          { name: '轮转机', type: 'workshop', enabled: true },
+          { name: '跟单', type: 'department', enabled: true },
+          { name: '设计', type: 'department', enabled: true },
+          { name: '品检', type: 'department', enabled: true }
+        ];
+      }
+    }
 
     let todayCount = 0;
     let todayInnerCount = 0;
@@ -948,6 +974,79 @@ router.get('/month-stats', async (req, res) => {
       });
     }
 
+    // ===================== 新增：责任人统计 =====================
+    // 统计月度责任人数据
+    let responsibilityStats = {};
+    
+    if (showMonthCount) {
+      // 主责人统计
+      const mainPersonResult = await pool.request()
+        .input('TargetYear', sql.Int, targetYear)
+        .input('TargetMonth', sql.Int, targetMonth)
+        .query(`
+          SELECT 
+            COUNT(CASE WHEN MainPerson IS NOT NULL AND MainPerson != '' THEN 1 END) as count,
+            ISNULL(SUM(CASE WHEN MainPersonAssessment IS NOT NULL AND MainPersonAssessment > 0 THEN MainPersonAssessment ELSE 0 END), 0) as totalAmount
+          FROM ComplaintRegister 
+          WHERE YEAR(Date) = @TargetYear AND MONTH(Date) = @TargetMonth
+        `);
+
+      // 次责人统计
+      const secondPersonResult = await pool.request()
+        .input('TargetYear', sql.Int, targetYear)
+        .input('TargetMonth', sql.Int, targetMonth)
+        .query(`
+          SELECT 
+            COUNT(CASE WHEN SecondPerson IS NOT NULL AND SecondPerson != '' THEN 1 END) as count,
+            ISNULL(SUM(CASE WHEN SecondPersonAssessment IS NOT NULL AND SecondPersonAssessment > 0 THEN SecondPersonAssessment ELSE 0 END), 0) as totalAmount
+          FROM ComplaintRegister 
+          WHERE YEAR(Date) = @TargetYear AND MONTH(Date) = @TargetMonth
+        `);
+
+      // 管理人员统计
+      const managerResult = await pool.request()
+        .input('TargetYear', sql.Int, targetYear)
+        .input('TargetMonth', sql.Int, targetMonth)
+        .query(`
+          SELECT 
+            COUNT(CASE WHEN Manager IS NOT NULL AND Manager != '' THEN 1 END) as count,
+            ISNULL(SUM(CASE WHEN ManagerAssessment IS NOT NULL AND ManagerAssessment > 0 THEN ManagerAssessment ELSE 0 END), 0) as totalAmount
+          FROM ComplaintRegister 
+          WHERE YEAR(Date) = @TargetYear AND MONTH(Date) = @TargetMonth
+        `);
+
+      // 总考核金额统计
+      const totalAssessmentResult = await pool.request()
+        .input('TargetYear', sql.Int, targetYear)
+        .input('TargetMonth', sql.Int, targetMonth)
+        .query(`
+          SELECT 
+            ISNULL(SUM(CASE WHEN MainPersonAssessment IS NOT NULL AND MainPersonAssessment > 0 THEN MainPersonAssessment ELSE 0 END), 0) +
+            ISNULL(SUM(CASE WHEN SecondPersonAssessment IS NOT NULL AND SecondPersonAssessment > 0 THEN SecondPersonAssessment ELSE 0 END), 0) +
+            ISNULL(SUM(CASE WHEN ManagerAssessment IS NOT NULL AND ManagerAssessment > 0 THEN ManagerAssessment ELSE 0 END), 0) as totalAssessment
+          FROM ComplaintRegister 
+          WHERE YEAR(Date) = @TargetYear AND MONTH(Date) = @TargetMonth
+        `);
+
+      responsibilityStats = {
+        mainPerson: {
+          count: mainPersonResult.recordset[0].count || 0,
+          totalAmount: parseFloat(mainPersonResult.recordset[0].totalAmount || 0)
+        },
+        secondPerson: {
+          count: secondPersonResult.recordset[0].count || 0,
+          totalAmount: parseFloat(secondPersonResult.recordset[0].totalAmount || 0)
+        },
+        manager: {
+          count: managerResult.recordset[0].count || 0,
+          totalAmount: parseFloat(managerResult.recordset[0].totalAmount || 0)
+        },
+        total: {
+          totalAssessment: parseFloat(totalAssessmentResult.recordset[0].totalAssessment || 0)
+        }
+      };
+    }
+
     res.json({
       success: true,
       showTodayCount,
@@ -959,6 +1058,7 @@ router.get('/month-stats', async (req, res) => {
       monthInnerCount,
       monthOuterCount,
       units: unitStats,
+      responsibility: responsibilityStats, // 新增责任人统计数据
       targetMonth: `${targetYear}-${targetMonth.toString().padStart(2, '0')}`, // 返回目标月份
       config: {
         displayUnits: enabledUnits

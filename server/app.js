@@ -68,6 +68,7 @@ const userLoginLogsRouter = require('./routes/userLoginLogs');   // 用户登录
 const dashboardRouter = require('./routes/dashboard');           // 仪表板数据路由
 const monthlyBatchStatsRouter = require('./routes/monthlyBatchStats'); // 月度批次统计管理路由
 const versionUpdatesRouter = require('./routes/versionUpdates'); // 版本更新管理路由
+const assessmentRouter = require('./routes/assessment');         // 质量考核管理路由
 const erpSyncService = require('./services/erpSyncService');
 const { startFileServer } = require('./file-server');
 const { logCleanupService } = require('./services/logCleanupService');
@@ -292,6 +293,7 @@ app.use('/api/user-login-logs', userLoginLogsRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/monthly-batch-stats', monthlyBatchStatsRouter);
 app.use('/api/version-updates', versionUpdatesRouter);
+app.use('/api/assessment', assessmentRouter);
 app.use('/api/log-export', require('./routes/logExport'));
 
 // 错误日志记录中间件（必须在所有路由之后）

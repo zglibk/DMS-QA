@@ -152,6 +152,38 @@ const routes = [
         component: () => import('../views/quality/targets/QualityTargetStatistics.vue'),
         meta: { title: '目标统计数据', requiresAuth: true }
       },
+
+      // 考核记录管理模块
+      {
+        path: 'quality/assessment',
+        redirect: '/admin/quality/assessment/records'
+      },
+      {
+        path: 'quality/assessment/records',
+        component: () => import('../views/quality/assessment/AssessmentRecords.vue'),
+        meta: { title: '考核记录管理', requiresAuth: true }
+      },
+      {
+        path: 'quality/assessment/improvement',
+        component: () => import('../views/quality/assessment/ImprovementTracking.vue'),
+        meta: { title: '改善期跟踪', requiresAuth: true }
+      },
+      {
+        path: 'quality/assessment/statistics',
+        component: () => import('../views/quality/assessment/AssessmentStatistics.vue'),
+        meta: { title: '考核统计分析', requiresAuth: true }
+      },
+
+      // 考核记录管理模块 - 兼容数据库中的另一个路径
+      {
+        path: 'assessment-records',
+        redirect: '/admin/assessment-records/improvement'
+      },
+      {
+        path: 'assessment-records/improvement',
+        component: () => import('../views/quality/assessment/ImprovementTracking.vue'),
+        meta: { title: '改善期跟踪', requiresAuth: true }
+      },
       {
         path: 'publishing-exceptions',
         component: () => import('../components/PublishingExceptionsContent.vue'),

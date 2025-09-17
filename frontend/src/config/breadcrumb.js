@@ -92,6 +92,30 @@ export const breadcrumbConfig = {
     icon: 'mdi:chart-areaspline'
   },
 
+  // 考核记录管理
+  '/admin/quality/assessment': {
+    title: '考核记录管理',
+    icon: 'mdi:clipboard-list'
+  },
+
+  // 考核记录列表
+  '/admin/quality/assessment/records': {
+    title: '考核记录',
+    icon: 'mdi:format-list-bulleted'
+  },
+
+  // 改善期跟踪
+  '/admin/quality/assessment/improvement': {
+    title: '改善期跟踪',
+    icon: 'mdi:trending-up'
+  },
+
+  // 考核统计分析
+  '/admin/quality/assessment/statistics': {
+    title: '考核统计分析',
+    icon: 'mdi:chart-bar'
+  },
+
   // 供应商审核
   '/admin/supplier/audit': {
     title: '供应商审核',

@@ -1012,13 +1012,13 @@ const systemModulesConfig = [
   {
     key: 'quality',
     title: '质量管理',
-    description: '投诉处理、返工管理、质量目标等',
+    description: '投诉处理、返工管理、质量目标、考核记录等',
     icon: 'mdi:quality-high',
     color: '#409EFF',
     path: '/admin/quality/targets',
     // 权限检查：需要质量管理相关权限
-    requiredPermissions: ['quality:targets:view', 'quality:complaint:view'],
-    requiredMenus: ['/admin/quality/targets', '/admin/quality/complaint'],
+    requiredPermissions: ['quality:targets:view', 'quality:complaint:view', 'quality:assessment:view'],
+    requiredMenus: ['/admin/quality/targets', '/admin/quality/complaint', '/admin/quality/assessment'],
     requiredRoles: ['质量经理']
   },
   {
