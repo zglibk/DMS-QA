@@ -57,11 +57,11 @@
         </el-col>
         <el-col :span="6">
           <el-button type="primary" @click="handleSearch">
-            <el-icon><Search /></el-icon>
+            <el-icon style="margin-right:5px"><Search /></el-icon>
             搜索
           </el-button>
-          <el-button @click="resetSearch">
-            <el-icon><Refresh /></el-icon>
+          <el-button  type="warning" @click="resetSearch">
+            <el-icon style="margin-right:5px"><Refresh /></el-icon>
             重置
           </el-button>
           <el-button type="primary" plain @click="toggleAdvancedSearch">
@@ -123,7 +123,7 @@
             </template>
           </el-input>
         </el-col>
-        <el-col :span="4">
+        <el-col :span="3">
           <el-input-number
             v-model="searchForm.minAmount"
             placeholder="最小金额"
@@ -204,16 +204,16 @@
         <div class="table-actions">
           <!-- 列显示控制按钮 -->
           <el-button type="plan" plain @click="showColumnTransfer">
-            <el-icon><Setting /></el-icon>
+            <el-icon style="margin-right:5px"><Setting /></el-icon>
             列设置
           </el-button>
           
           <el-button type="success" @click="handleGenerateRecords">
-            <el-icon><Plus /></el-icon>
+            <el-icon style="margin-right:5px"><Plus /></el-icon>
             生成考核记录
           </el-button>
           <el-button type="primary" @click="handleExportRecords">
-            <el-icon><Download /></el-icon>
+            <el-icon style="margin-right:5px"><Download /></el-icon>
             导出考核表
           </el-button>
         </div>
