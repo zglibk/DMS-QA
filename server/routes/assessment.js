@@ -155,7 +155,14 @@ router.get('/records', async (req, res) => {
                     CONVERT(VARCHAR(10), ar.ImprovementStartDate, 120) as improvementStartDate,
                     CONVERT(VARCHAR(10), ar.ImprovementEndDate, 120) as improvementEndDate,
                     CONVERT(VARCHAR(10), ar.ReturnDate, 120) as returnDate,
-                    ar.Remarks as remarks,
+                    ar.Remarks as assessmentRemarks,
+                    -- 从源表获取备注信息
+                    CASE 
+                        WHEN ar.SourceType = 'complaint' THEN cr.AssessmentDescription
+                        WHEN ar.SourceType = 'rework' THEN prr.Remarks
+                        WHEN ar.SourceType = 'exception' THEN pe.exception_description
+                        ELSE ar.Remarks
+                    END as remarks,
                     ar.SourceType as sourceType,
                     -- 来源表的详细信息
                     CASE 
@@ -181,7 +188,7 @@ router.get('/records', async (req, res) => {
                         WHEN ar.SourceType = 'rework' THEN prr.ProductName
                         WHEN ar.SourceType = 'exception' THEN pe.product_name
                         ELSE ''
-                    END as productModel,
+                    END as productName,
                     ROW_NUMBER() OVER (ORDER BY ${orderByField} ${orderDirection}) as RowNum
                 FROM AssessmentRecords ar
                 LEFT JOIN ComplaintRegister cr ON ar.ComplaintID = cr.ID AND ar.SourceType = 'complaint'
@@ -192,8 +199,8 @@ router.get('/records', async (req, res) => {
             SELECT 
                 id, employeeName, department, position, complaintNumber, complaintId,
                 assessmentAmount, assessmentDate, status, improvementStartDate, 
-                improvementEndDate, returnDate, remarks, sourceType, sourceDescription,
-                customerName, customerCode, productModel
+                improvementEndDate, returnDate, assessmentRemarks, remarks, sourceType, sourceDescription,
+                customerName, customerCode, productName
             FROM PagedResults
             WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize)
         `;

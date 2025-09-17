@@ -64,9 +64,9 @@
             <el-icon><Refresh /></el-icon>
             重置
           </el-button>
-          <el-button type="info" @click="toggleAdvancedSearch">
-            <el-icon><Setting /></el-icon>
-            {{ showAdvanced ? '收起' : '高级' }}
+          <el-button type="primary" plain @click="toggleAdvancedSearch">
+            <el-icon style="margin-right: 5px;"><Setting /></el-icon>
+            {{ showAdvanced ? '收起查询' : '更多查询' }}
           </el-button>
         </el-col>
       </el-row>
@@ -202,6 +202,12 @@
           <h3>考核记录列表</h3>
         </div>
         <div class="table-actions">
+          <!-- 列显示控制按钮 -->
+          <el-button type="plan" plain @click="showColumnTransfer">
+            <el-icon><Setting /></el-icon>
+            列设置
+          </el-button>
+          
           <el-button type="success" @click="handleGenerateRecords">
             <el-icon><Plus /></el-icon>
             生成考核记录
@@ -222,58 +228,150 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="employeeName" label="员工姓名" width="100" />
-        <el-table-column prop="department" label="部门" width="120" />
-        <el-table-column prop="position" label="责任类型" width="120">
+        <el-table-column 
+          v-if="isColumnVisible('employeeName')"
+          prop="employeeName" 
+          label="员工姓名" 
+          width="100" 
+        />
+        <el-table-column 
+          v-if="isColumnVisible('department')"
+          prop="department" 
+          label="部门" 
+          width="120" 
+        />
+        <el-table-column 
+          v-if="isColumnVisible('position')"
+          prop="position" 
+          label="责任类型" 
+          width="120"
+        >
           <template #default="{ row }">
             <el-tag :type="getResponsibilityTagType(row.position)">
               {{ getResponsibilityLabel(row.position) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="sourceType" label="数据来源" width="120">
+        <el-table-column 
+          v-if="isColumnVisible('sourceType')"
+          prop="sourceType" 
+          label="数据来源" 
+          width="120"
+        >
           <template #default="{ row }">
             <el-tag :type="getSourceTagType(row.sourceType)">
               {{ getSourceLabel(row.sourceType) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="complaintNumber" label="工单号" width="140">
+        <el-table-column 
+          v-if="isColumnVisible('complaintNumber')"
+          prop="complaintNumber" 
+          label="工单号" 
+          width="140"
+        >
           <template #default="{ row }">
             <el-link type="primary" @click="viewComplaint(row.complaintId)">
               {{ row.complaintNumber }}
             </el-link>
           </template>
         </el-table-column>
-        <el-table-column prop="customerCode" label="客户编号" width="120">
+        <el-table-column 
+          v-if="isColumnVisible('customerCode')"
+          prop="customerCode" 
+          label="客户编号" 
+          width="120"
+        >
           <template #default="{ row }">
             <span class="customer-code-text">{{ row.customerCode || '-' }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="sourceDescription" label="问题描述" min-width="200" show-overflow-tooltip>
+        <el-table-column 
+          v-if="isColumnVisible('productName')"
+          prop="productName" 
+          label="产品名称" 
+          width="150" 
+          align="left" 
+          show-overflow-tooltip
+        >
+          <template #default="{ row }">
+            <span class="product-name-text" :title="row.productName">
+              {{ row.productName || '-' }}
+            </span>
+          </template>
+        </el-table-column>
+        <el-table-column 
+          v-if="isColumnVisible('sourceDescription')"
+          prop="sourceDescription" 
+          label="问题描述" 
+          min-width="200" 
+          show-overflow-tooltip
+        >
           <template #default="{ row }">
             <span class="description-text" :title="row.sourceDescription">
               {{ row.sourceDescription || '暂无描述' }}
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="assessmentAmount" label="考核金额" width="100" align="right">
+        <el-table-column 
+          v-if="isColumnVisible('assessmentAmount')"
+          prop="assessmentAmount" 
+          label="考核金额" 
+          width="100" 
+          align="right"
+        >
           <template #default="{ row }">
             <span class="amount-text">¥{{ row.assessmentAmount }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="assessmentDate" label="发生日期" width="110" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column 
+          v-if="isColumnVisible('assessmentDate')"
+          prop="assessmentDate" 
+          label="发生日期" 
+          width="110" 
+        />
+        <el-table-column 
+          v-if="isColumnVisible('status')"
+          prop="status" 
+          label="状态" 
+          width="100"
+        >
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row.status)">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="improvementStartDate" label="改善期开始" width="110" />
-        <el-table-column prop="improvementEndDate" label="改善期结束" width="110" />
-        <el-table-column prop="returnDate" label="返还日期" width="110" />
-        <el-table-column prop="remarks" label="备注" min-width="150" show-overflow-tooltip />
+        <el-table-column 
+          v-if="isColumnVisible('improvementStartDate')"
+          prop="improvementStartDate" 
+          label="改善期开始" 
+          width="110" 
+        />
+        <el-table-column 
+          v-if="isColumnVisible('improvementEndDate')"
+          prop="improvementEndDate" 
+          label="改善期结束" 
+          width="110" 
+        />
+        <el-table-column 
+          v-if="isColumnVisible('returnDate')"
+          prop="returnDate" 
+          label="返还日期" 
+          width="110" 
+        />
+        <el-table-column 
+          v-if="isColumnVisible('remarks')"
+          prop="remarks" 
+          label="备注" 
+          min-width="150" 
+          show-overflow-tooltip 
+          align="left"
+        >
+          <template #default="{ row }">
+            <span class="remarks-text">{{ row.remarks }}</span>
+          </template>
+        </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" size="small" @click="handleEdit(row)">
@@ -310,6 +408,36 @@
         />
       </div>
     </div>
+
+    <!-- 列设置穿梭框对话框 -->
+    <el-dialog
+      v-model="columnTransferVisible"
+      title="列设置"
+      width="800px"
+      :close-on-click-modal="false"
+      @close="handleColumnTransferClose"
+    >
+      <el-transfer
+        v-model="selectedColumns"
+        filterable
+        :filter-method="filterMethod"
+        filter-placeholder="搜索列名"
+        :data="transferData"
+        :titles="['可选列', '已选列']"
+        :button-texts="['移除', '添加']"
+        :format="{
+          noChecked: '${total}',
+          hasChecked: '${checked}/${total}'
+        }"
+      />
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="resetToDefaultColumns">重置默认</el-button>
+          <el-button @click="columnTransferVisible = false">取消</el-button>
+          <el-button type="primary" @click="saveColumnTransferSettings">确定</el-button>
+        </span>
+      </template>
+    </el-dialog>
 
     <!-- 编辑对话框 -->
     <AssessmentRecordDialog
@@ -464,9 +592,137 @@ const formRules = {
 const formRef = ref()
 
 /**
+ * 列显示控制相关数据和方法
+ */
+// 可用列配置
+const availableColumns = ref([
+  { key: 'employeeName', label: '员工姓名', required: true },
+  { key: 'department', label: '部门', required: false },
+  { key: 'position', label: '责任类型', required: false },
+  { key: 'sourceType', label: '数据来源', required: false },
+  { key: 'complaintNumber', label: '工单号', required: true },
+  { key: 'customerCode', label: '客户编号', required: false },
+  { key: 'productName', label: '产品名称', required: false },
+  { key: 'sourceDescription', label: '问题描述', required: true },
+  { key: 'assessmentAmount', label: '考核金额', required: true },
+  { key: 'assessmentDate', label: '发生日期', required: true },
+  { key: 'status', label: '状态', required: true },
+  { key: 'improvementStartDate', label: '改善期开始', required: false },
+  { key: 'improvementEndDate', label: '改善期结束', required: false },
+  { key: 'returnDate', label: '返还日期', required: false },
+  { key: 'remarks', label: '备注', required: false }
+])
+
+// 默认显示的列
+const defaultColumns = [
+  'employeeName', 'complaintNumber', 'sourceDescription', 
+  'assessmentAmount', 'assessmentDate', 'status'
+]
+
+// 当前显示的列
+const visibleColumns = ref([...defaultColumns])
+
+// 穿梭框相关数据
+const columnTransferVisible = ref(false)
+const selectedColumns = ref([])
+const transferData = ref([])
+
+/**
+ * 初始化穿梭框数据
+ */
+const initTransferData = () => {
+  transferData.value = availableColumns.value.map(column => ({
+    key: column.key,
+    label: column.label + (column.required ? ' (必需)' : ''),
+    disabled: column.required, // 必需列不能移除
+    required: column.required
+  }))
+  
+  // 设置已选择的列
+  selectedColumns.value = [...visibleColumns.value]
+}
+
+/**
+ * 穿梭框搜索过滤方法
+ */
+const filterMethod = (query, item) => {
+  return item.label.toLowerCase().includes(query.toLowerCase())
+}
+
+/**
+ * 显示列设置穿梭框对话框
+ */
+const showColumnTransfer = () => {
+  initTransferData()
+  columnTransferVisible.value = true
+}
+
+/**
+ * 重置为默认列
+ */
+const resetToDefaultColumns = () => {
+  selectedColumns.value = [...defaultColumns]
+}
+
+/**
+ * 保存穿梭框列设置
+ */
+const saveColumnTransferSettings = () => {
+  // 确保必需列始终显示
+  const requiredColumns = availableColumns.value
+    .filter(col => col.required)
+    .map(col => col.key)
+  
+  visibleColumns.value = [...new Set([...requiredColumns, ...selectedColumns.value])]
+  saveColumnSettings()
+  columnTransferVisible.value = false
+  ElMessage.success('列设置已保存')
+}
+
+/**
+ * 处理穿梭框对话框关闭事件
+ * 重置穿梭框的选项状态到初始状态
+ */
+const handleColumnTransferClose = () => {
+  // 重置选中的列到当前可见列状态
+  selectedColumns.value = [...visibleColumns.value]
+}
+
+/**
+ * 列显示控制方法
+ */
+// 判断列是否可见
+const isColumnVisible = (columnKey) => {
+  return visibleColumns.value.includes(columnKey)
+}
+const saveColumnSettings = () => {
+  localStorage.setItem('assessmentRecords_visibleColumns', JSON.stringify(visibleColumns.value))
+}
+
+// 从本地存储加载列设置
+const loadColumnSettings = () => {
+  const saved = localStorage.getItem('assessmentRecords_visibleColumns')
+  if (saved) {
+    try {
+      const savedColumns = JSON.parse(saved)
+      // 确保必需列始终显示
+      const requiredColumns = availableColumns.value
+        .filter(col => col.required)
+        .map(col => col.key)
+      
+      visibleColumns.value = [...new Set([...requiredColumns, ...savedColumns])]
+    } catch (error) {
+      console.error('加载列设置失败:', error)
+      visibleColumns.value = [...defaultColumns]
+    }
+  }
+}
+
+/**
  * 生命周期钩子
  */
 onMounted(() => {
+  loadColumnSettings() // 加载列设置
   loadData()
   loadStatistics()
 })
@@ -1185,7 +1441,258 @@ const getSourceLabel = (sourceType) => {
   font-weight: normal !important;
 }
 
+/* 产品名称列左对齐样式 */
+:deep(.el-table .product-name-text) {
+  text-align: left !important;
+  display: block !important;
+  width: 100% !important;
+  font-weight: normal !important;
+}
+
+/* 产品名称列单元格左对齐 */
+:deep(.el-table td .cell .product-name-text) {
+  text-align: left !important;
+  justify-content: flex-start !important;
+  font-weight: normal !important;
+}
+
+/* 备注列左对齐样式 */
+:deep(.el-table .remarks-text) {
+  text-align: left !important;
+  display: block !important;
+  width: 100% !important;
+  font-weight: normal !important;
+}
+
+/* 备注列单元格左对齐 */
+:deep(.el-table td .cell .remarks-text) {
+  text-align: left !important;
+  justify-content: flex-start !important;
+  font-weight: normal !important;
+}
+
 :deep(.el-table-column--selection .cell) {
   text-align: center !important;
+}
+
+/* MessageBox 列设置样式 */
+:deep(.column-settings-messagebox) {
+  width: 500px !important;
+  max-width: 90vw !important;
+}
+
+:deep(.column-settings-messagebox .el-message-box__content) {
+  max-height: 500px !important;
+  overflow-y: auto !important;
+}
+
+:deep(.column-settings-messagebox .column-item) {
+  margin-bottom: 8px !important;
+  padding: 4px 0 !important;
+}
+
+:deep(.column-settings-messagebox .column-item label) {
+  display: flex !important;
+  align-items: center !important;
+  cursor: pointer !important;
+  font-size: 14px !important;
+  line-height: 1.5 !important;
+}
+
+:deep(.column-settings-messagebox .column-item input[type="checkbox"]) {
+  margin-right: 8px !important;
+  transform: scale(1.1) !important;
+}
+
+:deep(.column-settings-messagebox .column-item input[type="checkbox"]:disabled) {
+  cursor: not-allowed !important;
+}
+
+/* 穿梭框样式优化 */
+:deep(.el-transfer) {
+  display: flex;
+  align-items: flex-start;
+}
+
+:deep(.el-transfer-panel) {
+  width: 300px;
+  height: 400px;
+}
+
+:deep(.el-transfer-panel__header) {
+  background-color: #f5f7fa;
+  border-bottom: 1px solid #e4e7ed;
+  padding: 12px 15px;
+  font-weight: 500;
+}
+
+:deep(.el-transfer-panel__body) {
+  height: 320px;
+}
+
+:deep(.el-transfer-panel__filter) {
+  padding: 15px;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+:deep(.el-transfer-panel__list) {
+  height: 240px;
+  overflow-y: auto;
+}
+
+:deep(.el-transfer-panel__item) {
+  padding: 8px 15px;
+  border-bottom: 1px solid #f0f0f0;
+  transition: background-color 0.3s;
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+}
+
+:deep(.el-transfer-panel__item) {
+  display: flex !important;
+  align-items: center !important;
+  padding: 8px 15px !important;
+  min-height: 32px !important;
+  border: none !important;
+  border-bottom: none !important;
+}
+
+:deep(.el-transfer-panel__list) {
+  border: none !important;
+}
+
+:deep(.el-transfer-panel) {
+  border: 1px solid #dcdfe6 !important;
+}
+
+:deep(.el-transfer-panel__item .el-checkbox) {
+  display: flex !important;
+  align-items: center !important;
+  margin-right: 12px !important;
+  flex-shrink: 0 !important;
+}
+
+:deep(.el-checkbox__inner) {
+  position: static !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+  margin: 0 !important;
+}
+
+:deep(.el-transfer-panel__item .el-checkbox__label) {
+  display: flex;
+  align-items: center;
+  line-height: 1.7;
+}
+
+:deep(.el-transfer-panel__item:hover) {
+  background-color: #f5f7fa;
+}
+
+:deep(.el-transfer-panel__item.is-disabled) {
+  background-color: #f9f9f9;
+  color: #c0c4cc;
+}
+
+:deep(.el-transfer-panel__item.is-disabled .el-checkbox__label) {
+  color: #c0c4cc;
+}
+
+/* 已选列表项的勾选状态显示 - 强制覆盖Element Plus默认样式 */
+:deep(.el-checkbox.is-checked .el-checkbox__inner) {
+  background-color: #409eff !important;
+  border-color: #409eff !important;
+}
+
+:deep(.el-checkbox.is-checked .el-checkbox__inner::after) {
+  content: "" !important;
+  position: absolute !important;
+  left: 4px !important;
+  top: 1px !important;
+  width: 3px !important;
+  height: 7px !important;
+  border: 2px solid #fff !important;
+  border-left: 0 !important;
+  border-top: 0 !important;
+  transform: rotate(45deg) scaleY(1) !important;
+  display: block !important;
+  box-sizing: content-box !important;
+}
+
+/* 强制覆盖已选列表中禁用项的样式 */
+:deep(.el-transfer-panel__item.is-disabled .el-checkbox) {
+  opacity: 1 !important;
+}
+
+:deep(.el-transfer-panel__item.is-disabled .el-checkbox.is-checked .el-checkbox__inner) {
+  background-color: #409eff !important;
+  border-color: #409eff !important;
+  opacity: 1 !important;
+}
+
+:deep(.el-transfer-panel__item.is-disabled .el-checkbox.is-checked .el-checkbox__inner::after) {
+  content: "" !important;
+  position: absolute !important;
+  left: 4px !important;
+  top: 1px !important;
+  width: 3px !important;
+  height: 7px !important;
+  border: 2px solid #fff !important;
+  border-left: 0 !important;
+  border-top: 0 !important;
+  transform: rotate(45deg) scaleY(1) !important;
+  display: block !important;
+  box-sizing: content-box !important;
+}
+
+/* 确保已选列表中的复选框始终显示为勾选状态 */
+:deep(.el-transfer-panel:last-child .el-checkbox__inner) {
+  background-color: #409eff !important;
+  border-color: #409eff !important;
+}
+
+:deep(.el-transfer-panel:last-child .el-checkbox__inner::after) {
+  content: "" !important;
+  position: absolute !important;
+  left: 4px !important;
+  top: 1px !important;
+  width: 3px !important;
+  height: 7px !important;
+  border: 2px solid #fff !important;
+  border-left: 0 !important;
+  border-top: 0 !important;
+  transform: rotate(45deg) scaleY(1) !important;
+  display: block !important;
+  box-sizing: content-box !important;
+}
+
+:deep(.el-transfer__buttons) {
+  padding: 0 20px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  height: 400px;
+}
+
+:deep(.el-transfer__button) {
+  width: 80px;
+  height: 32px;
+  border-radius: 6px;
+  font-size: 12px;
+  margin: 0;
+}
+
+/* 对话框样式 */
+:deep(.el-dialog__body) {
+  padding: 20px;
+}
+
+:deep(.el-dialog__footer) {
+  padding: 15px 20px;
+  border-top: 1px solid #e4e7ed;
 }
 </style>
