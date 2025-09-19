@@ -72,12 +72,13 @@ export const deleteAssessmentRecord = (id) => {
 /**
  * 生成考核记录
  * 从ComplaintRegister、ProductionReworkRegister、publishing_exceptions三个表自动生成考核记录
- * @param {Object} params - 生成参数
- * @param {string} params.startDate - 开始日期
- * @param {string} params.endDate - 结束日期
+ * 新版本：存储过程已优化，自动处理所有未生成的记录，不再需要日期参数
+ * @param {Object} params - 生成参数（可选）
+ * @param {boolean} params.resetRecords - 是否重置现有记录
+ * @param {boolean} params.resetAutoIncrement - 是否重置自增ID
  * @returns {Promise} API响应
  */
-export const generateAssessmentRecords = (params) => {
+export const generateAssessmentRecords = (params = {}) => {
   return api.post('/assessment/generate', params)
 }
 

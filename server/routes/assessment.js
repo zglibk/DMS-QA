@@ -147,6 +147,7 @@ router.get('/records', async (req, res) => {
                     ar.PersonName as employeeName,
                     COALESCE(cr.Workshop, prr.Workshop, pe.responsible_unit) as department,
                     ar.PersonType as position,
+                    ar.ResponsibilityType as responsibilityType,
                     COALESCE(cr.OrderNo, prr.OrderNo, pe.work_order_number) as complaintNumber,
                     COALESCE(cr.ID, prr.ID, pe.id) as complaintId,
                     ar.AssessmentAmount as assessmentAmount,
@@ -186,7 +187,7 @@ router.get('/records', async (req, res) => {
                 WHERE ${whereClause}
             )
             SELECT 
-                id, employeeName, department, position, complaintNumber, complaintId,
+                id, employeeName, department, position, responsibilityType, complaintNumber, complaintId,
                 assessmentAmount, assessmentDate, status, improvementStartDate, 
                 improvementEndDate, returnDate, assessmentRemarks, remarks, sourceType, sourceDescription,
                 customerCode, productName
@@ -658,19 +659,16 @@ router.post('/generate', async (req, res) => {
             }
         }
         
-        // 如果是重置记录模式，先删除现有记录
+        // 如果是重置记录模式，先删除所有现有记录
         if (resetRecords) {
             try {
-                console.log('删除现有考核记录...');
+                console.log('删除所有现有考核记录...');
                 
                 const deleteRequest = pool.request();
-                deleteRequest.input('startDate', sql.Date, startDate);
-                deleteRequest.input('endDate', sql.Date, endDate);
                 
+                // 删除所有考核记录，不限制日期范围
                 const deleteResult = await deleteRequest.query(`
-                    DELETE FROM AssessmentRecords 
-                    WHERE AssessmentDate >= @startDate 
-                    AND AssessmentDate <= @endDate
+                    DELETE FROM AssessmentRecords
                 `);
                 
                 console.log('删除记录数量:', deleteResult.rowsAffected[0]);
@@ -704,25 +702,13 @@ router.post('/generate', async (req, res) => {
             }
         }
         
-        // 设置存储过程参数
-        if (startDate) {
-            request.input('startDate', sql.Date, startDate);
-        }
-        if (endDate) {
-            request.input('endDate', sql.Date, endDate);
-        }
-        
-        // 添加输出参数
-        request.output('GeneratedCount', sql.Int);
-        
-        // 调用存储过程生成考核记录
+        // 调用存储过程生成考核记录（新版本不需要参数）
+        // 新版本的存储过程会自动处理所有未生成的考核记录
         const result = await request.execute('SP_GenerateAssessmentRecords');
         
-        // 确保获取到正确的生成记录数量
+        // 获取生成记录数量（新版本通过SELECT返回）
         let generatedCount = 0;
-        if (result.output && result.output.GeneratedCount !== undefined) {
-            generatedCount = result.output.GeneratedCount;
-        } else if (result.recordset && result.recordset.length > 0 && result.recordset[0].GeneratedCount !== undefined) {
+        if (result.recordset && result.recordset.length > 0 && result.recordset[0].GeneratedCount !== undefined) {
             generatedCount = result.recordset[0].GeneratedCount;
         }
         

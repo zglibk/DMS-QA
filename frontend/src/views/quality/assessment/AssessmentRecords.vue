@@ -1027,9 +1027,12 @@ const handleEdit = async (row) => {
         returnReason: apiData.ReturnReason,
         
         // 责任类型（根据PersonType映射）
+        // 注意：除了ComplaintRegister表中涉及"直接责任"、"管理责任"、"连带责任"外，其余的都是直接责任
         responsibilityType: apiData.PersonType === 'MainPerson' ? 'direct' : 
                            apiData.PersonType === 'Manager' ? 'management' : 
-                           apiData.PersonType === 'SecondPerson' ? 'joint' : 'direct'
+                           apiData.PersonType === 'SecondPerson' ? 'joint' : 
+                           // ReworkMainPerson和ExceptionMainPerson都是直接责任
+                           'direct'
       }
       
       // 将映射后的数据赋值给formData
@@ -1218,6 +1221,9 @@ const getResponsibilityTagType = (responsibilityType) => {
     'MainPerson': 'danger',
     'SecondPerson': 'warning', 
     'Manager': 'info',
+    // 新增的PersonType映射（区分不同来源）
+    'ReworkMainPerson': 'danger',
+    'ExceptionMainPerson': 'danger',
     // ResponsibilityType映射（新版本）
     'direct': 'danger',
     'management': 'info',
@@ -1244,6 +1250,10 @@ const getResponsibilityLabel = (responsibilityType) => {
     'MainPerson': '主责人',
     'SecondPerson': '次责人',
     'Manager': '管理人员',
+    // 新增的PersonType映射（区分不同来源）
+    // 注意：除了ComplaintRegister表中涉及"直接责任"、"管理责任"、"连带责任"外，其余的都是直接责任
+    'ReworkMainPerson': '返工主责人',
+    'ExceptionMainPerson': '异常主责人',
     // ResponsibilityType映射（新版本）
     'direct': '直接责任',
     'management': '管理责任',

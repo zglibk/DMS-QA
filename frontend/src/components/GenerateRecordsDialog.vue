@@ -8,8 +8,9 @@
   >
     <div class="dialog-content">
       <!-- 日期范围选择 -->
+      <!-- 注意：新版本存储过程已优化，不再需要日期参数，此选项已禁用 -->
       <div class="form-item">
-        <label class="form-label">选择日期范围：</label>
+        <label class="form-label">日期范围（已优化，无需选择）</label>
         <el-date-picker
           v-model="dateRange"
           type="daterange"
@@ -18,8 +19,12 @@
           end-placeholder="结束日期"
           format="YYYY-MM-DD"
           value-format="YYYY-MM-DD"
+          :disabled="true"
           style="width: 100%"
         />
+        <el-text type="info" size="small" style="margin-top: 5px; display: block;">
+          新版本存储过程会自动处理所有未生成的考核记录，无需指定日期范围
+        </el-text>
       </div>
 
       <!-- 重置记录控制 -->
@@ -72,9 +77,10 @@
           show-icon
         >
           <template #default>
-            <p>• 系统将根据选定的日期范围生成考核记录</p>
+            <p>• 系统将自动生成所有未处理的考核记录（投诉、返工、异常）</p>
             <p>• 重置记录控制：开启时删除现有记录重新生成，关闭时仅生成不存在的记录</p>
             <p>• 初始化自增ID：仅在重置记录时可用，会重置表的ID计数器</p>
+            <p>• 新版本已优化：无需指定日期范围，自动处理所有数据源</p>
           </template>
         </el-alert>
       </div>
@@ -199,26 +205,11 @@ function handleCancel() {
 /**
  * 处理确认按钮点击事件
  * 验证数据并触发生成考核记录
+ * 新版本：存储过程已优化，不再需要日期参数，自动处理所有未生成的记录
  */
 function handleConfirm() {
-  // 验证日期范围
-  if (!dateRange.value || dateRange.value.length !== 2) {
-    ElMessage.error('请选择有效的日期范围')
-    return
-  }
-
-  const [startDate, endDate] = dateRange.value
-  
-  // 验证日期有效性
-  if (new Date(startDate) > new Date(endDate)) {
-    ElMessage.error('开始日期不能大于结束日期')
-    return
-  }
-
-  // 构建参数对象
+  // 构建参数对象（新版本只需要重置选项）
   const params = {
-    startDate,
-    endDate,
     resetRecords: resetRecords.value,
     resetAutoIncrement: resetAutoIncrement.value
   }
