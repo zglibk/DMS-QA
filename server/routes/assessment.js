@@ -156,13 +156,8 @@ router.get('/records', async (req, res) => {
                     CONVERT(VARCHAR(10), ar.ImprovementEndDate, 120) as improvementEndDate,
                     CONVERT(VARCHAR(10), ar.ReturnDate, 120) as returnDate,
                     ar.Remarks as assessmentRemarks,
-                    -- 从源表获取备注信息
-                    CASE 
-                        WHEN ar.SourceType = 'complaint' THEN cr.AssessmentDescription
-                        WHEN ar.SourceType = 'rework' THEN prr.Remarks
-                        WHEN ar.SourceType = 'exception' THEN pe.exception_description
-                        ELSE ar.Remarks
-                    END as remarks,
+                    -- 只映射ComplaintRegister表的AssessmentDescription字段到remarks
+                    cr.AssessmentDescription as remarks,
                     ar.SourceType as sourceType,
                     -- 来源表的详细信息
                     CASE 
@@ -171,12 +166,6 @@ router.get('/records', async (req, res) => {
                         WHEN ar.SourceType = 'exception' THEN pe.exception_description
                         ELSE ''
                     END as sourceDescription,
-                    CASE 
-                        WHEN ar.SourceType = 'complaint' THEN cr.Customer
-                        WHEN ar.SourceType = 'rework' THEN prr.CustomerCode
-                        WHEN ar.SourceType = 'exception' THEN pe.customer_code
-                        ELSE ''
-                    END as customerName,
                     CASE 
                         WHEN ar.SourceType = 'complaint' THEN cr.Customer
                         WHEN ar.SourceType = 'rework' THEN prr.CustomerCode
@@ -200,7 +189,7 @@ router.get('/records', async (req, res) => {
                 id, employeeName, department, position, complaintNumber, complaintId,
                 assessmentAmount, assessmentDate, status, improvementStartDate, 
                 improvementEndDate, returnDate, assessmentRemarks, remarks, sourceType, sourceDescription,
-                customerName, customerCode, productName
+                customerCode, productName
             FROM PagedResults
             WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize)
         `;
@@ -244,14 +233,68 @@ router.get('/records/:id', async (req, res) => {
         const query = `
             SELECT 
                 ar.*,
-                cr.ID as ComplaintID,
+                -- 投诉记录字段
+                cr.ID as ComplaintRecordID,
                 cr.Workshop,
-                cr.DefectCategory,
-                cr.DefectiveDescription,
+                cr.DefectiveCategory as ComplaintCategory,
+                cr.DefectiveCategory,
+                cr.DefectiveDescription as ComplaintProblemDescription,
                 cr.Customer,
-                cr.ProductName
+                cr.ProductName as ComplaintProductName,
+                cr.OrderNo as ComplaintOrderNo,
+                -- 返工记录字段  
+                prr.ID as ReworkID,
+                prr.DefectiveReason as ReworkProblemDescription,
+                prr.ProductName as ReworkProductName,
+                prr.OrderNo as ReworkOrderNo,
+                prr.CustomerCode as ReworkCustomerCode,
+                prr.Workshop as ReworkDepartment,
+                -- 出版异常记录字段
+                pe.id as ExceptionID,
+                pe.exception_description as ExceptionProblemDescription,
+                pe.product_name as ExceptionProductName,
+                pe.work_order_number as ExceptionOrderNo,
+                pe.customer_code as ExceptionCustomerCode,
+                pe.responsible_unit as ExceptionDepartment,
+                -- 统一的问题描述字段（根据来源类型选择）
+                CASE 
+                    WHEN ar.SourceType = 'complaint' THEN cr.DefectiveDescription
+                    WHEN ar.SourceType = 'rework' THEN prr.DefectiveReason  
+                    WHEN ar.SourceType = 'exception' THEN pe.exception_description
+                    ELSE ar.ProblemDescription
+                END as problemDescription,
+                -- 统一的订单号字段
+                CASE 
+                    WHEN ar.SourceType = 'complaint' THEN cr.OrderNo
+                    WHEN ar.SourceType = 'rework' THEN prr.OrderNo
+                    WHEN ar.SourceType = 'exception' THEN pe.work_order_number
+                    ELSE ar.ComplaintNumber
+                END as orderNumber,
+                -- 统一的部门字段（根据来源类型选择）
+                CASE 
+                    WHEN ar.SourceType = 'complaint' THEN cr.Workshop
+                    WHEN ar.SourceType = 'rework' THEN prr.Workshop
+                    WHEN ar.SourceType = 'exception' THEN pe.responsible_unit
+                    ELSE ar.Department
+                END as department,
+                -- 统一的客户代码字段（根据来源类型选择）
+                CASE 
+                    WHEN ar.SourceType = 'complaint' THEN cr.Customer
+                    WHEN ar.SourceType = 'rework' THEN prr.CustomerCode
+                    WHEN ar.SourceType = 'exception' THEN pe.customer_code
+                    ELSE ar.CustomerCode
+                END as customerCode,
+                -- 统一的产品名称字段（根据来源类型选择）
+                CASE 
+                    WHEN ar.SourceType = 'complaint' THEN cr.ProductName
+                    WHEN ar.SourceType = 'rework' THEN prr.ProductName
+                    WHEN ar.SourceType = 'exception' THEN pe.product_name
+                    ELSE ar.ProductName
+                END as productName
             FROM AssessmentRecords ar
-            LEFT JOIN ComplaintRegister cr ON ar.ComplaintID = cr.ID
+            LEFT JOIN ComplaintRegister cr ON ar.ComplaintID = cr.ID AND ar.SourceType = 'complaint'
+            LEFT JOIN ProductionReworkRegister prr ON ar.ComplaintID = prr.ID AND ar.SourceType = 'rework'
+            LEFT JOIN publishing_exceptions pe ON ar.ComplaintID = pe.id AND ar.SourceType = 'exception'
             WHERE ar.ID = @id
         `;
         
@@ -264,9 +307,65 @@ router.get('/records/:id', async (req, res) => {
             });
         }
         
+        const record = result.recordset[0];
+        
+        // 修复remarks字段映射：如果考核记录的Remarks为空，则从来源记录中获取考核说明
+        if (!record.Remarks) {
+            if (record.SourceType === 'complaint' && record.ComplaintID) {
+                // 从投诉记录获取AssessmentDescription作为remarks
+                const complaintRequest = pool.request();
+                // 直接使用考核记录表中的ComplaintID字段（这是外键）
+                complaintRequest.input('complaintId', sql.Int, record.ComplaintID);
+                const complaintResult = await complaintRequest.query(`
+                    SELECT AssessmentDescription 
+                    FROM ComplaintRegister 
+                    WHERE ID = @complaintId
+                `);
+                
+                if (complaintResult.recordset.length > 0 && complaintResult.recordset[0].AssessmentDescription) {
+                    record.remarks = complaintResult.recordset[0].AssessmentDescription;
+                    console.log('从投诉记录映射remarks:', record.remarks);
+                }
+            }
+            // 可以在这里添加其他来源类型的remarks映射逻辑
+        } else {
+            record.remarks = record.Remarks;
+        }
+        
+        // 添加调试日志，特别关注返工记录和异常记录的字段
+        console.log('=== 考核记录详情API调试信息 ===');
+        console.log('记录ID:', req.params.id);
+        console.log('来源类型:', record.SourceType);
+        console.log('原始Remarks字段:', record.Remarks);
+        console.log('映射后remarks字段:', record.remarks);
+        console.log('部门字段 (department):', record.department);
+        console.log('客户代码字段 (customerCode):', record.customerCode);
+        console.log('产品名称字段 (productName):', record.productName);
+        console.log('Workshop字段:', record.Workshop);
+        console.log('Customer字段:', record.Customer);
+        
+        // 如果是返工记录，输出返工相关字段
+        if (record.SourceType === 'rework') {
+            console.log('--- 返工记录字段 ---');
+            console.log('ReworkDepartment:', record.ReworkDepartment);
+            console.log('ReworkCustomerCode:', record.ReworkCustomerCode);
+            console.log('ReworkProductName:', record.ReworkProductName);
+        }
+        
+        // 如果是异常记录，输出异常相关字段
+        if (record.SourceType === 'exception') {
+            console.log('--- 异常记录字段 ---');
+            console.log('ExceptionDepartment:', record.ExceptionDepartment);
+            console.log('ExceptionCustomerCode:', record.ExceptionCustomerCode);
+            console.log('ExceptionProductName:', record.ExceptionProductName);
+        }
+        
+        console.log('完整记录数据:', JSON.stringify(record, null, 2));
+        console.log('=== 调试信息结束 ===');
+        
         res.json({
             success: true,
-            data: result.recordset[0]
+            data: record
         });
         
     } catch (error) {
@@ -373,16 +472,49 @@ router.put('/records/:id', async (req, res) => {
             assessmentDate,
             status,
             remarks,
-            updatedBy
+            updatedBy,
+            // 新添加的字段
+            department,
+            responsibilityType,
+            sourceType,
+            complaintNumber,  // 修正字段名
+            customerCode,
+            productName,
+            problemDescription,
+            improvementStartDate,
+            improvementEndDate,
+            returnDate,
+            returnAmount
         } = req.body;
         
+        // 验证必填字段
+        if (!personName || personName.trim() === '') {
+            return res.status(400).json({
+                success: false,
+                message: 'PersonName字段不能为空'
+            });
+        }
+        
         request.input('id', sql.Int, req.params.id);
-        request.input('personName', sql.NVarChar, personName);
+        request.input('personName', sql.NVarChar, personName.trim());
         request.input('assessmentAmount', sql.Decimal(10, 2), assessmentAmount);
         request.input('assessmentDate', sql.Date, assessmentDate);
         request.input('status', sql.NVarChar, status || 'Active');
         request.input('remarks', sql.NVarChar, remarks || null);
         request.input('updatedBy', sql.NVarChar, updatedBy || null);
+        
+        // 新添加字段的参数
+        request.input('department', sql.NVarChar, department || null);
+        request.input('responsibilityType', sql.NVarChar, responsibilityType || null);
+        request.input('sourceType', sql.NVarChar, sourceType || null);
+        request.input('complaintNumber', sql.NVarChar, complaintNumber || null);  // 修正字段名
+        request.input('customerCode', sql.NVarChar, customerCode || null);
+        request.input('productName', sql.NVarChar, productName || null);
+        request.input('problemDescription', sql.NVarChar, problemDescription || null);
+        request.input('improvementStartDate', sql.Date, improvementStartDate || null);
+        request.input('improvementEndDate', sql.Date, improvementEndDate || null);
+        request.input('returnDate', sql.Date, returnDate || null);
+        request.input('returnAmount', sql.Decimal(10, 2), returnAmount || null);
         
         const updateQuery = `
             UPDATE AssessmentRecords
@@ -393,7 +525,18 @@ router.put('/records/:id', async (req, res) => {
                 Status = @status,
                 Remarks = @remarks,
                 UpdatedBy = @updatedBy,
-                UpdatedAt = GETDATE()
+                UpdatedAt = GETDATE(),
+                Department = @department,
+                ResponsibilityType = @responsibilityType,
+                SourceType = @sourceType,
+                ComplaintNumber = @complaintNumber,
+                CustomerCode = @customerCode,
+                ProductName = @productName,
+                ProblemDescription = @problemDescription,
+                ImprovementStartDate = @improvementStartDate,
+                ImprovementEndDate = @improvementEndDate,
+                ReturnDate = @returnDate,
+                ReturnAmount = @returnAmount
             WHERE ID = @id
         `;
         

@@ -82,9 +82,9 @@
         </el-col>
         <el-col :span="4">
           <el-select v-model="searchForm.sourceType" placeholder="数据来源" clearable>
-            <el-option label="客户投诉" value="complaint" />
+            <el-option label="投诉记录" value="complaint" />
             <el-option label="返工记录" value="rework" />
-            <el-option label="异常记录" value="exception" />
+            <el-option label="出版异常记录" value="exception" />
           </el-select>
         </el-col>
         <el-col :span="4">
@@ -242,13 +242,13 @@
         />
         <el-table-column 
           v-if="isColumnVisible('position')"
-          prop="position" 
+          prop="responsibilityType" 
           label="责任类型" 
           width="120"
         >
           <template #default="{ row }">
-            <el-tag :type="getResponsibilityTagType(row.position)">
-              {{ getResponsibilityLabel(row.position) }}
+            <el-tag :type="getResponsibilityTagType(row.responsibilityType || row.position)">
+              {{ getResponsibilityLabel(row.responsibilityType || row.position) }}
             </el-tag>
           </template>
         </el-table-column>
@@ -566,16 +566,27 @@ const duplicateDialogVisible = ref(false)
 const duplicateRecords = ref([])
 const duplicateLoading = ref(false)
 
-// 表单数据
+// 表单数据 - 包含对话框所需的所有字段
 const formData = reactive({
   id: null,
   employeeName: '',
   department: '',
+  position: '',
+  responsibilityType: '',
+  sourceType: '',
+  complaintNumber: '',
+  customerCode: '',
+  productName: '',
   assessmentAmount: 0,
+  assessmentDate: '',
   status: '',
+  problemDescription: '',
+  remarks: '',
   improvementStartDate: '',
   improvementEndDate: '',
-  remarks: ''
+  returnDate: '',
+  returnAmount: null,
+  returnReason: ''
 })
 
 // 表单验证规则
@@ -616,7 +627,7 @@ const availableColumns = ref([
 // 默认显示的列
 const defaultColumns = [
   'employeeName', 'complaintNumber', 'sourceDescription', 
-  'assessmentAmount', 'assessmentDate', 'status'
+  'assessmentAmount', 'assessmentDate', 'status', 'remarks'
 ]
 
 // 当前显示的列
@@ -963,19 +974,109 @@ const handleDuplicateCancel = () => {
   duplicateRecords.value = []
 }
 // 编辑记录
-const handleEdit = (row) => {
-  dialogTitle.value = '编辑考核记录'
-  Object.assign(formData, { ...row })
-  dialogVisible.value = true
+const handleEdit = async (row) => {
+  try {
+    dialogTitle.value = '编辑考核记录'
+    
+    // 先获取完整的考核记录详情，确保包含所有必要字段
+    const response = await assessmentApi.getAssessmentRecord(row.id)
+    
+    if (response.data.success) {
+      // 使用API返回的完整数据，并进行字段映射
+      const apiData = response.data.data
+      
+      // 添加调试日志，检查API返回的数据
+      console.log('编辑对话框 - API返回的完整数据:', apiData)
+      console.log('编辑对话框 - Remarks字段值:', apiData.Remarks)
+      console.log('编辑对话框 - AssessmentDescription字段值:', apiData.AssessmentDescription)
+      
+      // 创建映射后的表单数据对象
+      const mappedFormData = {
+        // 基础字段直接映射
+        id: apiData.ID,
+        employeeName: apiData.PersonName,
+        department: apiData.department || apiData.Workshop, // 优先使用department字段
+        position: apiData.PersonType,
+        sourceType: apiData.SourceType,
+        assessmentAmount: apiData.AssessmentAmount,
+        assessmentDate: apiData.AssessmentDate ? apiData.AssessmentDate.split('T')[0] : null,
+        status: apiData.Status,
+        problemDescription: apiData.problemDescription,
+        // 修复remarks字段映射逻辑：优先使用后端处理后的remarks字段，然后是Remarks字段
+        remarks: apiData.remarks || apiData.Remarks || apiData.AssessmentDescription || '',
+        
+        // 客户信息映射
+        customerCode: apiData.customerCode || apiData.Customer, // 优先使用customerCode字段
+        
+        // 产品名称映射
+        productName: apiData.productName || apiData.ProductName || apiData.Product,
+        
+        // 工单号映射
+        complaintNumber: apiData.orderNumber || apiData.ComplaintOrderNo || apiData.ReworkOrderNo || apiData.ExceptionOrderNo,
+        
+        // 改善期相关字段
+        improvementStartDate: apiData.ImprovementStartDate ? apiData.ImprovementStartDate.split('T')[0] : null,
+        improvementEndDate: apiData.ImprovementEndDate ? apiData.ImprovementEndDate.split('T')[0] : null,
+        
+        // 返还相关字段
+        returnDate: apiData.ReturnDate ? apiData.ReturnDate.split('T')[0] : null,
+        returnAmount: apiData.ReturnAmount,
+        returnReason: apiData.ReturnReason,
+        
+        // 责任类型（根据PersonType映射）
+        responsibilityType: apiData.PersonType === 'MainPerson' ? 'direct' : 
+                           apiData.PersonType === 'Manager' ? 'management' : 
+                           apiData.PersonType === 'SecondPerson' ? 'joint' : 'direct'
+      }
+      
+      // 将映射后的数据赋值给formData
+      Object.assign(formData, mappedFormData)
+      console.log('编辑操作 - 映射后的表单数据:', mappedFormData)
+      console.log('编辑操作 - 最终remarks字段值:', mappedFormData.remarks)
+      
+    } else {
+      // 如果API调用失败，回退到使用表格行数据
+      Object.assign(formData, { ...row })
+      // 尝试将sourceDescription映射到problemDescription
+      if (row.sourceDescription && !formData.problemDescription) {
+        formData.problemDescription = row.sourceDescription
+      }
+      console.log('编辑操作 - 使用表格行数据作为备选:', formData)
+    }
+    
+    dialogVisible.value = true
+  } catch (error) {
+    console.error('获取考核记录详情失败:', error)
+    // 出错时使用表格行数据
+    Object.assign(formData, { ...row })
+    // 尝试将sourceDescription映射到problemDescription
+    if (row.sourceDescription && !formData.problemDescription) {
+      formData.problemDescription = row.sourceDescription
+    }
+    dialogVisible.value = true
+  }
 }
 
 // 保存编辑
-const handleSave = async () => {
+const handleSave = async (formDataFromDialog) => {
   try {
-    await formRef.value.validate()
     saving.value = true
     
-    const response = await assessmentApi.updateAssessmentRecord(formData.id, formData)
+    // 使用从对话框传递过来的表单数据，如果没有则使用当前formData
+    const dataToSave = formDataFromDialog || formData
+    
+    // 修复字段映射问题：将employeeName映射为personName传递给后端
+    const apiData = {
+      ...dataToSave,
+      personName: dataToSave.employeeName || dataToSave.personName // 确保personName字段存在
+    }
+    
+    // 添加调试日志
+    console.log('保存操作 - 原始表单数据:', dataToSave)
+    console.log('保存操作 - 映射后API数据:', apiData)
+    console.log('保存操作 - personName字段值:', apiData.personName)
+    
+    const response = await assessmentApi.updateAssessmentRecord(apiData.id, apiData)
     
     if (response.data.success) {
       ElMessage.success('保存成功')
@@ -1105,13 +1206,21 @@ const getStatusLabel = (status) => {
  */
 const getResponsibilityTagType = (responsibilityType) => {
   const typeMap = {
+    // PersonType映射（旧版本兼容）
     'MainPerson': 'danger',
     'SecondPerson': 'warning', 
     'Manager': 'info',
+    // ResponsibilityType映射（新版本）
+    'direct': 'danger',
+    'management': 'info',
+    'joint': 'warning',
     // 兼容旧的中文映射
     '主责人': 'danger',
     '次责人': 'warning',
-    '管理人员': 'info'
+    '管理人员': 'info',
+    '直接责任': 'danger',
+    '管理责任': 'info',
+    '连带责任': 'warning'
   }
   return typeMap[responsibilityType] || ''
 }
@@ -1123,13 +1232,21 @@ const getResponsibilityTagType = (responsibilityType) => {
  */
 const getResponsibilityLabel = (responsibilityType) => {
   const labelMap = {
+    // PersonType映射（旧版本兼容）
     'MainPerson': '主责人',
     'SecondPerson': '次责人',
     'Manager': '管理人员',
+    // ResponsibilityType映射（新版本）
+    'direct': '直接责任',
+    'management': '管理责任',
+    'joint': '连带责任',
     // 兼容旧的中文映射
     '主责人': '主责人',
     '次责人': '次责人',
-    '管理人员': '管理人员'
+    '管理人员': '管理人员',
+    '直接责任': '直接责任',
+    '管理责任': '管理责任',
+    '连带责任': '连带责任'
   }
   return labelMap[responsibilityType] || responsibilityType
 }

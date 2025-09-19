@@ -1491,7 +1491,7 @@ const formatDate = (dateString) => {
     const day = String(date.getDate()).padStart(2, '0')
     return `${year}-${month}-${day}`
   } catch (error) {
-    console.error('日期格式化错误:', error?.message || '未知错误')
+    // console.error('日期格式化错误:', error?.message || '未知错误')
     return ''
   }
 }
@@ -1516,10 +1516,10 @@ const loadComplaintTypes = async () => {
     if (response.data.success) {
       complaintTypeOptions.value = response.data.data || []
     } else {
-      console.error('获取投诉类型失败:', response.data.message)
+      // console.error('获取投诉类型失败:', response.data.message)
     }
   } catch (error) {
-    console.error('获取投诉类型失败:', error?.message || '未知错误')
+    // console.error('获取投诉类型失败:', error?.message || '未知错误')
   }
 }
 
