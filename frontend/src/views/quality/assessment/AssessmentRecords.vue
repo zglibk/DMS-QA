@@ -203,7 +203,7 @@
         </div>
         <div class="table-actions">
           <!-- 列显示控制按钮 -->
-          <el-button type="plan" plain @click="showColumnTransfer">
+          <el-button type="info" plain @click="showColumnTransfer">
             <el-icon style="margin-right:5px"><Setting /></el-icon>
             列设置
           </el-button>
@@ -496,7 +496,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import {
   Search, Refresh, Plus, Clock, Loading, Check, Money,
@@ -973,30 +973,33 @@ const handleDuplicateCancel = () => {
   duplicateDialogVisible.value = false
   duplicateRecords.value = []
 }
-// 编辑记录
+/**
+ * 编辑考核记录
+ * @param {Object} row - 表格行数据
+ */
 const handleEdit = async (row) => {
   try {
+    if (dialogVisible.value) {
+      dialogVisible.value = false
+      // 等待一个事件循环，确保状态更新
+      await nextTick()
+    }
+    
+    // 设置对话框标题
     dialogTitle.value = '编辑考核记录'
     
-    // 先获取完整的考核记录详情，确保包含所有必要字段
+    // 尝试从API获取详细数据
     const response = await assessmentApi.getAssessmentRecord(row.id)
     
-    if (response.data.success) {
-      // 使用API返回的完整数据，并进行字段映射
+    if (response.data && response.data.success && response.data.data) {
       const apiData = response.data.data
       
-      // 添加调试日志，检查API返回的数据
-      console.log('编辑对话框 - API返回的完整数据:', apiData)
-      console.log('编辑对话框 - Remarks字段值:', apiData.Remarks)
-      console.log('编辑对话框 - AssessmentDescription字段值:', apiData.AssessmentDescription)
-      
-      // 创建映射后的表单数据对象
+      // 字段映射逻辑
       const mappedFormData = {
-        // 基础字段直接映射
-        id: apiData.ID,
-        employeeName: apiData.PersonName,
-        department: apiData.department || apiData.Workshop, // 优先使用department字段
-        position: apiData.PersonType,
+        id: apiData.id,
+        employeeName: apiData.personName || apiData.employeeName || apiData.PersonName,
+        department: apiData.department || apiData.Department,
+        position: apiData.position || apiData.Position,
         sourceType: apiData.SourceType,
         assessmentAmount: apiData.AssessmentAmount,
         assessmentDate: apiData.AssessmentDate ? apiData.AssessmentDate.split('T')[0] : null,
@@ -1031,8 +1034,6 @@ const handleEdit = async (row) => {
       
       // 将映射后的数据赋值给formData
       Object.assign(formData, mappedFormData)
-      console.log('编辑操作 - 映射后的表单数据:', mappedFormData)
-      console.log('编辑操作 - 最终remarks字段值:', mappedFormData.remarks)
       
     } else {
       // 如果API调用失败，回退到使用表格行数据
@@ -1041,10 +1042,13 @@ const handleEdit = async (row) => {
       if (row.sourceDescription && !formData.problemDescription) {
         formData.problemDescription = row.sourceDescription
       }
-      console.log('编辑操作 - 使用表格行数据作为备选:', formData)
     }
     
+    // 等待一个事件循环，确保数据更新完成
+    await nextTick()
+    
     dialogVisible.value = true
+    
   } catch (error) {
     console.error('获取考核记录详情失败:', error)
     // 出错时使用表格行数据
@@ -1053,6 +1057,10 @@ const handleEdit = async (row) => {
     if (row.sourceDescription && !formData.problemDescription) {
       formData.problemDescription = row.sourceDescription
     }
+    
+    // 等待一个事件循环，确保数据更新完成
+    await nextTick()
+    
     dialogVisible.value = true
   }
 }

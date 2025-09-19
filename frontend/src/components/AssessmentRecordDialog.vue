@@ -2,7 +2,7 @@
   <el-dialog
     v-model="dialogVisible"
     :title="title"
-    width="600px"
+    width="800px"
     :close-on-click-modal="false"
     :close-on-press-escape="false"
   >
@@ -14,14 +14,53 @@
       label-position="right"
     >
       <el-row :gutter="20">
-        <el-col :span="12">
-          <el-form-item label="员工姓名" prop="employeeName">
-            <el-input v-model="formData.employeeName" disabled />
+          <el-col :span="12">
+          <el-form-item label="来源类型" prop="sourceType">
+            <el-select v-model="formData.sourceType" placeholder="请选择来源类型" style="width: 100%" disabled>
+              <el-option label="投诉记录" value="complaint" />
+              <el-option label="返工记录" value="rework" />
+              <el-option label="出版异常记录" value="exception" />
+            </el-select>
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="部门" prop="department">
-            <el-input v-model="formData.department" disabled />
+          <el-form-item label="工单号" prop="complaintNumber">
+            <el-input v-model="formData.complaintNumber" disabled />
+          </el-form-item>
+        </el-col>
+      </el-row>
+      <el-row :gutter="20">
+        <el-col :span="12">
+          <el-form-item label="责任部门" prop="department">
+            <el-cascader
+              v-model="formData.departmentPath"
+              :options="departmentOptions"
+              :props="cascaderProps"
+              placeholder="请选择责任部门"
+              style="width: 100%"
+              @change="handleDepartmentChange"
+              clearable
+              filterable
+              :show-all-levels="false"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="12">
+          <el-form-item label="员工姓名" prop="employeeName">
+            <el-select 
+              v-model="formData.employeeName" 
+              placeholder="请选择员工姓名" 
+              style="width: 100%"
+              :disabled="!formData.department"
+              clearable
+            >
+              <el-option 
+                v-for="person in filteredPersons" 
+                :key="person.ID || person.id" 
+                :label="person.Name || person.RealName || person.name" 
+                :value="person.Name || person.RealName || person.name" 
+              />
+            </el-select>
           </el-form-item>
         </el-col>
       </el-row>
@@ -45,37 +84,39 @@
           </el-form-item>
         </el-col>
         <el-col :span="12">
-          <el-form-item label="来源类型" prop="sourceType">
-            <el-select v-model="formData.sourceType" placeholder="请选择来源类型" style="width: 100%" disabled>
-              <el-option label="投诉记录" value="complaint" />
-              <el-option label="返工记录" value="rework" />
-              <el-option label="出版异常记录" value="exception" />
-            </el-select>
-          </el-form-item>
-        </el-col>
-      </el-row>
-
-      <el-row :gutter="20">
-        <el-col :span="12">
-          <el-form-item label="工单号" prop="complaintNumber">
-            <el-input v-model="formData.complaintNumber" disabled />
-          </el-form-item>
-        </el-col>
-        <el-col :span="12">
           <el-form-item label="客户代码" prop="customerCode">
             <el-input v-model="formData.customerCode" disabled />
           </el-form-item>
         </el-col>
       </el-row>
-
       <el-row :gutter="20">
         <el-col :span="24">
           <el-form-item label="产品名称" prop="productName">
-            <el-input v-model="formData.productName" disabled />
+            <el-input 
+              v-model="formData.productName" 
+              type="textarea" 
+              :rows="2"
+              resize="vertical"
+              disabled 
+            />
           </el-form-item>
         </el-col>
       </el-row>
-      
+ 
+      <el-row :gutter="20">
+        <el-col :span="24">
+          <el-form-item label="问题描述" prop="problemDescription">
+            <el-input 
+              v-model="formData.problemDescription" 
+              type="textarea" 
+              :rows="3"
+              resize="vertical"
+              placeholder="请输入问题描述" 
+            />
+          </el-form-item>
+        </el-col>
+      </el-row>
+
       <el-row :gutter="20">
         <el-col :span="12">
           <el-form-item label="考核金额" prop="assessmentAmount">
@@ -112,13 +153,6 @@
               <el-option label="已确认" value="confirmed" />
               <el-option label="免考核" value="exempt" />
             </el-select>
-          </el-form-item>
-        </el-col>
-      </el-row>
-      <el-row :gutter="20">
-        <el-col :span="24">
-          <el-form-item label="问题描述" prop="problemDescription">
-            <el-input v-model="formData.problemDescription" placeholder="请输入问题描述" />
           </el-form-item>
         </el-col>
       </el-row>
@@ -199,8 +233,9 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { ElMessage } from 'element-plus'
+import api from '@/services/api'
 
 /**
  * 组件属性定义
@@ -234,6 +269,168 @@ const emit = defineEmits(['update:modelValue', 'save', 'cancel'])
  */
 const dialogVisible = ref(false)
 const formRef = ref()
+const departments = ref([])
+const departmentOptions = ref([]) // 级联选择器的部门选项
+const persons = ref([])
+
+/**
+ * 级联选择器配置
+ */
+const cascaderProps = {
+  value: 'ID',
+  label: 'Name',
+  children: 'children',
+  emitPath: false, // 只返回最后一级的值
+  checkStrictly: true // 允许选择任意一级
+}
+
+/**
+ * 根据选择的部门过滤人员列表
+ * @returns {Array} 过滤后的人员数组
+ */
+const filteredPersons = computed(() => {
+  if (!props.formData.department) {
+    return []
+  }
+  
+  // 根据部门名称过滤人员，使用更灵活的匹配逻辑
+  const filtered = persons.value.filter(person => {
+    // 检查多个可能的部门字段
+    const departmentFields = [
+      person.DepartmentName,
+      person.department,
+      person.Department
+    ]
+    
+    // 使用严格匹配和去除空格的匹配
+    const selectedDept = props.formData.department?.trim()
+    
+    const match = departmentFields.some(field => {
+      if (!field) return false
+      const fieldValue = String(field).trim()
+      return fieldValue === selectedDept
+    })
+    
+    return match
+  })
+  
+  return filtered
+})
+
+/**
+ * 加载部门列表
+ */
+const loadDepartments = async () => {
+  try {
+    // 同时加载平铺和树形结构的部门数据
+    const [flatResponse, treeResponse] = await Promise.all([
+      api.get('/departments'), // 平铺结构，用于人员过滤
+      api.get('/departments/tree') // 树形结构，用于级联选择器
+    ])
+    
+    if (flatResponse.data && flatResponse.data.success) {
+      departments.value = flatResponse.data.data || []
+    } else {
+      console.error('获取平铺部门列表失败:', flatResponse.data?.message)
+      departments.value = []
+    }
+    
+    if (treeResponse.data && treeResponse.data.success) {
+      departmentOptions.value = treeResponse.data.data || []
+    } else {
+      console.error('获取树形部门列表失败:', treeResponse.data?.message)
+      departmentOptions.value = []
+    }
+  } catch (error) {
+    console.error('获取部门列表出错:', error)
+    console.error('错误详情:', error.response?.data)
+    departments.value = []
+    departmentOptions.value = []
+  }
+}
+
+/**
+ * 加载人员列表
+ * 从后端获取所有在职人员信息
+ */
+const loadPersons = async () => {
+  try {
+    // 修改API调用：使用/person/list而不是/person，这样查询的是Person表而不是User表
+    const response = await api.get('/person/list', {
+      params: {
+        page: 1,
+        pageSize: 1000, // 获取所有人员
+        includeInactive: false // 只获取在职人员
+      }
+    });
+    
+    if (response.data.success) {
+      persons.value = response.data.data || [];
+    } else {
+      console.error('加载人员失败:', response.data.message);
+      persons.value = [];
+    }
+  } catch (error) {
+    console.error('加载人员失败:', error);
+    persons.value = [];
+  }
+};
+
+/**
+ * 处理部门选择变化
+ */
+const handleDepartmentChange = (value) => {
+  // 根据选择的部门ID找到对应的部门名称
+  if (value) {
+    const selectedDept = findDepartmentById(departmentOptions.value, value)
+    if (selectedDept) {
+      // 更新formData中的department字段为部门名称，用于人员过滤
+      props.formData.department = selectedDept.Name
+    } else {
+      console.warn('未找到对应的部门信息，ID:', value)
+      props.formData.department = ''
+    }
+  } else {
+    props.formData.department = ''
+  }
+  
+  // 清空员工选择
+  props.formData.employeeName = ''
+  
+  // 触发表单验证
+  if (formRef.value) {
+    formRef.value.clearValidate(['employeeName'])
+  }
+}
+
+/**
+ * 递归查找部门ID对应的部门信息
+ * @param {Array} departments - 部门树形数据
+ * @param {Number} targetId - 目标部门ID
+ * @returns {Object|null} 找到的部门信息或null
+ */
+const findDepartmentById = (departments, targetId) => {
+  for (const dept of departments) {
+    if (dept.ID === targetId) {
+      return dept
+    }
+    if (dept.children && dept.children.length > 0) {
+      const found = findDepartmentById(dept.children, targetId)
+      if (found) {
+        return found
+      }
+    }
+  }
+  return null
+}
+
+/**
+ * 组件挂载时加载数据
+ */
+onMounted(() => {
+  loadDepartments()
+  loadPersons()
+})
 
 /**
  * 表单验证规则
@@ -339,11 +536,33 @@ watch(() => props.modelValue, (newVal) => {
 })
 
 /**
- * 监听对话框显示状态变化，同步到父组件
- * @param {boolean} newVal - 新的对话框显示状态
+ * 监听对话框显示状态变化
  */
-watch(dialogVisible, (newVal) => {
-  emit('update:modelValue', newVal)
+watch(() => props.visible, (newValue, oldValue) => {
+  // 对话框状态变化处理逻辑可以在这里添加
+}, { immediate: true })
+
+// 监听props.visible变化
+watch(() => props.visible, (newVal, oldVal) => {
+  if (newVal) {
+    dialogVisible.value = true
+    // 确保数据已加载
+    if (departments.value.length === 0) {
+      loadDepartments()
+    }
+    if (persons.value.length === 0) {
+      loadPersons()
+    }
+  } else {
+    dialogVisible.value = false
+  }
+}, { immediate: true })
+
+// 监听dialogVisible内部状态变化
+watch(dialogVisible, (newVal, oldVal) => {
+  if (!newVal && props.visible) {
+    emit('update:visible', false)
+  }
 })
 
 /**
@@ -351,48 +570,36 @@ watch(dialogVisible, (newVal) => {
  * 修复异常记录问题描述显示在备注字段的问题
  */
 watch(() => props.formData, (newFormData) => {
-  console.log('=== 前端对话框调试信息 ===');
-  console.log('接收到的formData:', JSON.stringify(newFormData, null, 2));
-  
   if (newFormData && Object.keys(newFormData).length > 0) {
-    console.log('API返回的problemDescription:', newFormData.problemDescription);
-    console.log('API返回的remarks:', newFormData.remarks || newFormData.Remarks);
-    console.log('来源类型:', newFormData.SourceType || newFormData.sourceType);
-    
-    // 检查各种问题描述字段
-    console.log('ComplaintProblemDescription:', newFormData.ComplaintProblemDescription);
-    console.log('ReworkProblemDescription:', newFormData.ReworkProblemDescription);
-    console.log('ExceptionProblemDescription:', newFormData.ExceptionProblemDescription);
+    // 初始化级联选择器的departmentPath字段
+    if (newFormData.department && departmentOptions.value.length > 0) {
+      const departmentId = findDepartmentIdByName(departmentOptions.value, newFormData.department)
+      if (departmentId) {
+        newFormData.departmentPath = departmentId
+      }
+    }
     
     // 确保problemDescription字段有正确的值
     let finalProblemDescription = newFormData.problemDescription;
     
     // 如果API返回的problemDescription为空，根据来源类型获取对应字段
     if (!finalProblemDescription || finalProblemDescription === '') {
-      console.log('API返回的problemDescription为空，尝试从其他字段获取...');
-      
       const sourceType = newFormData.SourceType || newFormData.sourceType;
       
       if (sourceType === 'complaint' && newFormData.ComplaintProblemDescription) {
         finalProblemDescription = newFormData.ComplaintProblemDescription;
-        console.log('使用ComplaintProblemDescription:', finalProblemDescription);
       } else if (sourceType === 'rework' && newFormData.ReworkProblemDescription) {
         finalProblemDescription = newFormData.ReworkProblemDescription;
-        console.log('使用ReworkProblemDescription:', finalProblemDescription);
       } else if (sourceType === 'exception' && newFormData.ExceptionProblemDescription) {
         finalProblemDescription = newFormData.ExceptionProblemDescription;
-        console.log('使用ExceptionProblemDescription:', finalProblemDescription);
       } else {
         // 按优先级选择可用的问题描述字段
         if (newFormData.ComplaintProblemDescription) {
           finalProblemDescription = newFormData.ComplaintProblemDescription;
-          console.log('使用ComplaintProblemDescription作为备选:', finalProblemDescription);
         } else if (newFormData.ReworkProblemDescription) {
           finalProblemDescription = newFormData.ReworkProblemDescription;
-          console.log('使用ReworkProblemDescription作为备选:', finalProblemDescription);
         } else if (newFormData.ExceptionProblemDescription) {
           finalProblemDescription = newFormData.ExceptionProblemDescription;
-          console.log('使用ExceptionProblemDescription作为备选:', finalProblemDescription);
         }
       }
     }
@@ -400,31 +607,42 @@ watch(() => props.formData, (newFormData) => {
     // 强制设置problemDescription字段，确保显示在正确的表单字段中
     if (finalProblemDescription) {
       newFormData.problemDescription = finalProblemDescription;
-      console.log('强制设置problemDescription为:', finalProblemDescription);
     }
     
     // 确保备注字段不会被问题描述覆盖
     if (!newFormData.remarks && !newFormData.Remarks) {
       newFormData.remarks = '';
-      console.log('初始化remarks字段为空字符串');
     } else if (newFormData.remarks) {
       // 优先使用后端处理后的remarks字段（小写）
-      console.log('使用后端处理后的remarks字段值:', newFormData.remarks);
     } else if (newFormData.Remarks && !newFormData.remarks) {
       newFormData.remarks = newFormData.Remarks;
-      console.log('使用Remarks字段值:', newFormData.Remarks);
     } else if (newFormData.AssessmentDescription && !newFormData.remarks && !newFormData.Remarks) {
       // 如果Remarks为空但AssessmentDescription有值，使用AssessmentDescription
       newFormData.remarks = newFormData.AssessmentDescription;
-      console.log('使用AssessmentDescription字段值:', newFormData.AssessmentDescription);
     }
-    
-    console.log('最终problemDescription值:', newFormData.problemDescription);
-    console.log('最终remarks值:', newFormData.remarks);
-    console.log('AssessmentDescription值:', newFormData.AssessmentDescription);
   }
-  console.log('========================');
 }, { deep: true, immediate: true })
+
+/**
+ * 递归查找部门名称对应的部门ID
+ * @param {Array} departments - 部门树形数据
+ * @param {String} targetName - 目标部门名称
+ * @returns {Number|null} 找到的部门ID或null
+ */
+const findDepartmentIdByName = (departments, targetName) => {
+  for (const dept of departments) {
+    if (dept.Name === targetName) {
+      return dept.ID
+    }
+    if (dept.children && dept.children.length > 0) {
+      const found = findDepartmentIdByName(dept.children, targetName)
+      if (found) {
+        return found
+      }
+    }
+  }
+  return null
+}
 
 /**
  * 处理保存操作

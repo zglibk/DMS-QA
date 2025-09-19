@@ -53,7 +53,6 @@ router.get('/tree', authenticateToken, async (req, res) => {
       data: tree
     })
   } catch (error) {
-    console.error('获取部门树失败:', error)
     res.status(500).json({ error: '获取部门树失败', details: error.message })
   }
 })
@@ -122,7 +121,6 @@ router.get('/list', authenticateToken, async (req, res) => {
       }
     })
   } catch (error) {
-    console.error('获取部门列表失败:', error)
     res.status(500).json({ error: '获取部门列表失败', details: error.message })
   }
 })
@@ -161,7 +159,6 @@ router.get('/', async (req, res) => {
       message: '部门列表获取成功'
     })
   } catch (error) {
-    console.error('获取部门列表失败:', error)
     res.status(500).json({
       success: false,
       message: '获取部门列表失败',
@@ -208,7 +205,6 @@ router.get('/:id', async (req, res) => {
       data: result.recordset[0]
     })
   } catch (error) {
-    console.error('获取部门详情失败:', error)
     res.status(500).json({
       success: false,
       message: '获取部门详情失败',
@@ -285,16 +281,6 @@ router.post('/', async (req, res) => {
       data: { id: result.recordset[0].ID }
     })
   } catch (error) {
-    console.error('创建部门失败:', error)
-    
-    // 处理唯一键约束冲突
-    if (error.number === 2627) {
-      return res.status(400).json({
-        success: false,
-        message: '部门编码已存在，请使用其他编码'
-      })
-    }
-    
     res.status(500).json({
       success: false,
       message: '创建部门失败',
@@ -389,7 +375,6 @@ router.put('/:id', async (req, res) => {
       message: '部门更新成功'
     })
   } catch (error) {
-    console.error('更新部门失败:', error)
     res.status(500).json({
       success: false,
       message: '更新部门失败',
@@ -502,7 +487,6 @@ router.delete('/:id', async (req, res) => {
       deletedCount: deletedCount
     })
   } catch (error) {
-    console.error('删除部门失败:', error)
     res.status(500).json({
       success: false,
       message: '删除部门失败',
@@ -539,7 +523,6 @@ router.get('/options/list', authenticateToken, async (req, res) => {
       data: options
     })
   } catch (error) {
-    console.error('获取部门选项失败:', error)
     res.status(500).json({ error: '获取部门选项失败', details: error.message })
   }
 })

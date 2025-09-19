@@ -687,8 +687,6 @@ router.post('/generate', async (req, res) => {
         // 如果需要重置自增ID，执行重置操作（仅在重置记录模式下可用）
         if (resetAutoIncrement && resetRecords) {
             try {
-                console.log('开始重置AssessmentRecords表的自增ID...');
-                
                 // 重置自增ID的SQL语句
                 await request.query(`
                     DECLARE @MaxID INT;
@@ -696,7 +694,6 @@ router.post('/generate', async (req, res) => {
                     DBCC CHECKIDENT('AssessmentRecords', RESEED, @MaxID);
                 `);
                 
-                console.log('自增ID重置完成');
             } catch (resetError) {
                 console.error('重置自增ID失败:', resetError);
                 return res.status(500).json({
