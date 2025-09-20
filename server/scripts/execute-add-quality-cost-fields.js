@@ -18,13 +18,13 @@ const { executeQuery } = require('../db');
  */
 async function addQualityCostFields() {
     try {
-        console.log('开始执行质量成本字段添加脚本...');
+        // 开始执行质量成本字段添加脚本
         
         // 读取SQL脚本文件
         const sqlFilePath = path.join(__dirname, 'add-quality-cost-fields.sql');
         const sqlScript = fs.readFileSync(sqlFilePath, 'utf8');
         
-        console.log('开始执行质量成本字段SQL脚本...');
+        // 开始执行质量成本字段SQL脚本
         
         // 分割SQL脚本（按GO分割）
         const sqlCommands = sqlScript.split(/\bGO\b/gi).filter(cmd => cmd.trim());
@@ -33,7 +33,7 @@ async function addQualityCostFields() {
         for (let i = 0; i < sqlCommands.length; i++) {
             const command = sqlCommands[i].trim();
             if (command) {
-                console.log(`执行SQL命令 ${i + 1}/${sqlCommands.length}...`);
+                // 执行SQL命令
                 try {
                     await executeQuery(async (pool) => {
                         return await pool.request().query(command);
@@ -43,7 +43,7 @@ async function addQualityCostFields() {
                     if (cmdError.message.includes('already exists') || 
                         cmdError.message.includes('已存在') ||
                         cmdError.message.includes('Column names in each table must be unique')) {
-                        console.log(`⚠️ 跳过已存在的字段: ${cmdError.message}`);
+                        // 跳过已存在的字段
                     } else {
                         throw cmdError;
                     }
@@ -51,10 +51,10 @@ async function addQualityCostFields() {
             }
         }
         
-        console.log('✅ 质量成本字段添加脚本执行成功！');
+        // 质量成本字段添加脚本执行成功
         
         // 验证字段是否创建成功
-        console.log('\n验证质量成本字段...');
+        // 验证质量成本字段
         const verifyResult = await executeQuery(async (pool) => {
             return await pool.request().query(`
                 SELECT 
@@ -74,25 +74,25 @@ async function addQualityCostFields() {
         });
         
         if (verifyResult.recordset.length > 0) {
-            console.log('\n✅ 质量成本字段验证成功:');
+            // 质量成本字段验证成功
             verifyResult.recordset.forEach(field => {
-                console.log(`  - ${field.COLUMN_NAME}: ${field.DATA_TYPE} (可空: ${field.IS_NULLABLE})`);
+                // 字段信息记录
             });
         } else {
-            console.log('⚠️ 未找到质量成本字段，请检查执行结果');
+            // 未找到质量成本字段，请检查执行结果
         }
         
-        console.log('\n🎉 质量成本字段添加完成！');
-        console.log('已添加的字段包括：');
-        console.log('1. QualityPenalty - 质量罚款');
-        console.log('2. ReworkCost - 返工成本');
-        console.log('3. CustomerCompensation - 客户赔偿');
-        console.log('4. QualityLossCost - 质量损失成本');
-        console.log('5. InspectionCost - 检验成本');
-        console.log('6. TransportationCost - 运输成本');
-        console.log('7. PreventionCost - 预防成本');
-        console.log('8. TotalQualityCost - 总质量成本（计算字段）');
-        console.log('9. CostRemarks - 成本备注');
+        // 质量成本字段添加完成
+        // 已添加的字段包括：
+        // 1. QualityPenalty - 质量罚款
+        // 2. ReworkCost - 返工成本
+        // 3. CustomerCompensation - 客户赔偿
+        // 4. QualityLossCost - 质量损失成本
+        // 5. InspectionCost - 检验成本
+        // 6. TransportationCost - 运输成本
+        // 7. PreventionCost - 预防成本
+        // 8. TotalQualityCost - 总质量成本（计算字段）
+        // 9. CostRemarks - 成本备注
         
     } catch (error) {
         console.error('❌ 质量成本字段添加失败:', error.message);
@@ -105,7 +105,7 @@ async function addQualityCostFields() {
 if (require.main === module) {
     addQualityCostFields()
         .then(() => {
-            console.log('\n脚本执行完成');
+            // 脚本执行完成
             process.exit(0);
         })
         .catch((error) => {

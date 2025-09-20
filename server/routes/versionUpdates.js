@@ -789,7 +789,7 @@ router.get('/stats/summary', authenticateToken, async (req, res) => {
  */
 router.post('/generate-changelog', authenticateToken, async (req, res) => {
     try {
-        console.log('🚀 [API] 开始执行版本更新日志生成器...');
+        // 开始执行版本更新日志生成器
         
         const {
             version,

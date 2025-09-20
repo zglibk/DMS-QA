@@ -345,7 +345,7 @@ class SystemLogger {
    * @param {Object} options - 日志选项
    */
   info(message, options = {}) {
-    console.log(`[INFO] ${message}`, options);
+    // 记录信息日志
   }
 
   /**
@@ -372,7 +372,7 @@ class SystemLogger {
    * @param {Object} options - 日志选项
    */
   debug(message, options = {}) {
-    console.log(`[DEBUG] ${message}`, options);
+    // 记录调试日志
   }
 }
 

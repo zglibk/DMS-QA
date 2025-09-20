@@ -54,51 +54,65 @@ BEGIN
     (@VersionID, 'other', '文档更新', '更新版本管理功能相关的技术文档', 13, 0),
     (@VersionID, 'other', '测试用例补充', '补充版本管理功能的自动化测试用例', 14, 0),
     (@VersionID, 'other', '依赖包更新', '更新项目依赖包到最新稳定版本', 15, 0);
-    
-    PRINT '✅ 测试版本数据插入成功: v2.3.1';
-END
-ELSE
-BEGIN
-    PRINT '⚠️ 测试版本 v2.3.1 已存在，跳过插入';
 END
 
 -- 插入第二个测试版本
-IF NOT EXISTS (SELECT * FROM VersionUpdates WHERE Version = 'v2.3.0')
+-- 版本更新测试数据插入脚本
+-- 用于测试版本更新功能
+
+-- 检查并插入测试版本数据
+IF NOT EXISTS (SELECT 1 FROM VersionUpdates WHERE version_number = 'v2.3.0')
 BEGIN
     INSERT INTO VersionUpdates (
-        Version, Title, Description, ReleaseDate, Status, 
-        IsMajorUpdate, TotalCommits, FeaturesCount, FixesCount, 
-        ImprovementsCount, OtherCount, ChangelogMarkdown, 
-        Contributors, CreatedBy
+        version_number,
+        version_name,
+        release_date,
+        description,
+        update_type,
+        is_mandatory,
+        download_url,
+        file_size,
+        checksum,
+        min_supported_version,
+        created_by,
+        status
     ) VALUES (
         'v2.3.0',
-        '质量管理系统重大更新',
-        '本次为重大版本更新，新增了多个核心功能模块，全面提升了系统的功能性和稳定性。',
-        DATEADD(day, -7, GETDATE()),
-        'published',
-        1,
-        25,
-        8,
-        3,
-        6,
-        8,
-        '# 版本 v2.3.0 更新日志\n\n## 重大更新\n这是一个重大版本更新，包含多个核心功能的重构和优化。\n\n## 新功能\n- 全新的仪表盘界面\n- 质量指标统计功能\n- 成本计算模块\n- 工作计划管理\n\n## 系统优化\n- 数据库性能优化\n- 前端架构重构\n- API接口标准化',
-        '["系统管理员", "开发团队", "测试团队"]',
-        1
+        '质量管理系统优化版本',
+        '2024-01-15',
+        '本次更新包含以下改进：
+        1. 优化考核记录管理界面
+        2. 增强数据导出功能
+        3. 修复已知问题
+        4. 提升系统性能',
+        'minor',
+        0,
+        'https://releases.example.com/dms-qa/v2.3.0/setup.exe',
+        15728640,
+        'sha256:a1b2c3d4e5f6789012345678901234567890abcdef1234567890abcdef123456',
+        'v2.0.0',
+        'system',
+        'published'
     );
     
-    DECLARE @Version2ID INT = SCOPE_IDENTITY();
+    -- 插入版本更新详细项目
+    DECLARE @version_id INT = SCOPE_IDENTITY();
     
-    -- 插入版本更新项目数据
-    INSERT INTO VersionUpdateItems (VersionUpdateID, Category, Title, Description, SortOrder, IsHighlight) VALUES
-    (@Version2ID, 'features', '全新仪表盘界面', '重新设计的仪表盘界面，提供更直观的数据展示', 1, 1),
-    (@Version2ID, 'features', '质量指标统计', '新增质量指标统计功能，支持多维度数据分析', 2, 1),
-    (@Version2ID, 'features', '成本计算模块', '完整的成本计算体系，支持自动化成本核算', 3, 1),
-    (@Version2ID, 'features', '工作计划管理', '新增工作计划管理功能，支持任务分配和进度跟踪', 4, 0),
-    
-    (@Version2ID, 'improvements', '数据库性能优化', '全面优化数据库查询性能，提升系统响应速度', 5, 1),
-    (@Version2ID, 'improvements', '前端架构重构', '重构前端代码架构，提升开发效率和维护性', 6, 0),
-    (@Version2ID, 'improvements', 'API接口标准化', '统一API接口规范，提升接口的一致性和可维护性', 7, 0);
+    INSERT INTO VersionUpdateItems (
+        version_id,
+        item_type,
+        title,
+        description,
+        priority,
+        category
+    ) VALUES 
+    (@version_id, 'feature', '考核记录管理优化', '优化考核记录的添加、编辑和查询功能，提升用户体验', 'high', 'enhancement'),
+    (@version_id, 'feature', '数据导出增强', '支持更多格式的数据导出，包括Excel、PDF等', 'medium', 'feature'),
+    (@version_id, 'bugfix', '修复数据统计错误', '修复在特定条件下数据统计不准确的问题', 'high', 'bugfix'),
+    (@version_id, 'improvement', '性能优化', '优化数据库查询性能，提升页面加载速度', 'medium', 'performance'),
+    (@version_id, 'security', '安全性增强', '加强用户权限验证和数据安全保护', 'high', 'security');
+END
+GO
     
     PRINT '✅ 测试版本数据插入成功: v2.3.0';
 END

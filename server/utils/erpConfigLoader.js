@@ -73,7 +73,7 @@ class ErpConfigLoader {
 
             // 检查executeQuery是否返回null（数据库连接失败）
             if (result === null) {
-                console.log('ERP配置加载失败：数据库连接失败');
+                // ERP配置加载失败：数据库连接失败
                 // 如果缓存为空，设置默认配置
                 if (this.configCache.size === 0) {
                     this.setDefaultConfigs();
@@ -88,15 +88,15 @@ class ErpConfigLoader {
                 result.recordset.forEach(row => {
                     this.configCache.set(row.config_key, row.config_value);
                 });
-                console.log(`ERP配置加载成功：${result.recordset.length}个配置项`);
+                // ERP配置加载成功
             } else {
-                console.log('ERP配置加载失败：未找到配置项，使用默认配置');
+                // ERP配置加载失败：未找到配置项，使用默认配置
                 this.setDefaultConfigs();
             }
 
             this.lastLoadTime = Date.now();
         } catch (error) {
-            console.log('ERP配置加载失败:', error.message);
+            // ERP配置加载失败
             // 如果缓存为空，设置默认配置
             if (this.configCache.size === 0) {
                 this.setDefaultConfigs();
@@ -170,8 +170,7 @@ class ErpConfigLoader {
                 };
                 
                 const allConfigsLoaded = configStatus.baseUrl && configStatus.appId && configStatus.appSecret;
-                console.log(`ERP连接配置通过API拼接${allConfigsLoaded ? '成功' : '失败'}:`, 
-                           `baseUrl=${configStatus.baseUrl}, appId=${configStatus.appId}, appSecret=${configStatus.appSecret}`);
+                // ERP连接配置通过API拼接结果记录
 
                 return {
                     baseUrl,
@@ -182,7 +181,7 @@ class ErpConfigLoader {
                 throw new Error('API返回数据格式错误');
             }
         } catch (error) {
-            console.log('通过API获取ERP连接配置失败:', error.message);
+            // 通过API获取ERP连接配置失败
             // 返回默认配置，使用环境变量避免硬编码
             return {
                 baseUrl: process.env.ERP_BASE_URL || 'http://192.168.1.168:99',

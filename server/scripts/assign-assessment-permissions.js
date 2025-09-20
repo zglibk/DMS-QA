@@ -13,7 +13,7 @@ async function assignAssessmentPermissions() {
   let pool;
   
   try {
-    console.log('🔧 开始为admin角色分配考核记录管理菜单权限...');
+    // 开始为admin角色分配考核记录管理菜单权限
     
     // 获取数据库连接
     pool = await getConnection();
@@ -23,12 +23,11 @@ async function assignAssessmentPermissions() {
       .query(`SELECT ID FROM [dbo].[Roles] WHERE RoleCode = 'admin'`);
     
     if (adminRoleResult.recordset.length === 0) {
-      console.log('❌ 未找到admin角色');
+      // 未找到admin角色
       return;
     }
     
     const adminRoleId = adminRoleResult.recordset[0].ID;
-    console.log(`✅ 找到admin角色，ID: ${adminRoleId}`);
     
     // 2. 获取考核记录管理相关菜单
     const menusResult = await pool.request()
@@ -39,11 +38,9 @@ async function assignAssessmentPermissions() {
       `);
     
     if (menusResult.recordset.length === 0) {
-      console.log('❌ 未找到考核记录管理相关菜单');
+      // 未找到考核记录管理相关菜单
       return;
     }
-    
-    console.log(`✅ 找到 ${menusResult.recordset.length} 个考核记录管理菜单`);
     
     // 3. 为admin角色分配菜单权限
     let assignedCount = 0;
@@ -61,7 +58,7 @@ async function assignAssessmentPermissions() {
         `);
       
       if (existingPermission.recordset[0].count > 0) {
-        console.log(`⚠️ 跳过已存在的权限: ${menu.MenuName} (${menu.MenuCode})`);
+        // 跳过已存在的权限
         skippedCount++;
       } else {
         // 分配新权限
@@ -73,19 +70,12 @@ async function assignAssessmentPermissions() {
             VALUES (@roleId, @menuId, GETDATE())
           `);
         
-        console.log(`✅ 已分配权限: ${menu.MenuName} (${menu.MenuCode})`);
         assignedCount++;
       }
     }
     
-    // 4. 输出结果统计
-    console.log('\n📊 权限分配结果统计:');
-    console.log(`- 新分配权限: ${assignedCount} 个`);
-    console.log(`- 跳过已存在: ${skippedCount} 个`);
-    console.log(`- 总菜单数量: ${menusResult.recordset.length} 个`);
-    
-    // 5. 验证最终结果
-    console.log('\n🔍 验证admin角色的考核记录管理菜单权限...');
+    // 4. 验证最终结果
+    // 验证admin角色的考核记录管理菜单权限
     const verificationResult = await pool.request()
       .input('roleId', sql.Int, adminRoleId)
       .query(`
@@ -101,13 +91,10 @@ async function assignAssessmentPermissions() {
         ORDER BY m.ParentID, m.SortOrder
       `);
     
-    console.log('\n✅ admin角色现有的考核记录管理菜单权限:');
-    console.table(verificationResult.recordset);
-    
     if (verificationResult.recordset.length === menusResult.recordset.length) {
-      console.log('\n🎉 权限分配完成！admin角色已拥有所有考核记录管理菜单的显示权限');
+      // 权限分配完成！admin角色已拥有所有考核记录管理菜单的显示权限
     } else {
-      console.log('\n⚠️ 权限分配可能不完整，请检查数据库状态');
+      // 权限分配可能不完整，请检查数据库状态
     }
     
   } catch (error) {
@@ -124,7 +111,7 @@ async function assignAssessmentPermissions() {
 if (require.main === module) {
   assignAssessmentPermissions()
     .then(() => {
-      console.log('\n🎉 脚本执行完成');
+      // 脚本执行完成
       process.exit(0);
     })
     .catch(error => {

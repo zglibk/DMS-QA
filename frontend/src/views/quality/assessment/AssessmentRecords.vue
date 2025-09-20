@@ -41,6 +41,7 @@
             <el-option label="已返还" value="returned" />
             <el-option label="已确认" value="confirmed" />
             <el-option label="免考核" value="exempt" />
+            <el-option label="免考核" value="exempt" />
           </el-select>
         </el-col>
         <el-col :span="6">
@@ -409,27 +410,79 @@
       </div>
     </div>
 
-    <!-- 列设置穿梭框对话框 -->
+    <!-- 列设置对话框 -->
     <el-dialog
       v-model="columnTransferVisible"
       title="列设置"
-      width="800px"
+      width="600px"
+      height="450px"
       :close-on-click-modal="false"
       @close="handleColumnTransferClose"
     >
-      <el-transfer
-        v-model="selectedColumns"
-        filterable
-        :filter-method="filterMethod"
-        filter-placeholder="搜索列名"
-        :data="transferData"
-        :titles="['可选列', '已选列']"
-        :button-texts="['移除', '添加']"
-        :format="{
-          noChecked: '${total}',
-          hasChecked: '${checked}/${total}'
-        }"
-      />
+      <div class="column-settings-container">
+        <div class="column-settings-header">
+          <div class="header-info">
+            <span class="info-text">拖拽列名可调整顺序，勾选/取消勾选可控制列的显示</span>
+            <span class="selected-count">已选择 {{ selectedColumnsCount }} / {{ availableColumns.length }} 列</span>
+          </div>
+        </div>
+        
+        <div class="column-settings-content">
+          <div class="column-list">
+            <div class="column-list-header">
+              <el-checkbox 
+                v-model="selectAllColumns" 
+                :indeterminate="isIndeterminate"
+                @change="handleSelectAllColumns"
+              >
+                全选
+              </el-checkbox>
+              <span class="filter-input">
+                <el-input
+                  v-model="columnFilterText"
+                  placeholder="搜索列名"
+                  size="small"
+                  clearable
+                  style="width: 200px"
+                >
+                  <template #prefix>
+                    <el-icon><Search /></el-icon>
+                  </template>
+                </el-input>
+              </span>
+            </div>
+            
+            <div class="draggable-column-list">
+              <div
+                v-for="(column, index) in filteredColumnSettings"
+                :key="column.key"
+                class="column-item"
+                :class="{ 'column-disabled': column.required }"
+                draggable="true"
+                @dragstart="handleDragStart(index, $event)"
+                @dragover="handleDragOver($event)"
+                @drop="handleDrop(index, $event)"
+                @dragend="handleDragEnd"
+              >
+                <div class="column-item-content">
+                  <div class="drag-handle">
+                    <el-icon><Rank /></el-icon>
+                  </div>
+                  <el-checkbox
+                    v-model="column.visible"
+                    :disabled="column.required"
+                    @change="updateColumnVisibility"
+                  >
+                    {{ column.label }}
+                    <span v-if="column.required" class="required-tag">(必需)</span>
+                  </el-checkbox>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
       <template #footer>
         <span class="dialog-footer">
           <el-button @click="resetToDefaultColumns">重置默认</el-button>
@@ -492,6 +545,12 @@
       @confirm="handleDuplicateConfirm"
       @cancel="handleDuplicateCancel"
     />
+
+    <!-- 考核记录历史对话框 -->
+    <AssessmentHistoryDialog
+      v-model:visible="historyDialogVisible"
+      :record-id="currentRecordId"
+    />
   </div>
 </template>
 
@@ -501,16 +560,21 @@ import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import {
   Search, Refresh, Plus, Clock, Loading, Check, Money,
   User, OfficeBuilding, Edit, View, DataAnalysis, Download,
-  Setting, Document, Postcard
+  Setting, Document, Postcard, Rank
 } from '@element-plus/icons-vue'
 import * as assessmentApi from '@/services/assessmentApi'
 import AssessmentRecordDialog from '@/components/AssessmentRecordDialog.vue'
 import GenerateRecordsDialog from '@/components/GenerateRecordsDialog.vue'
 import DuplicateRecordsDialog from '@/components/DuplicateRecordsDialog.vue'
+import AssessmentHistoryDialog from '@/components/AssessmentHistoryDialog.vue'
+import { useUserStore } from '@/store/user'
 
 /**
  * 响应式数据定义
  */
+// 用户store
+const userStore = useUserStore()
+
 // 搜索表单
 const searchForm = reactive({
   employeeName: '',
@@ -565,6 +629,8 @@ const generateDialogRef = ref()
 const duplicateDialogVisible = ref(false)
 const duplicateRecords = ref([])
 const duplicateLoading = ref(false)
+const historyDialogVisible = ref(false)
+const currentRecordId = ref(null)
 
 // 表单数据 - 包含对话框所需的所有字段
 const formData = reactive({
@@ -617,7 +683,7 @@ const availableColumns = ref([
   { key: 'sourceDescription', label: '问题描述', required: true },
   { key: 'assessmentAmount', label: '考核金额', required: true },
   { key: 'assessmentDate', label: '发生日期', required: true },
-  { key: 'status', label: '状态', required: true },
+  { key: 'status', label: '状态', required: false },
   { key: 'improvementStartDate', label: '改善期开始', required: false },
   { key: 'improvementEndDate', label: '改善期结束', required: false },
   { key: 'returnDate', label: '返还日期', required: false },
@@ -633,38 +699,150 @@ const defaultColumns = [
 // 当前显示的列
 const visibleColumns = ref([...defaultColumns])
 
-// 穿梭框相关数据
+// 列设置对话框相关数据
 const columnTransferVisible = ref(false)
-const selectedColumns = ref([])
-const transferData = ref([])
+const columnFilterText = ref('')
+const selectAllColumns = ref(false)
+const isIndeterminate = ref(false)
+const draggedIndex = ref(-1)
+
+// 列设置数据 - 用于拖拽排序和显示控制
+const columnSettings = ref([])
 
 /**
- * 初始化穿梭框数据
+ * 初始化列设置数据
  */
-const initTransferData = () => {
-  transferData.value = availableColumns.value.map(column => ({
-    key: column.key,
-    label: column.label + (column.required ? ' (必需)' : ''),
-    disabled: column.required, // 必需列不能移除
-    required: column.required
-  }))
+const initColumnSettings = () => {
+  // 根据当前可见列的顺序创建列设置
+  const orderedColumns = []
   
-  // 设置已选择的列
-  selectedColumns.value = [...visibleColumns.value]
+  // 首先添加当前可见的列，保持其顺序
+  visibleColumns.value.forEach(columnKey => {
+    const column = availableColumns.value.find(col => col.key === columnKey)
+    if (column) {
+      orderedColumns.push({
+        key: column.key,
+        label: column.label,
+        required: column.required,
+        visible: true
+      })
+    }
+  })
+  
+  // 然后添加不可见的列
+  availableColumns.value.forEach(column => {
+    if (!visibleColumns.value.includes(column.key)) {
+      orderedColumns.push({
+        key: column.key,
+        label: column.label,
+        required: column.required,
+        visible: false
+      })
+    }
+  })
+  
+  columnSettings.value = orderedColumns
+  updateColumnVisibility()
 }
 
 /**
- * 穿梭框搜索过滤方法
+ * 过滤后的列设置
  */
-const filterMethod = (query, item) => {
-  return item.label.toLowerCase().includes(query.toLowerCase())
+const filteredColumnSettings = computed(() => {
+  if (!columnFilterText.value) {
+    return columnSettings.value
+  }
+  return columnSettings.value.filter(column =>
+    column.label.toLowerCase().includes(columnFilterText.value.toLowerCase())
+  )
+})
+
+/**
+ * 已选择的列数量
+ */
+const selectedColumnsCount = computed(() => {
+  return columnSettings.value.filter(col => col.visible).length
+})
+
+/**
+ * 更新列可见性状态
+ */
+const updateColumnVisibility = () => {
+  const visibleCount = columnSettings.value.filter(col => col.visible).length
+  const totalCount = columnSettings.value.filter(col => !col.required).length + columnSettings.value.filter(col => col.required).length
+  const nonRequiredCount = columnSettings.value.filter(col => !col.required).length
+  const visibleNonRequiredCount = columnSettings.value.filter(col => col.visible && !col.required).length
+  
+  // 必需列始终选中，所以只考虑非必需列的选择状态
+  selectAllColumns.value = visibleNonRequiredCount === nonRequiredCount
+  isIndeterminate.value = visibleNonRequiredCount > 0 && visibleNonRequiredCount < nonRequiredCount
 }
 
 /**
- * 显示列设置穿梭框对话框
+ * 处理全选/取消全选
+ */
+const handleSelectAllColumns = (checked) => {
+  columnSettings.value.forEach(column => {
+    if (!column.required) { // 必需列不受全选影响
+      column.visible = checked
+    }
+  })
+  isIndeterminate.value = false
+}
+
+/**
+ * 拖拽开始事件
+ */
+const handleDragStart = (index, event) => {
+  draggedIndex.value = index
+  event.dataTransfer.effectAllowed = 'move'
+  event.target.style.opacity = '0.5'
+}
+
+/**
+ * 拖拽结束事件
+ */
+const handleDragEnd = (event) => {
+  event.target.style.opacity = '1'
+  draggedIndex.value = -1
+}
+
+/**
+ * 拖拽悬停事件
+ */
+const handleDragOver = (event) => {
+  event.preventDefault()
+  event.dataTransfer.dropEffect = 'move'
+}
+
+/**
+ * 拖拽放置事件
+ */
+const handleDrop = (targetIndex, event) => {
+  event.preventDefault()
+  
+  if (draggedIndex.value === -1 || draggedIndex.value === targetIndex) {
+    return
+  }
+  
+  // 获取实际的索引（考虑过滤）
+  const draggedItem = filteredColumnSettings.value[draggedIndex.value]
+  const targetItem = filteredColumnSettings.value[targetIndex]
+  
+  const draggedRealIndex = columnSettings.value.findIndex(col => col.key === draggedItem.key)
+  const targetRealIndex = columnSettings.value.findIndex(col => col.key === targetItem.key)
+  
+  // 交换位置
+  const temp = columnSettings.value[draggedRealIndex]
+  columnSettings.value.splice(draggedRealIndex, 1)
+  columnSettings.value.splice(targetRealIndex, 0, temp)
+}
+
+/**
+ * 显示列设置对话框
  */
 const showColumnTransfer = () => {
-  initTransferData()
+  initColumnSettings()
   columnTransferVisible.value = true
 }
 
@@ -672,31 +850,63 @@ const showColumnTransfer = () => {
  * 重置为默认列
  */
 const resetToDefaultColumns = () => {
-  selectedColumns.value = [...defaultColumns]
-}
-
-/**
- * 保存穿梭框列设置
- */
-const saveColumnTransferSettings = () => {
-  // 确保必需列始终显示
-  const requiredColumns = availableColumns.value
-    .filter(col => col.required)
-    .map(col => col.key)
+  // 重置为默认显示状态
+  columnSettings.value.forEach(column => {
+    column.visible = defaultColumns.includes(column.key) || column.required
+  })
   
-  visibleColumns.value = [...new Set([...requiredColumns, ...selectedColumns.value])]
-  saveColumnSettings()
-  columnTransferVisible.value = false
-  ElMessage.success('列设置已保存')
+  // 重新排序为默认顺序
+  const defaultOrder = [...defaultColumns]
+  availableColumns.value.forEach(col => {
+    if (!defaultOrder.includes(col.key)) {
+      defaultOrder.push(col.key)
+    }
+  })
+  
+  columnSettings.value.sort((a, b) => {
+    return defaultOrder.indexOf(a.key) - defaultOrder.indexOf(b.key)
+  })
+  
+  updateColumnVisibility()
 }
 
 /**
- * 处理穿梭框对话框关闭事件
- * 重置穿梭框的选项状态到初始状态
+ * 保存列设置
+ */
+const saveColumnTransferSettings = async () => {
+  try {
+    // 更新可见列列表，按照当前设置的顺序
+    visibleColumns.value = columnSettings.value
+      .filter(col => col.visible)
+      .map(col => col.key)
+    
+    // 调用保存函数，等待完成
+    await saveColumnSettings()
+    
+    columnTransferVisible.value = false
+    ElMessage.success('列设置已保存')
+  } catch (error) {
+    console.error('保存列设置失败:', error)
+    ElMessage.error('保存列设置失败，请重试')
+  }
+}
+
+/**
+ * 获取当前列的顺序配置（用于导出）
+ */
+const getColumnOrder = () => {
+  return columnSettings.value
+    .filter(col => col.visible)
+    .map(col => col.key)
+}
+
+/**
+ * 处理列设置对话框关闭事件
  */
 const handleColumnTransferClose = () => {
-  // 重置选中的列到当前可见列状态
-  selectedColumns.value = [...visibleColumns.value]
+  // 重置到当前状态
+  initColumnSettings()
+  columnFilterText.value = ''
 }
 
 /**
@@ -706,12 +916,92 @@ const handleColumnTransferClose = () => {
 const isColumnVisible = (columnKey) => {
   return visibleColumns.value.includes(columnKey)
 }
-const saveColumnSettings = () => {
-  localStorage.setItem('assessmentRecords_visibleColumns', JSON.stringify(visibleColumns.value))
+
+// 保存列设置到本地存储
+/**
+ * 保存列设置到数据库
+ */
+const saveColumnSettings = async () => {
+  try {
+    const userId = userStore.user?.id
+    const userName = userStore.user?.realName || userStore.user?.RealName
+    
+    if (!userId) {
+      console.warn('用户未登录，无法保存列设置')
+      return false
+    }
+    
+    // 构建列设置对象，与后端API期望的结构匹配
+    const columnSettings = {
+      visibleColumns: visibleColumns.value,
+      columnOrder: getColumnOrder()
+    }
+    
+    // 传递用户姓名到后端，避免后端查询数据库
+    await assessmentApi.saveColumnSettings(userId, columnSettings, userName)
+    console.log('列设置保存成功')
+    return true
+  } catch (error) {
+    console.error('保存列设置失败:', error)
+    // 如果API保存失败，回退到localStorage
+    localStorage.setItem('assessmentRecords_visibleColumns', JSON.stringify(visibleColumns.value))
+    throw error // 重新抛出错误，让调用者处理
+  }
 }
 
-// 从本地存储加载列设置
-const loadColumnSettings = () => {
+/**
+ * 从数据库加载列设置
+ */
+const loadColumnSettings = async () => {
+  try {
+    const userId = userStore.user?.id
+    if (!userId) {
+      console.warn('用户未登录，使用本地存储的列设置')
+      loadColumnSettingsFromLocal()
+      return
+    }
+    
+    const response = await assessmentApi.getColumnSettings(userId)
+    if (response.data.success && response.data.data) {
+      const savedSettings = response.data.data
+      
+      // 确保必需列始终显示
+      const requiredColumns = availableColumns.value
+        .filter(col => col.required)
+        .map(col => col.key)
+      
+      // 如果有保存的列顺序，使用保存的顺序；否则使用可见列
+      if (savedSettings.columnOrder && Array.isArray(savedSettings.columnOrder)) {
+        // 使用保存的列顺序，并确保必需列包含在内
+        const orderedColumns = [...savedSettings.columnOrder]
+        requiredColumns.forEach(reqCol => {
+          if (!orderedColumns.includes(reqCol)) {
+            orderedColumns.unshift(reqCol) // 必需列放在前面
+          }
+        })
+        visibleColumns.value = orderedColumns
+      } else {
+        // 回退到使用visibleColumns
+        visibleColumns.value = [...new Set([...requiredColumns, ...(savedSettings.visibleColumns || [])])]
+      }
+    } else {
+      // 如果数据库中没有设置，尝试从localStorage加载
+      loadColumnSettingsFromLocal()
+    }
+  } catch (error) {
+    console.error('从数据库加载列设置失败:', error)
+    // 如果API加载失败，回退到localStorage
+    loadColumnSettingsFromLocal()
+  }
+  
+  // 初始化列设置数据，确保columnSettings正确填充
+  initColumnSettings()
+}
+
+/**
+ * 从本地存储加载列设置（回退方案）
+ */
+const loadColumnSettingsFromLocal = () => {
   const saved = localStorage.getItem('assessmentRecords_visibleColumns')
   if (saved) {
     try {
@@ -723,7 +1013,7 @@ const loadColumnSettings = () => {
       
       visibleColumns.value = [...new Set([...requiredColumns, ...savedColumns])]
     } catch (error) {
-      console.error('加载列设置失败:', error)
+      console.error('加载本地列设置失败:', error)
       visibleColumns.value = [...defaultColumns]
     }
   }
@@ -843,43 +1133,188 @@ const handleGenerateRecords = () => {
  */
 const handleExportRecords = async () => {
   try {
+    // 检查当前筛选结果的记录数
+    if (pagination.total === 0) {
+      ElMessage.warning('没有符合条件的任何记录，无法导出')
+      return
+    }
+    
+    // 构建导出信息摘要
+    const exportSummary = buildExportSummary()
+    
+    // 显示确认对话框
+    await ElMessageBox.confirm(
+      `
+        <div style="line-height: 1.6; color: #606266;">
+          <div style="margin-bottom: 16px; font-weight: 600; color: #303133;">
+            📊 即将导出考核记录表
+          </div>
+          
+          <div style="background: #f5f7fa; padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+            <div style="margin-bottom: 8px;"><strong>导出范围：</strong></div>
+            ${exportSummary.conditions}
+          </div>
+          
+          <div style="background: #e8f4fd; padding: 12px; border-radius: 6px; margin-bottom: 16px;">
+            <div style="margin-bottom: 8px;"><strong>导出内容：</strong></div>
+            <div>• 包含记录：${pagination.total} 条</div>
+            <div>• 包含列数：${getColumnOrder().length} 列</div>
+            <div>• 文件格式：Excel (.xlsx)</div>
+          </div>
+          
+          <div style="color: #909399; font-size: 13px;">
+            💡 提示：导出可能需要几秒钟时间，请耐心等待
+          </div>
+        </div>
+      `,
+      '确认导出',
+      {
+        confirmButtonText: '确认导出',
+        cancelButtonText: '取消',
+        type: 'info',
+        dangerouslyUseHTMLString: true,
+        customStyle: {
+          width: '520px',
+          maxWidth: '90vw'
+        },
+        customClass: 'export-confirm-dialog'
+      }
+    )
+    
+    // 用户确认后开始导出
     ElMessage.info('正在导出考核表，请稍候...')
     
-    // 构建导出参数，包含当前筛选条件
+    // 构建导出参数，包含当前筛选条件和列设置
     const exportParams = {
       ...searchForm,
-      currentPage: 1,
-      pageSize: 999999 // 导出所有数据
+      startDate: searchForm.dateRange?.[0],
+      endDate: searchForm.dateRange?.[1],
+      columns: JSON.stringify(getColumnOrder()) // 传递当前列的顺序配置
     }
+    
+    // 移除dateRange字段，避免后端接收到不需要的参数
+    delete exportParams.dateRange
     
     const response = await assessmentApi.exportAssessmentRecords(exportParams)
     
-    if (response.data.success) {
-      // 创建下载链接
-      const blob = new Blob([response.data], { 
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
-      })
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      
-      // 生成文件名
-      const currentDate = new Date().toISOString().split('T')[0]
-      link.download = `考核记录表_${currentDate}.xlsx`
-      
-      // 触发下载
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-      
-      ElMessage.success('考核表导出成功')
-    } else {
-      ElMessage.error(response.data.message || '导出失败')
-    }
+    // 创建下载链接
+    const blob = new Blob([response.data], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    // 生成文件名
+    const currentDate = new Date().toISOString().split('T')[0]
+    link.download = `考核记录表_${currentDate}.xlsx`
+    
+    // 触发下载
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('考核表导出成功！')
   } catch (error) {
+    if (error === 'cancel') {
+      // 用户取消导出
+      ElMessage.info('已取消导出')
+      return
+    }
     console.error('导出考核表失败:', error)
-    ElMessage.error('导出失败，请重试')
+    
+    // 处理后端返回的错误消息
+    let errorMessage = '导出失败，请重试'
+    if (error.response && error.response.data) {
+      // 优先使用后端返回的message字段
+      errorMessage = error.response.data.message || errorMessage
+    }
+    
+    ElMessage.error(errorMessage)
+  }
+}
+
+/**
+ * 构建导出信息摘要
+ * 根据当前筛选条件生成导出范围描述
+ */
+const buildExportSummary = () => {
+  const conditions = []
+  
+  // 员工姓名筛选
+  if (searchForm.employeeName) {
+    conditions.push(`员工：${searchForm.employeeName}`)
+  }
+  
+  // 部门筛选
+  if (searchForm.department) {
+    conditions.push(`部门：${searchForm.department}`)
+  }
+  
+  // 状态筛选
+  if (searchForm.status) {
+    const statusMap = {
+      'pending': '待改善',
+      'improving': '改善中', 
+      'returned': '已返还',
+      'confirmed': '已确认',
+      'exempt': '免考核'
+    }
+    conditions.push(`状态：${statusMap[searchForm.status] || searchForm.status}`)
+  }
+  
+  // 责任类型筛选
+  if (searchForm.position) {
+    const positionMap = {
+      'primary': '主责人',
+      'secondary': '次责人',
+      'manager': '管理者'
+    }
+    conditions.push(`责任类型：${positionMap[searchForm.position] || searchForm.position}`)
+  }
+  
+  // 数据来源筛选
+  if (searchForm.sourceType) {
+    const sourceMap = {
+      'complaint': '投诉记录',
+      'rework': '返工记录',
+      'exception': '异常记录'
+    }
+    conditions.push(`数据来源：${sourceMap[searchForm.sourceType] || searchForm.sourceType}`)
+  }
+  
+  // 工单号筛选
+  if (searchForm.complaintNumber) {
+    conditions.push(`工单号：${searchForm.complaintNumber}`)
+  }
+  
+  // 客户编号筛选
+  if (searchForm.customerCode) {
+    conditions.push(`客户编号：${searchForm.customerCode}`)
+  }
+  
+  // 客户名称筛选
+  if (searchForm.customerName) {
+    conditions.push(`客户名称：${searchForm.customerName}`)
+  }
+  
+  // 日期范围筛选
+  if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+    const startDate = new Date(searchForm.dateRange[0]).toLocaleDateString()
+    const endDate = new Date(searchForm.dateRange[1]).toLocaleDateString()
+    conditions.push(`日期范围：${startDate} ~ ${endDate}`)
+  }
+  
+  // 最小金额筛选
+  if (searchForm.minAmount !== null && searchForm.minAmount !== '') {
+    conditions.push(`最小金额：≥ ${searchForm.minAmount} 元`)
+  }
+  
+  return {
+    conditions: conditions.length > 0 
+      ? conditions.map(c => `<div>• ${c}</div>`).join('')
+      : '<div>• 全部记录（无筛选条件）</div>'
   }
 }
 
@@ -996,7 +1431,7 @@ const handleEdit = async (row) => {
       
       // 字段映射逻辑
       const mappedFormData = {
-        id: apiData.id,
+        id: apiData.id || apiData.ID || row.id, // 修复：添加多种ID字段的映射
         employeeName: apiData.personName || apiData.employeeName || apiData.PersonName,
         department: apiData.department || apiData.Department,
         position: apiData.position || apiData.Position,
@@ -1040,7 +1475,10 @@ const handleEdit = async (row) => {
       
     } else {
       // 如果API调用失败，回退到使用表格行数据
-      Object.assign(formData, { ...row })
+      // 确保ID字段正确传递
+      const rowDataWithId = { ...row, id: row.id || row.ID }
+      Object.assign(formData, rowDataWithId)
+      
       // 尝试将sourceDescription映射到problemDescription
       if (row.sourceDescription && !formData.problemDescription) {
         formData.problemDescription = row.sourceDescription
@@ -1055,7 +1493,10 @@ const handleEdit = async (row) => {
   } catch (error) {
     console.error('获取考核记录详情失败:', error)
     // 出错时使用表格行数据
-    Object.assign(formData, { ...row })
+    // 确保ID字段正确传递
+    const rowDataWithId = { ...row, id: row.id || row.ID }
+    Object.assign(formData, rowDataWithId)
+    
     // 尝试将sourceDescription映射到problemDescription
     if (row.sourceDescription && !formData.problemDescription) {
       formData.problemDescription = row.sourceDescription
@@ -1076,18 +1517,22 @@ const handleSave = async (formDataFromDialog) => {
     // 使用从对话框传递过来的表单数据，如果没有则使用当前formData
     const dataToSave = formDataFromDialog || formData
     
+    // 确保ID字段存在且有效
+    const recordId = dataToSave.id || formData.id
+    
+    if (!recordId) {
+      ElMessage.error('记录ID缺失，无法保存')
+      return
+    }
+    
     // 修复字段映射问题：将employeeName映射为personName传递给后端
     const apiData = {
       ...dataToSave,
+      id: recordId, // 确保ID字段存在
       personName: dataToSave.employeeName || dataToSave.personName // 确保personName字段存在
     }
     
-    // 添加调试日志
-    console.log('保存操作 - 原始表单数据:', dataToSave)
-    console.log('保存操作 - 映射后API数据:', apiData)
-    console.log('保存操作 - personName字段值:', apiData.personName)
-    
-    const response = await assessmentApi.updateAssessmentRecord(apiData.id, apiData)
+    const response = await assessmentApi.updateAssessmentRecord(recordId, apiData)
     
     if (response.data.success) {
       ElMessage.success('保存成功')
@@ -1158,13 +1603,12 @@ const handleBatchReturn = async () => {
 // 查看投诉详情
 const viewComplaint = (complaintId) => {
   // TODO: 跳转到投诉详情页面
-  console.log('查看投诉详情：', complaintId)
 }
 
 // 查看历史记录
 const handleViewHistory = (row) => {
-  // TODO: 显示历史记录对话框
-  console.log('查看历史记录：', row)
+  currentRecordId.value = row.id
+  historyDialogVisible.value = true
 }
 
 // 表格选择变化
@@ -1522,6 +1966,7 @@ const getSourceLabel = (sourceType) => {
 
 :deep(.el-table th) {
   padding: 8px 0 !important;
+  background-color: #f5f7fa !important;
 }
 
 /* 表格内容居中样式 */
@@ -1606,8 +2051,21 @@ const getSourceLabel = (sourceType) => {
   font-weight: normal !important;
 }
 
-:deep(.el-table-column--selection .cell) {
+/* 表格选择列复选框居中 - 仅针对表格 */
+:deep(.el-table .el-table-column--selection .cell) {
   text-align: center !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 !important;
+}
+
+:deep(.el-table .el-table-column--selection .el-checkbox) {
+  margin: 0 !important;
+}
+
+:deep(.el-table .el-table-column--selection .el-checkbox__input) {
+  margin: 0 auto  !important;
 }
 
 /* MessageBox 列设置样式 */
@@ -1643,191 +2101,222 @@ const getSourceLabel = (sourceType) => {
   cursor: not-allowed !important;
 }
 
-/* 穿梭框样式优化 */
-:deep(.el-transfer) {
+/* 列设置对话框样式 */
+.column-settings-container {
+  padding: 10px 0;
+}
+
+.column-settings-header {
+  margin-bottom: 20px;
+}
+
+.header-info {
   display: flex;
-  align-items: flex-start;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
 }
 
-:deep(.el-transfer-panel) {
-  width: 300px;
-  height: 400px;
+.info-text {
+  color: #6c757d;
+  font-size: 14px;
 }
 
-:deep(.el-transfer-panel__header) {
+.selected-count {
+  color: #409eff;
+  font-weight: 500;
+  font-size: 14px;
+}
+
+.column-settings-content {
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  background-color: #fff;
+}
+
+.column-list-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
   background-color: #f5f7fa;
   border-bottom: 1px solid #e4e7ed;
-  padding: 12px 15px;
-  font-weight: 500;
 }
 
-:deep(.el-transfer-panel__body) {
-  height: 320px;
+.filter-input {
+  display: flex;
+  align-items: center;
 }
 
-:deep(.el-transfer-panel__filter) {
-  padding: 15px;
-  border-bottom: 1px solid #e4e7ed;
-}
-
-:deep(.el-transfer-panel__list) {
-  height: 240px;
+.draggable-column-list {
+  max-height: 250px;
   overflow-y: auto;
 }
 
-:deep(.el-transfer-panel__item) {
-  padding: 8px 15px;
+.column-item {
   border-bottom: 1px solid #f0f0f0;
-  transition: background-color 0.3s;
+  transition: all 0.3s ease;
+  cursor: move;
+}
+
+.column-item:hover {
+  background-color: #f8f9fa;
+}
+
+.column-item:last-child {
+  border-bottom: none;
+}
+
+.column-item.column-disabled {
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.column-item-content {
   display: flex;
   align-items: center;
-  min-height: 40px;
+  padding: 8px 16px;
+  gap: 12px;
 }
 
-:deep(.el-transfer-panel__item) {
-  display: flex !important;
-  align-items: center !important;
-  padding: 8px 15px !important;
-  min-height: 32px !important;
-  border: none !important;
-  border-bottom: none !important;
-}
-
-:deep(.el-transfer-panel__list) {
-  border: none !important;
-}
-
-:deep(.el-transfer-panel) {
-  border: 1px solid #dcdfe6 !important;
-}
-
-:deep(.el-transfer-panel__item .el-checkbox) {
-  display: flex !important;
-  align-items: center !important;
-  margin-right: 12px !important;
-  flex-shrink: 0 !important;
-}
-
-:deep(.el-checkbox__inner) {
-  position: static !important;
-  top: auto !important;
-  left: auto !important;
-  transform: none !important;
-  margin: 0 !important;
-}
-
-:deep(.el-transfer-panel__item .el-checkbox__label) {
+.drag-handle {
+  color: #909399;
+  cursor: move;
   display: flex;
   align-items: center;
-  line-height: 1.7;
+  font-size: 16px;
 }
 
-:deep(.el-transfer-panel__item:hover) {
-  background-color: #f5f7fa;
+.column-item.column-disabled .drag-handle {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
-:deep(.el-transfer-panel__item.is-disabled) {
-  background-color: #f9f9f9;
-  color: #c0c4cc;
-}
-
-:deep(.el-transfer-panel__item.is-disabled .el-checkbox__label) {
-  color: #c0c4cc;
-}
-
-/* 已选列表项的勾选状态显示 - 强制覆盖Element Plus默认样式 */
-:deep(.el-checkbox.is-checked .el-checkbox__inner) {
-  background-color: #409eff !important;
-  border-color: #409eff !important;
-}
-
-:deep(.el-checkbox.is-checked .el-checkbox__inner::after) {
-  content: "" !important;
-  position: absolute !important;
-  left: 4px !important;
-  top: 1px !important;
-  width: 3px !important;
-  height: 7px !important;
-  border: 2px solid #fff !important;
-  border-left: 0 !important;
-  border-top: 0 !important;
-  transform: rotate(45deg) scaleY(1) !important;
-  display: block !important;
-  box-sizing: content-box !important;
-}
-
-/* 强制覆盖已选列表中禁用项的样式 */
-:deep(.el-transfer-panel__item.is-disabled .el-checkbox) {
-  opacity: 1 !important;
-}
-
-:deep(.el-transfer-panel__item.is-disabled .el-checkbox.is-checked .el-checkbox__inner) {
-  background-color: #409eff !important;
-  border-color: #409eff !important;
-  opacity: 1 !important;
-}
-
-:deep(.el-transfer-panel__item.is-disabled .el-checkbox.is-checked .el-checkbox__inner::after) {
-  content: "" !important;
-  position: absolute !important;
-  left: 4px !important;
-  top: 1px !important;
-  width: 3px !important;
-  height: 7px !important;
-  border: 2px solid #fff !important;
-  border-left: 0 !important;
-  border-top: 0 !important;
-  transform: rotate(45deg) scaleY(1) !important;
-  display: block !important;
-  box-sizing: content-box !important;
-}
-
-/* 确保已选列表中的复选框始终显示为勾选状态 */
-:deep(.el-transfer-panel:last-child .el-checkbox__inner) {
-  background-color: #409eff !important;
-  border-color: #409eff !important;
-}
-
-:deep(.el-transfer-panel:last-child .el-checkbox__inner::after) {
-  content: "" !important;
-  position: absolute !important;
-  left: 4px !important;
-  top: 1px !important;
-  width: 3px !important;
-  height: 7px !important;
-  border: 2px solid #fff !important;
-  border-left: 0 !important;
-  border-top: 0 !important;
-  transform: rotate(45deg) scaleY(1) !important;
-  display: block !important;
-  box-sizing: content-box !important;
-}
-
-:deep(.el-transfer__buttons) {
-  padding: 0 20px;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  gap: 10px;
-  height: 400px;
-}
-
-:deep(.el-transfer__button) {
-  width: 80px;
-  height: 32px;
-  border-radius: 6px;
+.required-tag {
+  color: #f56c6c;
   font-size: 12px;
+  margin-left: 4px;
+}
+
+:deep(.el-checkbox) {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+:deep(.el-checkbox__label) {
+  font-size: 14px;
+  color: #303133;
+  line-height: 1.4;
+}
+
+:deep(.el-checkbox__input.is-disabled .el-checkbox__inner) {
+  background-color: #f5f7fa;
+  border-color: #e4e7ed;
+  cursor: not-allowed;
+}
+
+:deep(.el-checkbox__input.is-disabled + .el-checkbox__label) {
+  color: #c0c4cc;
+  cursor: not-allowed;
+}
+
+/* 导出确认对话框样式优化 */
+:deep(.export-confirm-dialog) {
+  border-radius: 12px;
+  box-shadow: 0 12px 32px 4px rgba(0, 0, 0, 0.12), 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.export-confirm-dialog .el-message-box__header) {
+  padding: 20px 24px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+:deep(.export-confirm-dialog .el-message-box__title) {
+  font-size: 18px;
+  font-weight: 600;
+  color: #303133;
+  display: flex;
+  align-items: center;
+}
+
+:deep(.export-confirm-dialog .el-message-box__content) {
+  padding: 20px 24px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+:deep(.export-confirm-dialog .el-message-box__message) {
   margin: 0;
+  line-height: 1.6;
 }
 
-/* 对话框样式 */
-:deep(.el-dialog__body) {
-  padding: 20px;
+:deep(.export-confirm-dialog .el-message-box__btns) {
+  padding: 16px 24px 20px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
 }
 
-:deep(.el-dialog__footer) {
-  padding: 15px 20px;
-  border-top: 1px solid #e4e7ed;
+:deep(.export-confirm-dialog .el-button) {
+  min-width: 80px;
+  height: 36px;
+  border-radius: 6px;
+  font-weight: 500;
+}
+
+:deep(.export-confirm-dialog .el-button--primary) {
+  background: linear-gradient(135deg, #409eff 0%, #3a8ee6 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+  transition: all 0.3s ease;
+}
+
+:deep(.export-confirm-dialog .el-button--primary:hover) {
+  background: linear-gradient(135deg, #3a8ee6 0%, #337ecc 100%);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+:deep(.export-confirm-dialog .el-button--default) {
+  background: #ffffff;
+  border: 1px solid #dcdfe6;
+  color: #606266;
+  transition: all 0.3s ease;
+}
+
+:deep(.export-confirm-dialog .el-button--default:hover) {
+  background: #f5f7fa;
+  border-color: #c0c4cc;
+  color: #409eff;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  :deep(.export-confirm-dialog) {
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 0 auto;
+  }
+  
+  :deep(.export-confirm-dialog .el-message-box__header),
+  :deep(.export-confirm-dialog .el-message-box__content),
+  :deep(.export-confirm-dialog .el-message-box__btns) {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  
+  :deep(.export-confirm-dialog .el-message-box__btns) {
+    flex-direction: column-reverse;
+  }
+  
+  :deep(.export-confirm-dialog .el-button) {
+    width: 100%;
+    margin: 0;
+  }
 }
 </style>

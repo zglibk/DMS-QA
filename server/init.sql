@@ -3449,11 +3449,15 @@ BEGIN
         [AssessmentAmount] DECIMAL(10,2) NOT NULL,             -- 考核金额
         [AssessmentDate] DATE NOT NULL,                        -- 考核日期（投诉/返工/异常发生日期）
         
+        -- 部门关联字段
+        [DepartmentID] INT NULL,                               -- 部门ID，关联Department表
+        [DepartmentName] NVARCHAR(50) NULL,                    -- 部门名称（冗余字段，便于查询显示）
+        
         -- 计算字段：考核月份（格式：202501）
         [AssessmentMonth] AS (YEAR(AssessmentDate) * 100 + MONTH(AssessmentDate)),
         
         -- 状态管理字段
-        [Status] NVARCHAR(20) DEFAULT 'pending',               -- 状态：pending/improving/returned/confirmed
+        [Status] NVARCHAR(20) DEFAULT 'pending',               -- 状态：pending/improving/returned/confirmed/exempt
         [IsReturned] BIT DEFAULT 0,                            -- 是否已返还
         [ReturnDate] DATE NULL,                                -- 返还日期
         [ReturnAmount] DECIMAL(10,2) NULL,                     -- 返还金额
@@ -3474,7 +3478,11 @@ BEGIN
         CONSTRAINT CK_AssessmentRecords_SourceType 
             CHECK (SourceType IN ('complaint', 'rework', 'exception')),
         CONSTRAINT CK_AssessmentRecords_Status 
-            CHECK (Status IN ('pending', 'improving', 'returned', 'confirmed'))
+            CHECK (Status IN ('pending', 'improving', 'returned', 'confirmed', 'exempt')),
+        
+        -- 外键约束
+        CONSTRAINT FK_AssessmentRecords_Department
+            FOREIGN KEY (DepartmentID) REFERENCES [dbo].[Department](ID)
     );
     
     -- 创建性能优化索引
@@ -3484,6 +3492,7 @@ BEGIN
     CREATE INDEX IX_AssessmentRecords_Status ON AssessmentRecords (Status);
     CREATE INDEX IX_AssessmentRecords_IsReturned ON AssessmentRecords (IsReturned);
     CREATE INDEX IX_AssessmentRecords_SourceType ON AssessmentRecords (SourceType);
+    CREATE INDEX IX_AssessmentRecords_DepartmentID ON AssessmentRecords (DepartmentID);
     
     PRINT '✅ 考核记录表 (AssessmentRecords) 创建成功';
 END
@@ -3608,11 +3617,12 @@ BEGIN
     PRINT '⚠️ 考核统计视图 (V_AssessmentStatistics) 已存在，跳过创建';
 END
 
--- 创建生成考核记录的存储过程（更新版本）
--- 功能：从投诉记录、返工记录、异常记录中生成考核记录
--- 更新内容：修复字段映射、约束值、支持多数据源
+/* 创建生成考核记录的存储过程（更新版本） */
+/* 功能：从投诉记录、返工记录、异常记录中生成考核记录 */
+/* 更新内容：修复字段映射、约束值、支持多数据源 */
 IF OBJECT_ID('SP_GenerateAssessmentRecords', 'P') IS NOT NULL
     DROP PROCEDURE SP_GenerateAssessmentRecords;
+GO
 
 CREATE PROCEDURE [dbo].[SP_GenerateAssessmentRecords]
 AS
@@ -3621,11 +3631,10 @@ BEGIN
     
     DECLARE @GeneratedCount INT = 0;
     
-    -- 生成主责人考核记录（来源：投诉记录）
+    /* 生成主责人考核记录（来源：投诉记录） */
     INSERT INTO AssessmentRecords (
         ComplaintID, PersonName, PersonType, AssessmentAmount, AssessmentDate, 
-        ResponsibilityType, ComplaintNumber, CustomerCode, 
-        ProductName, ProblemDescription, Status, CreatedBy, CreatedAt
+        DepartmentID, DepartmentName, SourceType, Status, CreatedBy, CreatedAt
     )
     SELECT 
         cr.ID,
@@ -3633,30 +3642,30 @@ BEGIN
         'MainPerson',
         cr.MainPersonAssessment,
         cr.Date,
-        'direct',  -- 使用符合约束的值
-        cr.OrderNo,  -- 使用OrderNo作为投诉编号
-        cr.Customer,  -- 使用Customer作为客户代码
-        cr.ProductName,
-        cr.DefectiveDescription,  -- 使用DefectiveDescription作为问题描述
-        'pending',  -- 设置默认状态
+        /* 通过Person表获取部门信息 */
+        p.DepartmentID,
+        d.Name,
+        'complaint',
+        'pending',
         'System',
         GETDATE()
     FROM ComplaintRegister cr
+    LEFT JOIN Person p ON cr.MainPerson = p.Name
+    LEFT JOIN Department d ON p.DepartmentID = d.ID
     WHERE cr.MainPerson IS NOT NULL 
       AND cr.MainPersonAssessment IS NOT NULL
       AND cr.MainPersonAssessment > 0
       AND NOT EXISTS (
           SELECT 1 FROM AssessmentRecords ar 
-          WHERE ar.ComplaintID = cr.ID AND ar.PersonType = 'MainPerson'
+          WHERE ar.ComplaintID = cr.ID AND ar.PersonType = 'MainPerson' AND ar.SourceType = 'complaint'
       );
     
     SET @GeneratedCount = @GeneratedCount + @@ROWCOUNT;
     
-    -- 生成次责人考核记录（来源：投诉记录）
+    /* 生成次责人考核记录（来源：投诉记录） */
     INSERT INTO AssessmentRecords (
         ComplaintID, PersonName, PersonType, AssessmentAmount, AssessmentDate, 
-        ResponsibilityType, ComplaintNumber, CustomerCode, 
-        ProductName, ProblemDescription, Status, CreatedBy, CreatedAt
+        DepartmentID, DepartmentName, SourceType, Status, CreatedBy, CreatedAt
     )
     SELECT 
         cr.ID,
@@ -3664,30 +3673,30 @@ BEGIN
         'SecondPerson',
         cr.SecondPersonAssessment,
         cr.Date,
-        'joint',  -- 使用符合约束的值
-        cr.OrderNo,
-        cr.Customer,
-        cr.ProductName,
-        cr.DefectiveDescription,
-        'pending',  -- 设置默认状态
+        /* 通过Person表获取部门信息 */
+        p.DepartmentID,
+        d.Name,
+        'complaint',
+        'pending',
         'System',
         GETDATE()
     FROM ComplaintRegister cr
+    LEFT JOIN Person p ON cr.SecondPerson = p.Name
+    LEFT JOIN Department d ON p.DepartmentID = d.ID
     WHERE cr.SecondPerson IS NOT NULL 
       AND cr.SecondPersonAssessment IS NOT NULL
       AND cr.SecondPersonAssessment > 0
       AND NOT EXISTS (
           SELECT 1 FROM AssessmentRecords ar 
-          WHERE ar.ComplaintID = cr.ID AND ar.PersonType = 'SecondPerson'
+          WHERE ar.ComplaintID = cr.ID AND ar.PersonType = 'SecondPerson' AND ar.SourceType = 'complaint'
       );
     
     SET @GeneratedCount = @GeneratedCount + @@ROWCOUNT;
     
-    -- 生成管理者考核记录（来源：投诉记录）
+    /* 生成管理者考核记录（来源：投诉记录） */
     INSERT INTO AssessmentRecords (
         ComplaintID, PersonName, PersonType, AssessmentAmount, AssessmentDate, 
-        ResponsibilityType, ComplaintNumber, CustomerCode, 
-        ProductName, ProblemDescription, Status, CreatedBy, CreatedAt
+        DepartmentID, DepartmentName, SourceType, Status, CreatedBy, CreatedAt
     )
     SELECT 
         cr.ID,
@@ -3695,79 +3704,78 @@ BEGIN
         'Manager',
         cr.ManagerAssessment,
         cr.Date,
-        'management',  -- 使用符合约束的值
-        cr.OrderNo,
-        cr.Customer,
-        cr.ProductName,
-        cr.DefectiveDescription,
-        'pending',  -- 设置默认状态
+        /* 通过Person表获取部门信息 */
+        p.DepartmentID,
+        d.Name,
+        'complaint',
+        'pending',
         'System',
         GETDATE()
     FROM ComplaintRegister cr
+    LEFT JOIN Person p ON cr.Manager = p.Name
+    LEFT JOIN Department d ON p.DepartmentID = d.ID
     WHERE cr.Manager IS NOT NULL 
       AND cr.ManagerAssessment IS NOT NULL
       AND cr.ManagerAssessment > 0
       AND NOT EXISTS (
           SELECT 1 FROM AssessmentRecords ar 
-          WHERE ar.ComplaintID = cr.ID AND ar.PersonType = 'Manager'
+          WHERE ar.ComplaintID = cr.ID AND ar.PersonType = 'Manager' AND ar.SourceType = 'complaint'
       );
     
     SET @GeneratedCount = @GeneratedCount + @@ROWCOUNT;
     
-    -- 生成主责人考核记录（来源：返工记录）
-    -- 注意：ProductionReworkRegister表使用ResponsiblePerson字段，没有MainPerson字段
+    /* 生成主责人考核记录（来源：返工记录） */
     INSERT INTO AssessmentRecords (
         ComplaintID, PersonName, PersonType, AssessmentAmount, AssessmentDate, 
-        ResponsibilityType, ComplaintNumber, CustomerCode, 
-        ProductName, ProblemDescription, Status, CreatedBy, CreatedAt
+        DepartmentID, DepartmentName, SourceType, Status, CreatedBy, CreatedAt
     )
     SELECT 
-        prr.ID,  -- 使用ComplaintID字段存储返工记录ID
-        prr.ResponsiblePerson,  -- 使用ResponsiblePerson字段
-        'ReworkMainPerson',  -- 使用不同的PersonType来区分来源
-        prr.TotalCost,  -- 使用TotalCost作为考核金额
+        prr.ID,
+        prr.ResponsiblePerson,
+        'MainPerson',
+        prr.TotalCost,
         prr.ReworkDate,
-        'direct',  -- 使用符合约束的值
-        prr.OrderNo,  -- 使用OrderNo作为返工编号
-        prr.CustomerCode,
-        prr.ProductName,
-        prr.DefectiveDescription,  -- 使用DefectiveDescription作为问题描述
-        'pending',  -- 设置默认状态
+        /* 通过Person表获取部门信息 */
+        p.DepartmentID,
+        d.Name,
+        'rework',
+        'pending',
         'System',
         GETDATE()
     FROM ProductionReworkRegister prr
+    LEFT JOIN Person p ON prr.ResponsiblePerson = p.Name
+    LEFT JOIN Department d ON p.DepartmentID = d.ID
     WHERE prr.ResponsiblePerson IS NOT NULL 
       AND prr.TotalCost IS NOT NULL
       AND prr.TotalCost > 0
       AND NOT EXISTS (
           SELECT 1 FROM AssessmentRecords ar 
-          WHERE ar.ComplaintID = prr.ID AND ar.PersonType = 'ReworkMainPerson'
+          WHERE ar.ComplaintID = prr.ID AND ar.PersonType = 'MainPerson' AND ar.SourceType = 'rework'
       );
     
     SET @GeneratedCount = @GeneratedCount + @@ROWCOUNT;
     
-    -- 生成主责人考核记录（来源：异常记录）
-    -- 注意：publishing_exceptions表的字段名为小写下划线格式
+    /* 生成主责人考核记录（来源：异常记录） */
     INSERT INTO AssessmentRecords (
         ComplaintID, PersonName, PersonType, AssessmentAmount, AssessmentDate, 
-        ResponsibilityType, ComplaintNumber, CustomerCode, 
-        ProductName, ProblemDescription, Status, CreatedBy, CreatedAt
+        DepartmentID, DepartmentName, SourceType, Status, CreatedBy, CreatedAt
     )
     SELECT 
-        pe.id,  -- 使用ComplaintID字段存储异常记录ID
-        pe.responsible_person,  -- 使用responsible_person字段
-        'ExceptionMainPerson',  -- 使用不同的PersonType来区分来源
-        ISNULL(pe.unit_price * pe.area_cm2 / 10000, 0),  -- 计算考核金额：单价 * 面积(转换为平方米)
+        pe.id,
+        pe.responsible_person,
+        'MainPerson',
+        ISNULL(pe.unit_price * pe.area_cm2 / 10000, 0),
         pe.registration_date,
-        'direct',  -- 使用符合约束的值
-        pe.work_order_number,  -- 使用work_order_number作为异常编号
-        pe.customer_code,
-        pe.product_name,
-        pe.exception_description,  -- 使用exception_description作为问题描述
-        'pending',  -- 设置默认状态
+        /* 通过Person表获取部门信息 */
+        p.DepartmentID,
+        d.Name,
+        'exception',
+        'pending',
         'System',
         GETDATE()
     FROM publishing_exceptions pe
+    LEFT JOIN Person p ON pe.responsible_person = p.Name
+    LEFT JOIN Department d ON p.DepartmentID = d.ID
     WHERE pe.responsible_person IS NOT NULL 
       AND pe.unit_price IS NOT NULL
       AND pe.area_cm2 IS NOT NULL
@@ -3775,16 +3783,17 @@ BEGIN
       AND pe.area_cm2 > 0
       AND NOT EXISTS (
           SELECT 1 FROM AssessmentRecords ar 
-          WHERE ar.ComplaintID = pe.id AND ar.PersonType = 'ExceptionMainPerson'
+          WHERE ar.ComplaintID = pe.id AND ar.PersonType = 'MainPerson' AND ar.SourceType = 'exception'
       );
     
     SET @GeneratedCount = @GeneratedCount + @@ROWCOUNT;
     
-    -- 返回生成的记录数量
+    /* 返回生成的记录数量 */
     SELECT @GeneratedCount as GeneratedCount;
 END
+GO
 
-PRINT '✅ 生成考核记录存储过程 (SP_GenerateAssessmentRecords) 创建成功';
+PRINT '✅ 生成考核记录存储过程 (SP_GenerateAssessmentRecords) 更新完成';
 
 -- 创建处理改善期返还的存储过程
 IF NOT EXISTS (SELECT * FROM sys.procedures WHERE name = 'SP_ProcessImprovementReturns')

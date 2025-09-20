@@ -10,7 +10,7 @@ const { getConnection } = require('../db');
  */
 async function checkAssessmentMenuPaths() {
   try {
-    console.log('=== 查询考核记录管理菜单路径配置 ===');
+    // 查询考核记录管理菜单路径配置
     
     // 获取数据库连接
     const pool = await getConnection();
@@ -28,16 +28,10 @@ async function checkAssessmentMenuPaths() {
       ORDER BY ParentID, SortOrder
     `);
     
-    console.log('\n考核记录管理菜单配置：');
+    // 考核记录管理菜单配置
     console.table(result.recordset);
     
-    // 检查路径格式
-    console.log('\n路径分析：');
-    result.recordset.forEach(menu => {
-      console.log(`${menu.MenuName}: ${menu.Path}`);
-    });
-    
-    console.log('\n=== 查询完成 ===');
+    // 查询完成
     
   } catch (error) {
     console.error('查询失败:', error.message);

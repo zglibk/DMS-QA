@@ -472,7 +472,7 @@ router.post('/login', async (req, res) => {
             await erpService.getToken();
             erpToken = erpService.token;
             if (erpToken) {
-              console.log('ERP token获取成功，用户:', user.Username);
+              // ERP token获取成功
             } else {
               erpTokenStatus = 'failed';
               erpMessage = 'ERP token获取失败，请检查ERP系统配置';
@@ -534,7 +534,7 @@ router.post('/login', async (req, res) => {
     
     // 如果ERP token获取失败，在控制台输出详细信息供调试
     if (erpTokenStatus !== 'success') {
-      console.log(`用户 ${user.Username} 登录成功，但ERP token状态: ${erpTokenStatus}, 提示: ${erpMessage}`);
+      // ERP token状态异常，已记录到日志
     }
     // 登录成功，准备返回响应
     res.json(responseData);

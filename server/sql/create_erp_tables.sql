@@ -19,12 +19,6 @@ BEGIN
     CREATE INDEX idx_batch_date ON erp_production_data (batch_number, production_date);
     CREATE INDEX idx_production_date ON erp_production_data (production_date);
     CREATE INDEX idx_product_line ON erp_production_data (product_line);
-    
-    PRINT 'ERP生产数据表创建成功';
-END
-ELSE
-BEGIN
-    PRINT 'ERP生产数据表已存在';
 END
 GO
 
@@ -46,12 +40,6 @@ BEGIN
     CREATE INDEX idx_delivery_date ON erp_delivery_data (delivery_date);
     CREATE INDEX idx_customer_code ON erp_delivery_data (customer_code);
     CREATE INDEX idx_delivery_number ON erp_delivery_data (delivery_number);
-    
-    PRINT 'ERP交付数据表创建成功';
-END
-ELSE
-BEGIN
-    PRINT 'ERP交付数据表已存在';
 END
 GO
 
@@ -69,12 +57,6 @@ BEGIN
     -- 创建索引
     CREATE INDEX idx_metric_name ON quality_metrics (metric_name);
     CREATE INDEX idx_calculation_date ON quality_metrics (calculation_date);
-    
-    PRINT '质量指标表创建成功';
-END
-ELSE
-BEGIN
-    PRINT '质量指标表已存在';
 END
 GO
 
@@ -97,122 +79,168 @@ BEGIN
     CREATE INDEX idx_sync_id ON erp_sync_logs (sync_id);
     CREATE INDEX idx_start_time ON erp_sync_logs (start_time);
     CREATE INDEX idx_status ON erp_sync_logs (status);
-    
-    PRINT 'ERP同步日志表创建成功';
-END
-ELSE
-BEGIN
-    PRINT 'ERP同步日志表已存在';
 END
 GO
 
--- 5. ERP配置表
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='erp_config' AND xtype='U')
+-- 5. 成本计算表
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='cost_calculations' AND xtype='U')
 BEGIN
-    CREATE TABLE erp_config (
+    CREATE TABLE cost_calculations (
         id INT IDENTITY(1,1) PRIMARY KEY,
-        config_key NVARCHAR(50) NOT NULL UNIQUE, -- 配置键
-        config_value NVARCHAR(500), -- 配置值
-        description NVARCHAR(200), -- 配置描述
+        calculation_id NVARCHAR(50) NOT NULL, -- 计算ID
+        calculation_date DATE NOT NULL, -- 计算日期
+        total_cost DECIMAL(15,2) DEFAULT 0, -- 总成本
+        material_cost DECIMAL(15,2) DEFAULT 0, -- 材料成本
+        labor_cost DECIMAL(15,2) DEFAULT 0, -- 人工成本
+        overhead_cost DECIMAL(15,2) DEFAULT 0, -- 管理费用
+        quality_cost DECIMAL(15,2) DEFAULT 0, -- 质量成本
         created_at DATETIME DEFAULT GETDATE(), -- 创建时间
         updated_at DATETIME DEFAULT GETDATE() -- 更新时间
     );
     
     -- 创建索引
-    CREATE INDEX idx_config_key ON erp_config (config_key);
-    
-    PRINT 'ERP配置表创建成功';
-END
-ELSE
-BEGIN
-    PRINT 'ERP配置表已存在';
+    CREATE INDEX idx_calculation_date ON cost_calculations (calculation_date);
+    CREATE INDEX idx_calculation_id ON cost_calculations (calculation_id);
 END
 GO
 
--- 插入默认配置数据
-IF NOT EXISTS (SELECT * FROM erp_config WHERE config_key = 'sync_enabled')
+-- 6. 工作计划表
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='work_plans' AND xtype='U')
 BEGIN
-    INSERT INTO erp_config (config_key, config_value, description) VALUES
-    ('sync_enabled', 'true', '是否启用自动同步'),
-    ('sync_interval', '0 */1 * * *', '同步间隔(cron表达式)'),
-    ('sync_time_range', '24', '同步时间范围(小时)'),
-    ('erp_api_url', 'http://api.xinyueerp.com', 'ERP系统API地址'),
-    ('erp_app_id', 'your_app_id', 'ERP系统应用ID'),
-    ('erp_app_secret', 'your_app_secret', 'ERP系统应用密钥');
+    CREATE TABLE work_plans (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        plan_id NVARCHAR(50) NOT NULL, -- 计划ID
+        plan_name NVARCHAR(200) NOT NULL, -- 计划名称
+        plan_type NVARCHAR(50), -- 计划类型
+        start_date DATE, -- 开始日期
+        end_date DATE, -- 结束日期
+        status NVARCHAR(20) DEFAULT 'pending', -- 状态
+        assigned_to NVARCHAR(100), -- 分配给
+        description NTEXT, -- 描述
+        created_at DATETIME DEFAULT GETDATE(), -- 创建时间
+        updated_at DATETIME DEFAULT GETDATE() -- 更新时间
+    );
     
-    PRINT '默认ERP配置数据插入成功';
-END
-ELSE
-BEGIN
-    PRINT 'ERP配置数据已存在';
+    -- 创建索引
+    CREATE INDEX idx_plan_id ON work_plans (plan_id);
+    CREATE INDEX idx_start_date ON work_plans (start_date);
+    CREATE INDEX idx_status ON work_plans (status);
+    CREATE INDEX idx_assigned_to ON work_plans (assigned_to);
 END
 GO
 
--- 创建视图：客户投诉率统计
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='v_complaint_rate_stats' AND xtype='V')
+-- 7. 质量检查记录表
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='quality_checks' AND xtype='U')
 BEGIN
-    EXEC('CREATE VIEW v_complaint_rate_stats AS
-    SELECT 
-        CONVERT(DATE, d.delivery_date) as stat_date,
-        COUNT(d.id) as total_deliveries,
-        SUM(d.quantity) as total_quantity,
-        COUNT(c.id) as total_complaints,
-        CASE 
-            WHEN COUNT(d.id) > 0 THEN CAST(COUNT(c.id) * 100.0 / COUNT(d.id) AS DECIMAL(10,2))
-            ELSE 0 
-        END as complaint_rate
-    FROM erp_delivery_data d
-    LEFT JOIN CustomerComplaints c ON CONVERT(DATE, d.delivery_date) = CONVERT(DATE, c.Date)
-    WHERE d.delivery_date >= DATEADD(day, -30, GETDATE())
-    GROUP BY CONVERT(DATE, d.delivery_date)');
+    CREATE TABLE quality_checks (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        check_id NVARCHAR(50) NOT NULL, -- 检查ID
+        batch_number NVARCHAR(50), -- 批次号
+        check_date DATE NOT NULL, -- 检查日期
+        check_type NVARCHAR(50), -- 检查类型
+        check_result NVARCHAR(20), -- 检查结果
+        defect_count INT DEFAULT 0, -- 缺陷数量
+        inspector NVARCHAR(100), -- 检查员
+        notes NTEXT, -- 备注
+        created_at DATETIME DEFAULT GETDATE() -- 创建时间
+    );
     
-    PRINT '客户投诉率统计视图创建成功';
-END
-ELSE
-BEGIN
-    PRINT '客户投诉率统计视图已存在';
+    -- 创建索引
+    CREATE INDEX idx_check_id ON quality_checks (check_id);
+    CREATE INDEX idx_batch_number ON quality_checks (batch_number);
+    CREATE INDEX idx_check_date ON quality_checks (check_date);
+    CREATE INDEX idx_check_result ON quality_checks (check_result);
 END
 GO
 
--- 创建存储过程：手动触发ERP数据同步
-IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sp_trigger_erp_sync' AND xtype='P')
+-- 8. 系统配置表
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='system_config' AND xtype='U')
 BEGIN
-    EXEC('CREATE PROCEDURE sp_trigger_erp_sync
-        @sync_types NVARCHAR(200) = ''production,delivery'',
-        @time_range INT = 24
+    CREATE TABLE system_config (
+        id INT IDENTITY(1,1) PRIMARY KEY,
+        config_key NVARCHAR(100) NOT NULL UNIQUE, -- 配置键
+        config_value NVARCHAR(500), -- 配置值
+        config_type NVARCHAR(50) DEFAULT 'string', -- 配置类型
+        description NVARCHAR(200), -- 描述
+        is_active BIT DEFAULT 1, -- 是否激活
+        created_at DATETIME DEFAULT GETDATE(), -- 创建时间
+        updated_at DATETIME DEFAULT GETDATE() -- 更新时间
+    );
+    
+    -- 创建索引
+    CREATE INDEX idx_config_key ON system_config (config_key);
+    CREATE INDEX idx_is_active ON system_config (is_active);
+    
+    -- 插入默认配置
+    INSERT INTO system_config (config_key, config_value, config_type, description) VALUES
+    ('erp_sync_interval', '3600', 'number', 'ERP同步间隔时间(秒)'),
+    ('quality_threshold', '95.0', 'number', '质量合格阈值(%)'),
+    ('cost_calculation_enabled', 'true', 'boolean', '是否启用成本计算'),
+    ('notification_enabled', 'true', 'boolean', '是否启用通知功能'),
+    ('max_sync_retries', '3', 'number', '最大同步重试次数');
+END
+GO
+
+-- 创建存储过程：计算质量指标
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='sp_calculate_quality_metrics' AND xtype='P')
+BEGIN
+    EXEC('
+    CREATE PROCEDURE sp_calculate_quality_metrics
+        @calculation_date DATE = NULL
     AS
     BEGIN
         SET NOCOUNT ON;
         
-        DECLARE @sync_id NVARCHAR(50) = CAST(GETDATE() AS NVARCHAR(50));
-        DECLARE @start_time DATETIME = GETDATE();
+        -- 如果未指定日期，使用当前日期
+        IF @calculation_date IS NULL
+            SET @calculation_date = CAST(GETDATE() AS DATE);
         
-        -- 记录同步开始
-        INSERT INTO erp_sync_logs (sync_id, start_time, status, sync_types)
-        VALUES (@sync_id, @start_time, ''manual_triggered'', @sync_types);
+        -- 计算合格率
+        DECLARE @pass_rate DECIMAL(10,4);
+        SELECT @pass_rate = 
+            CASE 
+                WHEN COUNT(*) = 0 THEN 0
+                ELSE CAST(SUM(CASE WHEN check_result = ''pass'' THEN 1 ELSE 0 END) AS DECIMAL(10,4)) / COUNT(*) * 100
+            END
+        FROM quality_checks 
+        WHERE check_date = @calculation_date;
         
-        -- 返回同步ID供外部程序使用
-        SELECT @sync_id as sync_id, @start_time as start_time;
+        -- 插入或更新质量指标
+        IF EXISTS (SELECT 1 FROM quality_metrics WHERE metric_name = ''pass_rate'' AND calculation_date = @calculation_date)
+        BEGIN
+            UPDATE quality_metrics 
+            SET metric_value = @pass_rate 
+            WHERE metric_name = ''pass_rate'' AND calculation_date = @calculation_date;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO quality_metrics (metric_name, metric_value, calculation_date)
+            VALUES (''pass_rate'', @pass_rate, @calculation_date);
+        END
         
-        PRINT ''手动ERP同步已触发，同步ID: '' + @sync_id;
-    END');
-    
-    PRINT '手动触发ERP同步存储过程创建成功';
-END
-ELSE
-BEGIN
-    PRINT '手动触发ERP同步存储过程已存在';
+        -- 计算缺陷率
+        DECLARE @defect_rate DECIMAL(10,4);
+        SELECT @defect_rate = 
+            CASE 
+                WHEN COUNT(*) = 0 THEN 0
+                ELSE CAST(SUM(defect_count) AS DECIMAL(10,4)) / COUNT(*) 
+            END
+        FROM quality_checks 
+        WHERE check_date = @calculation_date;
+        
+        -- 插入或更新缺陷率指标
+        IF EXISTS (SELECT 1 FROM quality_metrics WHERE metric_name = ''defect_rate'' AND calculation_date = @calculation_date)
+        BEGIN
+            UPDATE quality_metrics 
+            SET metric_value = @defect_rate 
+            WHERE metric_name = ''defect_rate'' AND calculation_date = @calculation_date;
+        END
+        ELSE
+        BEGIN
+            INSERT INTO quality_metrics (metric_name, metric_value, calculation_date)
+            VALUES (''defect_rate'', @defect_rate, @calculation_date);
+        END
+    END
+    ');
 END
 GO
-
-PRINT '===================================';
-PRINT 'ERP系统集成数据表创建完成！';
-PRINT '包含以下表和对象：';
-PRINT '1. erp_production_data - ERP生产数据表';
-PRINT '2. erp_delivery_data - ERP交付数据表';
-PRINT '3. quality_metrics - 质量指标表';
-PRINT '4. erp_sync_logs - ERP同步日志表';
-PRINT '5. erp_config - ERP配置表';
-PRINT '6. v_complaint_rate_stats - 客户投诉率统计视图';
-PRINT '7. sp_trigger_erp_sync - 手动触发同步存储过程';
-PRINT '===================================';

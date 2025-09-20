@@ -452,9 +452,14 @@ const formRules = {
   improvementStartDate: [
     { 
       validator: (rule, value, callback) => {
-        if (props.formData.status === 'improving' && !value) {
-          callback(new Error('改善中状态需要选择开始日期'))
-        } else {
+        try {
+          if (props.formData.status === 'improving' && !value) {
+            callback(new Error('改善中状态需要选择开始日期'))
+          } else {
+            callback()
+          }
+        } catch (error) {
+          console.error('改善开始日期验证错误:', error)
           callback()
         }
       }, 
@@ -464,11 +469,16 @@ const formRules = {
   improvementEndDate: [
     { 
       validator: (rule, value, callback) => {
-        if (props.formData.status === 'improving' && !value) {
-          callback(new Error('改善中状态需要选择结束日期'))
-        } else if (props.formData.status === 'improving' && value && props.formData.improvementStartDate && value <= props.formData.improvementStartDate) {
-          callback(new Error('结束日期必须晚于开始日期'))
-        } else {
+        try {
+          if (props.formData.status === 'improving' && !value) {
+            callback(new Error('改善中状态需要选择结束日期'))
+          } else if (props.formData.status === 'improving' && value && props.formData.improvementStartDate && value <= props.formData.improvementStartDate) {
+            callback(new Error('结束日期必须晚于开始日期'))
+          } else {
+            callback()
+          }
+        } catch (error) {
+          console.error('改善结束日期验证错误:', error)
           callback()
         }
       }, 
@@ -478,9 +488,14 @@ const formRules = {
   returnDate: [
     { 
       validator: (rule, value, callback) => {
-        if (props.formData.status === 'returned' && !value) {
-          callback(new Error('已返还状态需要选择返还日期'))
-        } else {
+        try {
+          if (props.formData.status === 'returned' && !value) {
+            callback(new Error('已返还状态需要选择返还日期'))
+          } else {
+            callback()
+          }
+        } catch (error) {
+          console.error('返还日期验证错误:', error)
           callback()
         }
       }, 
@@ -490,11 +505,16 @@ const formRules = {
   returnAmount: [
     { 
       validator: (rule, value, callback) => {
-        if (props.formData.status === 'returned' && (!value || value <= 0)) {
-          callback(new Error('已返还状态需要输入返还金额'))
-        } else if (props.formData.status === 'returned' && value > props.formData.assessmentAmount) {
-          callback(new Error('返还金额不能超过考核金额'))
-        } else {
+        try {
+          if (props.formData.status === 'returned' && (!value || value <= 0)) {
+            callback(new Error('已返还状态需要输入返还金额'))
+          } else if (props.formData.status === 'returned' && value > props.formData.assessmentAmount) {
+            callback(new Error('返还金额不能超过考核金额'))
+          } else {
+            callback()
+          }
+        } catch (error) {
+          console.error('返还金额验证错误:', error)
           callback()
         }
       }, 
@@ -650,10 +670,20 @@ const findDepartmentIdByName = (departments, targetName) => {
  */
 const handleSave = async () => {
   try {
-    await formRef.value.validate()
-    emit('save', props.formData)
+    // 清除之前的验证错误
+    formRef.value.clearValidate()
+    
+    // 执行表单验证
+    const isValid = await formRef.value.validate().catch(() => false)
+    
+    if (isValid) {
+      emit('save', props.formData)
+    } else {
+      ElMessage.error('请检查表单输入')
+    }
   } catch (error) {
-    ElMessage.error('请检查表单输入')
+    console.error('表单验证错误:', error)
+    ElMessage.error('表单验证失败，请检查输入')
   }
 }
 

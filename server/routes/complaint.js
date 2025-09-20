@@ -5,10 +5,7 @@ const { authenticateToken } = require('../middleware/auth');
 
 // 添加请求日志中间件
 router.use((req, res, next) => {
-  console.log(`=== Complaint路由收到请求 ===`);
-  console.log(`方法: ${req.method}`);
-  console.log(`路径: ${req.path}`);
-  console.log(`完整URL: ${req.originalUrl}`);
+  // 请求路由处理
   next();
 });
 

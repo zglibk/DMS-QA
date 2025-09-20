@@ -48,7 +48,7 @@ class LogCleanupService {
    * 启动日志清理服务
    */
   start() {
-    console.log('🧹 启动日志自动清理服务...');
+    // 启动日志自动清理服务
     
     // 设置定时任务
     cron.schedule(CLEANUP_CONFIG.cronSchedule, async () => {
@@ -58,7 +58,7 @@ class LogCleanupService {
       timezone: 'Asia/Shanghai'
     });
     
-    console.log(`✅ 日志清理服务已启动，将在每天凌晨2点执行清理任务`);
+    // 日志清理服务已启动，将在每天凌晨2点执行清理任务
     
     // 启动时执行一次清理（可选）
     // this.performCleanup();
@@ -400,7 +400,7 @@ class LogCleanupService {
    */
   updateConfig(newConfig) {
     Object.assign(CLEANUP_CONFIG, newConfig);
-    console.log('📝 日志清理配置已更新:', CLEANUP_CONFIG);
+    // 日志清理配置已更新
   }
 }
 

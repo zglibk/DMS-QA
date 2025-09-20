@@ -6,6 +6,7 @@
 const express = require('express');
 const router = express.Router();
 const { sql, config, getDynamicConfig } = require('../db');
+const ExcelJS = require('exceljs');
 
 /**
  * 获取考核记录列表
@@ -44,7 +45,7 @@ router.get('/records', async (req, res) => {
         }
         
         if (department) {
-            whereConditions.push('(cr.Workshop LIKE @department OR prr.Workshop LIKE @department OR pe.responsible_unit LIKE @department)');
+            whereConditions.push('(ar.DepartmentName LIKE @department OR cr.Workshop LIKE @department OR prr.Workshop LIKE @department OR ar.Department LIKE @department)');
             request.input('department', sql.NVarChar, `%${department}%`);
         }
         
@@ -145,7 +146,7 @@ router.get('/records', async (req, res) => {
                 SELECT 
                     ar.ID as id,
                     ar.PersonName as employeeName,
-                    COALESCE(cr.Workshop, prr.Workshop, pe.responsible_unit) as department,
+                    COALESCE(ar.DepartmentName, cr.Workshop, prr.Workshop, pe.responsible_unit) as department,
                     ar.PersonType as position,
                     ar.ResponsibilityType as responsibilityType,
                     COALESCE(cr.OrderNo, prr.OrderNo, pe.work_order_number) as complaintNumber,
@@ -160,6 +161,9 @@ router.get('/records', async (req, res) => {
                     -- 只映射ComplaintRegister表的AssessmentDescription字段到remarks
                     cr.AssessmentDescription as remarks,
                     ar.SourceType as sourceType,
+                    -- 部门相关字段
+                    ar.DepartmentID as departmentId,
+                    ar.DepartmentName as departmentName,
                     -- 来源表的详细信息
                     CASE 
                         WHEN ar.SourceType = 'complaint' THEN cr.DefectiveDescription
@@ -190,7 +194,7 @@ router.get('/records', async (req, res) => {
                 id, employeeName, department, position, responsibilityType, complaintNumber, complaintId,
                 assessmentAmount, assessmentDate, status, improvementStartDate, 
                 improvementEndDate, returnDate, assessmentRemarks, remarks, sourceType, sourceDescription,
-                customerCode, productName
+                customerCode, productName, departmentId, departmentName
             FROM PagedResults
             WHERE RowNum > @offset AND RowNum <= (@offset + @pageSize)
         `;
@@ -325,44 +329,12 @@ router.get('/records/:id', async (req, res) => {
                 
                 if (complaintResult.recordset.length > 0 && complaintResult.recordset[0].AssessmentDescription) {
                     record.remarks = complaintResult.recordset[0].AssessmentDescription;
-                    console.log('从投诉记录映射remarks:', record.remarks);
                 }
             }
             // 可以在这里添加其他来源类型的remarks映射逻辑
         } else {
             record.remarks = record.Remarks;
         }
-        
-        // 添加调试日志，特别关注返工记录和异常记录的字段
-        console.log('=== 考核记录详情API调试信息 ===');
-        console.log('记录ID:', req.params.id);
-        console.log('来源类型:', record.SourceType);
-        console.log('原始Remarks字段:', record.Remarks);
-        console.log('映射后remarks字段:', record.remarks);
-        console.log('部门字段 (department):', record.department);
-        console.log('客户代码字段 (customerCode):', record.customerCode);
-        console.log('产品名称字段 (productName):', record.productName);
-        console.log('Workshop字段:', record.Workshop);
-        console.log('Customer字段:', record.Customer);
-        
-        // 如果是返工记录，输出返工相关字段
-        if (record.SourceType === 'rework') {
-            console.log('--- 返工记录字段 ---');
-            console.log('ReworkDepartment:', record.ReworkDepartment);
-            console.log('ReworkCustomerCode:', record.ReworkCustomerCode);
-            console.log('ReworkProductName:', record.ReworkProductName);
-        }
-        
-        // 如果是异常记录，输出异常相关字段
-        if (record.SourceType === 'exception') {
-            console.log('--- 异常记录字段 ---');
-            console.log('ExceptionDepartment:', record.ExceptionDepartment);
-            console.log('ExceptionCustomerCode:', record.ExceptionCustomerCode);
-            console.log('ExceptionProductName:', record.ExceptionProductName);
-        }
-        
-        console.log('完整记录数据:', JSON.stringify(record, null, 2));
-        console.log('=== 调试信息结束 ===');
         
         res.json({
             success: true,
@@ -394,7 +366,9 @@ router.post('/records', async (req, res) => {
             assessmentAmount,
             assessmentDate,
             remarks,
-            createdBy
+            createdBy,
+            departmentId,
+            departmentName
         } = req.body;
         
         // 验证必填字段
@@ -431,13 +405,15 @@ router.post('/records', async (req, res) => {
         request.input('createdBy', sql.NVarChar, createdBy || null);
         request.input('status', sql.NVarChar, 'pending'); // 默认状态为pending
         request.input('sourceType', sql.NVarChar, 'complaint'); // 默认来源类型为complaint
+        request.input('departmentID', sql.Int, departmentId || null);
+        request.input('departmentName', sql.NVarChar, departmentName || null);
         
         const insertQuery = `
             INSERT INTO AssessmentRecords 
-            (ComplaintID, PersonName, PersonType, AssessmentAmount, AssessmentDate, Remarks, CreatedBy, Status, SourceType)
+            (ComplaintID, PersonName, PersonType, AssessmentAmount, AssessmentDate, Remarks, CreatedBy, Status, SourceType, DepartmentID, DepartmentName)
             OUTPUT INSERTED.ID
             VALUES 
-            (@complaintID, @personName, @personType, @assessmentAmount, @assessmentDate, @remarks, @createdBy, @status, @sourceType)
+            (@complaintID, @personName, @personType, @assessmentAmount, @assessmentDate, @remarks, @createdBy, @status, @sourceType, @departmentID, @departmentName)
         `;
         
         const result = await request.query(insertQuery);
@@ -506,6 +482,8 @@ router.put('/records/:id', async (req, res) => {
         
         // 新添加字段的参数
         request.input('department', sql.NVarChar, department || null);
+        request.input('departmentId', sql.Int, req.body.departmentId || null);
+        request.input('departmentName', sql.NVarChar, req.body.departmentName || null);
         request.input('responsibilityType', sql.NVarChar, responsibilityType || null);
         request.input('sourceType', sql.NVarChar, sourceType || null);
         request.input('complaintNumber', sql.NVarChar, complaintNumber || null);  // 修正字段名
@@ -528,6 +506,8 @@ router.put('/records/:id', async (req, res) => {
                 UpdatedBy = @updatedBy,
                 UpdatedAt = GETDATE(),
                 Department = @department,
+                DepartmentID = @departmentId,
+                DepartmentName = @departmentName,
                 ResponsibilityType = @responsibilityType,
                 SourceType = @sourceType,
                 ComplaintNumber = @complaintNumber,
@@ -613,9 +593,12 @@ router.post('/generate', async (req, res) => {
         const pool = await sql.connect(await getDynamicConfig());
         const request = pool.request();
         
-        const { startDate, endDate, resetRecords = false, resetAutoIncrement = false } = req.body;
+        const { resetRecords = false, resetAutoIncrement = false } = req.body;
         
-        console.log('生成考核记录请求参数:', { startDate, endDate, resetRecords, resetAutoIncrement });
+        // 自动设置当前年份的日期范围（新版本不再依赖前端传递日期）
+        const currentYear = new Date().getFullYear();
+        const startDate = `${currentYear}-01-01`;
+        const endDate = `${currentYear}-12-31`;
         
         // 如果不是重置记录模式，先检查是否存在重复记录
         if (!resetRecords) {
@@ -662,16 +645,19 @@ router.post('/generate', async (req, res) => {
         // 如果是重置记录模式，先删除所有现有记录
         if (resetRecords) {
             try {
-                console.log('删除所有现有考核记录...');
-                
                 const deleteRequest = pool.request();
                 
-                // 删除所有考核记录，不限制日期范围
-                const deleteResult = await deleteRequest.query(`
+                // 由于外键约束，需要先删除AssessmentHistory中的相关记录，再删除AssessmentRecords
+                // 1. 先删除AssessmentHistory中的所有记录
+                await deleteRequest.query(`
+                    DELETE FROM AssessmentHistory
+                `);
+                
+                // 2. 再删除AssessmentRecords中的所有记录
+                await deleteRequest.query(`
                     DELETE FROM AssessmentRecords
                 `);
                 
-                console.log('删除记录数量:', deleteResult.rowsAffected[0]);
             } catch (deleteError) {
                 console.error('删除现有记录失败:', deleteError);
                 return res.status(500).json({
@@ -758,8 +744,6 @@ router.post('/generate', async (req, res) => {
          updateRequest.input('StartDate', sql.Date, startDate);
          updateRequest.input('EndDate', sql.Date, endDate);
          await updateRequest.query(updateImprovementQuery);
-        
-        console.log('考核记录生成完成，已更新改善期字段');
 
         let message = `成功生成 ${generatedCount} 条考核记录`;
         if (resetRecords) {
@@ -926,7 +910,7 @@ router.get('/statistics', async (req, res) => {
         }
         
         if (department) {
-            whereConditions.push('(cr.Workshop LIKE @department OR prr.Workshop LIKE @department OR pe.responsible_unit LIKE @department)');
+            whereConditions.push('(ar.DepartmentName LIKE @department OR cr.Workshop LIKE @department OR prr.Workshop LIKE @department OR ar.Department LIKE @department)');
             request.input('department', sql.NVarChar, `%${department}%`);
         }
         
@@ -1056,6 +1040,696 @@ router.get('/persons', async (req, res) => {
         res.status(500).json({
             success: false,
             message: '获取人员列表失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 获取考核记录历史
+ * 根据考核记录ID获取该记录的所有历史变更记录
+ */
+router.get('/:id/history', async (req, res) => {
+    try {
+        const pool = await sql.connect(await getDynamicConfig());
+        const request = pool.request();
+        
+        const { id } = req.params;
+        
+        // 验证考核记录ID
+        if (!id || isNaN(id)) {
+            return res.status(400).json({
+                success: false,
+                message: '无效的考核记录ID'
+            });
+        }
+        
+        // 首先检查考核记录是否存在
+        const checkResult = await request
+            .input('RecordID', sql.Int, id)
+            .query(`
+                SELECT ID, PersonName, ComplaintNumber, AssessmentAmount, AssessmentDate, Status
+                FROM AssessmentRecords 
+                WHERE ID = @RecordID
+            `);
+            
+        if (checkResult.recordset.length === 0) {
+            return res.status(404).json({
+                success: false,
+                message: '考核记录不存在'
+            });
+        }
+        
+        const recordInfo = checkResult.recordset[0];
+        
+        // 查询历史记录
+        const historyResult = await request
+            .input('AssessmentRecordID', sql.Int, id)
+            .query(`
+                SELECT 
+                    ID,
+                    Action,
+                    OldValue,
+                    NewValue,
+                    OperatorName,
+                    OperationTime,
+                    Remarks
+                FROM AssessmentHistory 
+                WHERE AssessmentRecordID = @AssessmentRecordID
+                ORDER BY OperationTime DESC
+            `);
+        
+        // 格式化历史记录数据
+        const historyRecords = historyResult.recordset.map(record => {
+            let oldValue = null;
+            let newValue = null;
+            
+            // 尝试解析JSON格式的值
+            try {
+                if (record.OldValue) {
+                    oldValue = JSON.parse(record.OldValue);
+                }
+                if (record.NewValue) {
+                    newValue = JSON.parse(record.NewValue);
+                }
+            } catch (e) {
+                // 如果不是JSON格式，保持原值
+                oldValue = record.OldValue;
+                newValue = record.NewValue;
+            }
+            
+            return {
+                id: record.ID,
+                action: record.Action,
+                oldValue: oldValue,
+                newValue: newValue,
+                operatorName: record.OperatorName,
+                operationTime: record.OperationTime,
+                remarks: record.Remarks
+            };
+        });
+        
+        res.json({
+            success: true,
+            data: {
+                recordInfo: recordInfo,
+                history: historyRecords
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取考核记录历史失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取考核记录历史失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 导出考核记录到Excel
+ * 根据列设置和筛选条件导出数据
+ */
+router.get('/export', async (req, res) => {
+    try {
+        const pool = await sql.connect(await getDynamicConfig());
+        
+        // 获取查询参数（与获取记录列表的参数保持一致）
+        const {
+            employeeName,
+            department,
+            status,
+            startDate,
+            endDate,
+            position,
+            sourceType,
+            complaintNumber,
+            customerCode,
+            customerName,
+            minAmount,
+            sortBy = 'assessmentDate',
+            sortOrder = 'DESC',
+            columns // 前端传递的列配置
+        } = req.query;
+        
+        // 构建WHERE条件（复用获取记录列表的逻辑）
+        let whereConditions = ['1=1'];
+        
+        const request = pool.request();
+        
+        if (employeeName) {
+            whereConditions.push('(ar.PersonName LIKE @employeeName)');
+            request.input('employeeName', sql.NVarChar, `%${employeeName}%`);
+        }
+        
+        if (department) {
+            whereConditions.push('(cr.Workshop LIKE @department OR prr.Workshop LIKE @department OR pe.responsible_unit LIKE @department)');
+            request.input('department', sql.NVarChar, `%${department}%`);
+        }
+        
+        if (status) {
+            whereConditions.push('ar.Status = @status');
+            request.input('status', sql.NVarChar, status);
+        }
+        
+        if (startDate) {
+            whereConditions.push('ar.AssessmentDate >= @startDate');
+            request.input('startDate', sql.Date, startDate);
+        }
+        
+        if (endDate) {
+            whereConditions.push('ar.AssessmentDate <= @endDate');
+            request.input('endDate', sql.Date, endDate);
+        }
+        
+        if (position) {
+            // 映射前端责任类型值到数据库值（与列表查询保持一致）
+            let dbPersonType;
+            switch(position) {
+                case 'direct':
+                    dbPersonType = 'MainPerson';
+                    break;
+                case 'management':
+                    dbPersonType = 'Manager';
+                    break;
+                case 'joint':
+                    dbPersonType = 'SecondPerson';
+                    break;
+                default:
+                    dbPersonType = position; // 兼容直接传递数据库值的情况
+            }
+            whereConditions.push('ar.PersonType = @position');
+            request.input('position', sql.NVarChar, dbPersonType);
+        }
+        
+        if (sourceType) {
+            whereConditions.push('ar.SourceType = @sourceType');
+            request.input('sourceType', sql.NVarChar, sourceType);
+        }
+        
+        if (complaintNumber) {
+            whereConditions.push('(cr.ComplaintNumber LIKE @complaintNumber OR prr.ComplaintNumber LIKE @complaintNumber OR ar.ComplaintNumber LIKE @complaintNumber)');
+            request.input('complaintNumber', sql.NVarChar, `%${complaintNumber}%`);
+        }
+        
+        if (customerCode) {
+            whereConditions.push('(cr.CustomerCode LIKE @customerCode OR prr.CustomerCode LIKE @customerCode OR ar.CustomerCode LIKE @customerCode)');
+            request.input('customerCode', sql.NVarChar, `%${customerCode}%`);
+        }
+        
+        if (customerName) {
+            whereConditions.push('(cr.CustomerName LIKE @customerName OR prr.CustomerName LIKE @customerName)');
+            request.input('customerName', sql.NVarChar, `%${customerName}%`);
+        }
+        
+        if (minAmount) {
+            whereConditions.push('ar.AssessmentAmount >= @minAmount');
+            request.input('minAmount', sql.Decimal(10, 2), minAmount);
+        }
+        
+        // 验证排序字段
+        const validSortColumns = {
+            'assessmentDate': 'ar.AssessmentDate',
+            'assessmentAmount': 'ar.AssessmentAmount',
+            'employeeName': 'ar.PersonName',
+            'complaintNumber': 'COALESCE(cr.OrderNo, prr.OrderNo, ar.ComplaintNumber)',
+            'status': 'ar.Status',
+            'createdAt': 'ar.CreatedAt'
+        };
+        
+        const orderByColumn = validSortColumns[sortBy] || 'ar.AssessmentDate';
+        const orderDirection = sortOrder.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';  
+    
+        // 构建查询语句（不分页，获取所有符合条件的记录）
+        const query = `
+            SELECT 
+                ar.ID,
+                ar.PersonName as employeeName,
+                ar.PersonType,
+                ar.AssessmentAmount as assessmentAmount,
+                ar.AssessmentDate as assessmentDate,
+                ar.Status as status,
+                ar.Remarks,
+                ar.CreatedAt,
+                ar.SourceType,
+                ar.ComplaintID,
+                ar.DepartmentName as Department,
+                ar.ComplaintNumber,
+                ar.CustomerCode,
+                ar.ProductName,
+                
+                -- 投诉记录相关字段
+                cr.OrderNo as CRComplaintNumber,
+                cr.Customer as CRCustomerCode,
+                cr.Customer as CRCustomerName,
+                cr.Workshop as CRWorkshop,
+                cr.MainPerson as CRResponsiblePerson,
+                cr.AssessmentDescription,
+                
+                -- 返工记录相关字段
+                prr.OrderNo as PRRComplaintNumber,
+                prr.CustomerCode as PRRCustomerCode,
+                prr.CustomerCode as PRRCustomerName,
+                prr.Workshop as PRRWorkshop,
+                prr.ResponsiblePerson as PRRResponsiblePerson,
+                
+                -- 出版异常记录相关字段
+                pe.customer_code as PECustomerCode,
+                pe.product_name as PEProductName,
+                pe.responsible_unit as PEResponsibleUnit,
+                pe.responsible_person as PEResponsiblePerson,
+                pe.work_order_number as PEWorkOrderNumber,
+                
+                -- 问题描述字段（根据来源类型获取对应的问题描述）
+                CASE 
+                    WHEN ar.SourceType = 'complaint' THEN cr.DefectiveDescription
+                    WHEN ar.SourceType = 'rework' THEN prr.DefectiveReason
+                    WHEN ar.SourceType = 'exception' THEN pe.exception_description
+                    ELSE NULL
+                END as sourceDescription
+                
+            FROM AssessmentRecords ar
+            LEFT JOIN ComplaintRegister cr ON ar.ComplaintID = cr.ID AND ar.SourceType = 'complaint'
+            LEFT JOIN ProductionReworkRegister prr ON ar.ComplaintID = prr.ID AND ar.SourceType = 'rework'
+            LEFT JOIN publishing_exceptions pe ON ar.ComplaintID = pe.id AND ar.SourceType = 'exception'
+            WHERE ${whereConditions.join(' AND ')}
+            ORDER BY ${orderByColumn} ${orderDirection}
+        `;
+        
+        const result = await request.query(query);
+        const records = result.recordset;
+        
+        // 检查记录数是否为0，如果为0则返回错误提示
+        if (records.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: '导出失败，请重试',
+                error: '没有找到符合条件的记录，无法导出Excel文件。请检查筛选条件后重试。',
+                code: 'NO_RECORDS_FOUND'
+            });
+        }
+        
+        // 解析前端传递的列配置
+        let visibleColumns = [];
+        if (columns) {
+            try {
+                visibleColumns = JSON.parse(columns);
+
+            } catch (error) {
+                console.error('解析列配置失败:', error);
+                // 使用默认列配置
+                visibleColumns = ['employeeName', 'complaintNumber', 'sourceDescription', 'assessmentAmount', 'assessmentDate', 'status', 'remarks'];
+            }
+        } else {
+            // 如果没有传递columns参数，使用默认列配置
+            visibleColumns = ['employeeName', 'complaintNumber', 'sourceDescription', 'assessmentAmount', 'assessmentDate', 'status', 'remarks'];
+        }
+        
+        // 列配置映射 - 扩展更多列选项
+        const columnConfig = {
+            employeeName: { header: '员工姓名', width: 15 },
+            department: { header: '部门', width: 15 },
+            position: { header: '责任类型', width: 15 },
+            sourceType: { header: '来源类型', width: 12 },
+            complaintNumber: { header: '工单号', width: 20 },
+            customerCode: { header: '客户编号', width: 15 },
+            productName: { header: '产品名称', width: 20 },
+            sourceDescription: { header: '问题描述', width: 25 },
+            assessmentAmount: { header: '考核金额', width: 15 },
+            assessmentDate: { header: '发生日期', width: 15 },
+            status: { header: '状态', width: 12 },
+            improvementStartDate: { header: '改善期开始', width: 15 },
+            improvementEndDate: { header: '改善期结束', width: 15 },
+            returnDate: { header: '返还日期', width: 15 },
+            remarks: { header: '备注', width: 30 },
+            workshop: { header: '车间', width: 15 },
+            responsiblePerson: { header: '责任人', width: 15 },
+            createdAt: { header: '创建时间', width: 20 }
+        };
+        
+        // 创建Excel工作簿
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('考核记录');
+        
+        // 设置列
+        const excelColumns = visibleColumns.map(col => ({
+            header: columnConfig[col]?.header || col,
+            key: col,
+            width: columnConfig[col]?.width || 15
+        }));
+        
+        worksheet.columns = excelColumns;
+        
+        // 处理数据并添加到工作表
+        records.forEach(record => {
+            // 使用数据库查询中获取的原始问题描述内容，而不是拼接字符串
+            let sourceDescription = record.sourceDescription || '';
+            
+            // 构建备注信息
+            let remarks = record.Remarks || '';
+            if (!remarks && record.SourceType === 'complaint' && record.AssessmentDescription) {
+                remarks = record.AssessmentDescription;
+            }
+            
+            // 构建行数据 - 只包含可见列的数据
+            const rowData = {};
+            visibleColumns.forEach(col => {
+                switch (col) {
+                    case 'employeeName':
+                        rowData[col] = record.employeeName; // 使用查询别名
+                        break;
+                    case 'department':
+                        rowData[col] = record.Department || '';
+                        break;
+                    case 'position':
+                        // 责任类型中文映射
+                        const responsibilityType = record.ResponsibilityType || record.PersonType;
+                        const responsibilityMap = {
+                            // ResponsibilityType映射（新版本）
+                            'direct': '直接责任',
+                            'management': '管理责任',
+                            'joint': '连带责任',
+                            // PersonType映射（旧版本兼容）
+                            'MainPerson': '直接责任',
+                            'SecondPerson': '连带责任',
+                            'Manager': '管理责任',
+                            // 新增的PersonType映射（区分不同来源）
+                            'ReworkMainPerson': '直接责任',
+                            'ExceptionMainPerson': '直接责任',
+                            // 兼容已有的中文映射
+                            '主责人': '直接责任',
+                            '次责人': '连带责任',
+                            '管理人员': '管理责任',
+                            '直接责任': '直接责任',
+                            '管理责任': '管理责任',
+                            '连带责任': '连带责任'
+                        };
+                        rowData[col] = responsibilityMap[responsibilityType] || responsibilityType || '';
+                        break;
+                    case 'sourceType':
+                        rowData[col] = record.SourceType === 'complaint' ? '投诉记录' : 
+                                      record.SourceType === 'rework' ? '返工记录' : 
+                                      record.SourceType === 'exception' ? '出版异常' : '其他';
+                        break;
+                    case 'complaintNumber':
+                        rowData[col] = record.CRComplaintNumber || record.PRRComplaintNumber || record.ComplaintNumber || '';
+                        break;
+                    case 'customerCode':
+                        rowData[col] = record.CRCustomerCode || record.PRRCustomerCode || record.PECustomerCode || record.CustomerCode || '';
+                        break;
+                    case 'customerName':
+                        rowData[col] = record.CRCustomerName || record.PRRCustomerName || '';
+                        break;
+                    case 'productName':
+                        rowData[col] = record.ProductName || record.PEProductName || '';
+                        break;
+                    case 'sourceDescription':
+                        rowData[col] = sourceDescription;
+                        break;
+                    case 'assessmentAmount':
+                        rowData[col] = record.assessmentAmount; // 使用查询别名
+                        break;
+                    case 'assessmentDate':
+                        rowData[col] = record.assessmentDate ? new Date(record.assessmentDate).toLocaleDateString('zh-CN') : ''; // 使用查询别名
+                        break;
+                    case 'status':
+                        // 修复状态映射，添加exempt状态
+                        rowData[col] = record.status === 'pending' ? '待处理' : 
+                                      record.status === 'approved' ? '已批准' : 
+                                      record.status === 'rejected' ? '已拒绝' :
+                                      record.status === 'exempt' ? '免考核' :
+                                      record.status === 'improving' ? '改善中' :
+                                      record.status === 'returned' ? '已返还' :
+                                      record.status === 'confirmed' ? '已确认' : record.status; // 使用查询别名
+                        break;
+                    case 'improvementStartDate':
+                        rowData[col] = record.ImprovementStartDate ? new Date(record.ImprovementStartDate).toLocaleDateString('zh-CN') : '';
+                        break;
+                    case 'improvementEndDate':
+                        rowData[col] = record.ImprovementEndDate ? new Date(record.ImprovementEndDate).toLocaleDateString('zh-CN') : '';
+                        break;
+                    case 'returnDate':
+                        rowData[col] = record.ReturnDate ? new Date(record.ReturnDate).toLocaleDateString('zh-CN') : '';
+                        break;
+                    case 'remarks':
+                        rowData[col] = remarks;
+                        break;
+                    case 'workshop':
+                        rowData[col] = record.CRWorkshop || record.PRRWorkshop || record.PEResponsibleUnit || record.Department || '';
+                        break;
+                    case 'responsiblePerson':
+                        rowData[col] = record.CRResponsiblePerson || record.PRRResponsiblePerson || record.PEResponsiblePerson || '';
+                        break;
+                    case 'createdAt':
+                        rowData[col] = record.CreatedAt ? new Date(record.CreatedAt).toLocaleString('zh-CN') : '';
+                        break;
+                    default:
+                        rowData[col] = '';
+                }
+            });
+            
+            worksheet.addRow(rowData);
+        });
+        
+        // 设置表头样式
+        worksheet.getRow(1).eachCell((cell) => {
+            cell.font = { 
+                bold: true, 
+                name: 'Tahoma',  // 修改为Tahoma字体
+                size: 10 
+            };
+            cell.fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFE0E0E0' }
+            };
+            cell.border = {
+                top: { style: 'thin' },
+                left: { style: 'thin' },
+                bottom: { style: 'thin' },
+                right: { style: 'thin' }
+            };
+            // 标题行水平和垂直居中对齐
+            cell.alignment = { 
+                horizontal: 'center', 
+                vertical: 'middle' 
+            };
+        });
+        
+        // 设置标题行高度为22
+        worksheet.getRow(1).height = 22;
+        
+        // 设置数据行样式
+        for (let rowNumber = 2; rowNumber <= worksheet.rowCount; rowNumber++) {
+            // 设置数据行高度为19
+            worksheet.getRow(rowNumber).height = 19;
+            
+            worksheet.getRow(rowNumber).eachCell((cell, colNumber) => {
+                // 设置字体
+                cell.font = { 
+                    name: 'Tahoma',  // 修改为Tahoma字体
+                    size: 10 
+                };
+                
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+                
+                // 获取当前列名
+                const columnName = visibleColumns[colNumber - 1];
+                
+                // 设置对齐方式
+                if (columnName === 'sourceDescription' || columnName === 'productName') {
+                    // 问题描述和产品名称列：垂直居中，左对齐，文本换行
+                    cell.alignment = { 
+                        wrapText: true, 
+                        vertical: 'middle',
+                        horizontal: 'left'
+                    };
+                } else {
+                    // 其他列：垂直和水平居中
+                    cell.alignment = { 
+                        vertical: 'middle',
+                        horizontal: 'center'
+                    };
+                }
+                
+                // 隔行变色（浅灰色）
+                if (rowNumber % 2 === 0) {
+                    cell.fill = {
+                        type: 'pattern',
+                        pattern: 'solid',
+                        fgColor: { argb: 'FFF5F5F5' }  // 浅灰色
+                    };
+                }
+            });
+        }
+        
+        // 自适应列宽
+        worksheet.columns.forEach((column, index) => {
+            const columnName = visibleColumns[index];
+            let maxLength = 0;
+            
+            // 计算列的最大内容长度
+            column.eachCell({ includeEmpty: true }, (cell) => {
+                const cellValue = cell.value ? cell.value.toString() : '';
+                if (cellValue.length > maxLength) {
+                    maxLength = cellValue.length;
+                }
+            });
+            
+            // 设置列宽，最小宽度10，最大宽度50
+            if (columnName === 'sourceDescription' || columnName === 'productName') {
+                // 问题描述和产品名称列设置较大的宽度
+                column.width = Math.min(Math.max(maxLength * 1.2, 20), 50);
+            } else {
+                column.width = Math.min(Math.max(maxLength * 1.2, 10), 30);
+            }
+        });
+        
+        // 设置响应头
+        const fileName = `考核记录_${new Date().toISOString().slice(0, 10)}.xlsx`;
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename*=UTF-8''${encodeURIComponent(fileName)}`);
+        
+        // 输出Excel文件
+        await workbook.xlsx.write(res);
+        res.end();
+        
+    } catch (error) {
+        console.error('导出考核记录失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '导出考核记录失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 获取用户的列设置配置
+ * 从AssessmentConfig表中获取指定用户的列设置
+ */
+router.get('/column-settings/:userId', async (req, res) => {
+    try {
+        const pool = await sql.connect(await getDynamicConfig());
+        const { userId } = req.params;
+        
+        const result = await pool.request()
+            .input('ConfigKey', sql.NVarChar, `COLUMN_SETTINGS_${userId}`)
+            .query('SELECT ConfigValue FROM AssessmentConfig WHERE ConfigKey = @ConfigKey AND IsActive = 1');
+        
+        if (result.recordset.length > 0) {
+            const columnSettings = JSON.parse(result.recordset[0].ConfigValue);
+            res.json({
+                success: true,
+                data: columnSettings
+            });
+        } else {
+            // 返回默认列设置
+            res.json({
+                success: true,
+                data: null
+            });
+        }
+        
+    } catch (error) {
+        console.error('获取列设置失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取列设置失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 保存用户的列设置配置
+ * 将列设置保存到AssessmentConfig表中，并查询用户真实姓名用于描述
+ */
+router.post('/column-settings/:userId', async (req, res) => {
+    try {
+        const pool = await sql.connect(await getDynamicConfig());
+        const { userId } = req.params;
+        const { columnSettings } = req.body;
+        
+        const configKey = `COLUMN_SETTINGS_${userId}`;
+        const configValue = JSON.stringify(columnSettings);
+        
+        // 使用前端传递的用户姓名，如果没有则使用默认格式
+        const { userName } = req.body;
+        const displayName = userName || `用户${userId}`;
+        
+        const description = `用户${displayName}的考核记录列设置`;
+        
+        // 检查配置是否存在
+        const existResult = await pool.request()
+            .input('ConfigKey', sql.NVarChar, configKey)
+            .query('SELECT ID FROM AssessmentConfig WHERE ConfigKey = @ConfigKey');
+        
+        if (existResult.recordset.length > 0) {
+            // 更新现有配置（包括描述）
+            await pool.request()
+                .input('ConfigKey', sql.NVarChar, configKey)
+                .input('ConfigValue', sql.NVarChar, configValue)
+                .input('Description', sql.NVarChar, description)
+                .query(`UPDATE AssessmentConfig SET 
+                          ConfigValue = @ConfigValue,
+                          Description = @Description,
+                          UpdatedAt = GETDATE()
+                        WHERE ConfigKey = @ConfigKey`);
+        } else {
+            // 插入新配置
+            await pool.request()
+                .input('ConfigKey', sql.NVarChar, configKey)
+                .input('ConfigValue', sql.NVarChar, configValue)
+                .input('Description', sql.NVarChar, description)
+                .query(`INSERT INTO AssessmentConfig (ConfigKey, ConfigValue, Description, IsActive, CreatedAt, UpdatedAt)
+                        VALUES (@ConfigKey, @ConfigValue, @Description, 1, GETDATE(), GETDATE())`);
+        }
+        
+        res.json({
+            success: true,
+            message: '列设置保存成功'
+        });
+        
+    } catch (error) {
+        console.error('保存列设置失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '保存列设置失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 删除用户的列设置配置
+ * 从AssessmentConfig表中删除指定用户的列设置
+ */
+router.delete('/column-settings/:userId', async (req, res) => {
+    try {
+        const pool = await sql.connect(await getDynamicConfig());
+        const { userId } = req.params;
+        
+        await pool.request()
+            .input('ConfigKey', sql.NVarChar, `COLUMN_SETTINGS_${userId}`)
+            .query('UPDATE AssessmentConfig SET IsActive = 0, UpdatedAt = GETDATE() WHERE ConfigKey = @ConfigKey');
+        
+        res.json({
+            success: true,
+            message: '列设置删除成功'
+        });
+        
+    } catch (error) {
+        console.error('删除列设置失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '删除列设置失败',
             error: error.message
         });
     }

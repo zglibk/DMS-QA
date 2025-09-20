@@ -133,10 +133,52 @@ export const getPersons = () => {
 }
 
 /**
- * 导出考核记录数据
- * @param {Object} params - 导出参数
- * @returns {Promise} API响应
+ * 导出考核记录为Excel文件
+ * @param {Object} params - 导出参数，包含筛选条件和列配置
+ * @param {string} params.columns - JSON字符串格式的可见列配置
+ * @returns {Promise} API响应，返回Excel文件的Blob数据
  */
 export const exportAssessmentRecords = (params) => {
-  return api.get('/assessment/records/export', { params, responseType: 'blob' })
+  return api.get('/assessment/export', { params, responseType: 'blob' })
+}
+
+/**
+ * 获取考核记录历史
+ * @param {number} id - 考核记录ID
+ * @returns {Promise} API响应，包含记录信息和历史变更记录
+ */
+export const getAssessmentHistory = (id) => {
+  return api.get(`/assessment/${id}/history`)
+}
+
+/**
+ * 获取用户的列设置配置
+ * @param {string} userId - 用户ID
+ * @returns {Promise} API响应，包含用户的列设置配置
+ */
+export const getColumnSettings = (userId) => {
+  return api.get(`/assessment/column-settings/${userId}`)
+}
+
+/**
+ * 保存用户的列设置配置
+ * @param {string} userId - 用户ID
+ * @param {Object} columnSettings - 列设置配置对象
+ * @param {string} userName - 用户姓名（可选）
+ * @returns {Promise} API响应
+ */
+export const saveColumnSettings = (userId, columnSettings, userName) => {
+  return api.post(`/assessment/column-settings/${userId}`, { 
+    columnSettings,
+    userName 
+  })
+}
+
+/**
+ * 删除用户的列设置配置
+ * @param {string} userId - 用户ID
+ * @returns {Promise} API响应
+ */
+export const deleteColumnSettings = (userId) => {
+  return api.delete(`/assessment/column-settings/${userId}`)
 }

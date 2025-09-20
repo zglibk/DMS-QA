@@ -94,7 +94,6 @@
           type="primary" 
           @click="handleConfirm"
           :loading="loading"
-          :disabled="!dateRange || dateRange.length !== 2"
         >
           {{ loading ? '生成中...' : '确认生成' }}
         </el-button>

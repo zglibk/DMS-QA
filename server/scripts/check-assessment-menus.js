@@ -11,7 +11,7 @@ const { getConnection } = require('../db');
  */
 async function checkAssessmentMenus() {
   try {
-    console.log('🔍 查询考核记录管理相关菜单...');
+    // 查询考核记录管理相关菜单
     
     const pool = await getConnection();
     
@@ -34,15 +34,15 @@ async function checkAssessmentMenus() {
     const result = await pool.request().query(query);
     
     if (result.recordset.length === 0) {
-      console.log('❌ 未找到考核记录管理相关的菜单');
+      // 未找到考核记录管理相关的菜单
       return false;
     }
     
-    console.log('\n📋 找到以下考核记录管理相关菜单:');
+    // 找到以下考核记录管理相关菜单
     console.table(result.recordset);
     
     // 检查权限分配
-    console.log('\n🔐 检查管理员角色权限分配...');
+    // 检查管理员角色权限分配
     const permissionQuery = `
       SELECT 
         r.RoleName,
@@ -58,10 +58,8 @@ async function checkAssessmentMenus() {
     const permissionResult = await pool.request().query(permissionQuery);
     
     if (permissionResult.recordset.length > 0) {
-      console.log('\n📋 权限分配情况:');
+      // 权限分配情况
       console.table(permissionResult.recordset);
-    } else {
-      console.log('⚠️ 未找到相关权限分配');
     }
     
     return true;
@@ -75,9 +73,9 @@ async function checkAssessmentMenus() {
 // 执行查询
 checkAssessmentMenus().then((success) => {
   if (success) {
-    console.log('\n✅ 考核记录管理菜单验证完成');
+    // 考核记录管理菜单验证完成
   } else {
-    console.log('\n❌ 考核记录管理菜单验证失败');
+    // 考核记录管理菜单验证失败
   }
 }).catch(error => {
   console.error('❌ 执行失败:', error);

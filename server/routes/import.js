@@ -258,7 +258,7 @@ router.get('/template', async (req, res) => {
 
 // 预览Excel文件内容
 router.post('/preview', upload.single('file'), async (req, res) => {
-  console.log('=== 收到Excel预览请求 ===');
+  // Excel预览请求处理
   try {
     if (!req.file) {
       return res.status(400).json({

@@ -26,7 +26,7 @@ class ErpSyncService {
      */
     async start() {
         if (this.isRunning) {
-            console.log('ERP同步服务已在运行中');
+            // ERP同步服务已在运行中
             return;
         }
 
@@ -47,7 +47,7 @@ class ErpSyncService {
      */
     stop() {
         if (!this.isRunning) {
-            console.log('ERP同步服务未在运行');
+            // ERP同步服务未在运行
             return;
         }
 

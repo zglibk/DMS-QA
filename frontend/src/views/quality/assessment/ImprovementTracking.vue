@@ -35,6 +35,7 @@
             <el-option label="即将到期" value="expiring_soon" />
             <el-option label="符合返还" value="eligible_return" />
             <el-option label="已返还" value="returned" />
+            <el-option label="免考核" value="exempt" />
           </el-select>
         </el-col>
         <el-col :span="6">
