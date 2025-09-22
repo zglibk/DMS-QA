@@ -147,7 +147,7 @@
         <el-col :span="12">
           <el-form-item label="状态" prop="status">
             <el-select v-model="formData.status" placeholder="请选择状态" style="width: 100%" @change="handleStatusChange">
-              <el-option label="待改善" value="pending" />
+              <el-option label="待考核" value="pending" />
               <el-option label="改善中" value="improving" />
               <el-option label="已返还" value="returned" />
               <el-option label="已确认" value="confirmed" />

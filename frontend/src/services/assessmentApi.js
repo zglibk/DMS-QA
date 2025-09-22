@@ -161,6 +161,43 @@ export const getColumnSettings = (userId) => {
 }
 
 /**
+ * 获取改善期跟踪数据
+ * @param {Object} params - 查询参数
+ * @param {number} params.page - 页码
+ * @param {number} params.pageSize - 每页数量
+ * @param {string} params.employeeName - 员工姓名
+ * @param {string} params.department - 部门
+ * @param {string} params.status - 状态
+ * @returns {Promise} API响应
+ */
+export const getImprovementTracking = (params) => {
+  return api.get('/assessment/improvement-tracking', { params })
+}
+
+/**
+ * 获取改善期概览数据
+ * @param {Object} params - 查询参数（可选）
+ * @param {string} params.employeeName - 员工姓名
+ * @param {string} params.department - 部门
+ * @param {string} params.trackingStatus - 跟踪状态
+ * @returns {Promise} API响应
+ */
+export const getImprovementOverview = (params) => {
+  return api.get('/assessment/improvement-overview', { params })
+}
+
+/**
+ * 自动返还处理
+ * @param {Object} data - 返还处理数据
+ * @param {string} data.operatorName - 操作人姓名
+ * @param {string} data.remarks - 备注
+ * @returns {Promise} API响应
+ */
+export const autoReturn = (data) => {
+  return api.post('/assessment/auto-return', data)
+}
+
+/**
  * 保存用户的列设置配置
  * @param {string} userId - 用户ID
  * @param {Object} columnSettings - 列设置配置对象

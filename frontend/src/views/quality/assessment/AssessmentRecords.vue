@@ -36,11 +36,10 @@
         </el-col>
         <el-col :span="4">
           <el-select v-model="searchForm.status" placeholder="考核状态" clearable>
-            <el-option label="待改善" value="pending" />
+            <el-option label="待考核" value="pending" />
             <el-option label="改善中" value="improving" />
             <el-option label="已返还" value="returned" />
             <el-option label="已确认" value="confirmed" />
-            <el-option label="免考核" value="exempt" />
             <el-option label="免考核" value="exempt" />
           </el-select>
         </el-col>
@@ -238,7 +237,7 @@
         <el-table-column 
           v-if="isColumnVisible('department')"
           prop="department" 
-          label="部门" 
+          label="责任部门" 
           width="120" 
         />
         <el-table-column 
@@ -674,7 +673,7 @@ const formRef = ref()
 // 可用列配置
 const availableColumns = ref([
   { key: 'employeeName', label: '员工姓名', required: true },
-  { key: 'department', label: '部门', required: false },
+  { key: 'department', label: '责任部门', required: false },
   { key: 'position', label: '责任类型', required: false },
   { key: 'sourceType', label: '数据来源', required: false },
   { key: 'complaintNumber', label: '工单号', required: true },
@@ -1255,7 +1254,7 @@ const buildExportSummary = () => {
   // 状态筛选
   if (searchForm.status) {
     const statusMap = {
-      'pending': '待改善',
+      'pending': '待考核',
       'improving': '改善中', 
       'returned': '已返还',
       'confirmed': '已确认',
@@ -1645,7 +1644,7 @@ const getStatusTagType = (status) => {
 // 获取状态标签文本
 const getStatusLabel = (status) => {
   const labelMap = {
-    pending: '待改善',
+    pending: '待考核',
     improving: '改善中',
     returned: '已返还',
     confirmed: '已确认',

@@ -22,12 +22,19 @@
           </el-input>
         </el-col>
         <el-col :span="4">
-          <el-select v-model="filterForm.department" placeholder="部门" clearable>
-            <el-option label="生产部" value="生产部" />
-            <el-option label="质检部" value="质检部" />
-            <el-option label="技术部" value="技术部" />
-            <el-option label="采购部" value="采购部" />
-          </el-select>
+          <el-cascader
+            v-model="filterForm.department"
+            :options="departmentOptions"
+            :props="cascaderProps"
+            placeholder="选择部门"
+            clearable
+            filterable
+            :show-all-levels="false"
+            collapse-tags
+            collapse-tags-tooltip
+            style="width: 100%"
+            @change="handleDepartmentChange"
+          />
         </el-col>
         <el-col :span="4">
           <el-select v-model="filterForm.trackingStatus" placeholder="跟踪状态" clearable>
@@ -123,18 +130,22 @@
         style="width: 100%"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="employeeName" label="员工姓名" width="100" />
-        <el-table-column prop="department" label="部门" width="100" />
-        <el-table-column prop="position" label="职位" width="120" />
+        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column prop="employeeName" label="员工姓名" width="100" align="center" />
+        <el-table-column prop="department" label="责任部门" width="120" align="center" />
+        <el-table-column prop="position" label="责任类型" width="120" align="center">
+          <template #default="{ row }">
+            {{ getResponsibilityTypeLabel(row.position) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="assessmentCount" label="考核次数" width="100" align="center" />
-        <el-table-column prop="totalAmount" label="总考核金额" width="120" align="right">
+        <el-table-column prop="totalAmount" label="总考核金额" width="120" align="center">
           <template #default="{ row }">
             <span class="amount-text">¥{{ row.totalAmount }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="improvementStartDate" label="改善期开始" width="120" />
-        <el-table-column prop="improvementEndDate" label="改善期结束" width="120" />
+        <el-table-column prop="improvementStartDate" label="改善期开始" width="120" align="center" />
+        <el-table-column prop="improvementEndDate" label="改善期结束" width="120" align="center" />
         <el-table-column prop="remainingDays" label="剩余天数" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getRemainingDaysTagType(row.remainingDays)">
@@ -142,7 +153,7 @@
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="lastAssessmentDate" label="最后考核日期" width="120" />
+        <el-table-column prop="lastAssessmentDate" label="最后考核日期" width="120" align="center" />
         <el-table-column prop="noAssessmentDays" label="无考核天数" width="100" align="center">
           <template #default="{ row }">
             <span :class="getNoAssessmentDaysClass(row.noAssessmentDays)">
@@ -150,32 +161,54 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column prop="trackingStatus" label="跟踪状态" width="120">
+        <el-table-column prop="trackingStatus" label="跟踪状态" width="120" align="center">
           <template #default="{ row }">
             <el-tag :type="getTrackingStatusTagType(row.trackingStatus)">
               {{ getTrackingStatusLabel(row.trackingStatus) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" min-width="200" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button 
-              type="success" 
-              size="small" 
-              @click="handleReturn(row)"
-              v-if="row.trackingStatus === 'eligible_return'"
-            >
-              <el-icon><Check /></el-icon>
-              返还
-            </el-button>
-            <el-button type="primary" size="small" @click="handleViewDetails(row)">
-              <el-icon><View /></el-icon>
-              详情
-            </el-button>
-            <el-button type="info" size="small" @click="handleViewTimeline(row)">
-              <el-icon><Timer /></el-icon>
-              时间线
-            </el-button>
+            <el-row :gutter="8" justify="center">
+              <!-- 详情按钮列 -->
+              <el-col :span="8">
+                <el-button 
+                  type="primary" 
+                  size="small" 
+                  text 
+                  @click="handleViewDetails(row)"
+                  style="width: 100%"
+                >
+                  详情
+                </el-button>
+              </el-col>
+              <!-- 时间线按钮列 -->
+              <el-col :span="8">
+                <el-button 
+                  type="info" 
+                  size="small" 
+                  text 
+                  @click="handleViewTimeline(row)"
+                  style="width: 100%"
+                >
+                  时间线
+                </el-button>
+              </el-col>
+              <!-- 返还按钮列 - 移动到第3列 -->
+              <el-col :span="8">
+                <el-button 
+                  v-if="row.trackingStatus === 'eligible_return'"
+                  type="success" 
+                  size="small" 
+                  text
+                  @click="handleReturn(row)"
+                  style="width: 100%"
+                >
+                  返还
+                </el-button>
+              </el-col>
+            </el-row>
           </template>
         </el-table-column>
       </el-table>
@@ -185,7 +218,7 @@
         <el-pagination
           v-model:current-page="pagination.currentPage"
           v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[5, 10, 20, 50, 100]"
           :total="pagination.total"
           layout="total, sizes, prev, pager, next, jumper"
           @size-change="handleSizeChange"
@@ -199,12 +232,14 @@
       v-model="detailDialogVisible"
       title="改善期详情"
       width="800px"
+      :style="{ maxHeight: '80vh' }"
+      :body-style="{ maxHeight: '70vh', overflow: 'auto' }"
     >
       <div class="detail-content" v-if="selectedEmployee">
         <el-descriptions :column="2" border>
           <el-descriptions-item label="员工姓名">{{ selectedEmployee.employeeName }}</el-descriptions-item>
-          <el-descriptions-item label="部门">{{ selectedEmployee.department }}</el-descriptions-item>
-          <el-descriptions-item label="职位">{{ selectedEmployee.position }}</el-descriptions-item>
+          <el-descriptions-item label="责任部门">{{ selectedEmployee.department }}</el-descriptions-item>
+          <el-descriptions-item label="责任类型">{{ selectedEmployee.position }}</el-descriptions-item>
           <el-descriptions-item label="考核次数">{{ selectedEmployee.assessmentCount }}</el-descriptions-item>
           <el-descriptions-item label="总考核金额">¥{{ selectedEmployee.totalAmount }}</el-descriptions-item>
           <el-descriptions-item label="改善期开始">{{ selectedEmployee.improvementStartDate }}</el-descriptions-item>
@@ -273,6 +308,8 @@ import {
   Search, Refresh, Setting, Clock, Warning, Check, Money,
   User, View, Timer
 } from '@element-plus/icons-vue'
+import * as assessmentApi from '@/services/assessmentApi'
+import api from '@/utils/api'
 
 /**
  * 响应式数据定义
@@ -283,6 +320,16 @@ const filterForm = reactive({
   department: '',
   trackingStatus: ''
 })
+
+// 部门相关数据
+const departmentOptions = ref([])
+const cascaderProps = {
+  value: 'ID',
+  label: 'Name',
+  children: 'children',
+  checkStrictly: true,
+  emitPath: false
+}
 
 // 概览数据
 const overview = reactive({
@@ -300,7 +347,7 @@ const selectedRows = ref([])
 // 分页数据
 const pagination = reactive({
   currentPage: 1,
-  pageSize: 20,
+  pageSize: 5,
   total: 0
 })
 
@@ -314,6 +361,7 @@ const timelineData = ref([])
  * 生命周期钩子
  */
 onMounted(() => {
+  loadDepartments()
   loadData()
   loadOverview()
 })
@@ -321,77 +369,60 @@ onMounted(() => {
 /**
  * 数据加载函数
  */
+// 加载部门数据
+const loadDepartments = async () => {
+  try {
+    console.log('开始加载部门数据...')
+    const response = await api.get('/departments/tree')
+    console.log('部门API响应:', response)
+    
+    if (response && response.success) {
+      departmentOptions.value = response.data || []
+      console.log('部门数据加载成功:', departmentOptions.value)
+    } else {
+      console.error('获取部门数据失败:', response?.message || '响应格式错误')
+      console.error('完整响应:', response)
+      ElMessage.error(`获取部门数据失败: ${response?.message || '响应格式错误'}`)
+    }
+  } catch (error) {
+    console.error('获取部门数据失败:', error)
+    console.error('错误详情:', error.response?.data)
+    console.error('错误状态码:', error.response?.status)
+    
+    let errorMessage = '未知错误'
+    if (error.response?.data?.message) {
+      errorMessage = error.response.data.message
+    } else if (error.message) {
+      errorMessage = error.message
+    }
+    
+    ElMessage.error(`获取部门数据失败: ${errorMessage}`)
+  }
+}
+
 // 加载跟踪数据
 const loadData = async () => {
   loading.value = true
   try {
-    // TODO: 调用后端API获取改善期跟踪数据
-    // const response = await improvementApi.getTrackingData({
-    //   ...filterForm,
-    //   page: pagination.currentPage,
-    //   pageSize: pagination.pageSize
-    // })
+    const params = {
+      page: pagination.currentPage,
+      pageSize: pagination.pageSize,
+      employeeName: filterForm.employeeName,
+      department: filterForm.department,
+      trackingStatus: filterForm.trackingStatus
+    }
     
-    // 模拟数据
-    const mockData = [
-      {
-        id: 1,
-        employeeName: '张三',
-        department: '生产部',
-        position: '操作员',
-        assessmentCount: 2,
-        totalAmount: 300,
-        improvementStartDate: '2024-01-16',
-        improvementEndDate: '2024-04-16',
-        remainingDays: 45,
-        lastAssessmentDate: '2024-01-15',
-        noAssessmentDays: 75,
-        trackingStatus: 'eligible_return',
-        assessmentRecords: [
-          {
-            complaintNumber: 'QC2024001',
-            assessmentAmount: 100,
-            assessmentDate: '2024-01-15',
-            status: 'improving',
-            remarks: '产品质量问题'
-          },
-          {
-            complaintNumber: 'QC2024005',
-            assessmentAmount: 200,
-            assessmentDate: '2024-01-10',
-            status: 'improving',
-            remarks: '操作流程不当'
-          }
-        ]
-      },
-      {
-        id: 2,
-        employeeName: '李四',
-        department: '质检部',
-        position: '质检员',
-        assessmentCount: 1,
-        totalAmount: 200,
-        improvementStartDate: '2024-02-01',
-        improvementEndDate: '2024-05-01',
-        remainingDays: 15,
-        lastAssessmentDate: '2024-01-31',
-        noAssessmentDays: 60,
-        trackingStatus: 'expiring_soon',
-        assessmentRecords: [
-          {
-            complaintNumber: 'QC2024002',
-            assessmentAmount: 200,
-            assessmentDate: '2024-01-31',
-            status: 'improving',
-            remarks: '检验疏漏'
-          }
-        ]
-      }
-    ]
+    const response = await assessmentApi.getImprovementTracking(params)
     
-    trackingData.value = mockData
-    pagination.total = mockData.length
+    if (response.data && response.data.success) {
+      // 修复数据结构解析：后端返回的是data数组和pagination对象
+      trackingData.value = response.data.data || []
+      pagination.total = response.data.pagination?.total || 0
+    } else {
+      ElMessage.error('获取改善期跟踪数据失败')
+    }
   } catch (error) {
+    console.error('获取改善期跟踪数据失败:', error)
     ElMessage.error('加载数据失败：' + error.message)
   } finally {
     loading.value = false
@@ -401,18 +432,28 @@ const loadData = async () => {
 // 加载概览数据
 const loadOverview = async () => {
   try {
-    // TODO: 调用后端API获取概览数据
-    // const response = await improvementApi.getOverview()
+    // 传递与列表查询相同的筛选条件参数，确保统计卡片数据与筛选结果一致
+    const params = {
+      employeeName: filterForm.employeeName,
+      department: filterForm.department,
+      trackingStatus: filterForm.trackingStatus
+    }
     
-    // 模拟概览数据
-    Object.assign(overview, {
-      inProgressCount: 12,
-      expiringSoonCount: 3,
-      eligibleReturnCount: 5,
-      returnedAmount: 1500
-    })
+    const response = await assessmentApi.getImprovementOverview(params)
+    
+    if (response.data && response.data.success) {
+      Object.assign(overview, response.data.data || {
+        inProgressCount: 0,
+        expiringSoonCount: 0,
+        eligibleReturnCount: 0,
+        returnedAmount: 0
+      })
+    } else {
+      ElMessage.error('获取概览数据失败')
+    }
   } catch (error) {
-    console.error('加载概览数据失败：', error)
+    console.error('获取概览数据失败:', error)
+    ElMessage.error('获取概览数据失败')
   }
 }
 
@@ -423,6 +464,7 @@ const loadOverview = async () => {
 const handleFilter = () => {
   pagination.currentPage = 1
   loadData()
+  loadOverview() // 同时更新统计卡片数据
 }
 
 // 重置筛选
@@ -438,95 +480,132 @@ const resetFilter = () => {
 // 自动返还处理
 const handleAutoReturn = async () => {
   try {
-    const result = await ElMessageBox.confirm(
-      '系统将自动检测符合返还条件的记录并执行返还处理，确定继续吗？',
-      '自动返还处理',
+    await ElMessageBox.confirm(
+      '确认要执行自动返还操作吗？系统将自动处理所有符合条件的改善期返还。',
+      '确认操作',
       {
-        confirmButtonText: '确定',
+        confirmButtonText: '确认',
         cancelButtonText: '取消',
         type: 'warning'
       }
     )
     
-    if (result === 'confirm') {
-      loading.value = true
-      // TODO: 调用后端API执行自动返还
-      // const result = await improvementApi.autoReturn()
-      
-      ElMessage.success('自动返还处理完成')
-      loadData()
-      loadOverview()
+    const { value: operatorName } = await ElMessageBox.prompt(
+      '请输入操作人姓名：',
+      '自动返还',
+      {
+        confirmButtonText: '确认',
+        cancelButtonText: '取消',
+        inputPattern: /\S+/,
+        inputErrorMessage: '操作人姓名不能为空'
+      }
+    )
+    
+    const response = await assessmentApi.autoReturn({
+      operatorName,
+      remarks: '系统自动返还处理'
+    })
+    
+    if (response.data && response.data.success) {
+      ElMessage.success('自动返还处理成功')
+      await loadData()
+      await loadOverview()
+    } else {
+      ElMessage.error(response.data?.message || '自动返还处理失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('自动返还处理失败：' + error.message)
+      console.error('自动返还处理失败:', error)
+      ElMessage.error('自动返还处理失败')
     }
-  } finally {
-    loading.value = false
   }
 }
 
 // 单个返还处理
 const handleReturn = async (row) => {
   try {
-    const result = await ElMessageBox.confirm(
-      `确定要为 ${row.employeeName} 执行返还处理吗？返还金额：¥${row.totalAmount}`,
-      '确认返还',
+    const { value: operatorName } = await ElMessageBox.prompt(
+      '请输入操作人姓名：',
+      '单个返还处理',
       {
-        confirmButtonText: '确定',
+        confirmButtonText: '确认',
         cancelButtonText: '取消',
-        type: 'warning'
+        inputPattern: /\S+/,
+        inputErrorMessage: '操作人姓名不能为空'
       }
     )
     
-    if (result === 'confirm') {
-      // TODO: 调用后端API执行返还
-      // await improvementApi.processReturn(row.id)
-      
+    const response = await assessmentApi.processReturn(row.id, {
+      operatorName,
+      returnPercentage: 100,
+      remarks: '手动返还处理'
+    })
+    
+    if (response.data && response.data.success) {
       ElMessage.success('返还处理成功')
-      loadData()
-      loadOverview()
+      await loadData()
+      await loadOverview()
+    } else {
+      ElMessage.error(response.data?.message || '返还处理失败')
     }
   } catch (error) {
     if (error !== 'cancel') {
-      ElMessage.error('返还处理失败：' + error.message)
+      console.error('返还处理失败:', error)
+      ElMessage.error('返还处理失败')
     }
   }
 }
 
 // 查看详情
 const handleViewDetails = (row) => {
-  selectedEmployee.value = row
+  // 使用真实数据填充详情对话框
+  selectedEmployee.value = {
+    employeeName: row.employeeName,
+    department: row.department,
+    position: row.position || '未知',
+    assessmentCount: row.assessmentCount,
+    totalAmount: row.totalAmount,
+    improvementStartDate: row.improvementStartDate,
+    improvementEndDate: row.improvementEndDate,
+    remainingDays: row.remainingDays,
+    lastAssessmentDate: row.lastAssessmentDate,
+    noAssessmentDays: row.noAssessmentDays,
+    trackingStatus: row.trackingStatus,
+    assessmentRecords: row.assessmentRecords || []
+  }
   detailDialogVisible.value = true
 }
 
 // 查看时间线
 const handleViewTimeline = (row) => {
-  // 模拟时间线数据
-  timelineData.value = [
-    {
-      id: 1,
-      date: '2024-01-15',
-      type: 'danger',
-      title: '质量考核',
-      description: '因产品质量问题被考核',
-      amount: 100
-    },
-    {
-      id: 2,
-      date: '2024-01-16',
-      type: 'primary',
+  // 使用真实数据填充时间线对话框
+  timelineData.value = row.assessmentRecords?.map(record => ({
+    date: record.assessmentDate,
+    title: `考核记录 - ${record.complaintNumber}`,
+    description: record.remarks,
+    amount: record.assessmentAmount,
+    status: record.status,
+    type: 'assessment'
+  })) || []
+  
+  // 添加改善期开始和结束节点
+  if (row.improvementStartDate) {
+    timelineData.value.unshift({
+      date: row.improvementStartDate,
       title: '改善期开始',
-      description: '进入3个月改善期'
-    },
-    {
-      id: 3,
-      date: '2024-04-01',
-      type: 'success',
-      title: '符合返还条件',
-      description: '连续3个月无新的质量考核记录'
-    }
-  ]
+      description: '开始改善期跟踪',
+      type: 'start'
+    })
+  }
+  
+  if (row.improvementEndDate) {
+    timelineData.value.push({
+      date: row.improvementEndDate,
+      title: '改善期结束',
+      description: '改善期跟踪结束',
+      type: 'end'
+    })
+  }
   
   timelineDialogVisible.value = true
 }
@@ -550,6 +629,32 @@ const handleCurrentChange = (page) => {
 /**
  * 工具函数
  */
+// 获取责任类型标签文本
+const getResponsibilityTypeLabel = (responsibilityType) => {
+  const labelMap = {
+    // PersonType映射为ResponsibilityType（主要映射逻辑）
+    'MainPerson': '直接责任',
+    'ReworkMainPerson': '直接责任',
+    'ExceptionMainPerson': '直接责任',
+    'SecondPerson': '连带责任', 
+    'Manager': '管理责任',
+    // ResponsibilityType映射（直接映射）
+    'direct': '直接责任',
+    'management': '管理责任',
+    'joint': '连带责任',
+    // 兼容旧的中文映射
+    '主责人': '直接责任',
+    '返工主责人': '直接责任',
+    '异常主责人': '直接责任',
+    '次责人': '连带责任',
+    '管理人员': '管理责任',
+    '直接责任': '直接责任',
+    '管理责任': '管理责任',
+    '连带责任': '连带责任'
+  }
+  return labelMap[responsibilityType] || '直接责任'
+}
+
 // 获取剩余天数标签类型
 const getRemainingDaysTagType = (days) => {
   if (days <= 7) return 'danger'
@@ -601,13 +706,42 @@ const getStatusTagType = (status) => {
 // 获取状态标签文本
 const getStatusLabel = (status) => {
   const labelMap = {
-    pending: '待改善',
+    pending: '待考核',
     improving: '改善中',
     returned: '已返还',
     confirmed: '已确认',
     exempt: '免考核'  // 免考核状态标签文本
   }
   return labelMap[status] || status
+}
+/**
+ * 事件处理函数
+ */
+// 部门选择变化处理
+const handleDepartmentChange = (value) => {
+  // 当选择部门时，获取部门名称用于筛选
+  if (value) {
+    const findDepartmentName = (options, id) => {
+      for (const option of options) {
+        if (option.ID === id) {
+          return option.Name
+        }
+        if (option.children && option.children.length > 0) {
+          const found = findDepartmentName(option.children, id)
+          if (found) return found
+        }
+      }
+      return null
+    }
+    
+    const departmentName = findDepartmentName(departmentOptions.value, value)
+    filterForm.department = departmentName || ''
+  } else {
+    filterForm.department = ''
+  }
+  
+  // 自动触发筛选
+  handleFilter()
 }
 </script>
 
@@ -773,5 +907,18 @@ const getStatusLabel = (status) => {
   color: #e74c3c;
   font-weight: 600;
   font-size: 12px;
+}
+
+/* 操作按钮对齐样式 */
+.action-buttons {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.action-buttons .el-button {
+  margin: 0;
 }
 </style>

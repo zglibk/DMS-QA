@@ -1455,7 +1455,7 @@ router.get('/export', async (req, res) => {
                         break;
                     case 'status':
                         // 修复状态映射，添加exempt状态
-                        rowData[col] = record.status === 'pending' ? '待处理' : 
+                        rowData[col] = record.status === 'pending' ? '待考核' : 
                                       record.status === 'approved' ? '已批准' : 
                                       record.status === 'rejected' ? '已拒绝' :
                                       record.status === 'exempt' ? '免考核' :
@@ -1730,6 +1730,365 @@ router.delete('/column-settings/:userId', async (req, res) => {
         res.status(500).json({
             success: false,
             message: '删除列设置失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 获取改善期跟踪数据
+ * 获取所有在改善期内的考核记录及其跟踪状态
+ */
+router.get('/improvement-tracking', async (req, res) => {
+    try {
+        const pool = await sql.connect(await getDynamicConfig());
+        const request = pool.request();
+        
+        const {
+            page = 1,
+            pageSize = 20,
+            employeeName,
+            department,
+            trackingStatus
+        } = req.query;
+        
+        // 构建WHERE条件
+        let whereConditions = ['ar.ImprovementStartDate IS NOT NULL', 'ar.ImprovementEndDate IS NOT NULL'];
+        
+        if (employeeName) {
+            whereConditions.push('ar.PersonName LIKE @employeeName');
+            request.input('employeeName', sql.NVarChar, `%${employeeName}%`);
+        }
+        
+        if (department) {
+            whereConditions.push('(ar.DepartmentName LIKE @department OR ar.Department LIKE @department)');
+            request.input('department', sql.NVarChar, `%${department}%`);
+        }
+        
+        const whereClause = whereConditions.join(' AND ');
+        
+        // 分页参数
+        const offset = (page - 1) * pageSize;
+        request.input('offset', sql.Int, offset);
+        request.input('pageSize', sql.Int, parseInt(pageSize));
+        
+        // 查询改善期跟踪数据
+        const query = `
+            WITH TrackingData AS (
+                SELECT 
+                    ar.PersonName as employeeName,
+                    ar.DepartmentName as department,
+                    ar.PersonType as position,
+                    COUNT(ar.ID) as assessmentCount,
+                    SUM(ar.AssessmentAmount) as totalAmount,
+                    MIN(ar.ImprovementStartDate) as improvementStartDate,
+                    MAX(ar.ImprovementEndDate) as improvementEndDate,
+                    DATEDIFF(day, GETDATE(), MAX(ar.ImprovementEndDate)) as remainingDays,
+                    MAX(ar.AssessmentDate) as lastAssessmentDate,
+                    DATEDIFF(day, MAX(ar.AssessmentDate), GETDATE()) as noAssessmentDays,
+                    CASE 
+                        WHEN DATEDIFF(day, MAX(ar.AssessmentDate), GETDATE()) >= 90 THEN 'eligible_return'
+                        WHEN DATEDIFF(day, GETDATE(), MAX(ar.ImprovementEndDate)) <= 7 THEN 'expiring_soon'
+                        WHEN MAX(CASE WHEN ar.Status = 'returned' THEN 1 ELSE 0 END) = 1 THEN 'returned'
+                        ELSE 'in_progress'
+                    END as trackingStatus
+                FROM AssessmentRecords ar
+                WHERE ${whereClause}
+                    AND ar.Status IN ('pending', 'improving', 'returned')
+                GROUP BY ar.PersonName, ar.DepartmentName, ar.PersonType
+            ),
+            PagedData AS (
+                SELECT 
+                    ROW_NUMBER() OVER (ORDER BY improvementStartDate DESC) as rowNum,
+                    ROW_NUMBER() OVER (ORDER BY improvementStartDate DESC) as id,
+                    *
+                FROM TrackingData
+                ${trackingStatus ? `WHERE trackingStatus = '${trackingStatus}'` : ''}
+            )
+            SELECT *
+            FROM PagedData
+            WHERE rowNum > @offset AND rowNum <= (@offset + @pageSize)
+            ORDER BY improvementStartDate DESC
+        `;
+        
+        const result = await request.query(query);
+        
+        // 获取总数
+        const countQuery = `
+            WITH TrackingData AS (
+                SELECT 
+                    ar.PersonName as employeeName,
+                    ar.DepartmentName as department,
+                    ar.PersonType as position,
+                    CASE 
+                        WHEN DATEDIFF(day, MAX(ar.AssessmentDate), GETDATE()) >= 90 THEN 'eligible_return'
+                        WHEN DATEDIFF(day, GETDATE(), MAX(ar.ImprovementEndDate)) <= 7 THEN 'expiring_soon'
+                        WHEN MAX(CASE WHEN ar.Status = 'returned' THEN 1 ELSE 0 END) = 1 THEN 'returned'
+                        ELSE 'in_progress'
+                    END as trackingStatus
+                FROM AssessmentRecords ar
+                WHERE ${whereClause}
+                    AND ar.Status IN ('pending', 'improving', 'returned')
+                GROUP BY ar.PersonName, ar.DepartmentName, ar.PersonType
+            )
+            SELECT COUNT(*) as total
+            FROM TrackingData
+            ${trackingStatus ? `WHERE trackingStatus = '${trackingStatus}'` : ''}
+        `;
+        
+        const countResult = await request.query(countQuery);
+        const total = countResult.recordset[0].total;
+        
+        // 为每个员工获取详细的考核记录
+        const trackingData = await Promise.all(result.recordset.map(async (row) => {
+            const detailRequest = pool.request();
+            detailRequest.input('employeeName', sql.NVarChar, row.employeeName);
+            detailRequest.input('department', sql.NVarChar, row.department);
+            
+            const detailQuery = `
+                SELECT 
+                    COALESCE(cr.OrderNo, prr.OrderNo, pe.work_order_number) as complaintNumber,
+                    ar.AssessmentAmount as assessmentAmount,
+                    CONVERT(VARCHAR(10), ar.AssessmentDate, 120) as assessmentDate,
+                    ar.Status as status,
+                    ar.Remarks as remarks
+                FROM AssessmentRecords ar
+                LEFT JOIN ComplaintRegister cr ON ar.ComplaintID = cr.ID AND ar.SourceType = 'complaint'
+                LEFT JOIN ProductionReworkRegister prr ON ar.ComplaintID = prr.ID AND ar.SourceType = 'rework'
+                LEFT JOIN publishing_exceptions pe ON ar.ComplaintID = pe.id AND ar.SourceType = 'exception'
+                WHERE ar.PersonName = @employeeName 
+                    AND ar.DepartmentName = @department
+                    AND ar.ImprovementStartDate IS NOT NULL
+                ORDER BY ar.AssessmentDate DESC
+            `;
+            
+            const detailResult = await detailRequest.query(detailQuery);
+            
+            return {
+                ...row,
+                improvementStartDate: row.improvementStartDate ? new Date(row.improvementStartDate).toISOString().split('T')[0] : null,
+                improvementEndDate: row.improvementEndDate ? new Date(row.improvementEndDate).toISOString().split('T')[0] : null,
+                lastAssessmentDate: row.lastAssessmentDate ? new Date(row.lastAssessmentDate).toISOString().split('T')[0] : null,
+                assessmentRecords: detailResult.recordset
+            };
+        }));
+        
+        res.json({
+            success: true,
+            data: trackingData,
+            pagination: {
+                currentPage: parseInt(page),
+                pageSize: parseInt(pageSize),
+                total: total,
+                totalPages: Math.ceil(total / pageSize)
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取改善期跟踪数据失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取改善期跟踪数据失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 获取改善期跟踪概览数据
+ * 统计改善期内、即将到期、符合返还条件等状态的数量
+ * 支持与列表相同的筛选条件以保持数据一致性
+ */
+router.get('/improvement-overview', async (req, res) => {
+    try {
+        const pool = await sql.connect(await getDynamicConfig());
+        const request = pool.request();
+        
+        // 获取筛选参数，与列表查询保持一致
+        const {
+            employeeName,
+            department,
+            trackingStatus
+        } = req.query;
+        
+        // 构建WHERE条件，与列表查询保持一致
+        let whereConditions = ['ar.ImprovementStartDate IS NOT NULL', 'ar.ImprovementEndDate IS NOT NULL'];
+        
+        if (employeeName) {
+            whereConditions.push('ar.PersonName LIKE @employeeName');
+            request.input('employeeName', sql.NVarChar, `%${employeeName}%`);
+        }
+        
+        if (department) {
+            whereConditions.push('(ar.DepartmentName LIKE @department OR ar.Department LIKE @department)');
+            request.input('department', sql.NVarChar, `%${department}%`);
+        }
+        
+        const whereClause = whereConditions.join(' AND ');
+        
+        // 获取概览统计数据，使用与列表查询相同的逻辑
+        let query;
+        
+        if (trackingStatus) {
+            // 当有筛选条件时，只统计符合条件的记录数量
+            query = `
+                WITH TrackingStats AS (
+                    SELECT 
+                        ar.PersonName,
+                        ar.DepartmentName,
+                        ar.PersonType,
+                        SUM(ar.AssessmentAmount) as totalAmount,
+                        MAX(ar.AssessmentDate) as lastAssessmentDate,
+                        MAX(ar.ImprovementEndDate) as improvementEndDate,
+                        CASE 
+                            WHEN DATEDIFF(day, MAX(ar.AssessmentDate), GETDATE()) >= 90 THEN 'eligible_return'
+                            WHEN DATEDIFF(day, GETDATE(), MAX(ar.ImprovementEndDate)) <= 7 THEN 'expiring_soon'
+                            WHEN MAX(CASE WHEN ar.Status = 'returned' THEN 1 ELSE 0 END) = 1 THEN 'returned'
+                            ELSE 'in_progress'
+                        END as trackingStatus
+                    FROM AssessmentRecords ar
+                    WHERE ${whereClause}
+                        AND ar.Status IN ('pending', 'improving', 'returned')
+                    GROUP BY ar.PersonName, ar.DepartmentName, ar.PersonType
+                )
+                SELECT 
+                    COUNT(*) as filteredCount,
+                    SUM(totalAmount) as filteredAmount
+                FROM TrackingStats
+                WHERE trackingStatus = '${trackingStatus}'
+            `;
+        } else {
+            // 无筛选条件时，统计所有状态的数量
+            query = `
+                WITH TrackingStats AS (
+                    SELECT 
+                        ar.PersonName,
+                        ar.DepartmentName,
+                        ar.PersonType,
+                        SUM(ar.AssessmentAmount) as totalAmount,
+                        MAX(ar.AssessmentDate) as lastAssessmentDate,
+                        MAX(ar.ImprovementEndDate) as improvementEndDate,
+                        CASE 
+                            WHEN DATEDIFF(day, MAX(ar.AssessmentDate), GETDATE()) >= 90 THEN 'eligible_return'
+                            WHEN DATEDIFF(day, GETDATE(), MAX(ar.ImprovementEndDate)) <= 7 THEN 'expiring_soon'
+                            WHEN MAX(CASE WHEN ar.Status = 'returned' THEN 1 ELSE 0 END) = 1 THEN 'returned'
+                            ELSE 'in_progress'
+                        END as trackingStatus
+                    FROM AssessmentRecords ar
+                    WHERE ${whereClause}
+                        AND ar.Status IN ('pending', 'improving', 'returned')
+                    GROUP BY ar.PersonName, ar.DepartmentName, ar.PersonType
+                )
+                SELECT 
+                    COUNT(CASE WHEN trackingStatus = 'in_progress' THEN 1 END) as inProgressCount,
+                    COUNT(CASE WHEN trackingStatus = 'expiring_soon' THEN 1 END) as expiringSoonCount,
+                    COUNT(CASE WHEN trackingStatus = 'eligible_return' THEN 1 END) as eligibleReturnCount,
+                    SUM(CASE WHEN trackingStatus = 'returned' THEN totalAmount ELSE 0 END) as returnedAmount
+                FROM TrackingStats
+            `;
+        }
+        
+        const result = await request.query(query);
+        
+        let overview;
+        if (trackingStatus) {
+            // 筛选状态时，返回筛选结果的统计
+            const data = result.recordset[0];
+            overview = {
+                inProgressCount: trackingStatus === 'in_progress' ? (data.filteredCount || 0) : 0,
+                expiringSoonCount: trackingStatus === 'expiring_soon' ? (data.filteredCount || 0) : 0,
+                eligibleReturnCount: trackingStatus === 'eligible_return' ? (data.filteredCount || 0) : 0,
+                returnedAmount: trackingStatus === 'returned' ? (parseFloat(data.filteredAmount) || 0) : 0
+            };
+        } else {
+            // 无筛选时，返回所有状态的统计
+            overview = result.recordset[0];
+        }
+        
+        res.json({
+            success: true,
+            data: {
+                inProgressCount: overview.inProgressCount || 0,
+                expiringSoonCount: overview.expiringSoonCount || 0,
+                eligibleReturnCount: overview.eligibleReturnCount || 0,
+                returnedAmount: parseFloat(overview.returnedAmount) || 0
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取改善期概览数据失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取改善期概览数据失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 自动返还处理
+ * 自动检测符合返还条件的记录并执行返还处理
+ */
+router.post('/auto-return', async (req, res) => {
+    try {
+        const pool = await sql.connect(await getDynamicConfig());
+        const request = pool.request();
+        
+        // 查找符合返还条件的记录（连续90天无新考核记录）
+        const eligibleQuery = `
+            SELECT ar.ID, ar.PersonName, ar.AssessmentAmount
+            FROM AssessmentRecords ar
+            WHERE ar.ImprovementStartDate IS NOT NULL 
+                AND ar.ImprovementEndDate IS NOT NULL
+                AND ar.Status IN ('pending', 'improving')
+                AND ar.IsReturned = 0
+                AND DATEDIFF(day, ar.AssessmentDate, GETDATE()) >= 90
+                AND NOT EXISTS (
+                    SELECT 1 FROM AssessmentRecords ar2 
+                    WHERE ar2.PersonName = ar.PersonName 
+                        AND ar2.DepartmentName = ar.DepartmentName
+                        AND ar2.AssessmentDate > ar.AssessmentDate
+                        AND DATEDIFF(day, ar.AssessmentDate, ar2.AssessmentDate) < 90
+                )
+        `;
+        
+        const eligibleResult = await request.query(eligibleQuery);
+        const eligibleRecords = eligibleResult.recordset;
+        
+        if (eligibleRecords.length === 0) {
+            return res.json({
+                success: true,
+                message: '没有符合自动返还条件的记录',
+                data: { processedCount: 0 }
+            });
+        }
+        
+        // 批量更新返还状态
+        const updateQuery = `
+            UPDATE AssessmentRecords
+            SET 
+                IsReturned = 1,
+                ReturnDate = GETDATE(),
+                ReturnAmount = AssessmentAmount,
+                ReturnReason = '自动返还-连续90天无新考核记录',
+                Status = 'returned',
+                UpdatedAt = GETDATE()
+            WHERE ID IN (${eligibleRecords.map(r => r.ID).join(',')})
+        `;
+        
+        await request.query(updateQuery);
+        
+        res.json({
+            success: true,
+            message: `成功处理 ${eligibleRecords.length} 条自动返还记录`,
+            data: { processedCount: eligibleRecords.length }
+        });
+        
+    } catch (error) {
+        console.error('自动返还处理失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '自动返还处理失败',
             error: error.message
         });
     }

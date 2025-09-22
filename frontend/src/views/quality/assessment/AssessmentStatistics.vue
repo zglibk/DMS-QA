@@ -238,7 +238,7 @@
             </template>
           </el-table-column>
           <el-table-column prop="improvingCount" label="改善中" width="80" align="center" />
-          <el-table-column prop="pendingCount" label="待改善" width="80" align="center" />
+          <el-table-column prop="pendingCount" label="待考核" width="80" align="center" />
         </el-table>
 
         <!-- 分页 -->
@@ -559,7 +559,7 @@ const initStatusChart = () => {
         },
         data: [
           { value: 12, name: '改善中', itemStyle: { color: '#409EFF' } },
-          { value: 5, name: '待改善', itemStyle: { color: '#E6A23C' } },
+          { value: 5, name: '待考核', itemStyle: { color: '#E6A23C' } },
           { value: 8, name: '已返还', itemStyle: { color: '#67C23A' } },
           { value: 3, name: '已确认', itemStyle: { color: '#909399' } }
         ]
