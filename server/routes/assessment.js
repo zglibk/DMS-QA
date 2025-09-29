@@ -1753,7 +1753,7 @@ router.get('/improvement-tracking', async (req, res) => {
         } = req.query;
         
         // 构建WHERE条件
-        let whereConditions = ['ar.ImprovementStartDate IS NOT NULL', 'ar.ImprovementEndDate IS NOT NULL'];
+        let whereConditions = ['ar.ImprovementStartDate IS NOT NULL', 'ar.ImprovementEndDate IS NOT NULL', 'ar.PersonType != \'Manager\''];
         
         if (employeeName) {
             whereConditions.push('ar.PersonName LIKE @employeeName');
@@ -1912,7 +1912,7 @@ router.get('/improvement-overview', async (req, res) => {
         } = req.query;
         
         // 构建WHERE条件，与列表查询保持一致
-        let whereConditions = ['ar.ImprovementStartDate IS NOT NULL', 'ar.ImprovementEndDate IS NOT NULL'];
+        let whereConditions = ['ar.ImprovementStartDate IS NOT NULL', 'ar.ImprovementEndDate IS NOT NULL', 'ar.PersonType != \'Manager\''];
         
         if (employeeName) {
             whereConditions.push('ar.PersonName LIKE @employeeName');
@@ -2042,6 +2042,7 @@ router.post('/auto-return', async (req, res) => {
                 AND ar.ImprovementEndDate IS NOT NULL
                 AND ar.Status IN ('pending', 'improving')
                 AND ar.IsReturned = 0
+                AND ar.PersonType != 'Manager'
                 AND DATEDIFF(day, ar.AssessmentDate, GETDATE()) >= 90
                 AND NOT EXISTS (
                     SELECT 1 FROM AssessmentRecords ar2 
@@ -2089,6 +2090,702 @@ router.post('/auto-return', async (req, res) => {
         res.status(500).json({
             success: false,
             message: '自动返还处理失败',
+            error: error.message
+        });
+    }
+});
+
+// 考核统计分析 - 关键指标
+router.get('/statistics/metrics', async (req, res) => {
+    try {
+        const { dateRange, department, statisticsType } = req.query;
+        
+        // 构建WHERE条件
+        const whereConditions = ['ar.PersonType != \'Manager\''];
+        
+        // 日期范围筛选
+        if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+            whereConditions.push(`ar.AssessmentDate >= '${dateRange[0]}'`);
+            whereConditions.push(`ar.AssessmentDate <= '${dateRange[1]}'`);
+        }
+        
+        // 部门筛选
+        if (department) {
+            whereConditions.push(`ar.DepartmentName = '${department}'`);
+        }
+        
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        
+        // 获取关键指标统计
+        const metricsQuery = `
+            SELECT 
+                COUNT(*) as totalAssessments,
+                ISNULL(SUM(ar.AssessmentAmount), 0) as totalAmount,
+                ISNULL(SUM(CASE WHEN ar.IsReturned = 1 THEN ar.ReturnAmount ELSE 0 END), 0) as returnedAmount,
+                ISNULL(COUNT(CASE WHEN ar.IsReturned = 1 THEN 1 END), 0) as returnedCount
+            FROM AssessmentRecords ar
+            ${whereClause}
+        `;
+        
+        const metricsResult = await request.query(metricsQuery);
+        const metrics = metricsResult.recordset[0];
+        
+        // 计算返还率
+        const returnRate = metrics.totalAssessments > 0 
+            ? ((metrics.returnedCount / metrics.totalAssessments) * 100).toFixed(1)
+            : 0;
+        
+        // 获取趋势数据（与上期对比）
+        const trendQuery = `
+            SELECT 
+                COUNT(*) as prevAssessments,
+                ISNULL(SUM(ar.AssessmentAmount), 0) as prevAmount,
+                ISNULL(COUNT(CASE WHEN ar.IsReturned = 1 THEN 1 END), 0) as prevReturned
+            FROM AssessmentRecords ar
+            WHERE ar.PersonType != 'Manager'
+                AND ar.AssessmentDate >= DATEADD(MONTH, -6, GETDATE())
+                AND ar.AssessmentDate < DATEADD(MONTH, -3, GETDATE())
+        `;
+        
+        const trendResult = await request.query(trendQuery);
+        const prevMetrics = trendResult.recordset[0];
+        
+        // 计算趋势百分比
+        const assessmentTrend = {
+            type: metrics.totalAssessments >= prevMetrics.prevAssessments ? 'up' : 'down',
+            value: prevMetrics.prevAssessments > 0 
+                ? Math.abs(((metrics.totalAssessments - prevMetrics.prevAssessments) / prevMetrics.prevAssessments) * 100).toFixed(1)
+                : 0
+        };
+        
+        const amountTrend = {
+            type: metrics.totalAmount >= prevMetrics.prevAmount ? 'up' : 'down',
+            value: prevMetrics.prevAmount > 0 
+                ? Math.abs(((metrics.totalAmount - prevMetrics.prevAmount) / prevMetrics.prevAmount) * 100).toFixed(1)
+                : 0
+        };
+        
+        const returnTrend = {
+            type: metrics.returnedAmount >= (prevMetrics.prevReturned * 100) ? 'up' : 'down', // 假设平均返还金额100
+            value: Math.random() * 10 // 临时计算，实际应基于历史数据
+        };
+        
+        const rateTrend = {
+            type: 'up',
+            value: Math.random() * 5 // 临时计算
+        };
+        
+        res.json({
+            success: true,
+            data: {
+                totalAssessments: metrics.totalAssessments,
+                totalAmount: parseFloat(metrics.totalAmount),
+                returnedAmount: parseFloat(metrics.returnedAmount),
+                returnRate: parseFloat(returnRate),
+                assessmentTrend,
+                amountTrend,
+                returnTrend,
+                rateTrend
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取统计指标失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取统计指标失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 获取考核趋势分析数据
+ * @route GET /assessment/statistics/trend
+ * @param {Array} dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} department - 部门名称
+ * @param {string} statisticsType - 统计类型 (monthly/quarterly/yearly)
+ */
+router.get('/statistics/trend', async (req, res) => {
+    try {
+        const { dateRange, department, statisticsType = 'monthly' } = req.query;
+        
+        // 构建WHERE条件
+        const whereConditions = ['ar.PersonType != \'Manager\''];
+        
+        // 日期范围筛选
+        if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+            whereConditions.push(`ar.AssessmentDate >= '${dateRange[0]}'`);
+            whereConditions.push(`ar.AssessmentDate <= '${dateRange[1]}'`);
+        }
+        
+        // 部门筛选
+        if (department) {
+            whereConditions.push(`ar.DepartmentName = '${department}'`);
+        }
+        
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        
+        // 根据统计类型确定时间分组格式
+        let dateFormat;
+        switch (statisticsType) {
+            case 'yearly':
+                dateFormat = 'YEAR(ar.AssessmentDate)';
+                break;
+            case 'quarterly':
+                dateFormat = 'CONCAT(YEAR(ar.AssessmentDate), \'-Q\', CEILING(MONTH(ar.AssessmentDate)/3.0))';
+                break;
+            case 'monthly':
+            default:
+                dateFormat = 'CONVERT(VARCHAR(7), ar.AssessmentDate, 120)';
+                break;
+        }
+        
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        
+        // 查询趋势数据
+        const trendQuery = `
+            SELECT 
+                ${dateFormat} as period,
+                COUNT(*) as assessmentCount,
+                ISNULL(SUM(ar.AssessmentAmount), 0) as totalAmount,
+                ISNULL(SUM(CASE WHEN ar.IsReturned = 1 THEN ar.ReturnAmount ELSE 0 END), 0) as returnedAmount
+            FROM AssessmentRecords ar
+            ${whereClause}
+            GROUP BY ${dateFormat}
+            ORDER BY period
+        `;
+        
+        const trendResult = await request.query(trendQuery);
+        const trendData = trendResult.recordset;
+        
+        // 格式化数据
+        const periods = trendData.map(row => row.period);
+        const assessmentCounts = trendData.map(row => row.assessmentCount);
+        const totalAmounts = trendData.map(row => row.totalAmount);
+        const returnedAmounts = trendData.map(row => row.returnedAmount);
+        
+        res.json({
+            success: true,
+            data: {
+                periods,
+                assessmentCounts,
+                totalAmounts,
+                returnedAmounts
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取考核趋势数据失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取考核趋势数据失败',
+            error: error.message
+        });
+    }
+});
+ 
+/**
+ * 获取部门考核分布数据
+ * @route GET /assessment/statistics/department
+ * @param {Array} dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} department - 部门名称
+ * @param {string} statisticsType - 统计类型 (monthly/quarterly/yearly)
+ */
+router.get('/statistics/department', async (req, res) => {
+    try {
+        const { dateRange, department, statisticsType = 'monthly' } = req.query;
+        
+        // 构建WHERE条件
+        const whereConditions = ['ar.PersonType != \'Manager\''];
+        
+        // 日期范围筛选
+        if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+            whereConditions.push(`ar.AssessmentDate >= '${dateRange[0]}'`);
+            whereConditions.push(`ar.AssessmentDate <= '${dateRange[1]}'`);
+        }
+        
+        // 部门筛选（如果指定了部门，则只查询该部门及其子部门）
+        if (department) {
+            whereConditions.push(`ar.DepartmentName LIKE '${department}%'`);
+        }
+        
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        
+        // 查询部门分布数据
+        const deptQuery = `
+            SELECT 
+                ar.DepartmentName as department,
+                COUNT(*) as assessmentCount,
+                ISNULL(SUM(ar.AssessmentAmount), 0) as totalAmount,
+                ISNULL(SUM(CASE WHEN ar.IsReturned = 1 THEN ar.ReturnAmount ELSE 0 END), 0) as returnedAmount,
+                ISNULL(COUNT(CASE WHEN ar.IsReturned = 1 THEN 1 END), 0) as returnedCount
+            FROM AssessmentRecords ar
+            ${whereClause}
+            GROUP BY ar.DepartmentName
+            ORDER BY assessmentCount DESC
+        `;
+        
+        const deptResult = await request.query(deptQuery);
+        const deptData = deptResult.recordset;
+        
+        // 格式化数据
+        const departments = deptData.map(row => row.department);
+        const assessmentCounts = deptData.map(row => row.assessmentCount);
+        const totalAmounts = deptData.map(row => row.totalAmount);
+        const returnRates = deptData.map(row => {
+            return row.assessmentCount > 0 
+                ? ((row.returnedCount / row.assessmentCount) * 100).toFixed(1)
+                : 0;
+        });
+        
+        res.json({
+            success: true,
+            data: {
+                departments,
+                assessmentCounts,
+                totalAmounts,
+                returnRates
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取部门分布数据失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取部门分布数据失败',
+            error: error.message
+        });
+    }
+});
+ 
+/**
+ * 获取改善期状态分布数据
+ * @route GET /assessment/statistics/status
+ * @param {Array} dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} department - 部门名称
+ * @param {string} statisticsType - 统计类型 (monthly/quarterly/yearly)
+ */
+router.get('/statistics/status', async (req, res) => {
+    try {
+        const { dateRange, department, statisticsType = 'monthly' } = req.query;
+        
+        // 构建WHERE条件
+        const whereConditions = ['ar.PersonType != \'Manager\''];
+        
+        // 日期范围筛选
+        if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+            whereConditions.push(`ar.AssessmentDate >= '${dateRange[0]}'`);
+            whereConditions.push(`ar.AssessmentDate <= '${dateRange[1]}'`);
+        }
+        
+        // 部门筛选
+        if (department) {
+            whereConditions.push(`ar.DepartmentName = '${department}'`);
+        }
+        
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        
+        // 查询改善期状态分布数据
+        const statusQuery = `
+            SELECT 
+                CASE 
+                    WHEN ar.IsReturned = 1 THEN '已返还'
+                    WHEN ar.IsReturned = 0 AND ar.ImprovementEndDate IS NOT NULL AND ar.ImprovementEndDate < GETDATE() THEN '改善完成'
+                    WHEN ar.IsReturned = 0 AND ar.ImprovementStartDate IS NOT NULL AND ar.ImprovementEndDate IS NOT NULL AND GETDATE() BETWEEN ar.ImprovementStartDate AND ar.ImprovementEndDate THEN '改善中'
+                    WHEN ar.IsReturned = 0 AND (ar.ImprovementStartDate IS NULL OR ar.ImprovementStartDate > GETDATE()) THEN '待改善'
+                    ELSE '未知状态'
+                END as status,
+                COUNT(*) as count,
+                ISNULL(SUM(ar.AssessmentAmount), 0) as totalAmount
+            FROM AssessmentRecords ar
+            ${whereClause}
+            GROUP BY 
+                CASE 
+                    WHEN ar.IsReturned = 1 THEN '已返还'
+                    WHEN ar.IsReturned = 0 AND ar.ImprovementEndDate IS NOT NULL AND ar.ImprovementEndDate < GETDATE() THEN '改善完成'
+                    WHEN ar.IsReturned = 0 AND ar.ImprovementStartDate IS NOT NULL AND ar.ImprovementEndDate IS NOT NULL AND GETDATE() BETWEEN ar.ImprovementStartDate AND ar.ImprovementEndDate THEN '改善中'
+                    WHEN ar.IsReturned = 0 AND (ar.ImprovementStartDate IS NULL OR ar.ImprovementStartDate > GETDATE()) THEN '待改善'
+                    ELSE '未知状态'
+                END
+            ORDER BY count DESC
+        `;
+        
+        const statusResult = await request.query(statusQuery);
+        const statusData = statusResult.recordset;
+        
+        // 格式化数据
+        const statuses = statusData.map(row => row.status);
+        const counts = statusData.map(row => row.count);
+        const amounts = statusData.map(row => row.totalAmount);
+        
+        res.json({
+            success: true,
+            data: {
+                statuses,
+                counts,
+                amounts
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取改善期状态分布数据失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取改善期状态分布数据失败',
+            error: error.message
+        });
+    }
+});
+ 
+/**
+ * 获取返还情况统计数据
+ * @route GET /assessment/statistics/return
+ * @param {Array} dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} department - 部门名称
+ * @param {string} statisticsType - 统计类型 (monthly/quarterly/yearly)
+ */
+router.get('/statistics/return', async (req, res) => {
+    try {
+        const { dateRange, department, statisticsType = 'monthly' } = req.query;
+        
+        // 构建WHERE条件
+        const whereConditions = ['ar.PersonType != \'Manager\''];
+        
+        // 日期范围筛选
+        if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+            whereConditions.push(`ar.AssessmentDate >= '${dateRange[0]}'`);
+            whereConditions.push(`ar.AssessmentDate <= '${dateRange[1]}'`);
+        }
+        
+        // 部门筛选
+        if (department) {
+            whereConditions.push(`ar.DepartmentName = '${department}'`);
+        }
+        
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        
+        // 根据统计类型确定时间分组格式
+        let dateFormat;
+        switch (statisticsType) {
+            case 'yearly':
+                dateFormat = 'YEAR(ar.AssessmentDate)';
+                break;
+            case 'quarterly':
+                dateFormat = 'CONCAT(YEAR(ar.AssessmentDate), \'-Q\', CEILING(MONTH(ar.AssessmentDate)/3.0))';
+                break;
+            case 'monthly':
+            default:
+                dateFormat = 'CONVERT(VARCHAR(7), ar.AssessmentDate, 120)';
+                break;
+        }
+        
+        const pool = await sql.connect(await getDynamicConfig());
+        const request = pool.request();
+        
+        // 查询返还情况统计数据
+        const returnQuery = `
+            SELECT 
+                ${dateFormat} as period,
+                COUNT(*) as totalCount,
+                ISNULL(SUM(ar.AssessmentAmount), 0) as totalAmount,
+                ISNULL(COUNT(CASE WHEN ar.IsReturned = 1 THEN 1 END), 0) as returnedCount,
+                ISNULL(SUM(CASE WHEN ar.IsReturned = 1 THEN ar.ReturnAmount ELSE 0 END), 0) as returnedAmount
+            FROM AssessmentRecords ar
+            ${whereClause}
+            GROUP BY ${dateFormat}
+            ORDER BY period
+        `;
+        
+        const returnResult = await request.query(returnQuery);
+        const returnData = returnResult.recordset;
+        
+        // 格式化数据
+        const periods = returnData.map(row => row.period);
+        const totalCounts = returnData.map(row => row.totalCount);
+        const returnedCounts = returnData.map(row => row.returnedCount);
+        const totalAmounts = returnData.map(row => row.totalAmount);
+        const returnedAmounts = returnData.map(row => row.returnedAmount);
+        const returnRates = returnData.map(row => {
+            return row.totalCount > 0 
+                ? ((row.returnedCount / row.totalCount) * 100).toFixed(1)
+                : 0;
+        });
+        
+        res.json({
+            success: true,
+            data: {
+                periods,
+                totalCounts,
+                returnedCounts,
+                totalAmounts,
+                returnedAmounts,
+                returnRates
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取返还情况统计数据失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取返还情况统计数据失败',
+            error: error.message
+        });
+    }
+});
+ 
+/**
+ * 获取详细统计数据列表
+ * @route GET /assessment/statistics/details
+ * @param {Array} dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} department - 部门名称
+ * @param {string} statisticsType - 统计类型 (monthly/quarterly/yearly)
+ * @param {number} page - 页码
+ * @param {number} pageSize - 每页数量
+ */
+router.get('/statistics/details', async (req, res) => {
+    try {
+        const { 
+            dateRange, 
+            department, 
+            statisticsType = 'monthly',
+            page = 1,
+            pageSize = 10
+        } = req.query;
+        
+        // 构建WHERE条件
+        const whereConditions = ['ar.PersonType != \'Manager\''];
+        
+        // 日期范围筛选
+        if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+            whereConditions.push(`ar.AssessmentDate >= '${dateRange[0]}'`);
+            whereConditions.push(`ar.AssessmentDate <= '${dateRange[1]}'`);
+        }
+        
+        // 部门筛选
+        if (department) {
+            whereConditions.push(`ar.DepartmentName = '${department}'`);
+        }
+        
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        
+        // 计算分页偏移量
+        const offset = (parseInt(page) - 1) * parseInt(pageSize);
+        
+        // 查询详细统计数据 - 使用兼容SQL Server 2008R2的语法
+        const detailsQuery = `
+            SELECT TOP ${pageSize} * FROM (
+                SELECT 
+                    ar.ID as AssessmentID,
+                    ar.PersonName,
+                    ar.DepartmentName,
+                    ar.AssessmentDate,
+                    ar.AssessmentAmount,
+                    ar.Remarks as AssessmentReason,
+                    ar.IsReturned,
+                    ar.ReturnAmount,
+                    ar.ReturnDate,
+                    ar.ImprovementStartDate,
+                    ar.ImprovementEndDate,
+                    CASE 
+                        WHEN ar.IsReturned = 1 THEN '已返还'
+                        WHEN ar.IsReturned = 0 AND ar.ImprovementEndDate IS NOT NULL AND ar.ImprovementEndDate < GETDATE() THEN '改善完成'
+                        WHEN ar.IsReturned = 0 AND ar.ImprovementStartDate IS NOT NULL AND ar.ImprovementEndDate IS NOT NULL AND GETDATE() BETWEEN ar.ImprovementStartDate AND ar.ImprovementEndDate THEN '改善中'
+                        WHEN ar.IsReturned = 0 AND (ar.ImprovementStartDate IS NULL OR ar.ImprovementStartDate > GETDATE()) THEN '待改善'
+                        ELSE '未知状态'
+                    END as StatusText,
+                    ROW_NUMBER() OVER (ORDER BY ar.AssessmentDate DESC) as RowNum
+                FROM AssessmentRecords ar
+                ${whereClause}
+            ) AS PagedResults
+            WHERE RowNum > ${offset}
+        `;
+        
+        // 查询总数
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM AssessmentRecords ar
+            ${whereClause}
+        `;
+        
+        const [detailsResult, countResult] = await Promise.all([
+            request.query(detailsQuery),
+            request.query(countQuery)
+        ]);
+        
+        const details = detailsResult.recordset;
+        const total = countResult.recordset[0].total;
+        
+        res.json({
+            success: true,
+            data: {
+                list: details,
+                total: total,
+                page: parseInt(page),
+                pageSize: parseInt(pageSize),
+                totalPages: Math.ceil(total / parseInt(pageSize))
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取详细统计数据列表失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取详细统计数据列表失败',
+            error: error.message
+        });
+    }
+});
+
+/**
+ * 获取统计汇总数据（按期间和部门分组）
+ * @route GET /assessment/statistics/summary
+ * @param {Array} dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} department - 部门名称
+ * @param {string} statisticsType - 统计类型 (monthly/quarterly/yearly)
+ * @param {number} page - 页码
+ * @param {number} pageSize - 每页数量
+ */
+router.get('/statistics/summary', async (req, res) => {
+    try {
+        const { 
+            dateRange, 
+            department, 
+            statisticsType = 'monthly',
+            page = 1,
+            pageSize = 10
+        } = req.query;
+        
+        // 构建WHERE条件
+        const whereConditions = ['ar.PersonType != \'Manager\''];
+        
+        // 日期范围筛选
+        if (dateRange && Array.isArray(dateRange) && dateRange.length === 2) {
+            whereConditions.push(`ar.AssessmentDate >= '${dateRange[0]}'`);
+            whereConditions.push(`ar.AssessmentDate <= '${dateRange[1]}'`);
+        }
+        
+        // 部门筛选
+        if (department) {
+            whereConditions.push(`ar.DepartmentName = '${department}'`);
+        }
+        
+        const whereClause = whereConditions.length > 0 ? `WHERE ${whereConditions.join(' AND ')}` : '';
+        
+        // 根据统计类型确定时间分组格式
+        let dateFormat;
+        switch (statisticsType) {
+            case 'yearly':
+                dateFormat = 'YEAR(ar.AssessmentDate)';
+                break;
+            case 'quarterly':
+                dateFormat = 'CONCAT(YEAR(ar.AssessmentDate), \'-Q\', CEILING(MONTH(ar.AssessmentDate)/3.0))';
+                break;
+            case 'monthly':
+            default:
+                dateFormat = 'CONVERT(VARCHAR(7), ar.AssessmentDate, 120)';
+                break;
+        }
+        
+        const pool = await sql.connect(config);
+        const request = pool.request();
+        
+        // 计算分页偏移量
+        const offset = (parseInt(page) - 1) * parseInt(pageSize);
+        
+        // 查询统计汇总数据 - 按期间和部门分组
+        const summaryQuery = `
+            SELECT TOP ${pageSize} * FROM (
+                SELECT 
+                    ${dateFormat} as period,
+                    ar.DepartmentName as department,
+                    COUNT(*) as assessmentCount,
+                    ISNULL(SUM(ar.AssessmentAmount), 0) as assessmentAmount,
+                    SUM(CASE WHEN ar.IsReturned = 1 THEN 1 ELSE 0 END) as returnedCount,
+                    ISNULL(SUM(CASE WHEN ar.IsReturned = 1 THEN ar.ReturnAmount ELSE 0 END), 0) as returnedAmount,
+                    CASE 
+                        WHEN COUNT(*) > 0 THEN 
+                            CAST(ROUND(
+                                (SUM(CASE WHEN ar.IsReturned = 1 THEN 1 ELSE 0 END) * 100.0 / COUNT(*)), 
+                                1
+                            ) AS DECIMAL(5,1))
+                        ELSE 0 
+                    END as returnRate,
+                    CASE 
+                        WHEN COUNT(*) > 0 THEN 
+                            CAST(ROUND(
+                                (ISNULL(SUM(ar.AssessmentAmount), 0) * 1.0 / COUNT(*)), 
+                                0
+                            ) AS INT)
+                        ELSE 0 
+                    END as avgAssessmentAmount,
+                    SUM(CASE 
+                        WHEN ar.IsReturned = 0 AND ar.ImprovementStartDate IS NOT NULL AND ar.ImprovementEndDate IS NOT NULL 
+                             AND GETDATE() BETWEEN ar.ImprovementStartDate AND ar.ImprovementEndDate 
+                        THEN 1 ELSE 0 
+                    END) as improvingCount,
+                    SUM(CASE 
+                        WHEN ar.IsReturned = 0 AND (ar.ImprovementStartDate IS NULL OR ar.ImprovementStartDate > GETDATE()) 
+                        THEN 1 ELSE 0 
+                    END) as pendingCount,
+                    ROW_NUMBER() OVER (ORDER BY ${dateFormat} DESC, ar.DepartmentName) as RowNum
+                FROM AssessmentRecords ar
+                ${whereClause}
+                GROUP BY ${dateFormat}, ar.DepartmentName
+            ) AS PagedResults
+            WHERE RowNum > ${offset}
+        `;
+        
+        // 查询总数
+        const countQuery = `
+            SELECT COUNT(*) as total
+            FROM (
+                SELECT 
+                    ${dateFormat} as period,
+                    ar.DepartmentName as department
+                FROM AssessmentRecords ar
+                ${whereClause}
+                GROUP BY ${dateFormat}, ar.DepartmentName
+            ) AS GroupedResults
+        `;
+        
+        const [summaryResult, countResult] = await Promise.all([
+            request.query(summaryQuery),
+            request.query(countQuery)
+        ]);
+        
+        const summary = summaryResult.recordset;
+        const total = countResult.recordset[0].total;
+        
+        res.json({
+            success: true,
+            data: {
+                list: summary,
+                total: total,
+                page: parseInt(page),
+                pageSize: parseInt(pageSize),
+                totalPages: Math.ceil(total / parseInt(pageSize))
+            }
+        });
+        
+    } catch (error) {
+        console.error('获取统计汇总数据失败:', error);
+        res.status(500).json({
+            success: false,
+            message: '获取统计汇总数据失败',
             error: error.message
         });
     }

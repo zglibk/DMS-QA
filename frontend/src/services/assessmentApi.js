@@ -219,3 +219,91 @@ export const saveColumnSettings = (userId, columnSettings, userName) => {
 export const deleteColumnSettings = (userId) => {
   return api.delete(`/assessment/column-settings/${userId}`)
 }
+
+/**
+ * 获取考核统计分析 - 关键指标
+ * @param {Object} params - 查询参数
+ * @param {Array} params.dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} params.department - 部门名称
+ * @param {string} params.statisticsType - 统计类型 (monthly/quarterly/yearly)
+ * @returns {Promise} API响应
+ */
+export const getStatisticsMetrics = (params) => {
+  return api.get('/assessment/statistics/metrics', { params })
+}
+
+/**
+ * 获取考核趋势分析数据
+ * @param {Object} params - 查询参数
+ * @param {Array} params.dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} params.department - 部门名称
+ * @param {string} params.statisticsType - 统计类型 (monthly/quarterly/yearly)
+ * @returns {Promise} API响应
+ */
+export const getStatisticsTrend = (params) => {
+  return api.get('/assessment/statistics/trend', { params })
+}
+
+/**
+ * 获取部门考核分布数据
+ * @param {Object} params - 查询参数
+ * @param {Array} params.dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} params.department - 部门名称
+ * @param {string} params.statisticsType - 统计类型 (monthly/quarterly/yearly)
+ * @returns {Promise} API响应
+ */
+export const getStatisticsDepartment = (params) => {
+  return api.get('/assessment/statistics/department', { params })
+}
+
+/**
+ * 获取改善期状态分布数据
+ * @param {Object} params - 查询参数
+ * @param {Array} params.dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} params.department - 部门名称
+ * @param {string} params.statisticsType - 统计类型 (monthly/quarterly/yearly)
+ * @returns {Promise} API响应
+ */
+export const getStatisticsStatus = (params) => {
+  return api.get('/assessment/statistics/status', { params });
+};
+
+/**
+ * 获取返还情况统计数据
+ * @param {Object} params - 查询参数
+ * @param {Array} params.dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} params.department - 部门名称
+ * @param {string} params.statisticsType - 统计类型 (monthly/quarterly/yearly)
+ * @returns {Promise} API响应
+ */
+export const getStatisticsReturn = (params) => {
+  return api.get('/assessment/statistics/return', { params });
+};
+
+/**
+ * 获取详细统计数据列表
+ * @param {Object} params - 查询参数
+ * @param {Array} params.dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} params.department - 部门名称
+ * @param {string} params.statisticsType - 统计类型 (monthly/quarterly/yearly)
+ * @param {number} params.page - 页码
+ * @param {number} params.pageSize - 每页数量
+ * @returns {Promise} API响应
+ */
+export const getStatisticsDetails = (params) => {
+  return api.get('/assessment/statistics/details', { params });
+};
+
+/**
+ * 获取统计汇总数据（按期间和部门分组）
+ * @param {Object} params - 查询参数
+ * @param {Array} params.dateRange - 日期范围 [开始日期, 结束日期]
+ * @param {string} params.department - 部门名称
+ * @param {string} params.statisticsType - 统计类型 (monthly/quarterly/yearly)
+ * @param {number} params.page - 页码
+ * @param {number} params.pageSize - 每页数量
+ * @returns {Promise} API响应
+ */
+export const getStatisticsSummary = (params) => {
+  return api.get('/assessment/statistics/summary', { params });
+};

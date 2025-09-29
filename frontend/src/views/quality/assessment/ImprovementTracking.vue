@@ -2,8 +2,16 @@
   <div class="improvement-tracking">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2>改善期跟踪</h2>
-      <p class="page-description">跟踪员工改善期状态，管理返还条件和处理流程</p>
+      <div class="header-left">
+        <h2>改善期跟踪</h2>
+        <p class="page-description">跟踪员工改善期状态，管理返还条件和处理流程</p>
+      </div>
+      <div class="header-right">
+        <el-button type="success" @click="handleAutoReturn">
+          <el-icon><Setting /></el-icon>
+          自动返还处理
+        </el-button>
+      </div>
     </div>
 
     <!-- 筛选区域 -->
@@ -53,10 +61,6 @@
           <el-button @click="resetFilter">
             <el-icon><Refresh /></el-icon>
             重置
-          </el-button>
-          <el-button type="success" @click="handleAutoReturn">
-            <el-icon><Setting /></el-icon>
-            自动返还处理
           </el-button>
         </el-col>
       </el-row>
@@ -752,6 +756,18 @@ const handleDepartmentChange = (value) => {
 
 .page-header {
   margin-bottom: 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.header-left {
+  flex: 1;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
 }
 
 .page-header h2 {

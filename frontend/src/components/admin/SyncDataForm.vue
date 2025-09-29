@@ -10,9 +10,9 @@
       <!-- 同步模式选择 -->
       <div class="sync-mode-selector">
         <el-radio-group v-model="syncMode" @change="handleSyncModeChange">
-          <el-radio-button label="manual">手动录入</el-radio-button>
-          <el-radio-button label="erp">ERP同步</el-radio-button>
-          <el-radio-button label="batch">批量同步</el-radio-button>
+          <el-radio-button value="manual">手动录入</el-radio-button>
+          <el-radio-button value="erp">ERP同步</el-radio-button>
+          <el-radio-button value="batch">批量同步</el-radio-button>
         </el-radio-group>
       </div>
 
