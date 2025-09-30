@@ -708,6 +708,11 @@ const refreshData = () => {
 // 初始化图表
 const initChart = () => {
   if (chartRef.value) {
+    // 如果已存在图表实例，先销毁
+    if (chartInstance.value) {
+      chartInstance.value.dispose()
+    }
+    
     chartInstance.value = echarts.init(chartRef.value)
     chartInstance.value.setOption(chartOption.value)
 

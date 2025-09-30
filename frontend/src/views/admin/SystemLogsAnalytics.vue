@@ -742,26 +742,46 @@ const fetchTrendData = async () => {
 const initCharts = () => {
   // 趋势图
   if (trendChartRef.value) {
+    // 如果已存在图表实例，先销毁
+    if (trendChart.value) {
+      trendChart.value.dispose()
+    }
     trendChart.value = echarts.init(trendChartRef.value)
   }
 
   // 分类分布图
   if (categoryChartRef.value) {
+    // 如果已存在图表实例，先销毁
+    if (categoryChart.value) {
+      categoryChart.value.dispose()
+    }
     categoryChart.value = echarts.init(categoryChartRef.value)
   }
 
   // 模块活跃度图
   if (moduleChartRef.value) {
+    // 如果已存在图表实例，先销毁
+    if (moduleChart.value) {
+      moduleChart.value.dispose()
+    }
     moduleChart.value = echarts.init(moduleChartRef.value)
   }
 
   // 用户活跃度图
   if (userChartRef.value) {
+    // 如果已存在图表实例，先销毁
+    if (userChart.value) {
+      userChart.value.dispose()
+    }
     userChart.value = echarts.init(userChartRef.value)
   }
 
   // 错误统计图
   if (errorChartRef.value) {
+    // 如果已存在图表实例，先销毁
+    if (errorChart.value) {
+      errorChart.value.dispose()
+    }
     errorChart.value = echarts.init(errorChartRef.value)
   }
 

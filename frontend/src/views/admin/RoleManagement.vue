@@ -115,8 +115,8 @@
       <!-- 分页 -->
       <div class="pagination-wrapper">
         <el-pagination
-          :current-page="pagination.page"
-          :page-size="pagination.size"
+          v-model:current-page="pagination.page"
+          v-model:page-size="pagination.size"
           :page-sizes="[5, 10, 20, 50, 100]"
           :total="pagination.total"
           layout="total, sizes, prev, pager, next, jumper"

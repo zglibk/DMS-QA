@@ -64,8 +64,8 @@ const refreshToken = async () => {
       }
     })
     
-    if (response.data.success && response.data.token) {
-      const newToken = response.data.token
+    if (response.data.success && response.data.data && response.data.data.token) {
+      const newToken = response.data.data.token
       localStorage.setItem('token', newToken)
       return newToken
     } else {

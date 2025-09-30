@@ -69,6 +69,7 @@ const dashboardRouter = require('./routes/dashboard');           // 仪表板数
 const monthlyBatchStatsRouter = require('./routes/monthlyBatchStats'); // 月度批次统计管理路由
 const versionUpdatesRouter = require('./routes/versionUpdates'); // 版本更新管理路由
 const assessmentRouter = require('./routes/assessment');         // 质量考核管理路由
+const instrumentsRouter = require('./routes/instruments');       // 仪器管理路由
 const erpSyncService = require('./services/erpSyncService');
 const { startFileServer } = require('./file-server');
 const { logCleanupService } = require('./services/logCleanupService');
@@ -273,6 +274,7 @@ app.use('/api/import', importRouter);
 app.use('/api/upload', uploadRouter);
 app.use('/api/quality-metrics', qualityMetricsRouter);
 app.use('/api/admin/material-prices', materialPriceRouter);
+app.use('/api/instruments', instrumentsRouter);
 app.use('/api/rework', reworkRouter);
 app.use('/api/person', personRouter);
 app.use('/api/departments', departmentRouter);

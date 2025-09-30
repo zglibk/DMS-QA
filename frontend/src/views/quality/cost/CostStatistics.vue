@@ -1261,12 +1261,24 @@ const updateCustomerChart = (customerData) => {
  */
 const initCharts = () => {
   if (trendChartRef.value) {
+    // 如果已存在图表实例，先销毁
+    if (trendChart) {
+      trendChart.dispose()
+    }
     trendChart = echarts.init(trendChartRef.value)
   }
   if (pieChartRef.value) {
+    // 如果已存在图表实例，先销毁
+    if (pieChart) {
+      pieChart.dispose()
+    }
     pieChart = echarts.init(pieChartRef.value)
   }
   if (customerChartRef.value) {
+    // 如果已存在图表实例，先销毁
+    if (customerChart) {
+      customerChart.dispose()
+    }
     customerChart = echarts.init(customerChartRef.value)
   }
 

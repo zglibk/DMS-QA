@@ -328,6 +328,32 @@ const routes = [
         meta: { requiresAuth: true }
       },
 
+      // 仪器管理模块
+      {
+        path: 'instruments',
+        redirect: '/admin/instruments/ledger'
+      },
+      {
+        path: 'instruments/list',
+        component: () => import('../views/admin/instruments/InstrumentManagement.vue'), // 仪器管理主页面
+        meta: { title: '仪器管理', requiresAuth: true }
+      },
+      {
+        path: 'instruments/ledger',
+        component: () => import('../views/admin/instruments/InstrumentManagement.vue'), // 仪器台账页面
+        meta: { title: '仪器台账', requiresAuth: true }
+      },
+      {
+        path: 'instruments/calibration',
+        component: () => import('../views/admin/instruments/InstrumentManagement.vue'), // 校准检定页面
+        meta: { title: '校准检定', requiresAuth: true }
+      },
+      {
+        path: 'instruments/annual-plan',
+        component: () => import('../views/admin/instruments/InstrumentManagement.vue'), // 年度计划页面
+        meta: { title: '年度计划', requiresAuth: true }
+      },
+
       // 二次开发模块
       {
         path: 'development',

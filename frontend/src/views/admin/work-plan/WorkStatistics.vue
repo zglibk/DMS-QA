@@ -507,6 +507,9 @@ const getDepartmentData = async () => {
 const drawTrendChart = (data) => {
   if (!trendChart) {
     trendChart = echarts.init(trendChartRef.value)
+  } else {
+    // 如果图表已存在，清空配置重新设置
+    trendChart.clear()
   }
   
   const option = {
@@ -566,6 +569,9 @@ const drawTrendChart = (data) => {
 const drawStatusChart = (data) => {
   if (!statusChart) {
     statusChart = echarts.init(statusChartRef.value)
+  } else {
+    // 如果图表已存在，清空配置重新设置
+    statusChart.clear()
   }
   
   const option = {
@@ -606,11 +612,14 @@ const drawStatusChart = (data) => {
 }
 
 /**
- * 绘制工作类型图表
+ * 绘制类型分布图表
  */
 const drawTypeChart = (data) => {
   if (!typeChart) {
     typeChart = echarts.init(typeChartRef.value)
+  } else {
+    // 如果图表已存在，清空配置重新设置
+    typeChart.clear()
   }
   
   const option = {
@@ -680,11 +689,14 @@ const drawTypeChart = (data) => {
 }
 
 /**
- * 绘制部门绩效图表
+ * 绘制部门统计图表
  */
 const drawDepartmentChart = (data) => {
   if (!departmentChart) {
     departmentChart = echarts.init(departmentChartRef.value)
+  } else {
+    // 如果图表已存在，清空配置重新设置
+    departmentChart.clear()
   }
   
   const option = {

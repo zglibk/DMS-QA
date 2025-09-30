@@ -75,7 +75,7 @@
                 <div class="metric-trend" :class="metrics.assessmentTrend.type">
                   <el-icon v-if="metrics.assessmentTrend.type === 'up'"><ArrowUp /></el-icon>
                   <el-icon v-else><ArrowDown /></el-icon>
-                  {{ metrics.assessmentTrend.value }}%
+                  {{ Number(metrics.assessmentTrend.value).toFixed(1) }}%
                 </div>
               </div>
             </div>
@@ -93,7 +93,7 @@
                 <div class="metric-trend" :class="metrics.amountTrend.type">
                   <el-icon v-if="metrics.amountTrend.type === 'up'"><ArrowUp /></el-icon>
                   <el-icon v-else><ArrowDown /></el-icon>
-                  {{ metrics.amountTrend.value }}%
+                  {{ Number(metrics.amountTrend.value).toFixed(1) }}%
                 </div>
               </div>
             </div>
@@ -111,7 +111,7 @@
                 <div class="metric-trend" :class="metrics.returnTrend.type">
                   <el-icon v-if="metrics.returnTrend.type === 'up'"><ArrowUp /></el-icon>
                   <el-icon v-else><ArrowDown /></el-icon>
-                  {{ metrics.returnTrend.value }}%
+                  {{ Number(metrics.returnTrend.value).toFixed(1) }}%
                 </div>
               </div>
             </div>
@@ -129,7 +129,7 @@
                 <div class="metric-trend" :class="metrics.rateTrend.type">
                   <el-icon v-if="metrics.rateTrend.type === 'up'"><ArrowUp /></el-icon>
                   <el-icon v-else><ArrowDown /></el-icon>
-                  {{ metrics.rateTrend.value }}%
+                  {{ Number(metrics.rateTrend.value).toFixed(1) }}%
                 </div>
               </div>
             </div>
@@ -584,6 +584,11 @@
     if (!trendChartRef.value) return
     
     try {
+      // 如果已存在图表实例，先销毁
+      if (trendChart) {
+        trendChart.dispose()
+      }
+      
       trendChart = echarts.init(trendChartRef.value)
       
       const trendData = await getTrendData(trendChartType.value)

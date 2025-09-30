@@ -2236,7 +2236,7 @@ router.get('/statistics/trend', async (req, res) => {
                 dateFormat = 'YEAR(ar.AssessmentDate)';
                 break;
             case 'quarterly':
-                dateFormat = 'CONCAT(YEAR(ar.AssessmentDate), \'-Q\', CEILING(MONTH(ar.AssessmentDate)/3.0))';
+                dateFormat = 'CAST(YEAR(ar.AssessmentDate) AS VARCHAR) + \'-Q\' + CAST(CEILING(CAST(MONTH(ar.AssessmentDate) AS FLOAT)/3.0) AS VARCHAR)';
                 break;
             case 'monthly':
             default:
@@ -2482,7 +2482,7 @@ router.get('/statistics/return', async (req, res) => {
                 dateFormat = 'YEAR(ar.AssessmentDate)';
                 break;
             case 'quarterly':
-                dateFormat = 'CONCAT(YEAR(ar.AssessmentDate), \'-Q\', CEILING(MONTH(ar.AssessmentDate)/3.0))';
+                dateFormat = 'CAST(YEAR(ar.AssessmentDate) AS VARCHAR) + \'-Q\' + CAST(CEILING(CAST(MONTH(ar.AssessmentDate) AS FLOAT)/3.0) AS VARCHAR)';
                 break;
             case 'monthly':
             default:
@@ -2692,7 +2692,7 @@ router.get('/statistics/summary', async (req, res) => {
                 dateFormat = 'YEAR(ar.AssessmentDate)';
                 break;
             case 'quarterly':
-                dateFormat = 'CONCAT(YEAR(ar.AssessmentDate), \'-Q\', CEILING(MONTH(ar.AssessmentDate)/3.0))';
+                dateFormat = 'CAST(YEAR(ar.AssessmentDate) AS VARCHAR) + \'-Q\' + CAST(CEILING(CAST(MONTH(ar.AssessmentDate) AS FLOAT)/3.0) AS VARCHAR)';
                 break;
             case 'monthly':
             default:
