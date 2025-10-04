@@ -622,22 +622,21 @@
       </template>
     </el-dialog>
 
-    <!-- 图片预览对话框 -->
-    <el-dialog v-model="imagePreviewVisible" title="图片预览" width="60%">
-      <div class="image-preview">
-        <img v-if="previewImageUrl && previewImageUrl.trim()" :src="previewImageUrl" alt="预览图片" style="width: 100%; height: auto;" />
-        <el-empty v-else description="暂无图片" />
-      </div>
-    </el-dialog>
+    <!-- 图片预览组件 - 使用封装的ImgPreview组件 -->
+    <ImgPreview v-model="imageViewerVisible" :imgs="[previewImageUrl]" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue'
+import { ref, reactive, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Document, Check, Clock, Close, Plus, Download, CircleClose, SuccessFilled } from '@element-plus/icons-vue'
+import { 
+  Document, Check, Clock, Close, Plus, CircleClose, SuccessFilled,
+  Back, Right, DArrowRight, ZoomOut, ZoomIn, RefreshRight, RefreshLeft, Refresh, Download
+} from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import { useUserStore } from '@/store/user'
+import ImgPreview from '@/components/ImgPreview.vue'
 // ExcelJS 将在需要时动态导入
 // 导出相关库将在需要时动态导入
 
@@ -709,6 +708,7 @@ const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
 const imagePreviewVisible = ref(false)
 const previewImageUrl = ref('')
+const imageViewerVisible = ref(false) // 新增：控制el-image-viewer显示状态
 const selectedRows = ref([])
 const formRef = ref(null)
 const drawingFileList = ref([])
@@ -1341,12 +1341,129 @@ function handleCurrentChange(page) {
 }
 
 /**
- * 图片查看
+ * 环境自适应的图片URL构建函数
+ * 根据当前环境（开发/生产）动态构建图片访问URL
+ * @param {string} imagePath - 图片路径
+ * @param {boolean} preventCache - 是否防止缓存，默认false
+ * @returns {string} 完整的图片URL
+ */
+function getAdaptedImageUrl(imagePath, preventCache = false) {
+  if (!imagePath) return ''
+  
+  // 根据当前页面的hostname判断环境
+  const hostname = window.location.hostname
+  const protocol = window.location.protocol
+  
+  // 调试信息：输出环境判断结果
+  console.log('🔍 图片URL构建调试信息:')
+  console.log('原始图片路径:', imagePath)
+  console.log('当前hostname:', hostname)
+  console.log('当前protocol:', protocol)
+  
+  // 构建图片URL
+  let url
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    // 开发环境：没有文件服务器，直接使用相对路径访问文件
+    // 确保路径以/files/开头，用于Vite开发服务器的静态文件代理
+    url = imagePath.startsWith('/files/') ? imagePath : `/files/${imagePath.replace(/^\/+/, '')}`
+    console.log('🏠 开发环境 - 构建的URL:', url)
+  } else {
+    // 生产环境：使用Nginx文件服务器，文件访问需要通过8080端口
+    const cleanPath = imagePath.startsWith('/files/') ? imagePath : `/files/${imagePath.replace(/^\/+/, '')}`
+    url = `${protocol}//${hostname}:8080${cleanPath}`
+    console.log('🏭 生产环境 - 清理后的路径:', cleanPath)
+    console.log('🏭 生产环境 - 构建的URL:', url)
+  }
+  
+  // 只在需要防止缓存时添加时间戳参数
+  if (preventCache) {
+    const timestamp = Date.now()
+    url += `?t=${timestamp}`
+    console.log('⏰ 添加防缓存时间戳后的URL:', url)
+  }
+  
+  console.log('✅ 最终返回的URL:', url)
+  console.log('---')
+  
+  return url
+}
+
+/**
+ * 图片查看 - 使用封装的ImgPreview组件
  */
 function viewImage(imageUrl) {
-  // 如果传入的图片URL为空或无效，设置为空字符串以显示暂无图片状态
-  previewImageUrl.value = imageUrl && imageUrl.trim() ? imageUrl : ''
-  imagePreviewVisible.value = true
+  // 如果传入的图片URL为空或无效，显示提示信息
+  if (!imageUrl || !imageUrl.trim()) {
+    ElMessage.warning('暂无图片可预览')
+    return
+  }
+
+  // 使用环境自适应的URL构建函数
+  previewImageUrl.value = getAdaptedImageUrl(imageUrl)
+  console.log('🔍 设置预览图片URL:', previewImageUrl.value)
+  
+  // 通过v-model双向绑定显示图片预览器
+  imageViewerVisible.value = true
+  console.log('✅ 图片预览器已打开')
+}
+
+/**
+ * 关闭图片预览器 - 由于使用v-model双向绑定，ImgPreview组件会自动处理关闭逻辑
+ * 此函数保留用于其他可能的关闭场景
+ */
+function closeImageViewer() {
+  imageViewerVisible.value = false
+  console.log('✅ 图片预览器已关闭')
+}
+
+/**
+ * 图片下载功能
+ * @param {string} imageUrl - 图片URL
+ */
+function downloadImage(imageUrl) {
+  if (!imageUrl || !imageUrl.trim()) {
+    ElMessage.warning('图片地址无效，无法下载')
+    return
+  }
+
+  try {
+    // 从URL中提取文件名和扩展名
+    const urlParts = imageUrl.split('/')
+    const fileName = urlParts[urlParts.length - 1]
+    const fileExtension = fileName.includes('.') ? fileName.split('.').pop() : 'jpg'
+    const downloadFileName = fileName || `sample_image_${Date.now()}.${fileExtension}`
+
+    // 使用fetch下载图片
+    fetch(imageUrl)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        return response.blob()
+      })
+      .then(blob => {
+        // 创建下载链接
+        const blobUrl = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = blobUrl
+        link.download = downloadFileName
+        document.body.appendChild(link)
+        link.click()
+        
+        // 清理资源
+        URL.revokeObjectURL(blobUrl)
+        document.body.removeChild(link)
+        
+        ElMessage.success('图片下载成功')
+      })
+      .catch(error => {
+        console.error('图片下载失败:', error)
+        ElMessage.error('图片下载失败，请检查网络连接或图片地址')
+      })
+  } catch (error) {
+    console.error('下载过程中发生错误:', error)
+    ElMessage.error('下载失败，请重试')
+  }
 }
 
 /**

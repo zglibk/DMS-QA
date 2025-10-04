@@ -1503,23 +1503,42 @@ router.post('/initialize-table', async (req, res) => {
 
       const originalCount = countResult.recordset[0].recordCount;
 
-      // 检查是否有自增ID列（简化判断，大部分表都有ID自增列）
+      // 检查是否有自增ID列，但需要考虑外键约束
+      // 有外键约束的表不能使用TRUNCATE，必须使用DELETE
+      const tablesWithForeignKeys = [
+        'ComplaintRegister' // 这个表被其他表引用，不能使用TRUNCATE
+      ];
+      
       const tablesWithIdentity = [
-        'ComplaintRegister', 'MaterialPrice', 'User', 'Workshop', 'Department',
+        'MaterialPrice', 'User', 'Workshop', 'Department',
         'Person', 'ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory',
         'DefectiveItem', 'UserTokens', 'DbConfig', 'PathMappingConfig',
         'HomeCardConfig', 'SiteConfig'
       ];
 
       const hasIdentity = tablesWithIdentity.includes(tableName);
+      const hasForeignKeys = tablesWithForeignKeys.includes(tableName);
 
       // 清空表数据
-      if (hasIdentity) {
-        // 有自增ID的表使用 TRUNCATE（会自动重置自增ID）
+      if (hasIdentity && !hasForeignKeys) {
+        // 有自增ID且没有外键约束的表使用 TRUNCATE（会自动重置自增ID）
         await pool.request().query(`TRUNCATE TABLE [${tableName}]`);
       } else {
-        // 没有自增ID的表使用 DELETE
+        // 有外键约束的表需要先删除相关的子表数据
+        if (tableName === 'ComplaintRegister') {
+          // 先删除所有引用ComplaintRegister的子表数据
+          await pool.request().query(`DELETE FROM [AssessmentRecords] WHERE ComplaintID IN (SELECT ID FROM [ComplaintRegister])`);
+          // 删除其他可能的子表数据（如果有的话）
+          // await pool.request().query(`DELETE FROM [OtherChildTable] WHERE ComplaintID IN (SELECT ID FROM [ComplaintRegister])`);
+        }
+        
+        // 然后删除主表数据
         await pool.request().query(`DELETE FROM [${tableName}]`);
+        
+        // 如果表有自增ID但有外键约束，需要手动重置自增ID
+        if ((hasIdentity || hasForeignKeys) && tableName === 'ComplaintRegister') {
+          await pool.request().query(`DBCC CHECKIDENT('[${tableName}]', RESEED, 0)`);
+        }
       }
 
       return {
@@ -1528,6 +1547,14 @@ router.post('/initialize-table', async (req, res) => {
         tableName
       };
     });
+
+    // 检查executeQuery是否返回null（数据库连接失败）
+    if (!result) {
+      return res.status(500).json({
+        success: false,
+        message: '数据库连接失败，无法执行初始化操作'
+      });
+    }
 
     res.json({
       success: true,
