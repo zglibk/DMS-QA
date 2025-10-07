@@ -24,6 +24,116 @@ const path = require('path');
 // =====================================================
 
 /**
+ * 检查仪器编号是否重复
+ * @route POST /api/instruments/check-duplicate
+ * @description 检查出厂编号和管理编号是否已存在
+ * @param {string} instrumentCode - 出厂编号（可选）
+ * @param {string} managementCode - 管理编号（可选）
+ * @param {number} excludeId - 排除的仪器ID（编辑时使用，可选）
+ * @returns {Object} 检查结果
+ */
+router.post('/check-duplicate', authenticateToken, async (req, res) => {
+  try {
+    const { instrumentCode, managementCode, excludeId } = req.body;
+
+    // 至少需要提供一个编号进行检查
+    if (!instrumentCode && !managementCode) {
+      return res.status(400).json({
+        code: 400,
+        message: '请提供要检查的编号'
+      });
+    }
+
+    const pool = await getConnection();
+    
+    // 构建查询条件
+    const checkConditions = [];
+    const checkRequest = pool.request();
+    
+    if (instrumentCode) {
+      checkConditions.push('InstrumentCode = @instrumentCode');
+      checkRequest.input('instrumentCode', sql.NVarChar, instrumentCode);
+    }
+    
+    if (managementCode) {
+      checkConditions.push('ManagementCode = @managementCode');
+      checkRequest.input('managementCode', sql.NVarChar, managementCode);
+    }
+    
+    // 如果是编辑模式，排除当前记录
+    let excludeCondition = '';
+    if (excludeId) {
+      excludeCondition = ' AND ID != @excludeId';
+      checkRequest.input('excludeId', sql.Int, excludeId);
+    }
+    
+    const checkQuery = `
+      SELECT 
+        InstrumentCode, 
+        ManagementCode, 
+        InstrumentName,
+        ID
+      FROM Instruments 
+      WHERE IsActive = 1 
+        AND (${checkConditions.join(' OR ')})
+        ${excludeCondition}
+    `;
+    
+    const checkResult = await checkRequest.query(checkQuery);
+    
+    if (checkResult.recordset.length > 0) {
+      const duplicates = checkResult.recordset;
+      const duplicateInfo = [];
+      
+      duplicates.forEach(record => {
+        if (instrumentCode && record.InstrumentCode === instrumentCode) {
+          duplicateInfo.push({
+            type: 'instrumentCode',
+            field: '出厂编号',
+            value: instrumentCode,
+            existingInstrument: record.InstrumentName,
+            id: record.ID
+          });
+        }
+        if (managementCode && record.ManagementCode === managementCode) {
+          duplicateInfo.push({
+            type: 'managementCode', 
+            field: '管理编号',
+            value: managementCode,
+            existingInstrument: record.InstrumentName,
+            id: record.ID
+          });
+        }
+      });
+      
+      return res.json({
+        code: 200,
+        data: {
+          isDuplicate: true,
+          duplicates: duplicateInfo
+        }
+      });
+    }
+    
+    return res.json({
+      code: 200,
+      data: {
+        isDuplicate: false,
+        duplicates: []
+      }
+    });
+    
+  } catch (error) {
+    console.error('检查编号重复性失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '检查编号重复性失败',
+      error: error.message
+    });
+  }
+});
+
+/**
  * 获取仪器台账列表
  * GET /api/instruments
  * 支持分页、搜索、筛选

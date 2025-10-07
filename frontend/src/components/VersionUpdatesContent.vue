@@ -1617,10 +1617,11 @@ const executeGenerateChangelog = async () => {
       // 关闭对话框
       closeGenerateDialog()
       
-      // 刷新版本列表和统计数据
+      // 刷新版本列表和统计数据，同时刷新通知数量
       await Promise.all([
         fetchVersionStats(),
-        fetchVersionUpdates()
+        fetchVersionUpdates(),
+        userStore.refreshNotifications() // 刷新通知数量，因为生成日志会发送通知
       ])
       
     } else {

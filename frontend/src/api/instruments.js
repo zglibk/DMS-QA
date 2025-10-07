@@ -316,6 +316,18 @@ export const instrumentApi = {
    */
   getCalibrationStatistics(params = {}) {
     return api.get('/api/instruments/calibration-statistics', { params })
+  },
+
+  /**
+   * 检查出厂编号和管理编号重复性
+   * @param {Object} params - 检查参数
+   * @param {string} params.instrumentCode - 出厂编号（可选）
+   * @param {string} params.managementCode - 管理编号（可选）
+   * @param {number} params.excludeId - 排除的仪器ID（编辑时使用，可选）
+   * @returns {Promise} API响应
+   */
+  checkDuplicate(params = {}) {
+    return api.get('/api/instruments/check-duplicate', { params })
   }
 }
 

@@ -89,13 +89,14 @@
           stripe
           border
           style="width: 100%"
+          :cell-style="{ 'white-space': 'nowrap' }"
         >
           <el-table-column prop="InstrumentCode" label="出厂编号" width="120">
             <template #default="{ row }">
               {{ row.InstrumentCode || '无' }}
             </template>
           </el-table-column>
-          <el-table-column prop="ManagementCode" label="管理编号" width="120">
+          <el-table-column prop="ManagementCode" label="管理编号" width="90" align="center">
             <template #default="{ row }">
               {{ row.ManagementCode || '无' }}
             </template>
@@ -103,7 +104,7 @@
           <el-table-column prop="InstrumentName" label="仪器名称" min-width="150" />
           <el-table-column prop="Model" label="型号规格" width="120" />
           <el-table-column prop="SerialNumber" label="序列号" width="120" />
-          <el-table-column prop="CategoryName" label="类别" width="100" />
+          <el-table-column prop="CategoryName" label="类别" width="120" show-overflow-tooltip />
           <el-table-column prop="Manufacturer" label="制造商" width="120" />
           <el-table-column prop="MeasurementRange" label="量程" width="120">
             <template #default="{ row }">
@@ -430,13 +431,13 @@ const instrumentForm = reactive({
   InstrumentName: '',
   Model: '',
   SerialNumber: '',
-  CategoryID: '',
+  CategoryID: null,      // 修改为null，确保选择器正确初始化
   Manufacturer: '',
   PurchaseDate: '',
   MeasurementRange: '',  // 新增量程字段
   Accuracy: '',          // 新增准确度字段
   Location: '',
-  ResponsiblePerson: '',
+  ResponsiblePerson: null, // 修改为null，确保树形选择器正确初始化
   Status: '正常',
   Notes: ''
 })
@@ -484,12 +485,120 @@ const validateCodeRequired = (rule, value, callback) => {
   }
 }
 
+/**
+ * 自定义验证器：检查出厂编号重复性
+ * @param {Object} rule - 验证规则
+ * @param {string} value - 当前字段值
+ * @param {Function} callback - 回调函数
+ */
+const validateInstrumentCode = async (rule, value, callback) => {
+  // 先执行基本的必填验证
+  const { InstrumentCode, ManagementCode } = instrumentForm
+  if (!InstrumentCode && !ManagementCode) {
+    callback(new Error('出厂编号和管理编号至少需要填写其中一个'))
+    return
+  }
+  
+  // 如果出厂编号为空，跳过重复性检查
+  if (!value) {
+    callback()
+    return
+  }
+  
+  // 如果是编辑模式，跳过重复性检查（因为是更新操作而不是插入操作）
+  if (isEdit.value) {
+    callback()
+    return
+  }
+  
+  try {
+    // 调用后端接口检查重复性
+    const params = {
+      instrumentCode: value
+    }
+    
+    const response = await instrumentApi.checkDuplicate(params)
+    
+    if (response.data && response.data.code === 200) {
+      const { isDuplicate, duplicates } = response.data.data
+      
+      if (isDuplicate) {
+        const duplicateInfo = duplicates.find(d => d.field === 'InstrumentCode')
+        if (duplicateInfo) {
+          callback(new Error(`出厂编号"${duplicateInfo.value}"已存在于仪器"${duplicateInfo.instrumentName}"中`))
+          return
+        }
+      }
+    }
+    
+    callback()
+  } catch (error) {
+    console.error('检查出厂编号重复性失败:', error)
+    // 网络错误时不阻止提交，只在控制台记录错误
+    callback()
+  }
+}
+
+/**
+ * 自定义验证器：检查管理编号重复性
+ * @param {Object} rule - 验证规则
+ * @param {string} value - 当前字段值
+ * @param {Function} callback - 回调函数
+ */
+const validateManagementCode = async (rule, value, callback) => {
+  // 先执行基本的必填验证
+  const { InstrumentCode, ManagementCode } = instrumentForm
+  if (!InstrumentCode && !ManagementCode) {
+    callback(new Error('出厂编号和管理编号至少需要填写其中一个'))
+    return
+  }
+  
+  // 如果管理编号为空，跳过重复性检查
+  if (!value) {
+    callback()
+    return
+  }
+  
+  // 如果是编辑模式，跳过重复性检查（因为是更新操作而不是插入操作）
+  if (isEdit.value) {
+    callback()
+    return
+  }
+  
+  try {
+    // 调用后端接口检查重复性
+    const params = {
+      managementCode: value
+    }
+    
+    const response = await instrumentApi.checkDuplicate(params)
+    
+    if (response.data && response.data.code === 200) {
+      const { isDuplicate, duplicates } = response.data.data
+      
+      if (isDuplicate) {
+        const duplicateInfo = duplicates.find(d => d.field === 'ManagementCode')
+        if (duplicateInfo) {
+          callback(new Error(`管理编号"${duplicateInfo.value}"已存在于仪器"${duplicateInfo.instrumentName}"中`))
+          return
+        }
+      }
+    }
+    
+    callback()
+  } catch (error) {
+    console.error('检查管理编号重复性失败:', error)
+    // 网络错误时不阻止提交，只在控制台记录错误
+    callback()
+  }
+}
+
 // 为出厂编号和管理编号添加自定义验证
 formRules.InstrumentCode = [
-  { validator: validateCodeRequired, trigger: 'blur' }
+  { validator: validateInstrumentCode, trigger: 'blur' }
 ]
 formRules.ManagementCode = [
-  { validator: validateCodeRequired, trigger: 'blur' }
+  { validator: validateManagementCode, trigger: 'blur' }
 ]
 
 // 计算属性
@@ -674,21 +783,57 @@ async function getInstrumentList() {
 }
 
 /**
+ * 确保仪器类别数据已加载
+ */
+async function ensureCategoriesLoaded() {
+  console.log('检查仪器类别数据是否已加载...')
+  console.log('当前categories.value:', categories.value)
+  if (!categories.value || categories.value.length === 0) {
+    console.log('仪器类别数据未加载，开始加载...')
+    await getCategories()
+  } else {
+    console.log('仪器类别数据已存在，跳过加载')
+  }
+}
+
+/**
+ * 确保责任人数据已加载
+ */
+async function ensurePersonsLoaded() {
+  console.log('检查责任人数据是否已加载...')
+  console.log('当前persons.value:', persons.value)
+  if (!persons.value || persons.value.length === 0) {
+    console.log('责任人数据未加载，开始加载...')
+    await getPersons()
+  } else {
+    console.log('责任人数据已存在，跳过加载')
+  }
+}
+
+/**
  * 获取仪器类别列表
  */
 async function getCategories() {
   try {
+    console.log('开始获取仪器类别列表...')
     const response = await instrumentApi.getCategories()
+    console.log('仪器类别API响应:', response)
     
     // 根据后端API返回的数据结构解析
     if (response.data && response.data.code === 200 && Array.isArray(response.data.data)) {
+      console.log('仪器类别数据:', response.data.data)
       categories.value = response.data.data
+      console.log('categories.value设置后:', categories.value)
     } else if (response.data && Array.isArray(response.data)) {
+      console.log('仪器类别数据(直接数组):', response.data)
       categories.value = response.data
+      console.log('categories.value设置后:', categories.value)
     } else {
+      console.log('仪器类别API返回错误:', response)
       categories.value = []
     }
   } catch (error) {
+    console.error('获取仪器类别列表失败:', error)
     ElMessage.error('获取类别列表失败：' + (error.response?.data?.message || error.message))
     categories.value = []
   }
@@ -744,9 +889,18 @@ function handleSearch() {
 /**
  * 新增仪器
  */
-function handleAdd() {
+async function handleAdd() {
+  console.log('开始新增仪器，重置表单...')
   isEdit.value = false
   resetForm()
+  
+  // 确保仪器类别和责任人数据已加载
+  await Promise.all([
+    ensureCategoriesLoaded(),
+    ensurePersonsLoaded()
+  ])
+  
+  console.log('新增仪器表单数据:', instrumentForm)
   dialogVisible.value = true
 }
 
@@ -754,11 +908,46 @@ function handleAdd() {
  * 编辑仪器
  * @param {Object} row - 仪器数据
  */
-function handleEdit(row) {
+async function handleEdit(row) {
+  console.log('开始编辑仪器，仪器数据:', row)
+  
   isEdit.value = true
   // 先重置表单，确保没有残留数据
   resetForm()
+  
+  // 确保仪器类别和责任人数据已加载
+  console.log('确保仪器类别和责任人数据已加载...')
+  await Promise.all([
+    ensureCategoriesLoaded(),
+    ensurePersonsLoaded()
+  ])
+  console.log('数据加载完成，准备打开编辑对话框')
+  
   // 只复制需要的字段，避免意外的数据残留
+  console.log('填充表单数据...')
+  
+  // 根据后端返回的Category字段名称找到对应的CategoryID
+  let categoryID = '';
+  if (row.Category) {
+    const matchedCategory = categories.value.find(cat => 
+      cat.CategoryName === row.Category || cat.CategoryCode === row.Category
+    );
+    if (matchedCategory) {
+      categoryID = matchedCategory.ID;
+    }
+  }
+  
+  // 根据后端返回的ResponsiblePersonName字段名称找到对应的责任人ID
+  let responsiblePersonID = '';
+  if (row.ResponsiblePersonName) {
+    const matchedPerson = persons.value.find(person => 
+      person.Name === row.ResponsiblePersonName
+    );
+    if (matchedPerson) {
+      responsiblePersonID = matchedPerson.ID;
+    }
+  }
+  
   Object.assign(instrumentForm, {
     InstrumentID: row.ID,  // 将后端的ID字段映射到前端的InstrumentID
     InstrumentCode: row.InstrumentCode || '',
@@ -766,17 +955,29 @@ function handleEdit(row) {
     InstrumentName: row.InstrumentName || '',
     Model: row.Model || '',
     SerialNumber: row.SerialNumber || '',
-    CategoryID: row.CategoryID || '',
+    CategoryID: categoryID,  // 使用找到的CategoryID
     Manufacturer: row.Manufacturer || '',
     PurchaseDate: row.PurchaseDate || '',
     MeasurementRange: row.MeasurementRange || '',
     Accuracy: row.Accuracy || '',
     Location: row.Location || '',
-    ResponsiblePerson: row.ResponsiblePersonID || row.ResponsiblePerson || '',
+    ResponsiblePerson: responsiblePersonID,  // 使用找到的责任人ID
     Status: row.Status || '正常',
     Notes: row.Notes || ''
   })
+  
+  console.log('字段映射详情:')
+  console.log('- 后端Category字段:', row.Category)
+  console.log('- 映射到的CategoryID:', categoryID)
+  console.log('- 后端ResponsiblePersonName字段:', row.ResponsiblePersonName)
+  console.log('- 映射到的ResponsiblePersonID:', responsiblePersonID)
+  
+  console.log('表单数据填充完成:', instrumentForm)
+  console.log('当前仪器类别数据:', categories.value)
+  console.log('当前责任人数据:', persons.value)
+  
   dialogVisible.value = true
+  console.log('编辑对话框已打开')
 }
 
 /**
@@ -837,22 +1038,36 @@ async function handleSubmit() {
     await formRef.value.validate()
     submitLoading.value = true
     
+    // 准备提交数据，处理字段映射
+    const submitData = { ...instrumentForm }
+    
+    // 将CategoryID映射为Category字段名称
+    if (submitData.CategoryID) {
+      const selectedCategory = categories.value.find(cat => cat.ID === submitData.CategoryID)
+      if (selectedCategory) {
+        submitData.Category = selectedCategory.CategoryName || selectedCategory.CategoryCode
+      }
+      delete submitData.CategoryID  // 删除前端字段
+    }
+    
     // 添加调试输出：显示提交的数据
     console.log('=== 仪器保存调试信息 ===')
     console.log('是否为编辑模式:', isEdit.value)
     console.log('仪器ID:', instrumentForm.InstrumentID)
-    console.log('提交的表单数据:', JSON.stringify(instrumentForm, null, 2))
-    console.log('ResponsiblePerson字段类型:', typeof instrumentForm.ResponsiblePerson)
-    console.log('ResponsiblePerson字段值:', instrumentForm.ResponsiblePerson)
+    console.log('原始表单数据:', JSON.stringify(instrumentForm, null, 2))
+    console.log('处理后的提交数据:', JSON.stringify(submitData, null, 2))
+    console.log('ResponsiblePerson字段类型:', typeof submitData.ResponsiblePerson)
+    console.log('ResponsiblePerson字段值:', submitData.ResponsiblePerson)
+    console.log('Category字段值:', submitData.Category)
     console.log('========================')
     
     if (isEdit.value) {
       console.log('调用更新接口，URL:', `/api/instruments/${instrumentForm.InstrumentID}`)
-      await instrumentApi.updateInstrument(instrumentForm.InstrumentID, instrumentForm)
+      await instrumentApi.updateInstrument(instrumentForm.InstrumentID, submitData)
       ElMessage.success('更新成功')
     } else {
       console.log('调用创建接口，URL:', '/api/instruments')
-      await instrumentApi.createInstrument(instrumentForm)
+      await instrumentApi.createInstrument(submitData)
       ElMessage.success('创建成功')
     }
     
@@ -888,17 +1103,18 @@ async function handleSubmit() {
      InstrumentName: '',
      Model: '',
      SerialNumber: '',
-     CategoryID: '',
+     CategoryID: null,       // 修改为null，确保选择器正确重置
      Manufacturer: '',
      PurchaseDate: '',
      MeasurementRange: '',  // 重置量程字段
      Accuracy: '',          // 重置准确度字段
      Location: '',
-     ResponsiblePerson: '',
+     ResponsiblePerson: null, // 修改为null，确保树形选择器正确重置
      Status: '正常',
      Notes: ''
    })
    formRef.value?.resetFields()
+   console.log('表单已重置，当前表单数据:', instrumentForm)
  }
 
 /**
@@ -963,17 +1179,50 @@ onMounted(() => {
   gap: 8px;
 }
 
+/* 表格样式 - 强制禁止换行 */
+:deep(.el-table) {
+  .el-table__body-wrapper .el-table__body .el-table__row .el-table__cell {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    word-break: keep-all !important;
+    word-wrap: normal !important;
+  }
+  
+  .el-table__header-wrapper .el-table__header .el-table__row .el-table__cell {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    word-wrap: normal !important;
+  }
+  
+  /* 特别针对类别列 */
+  .el-table__body .el-table__row .el-table__cell:nth-child(6) {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    word-break: keep-all !important;
+    word-wrap: normal !important;
+    max-width: 120px !important;
+  }
+}
+
 /* 表格内容居中样式 */
 .instrument-list :deep(.el-table th),
 .instrument-list :deep(.el-table td) {
   text-align: center !important;
   vertical-align: middle !important;
+  white-space: nowrap !important; /* 禁止自动换行 */
 }
 
 /* 仪器名称和制造商列左对齐 */
-.instrument-list :deep(.el-table td:nth-child(2)),
-.instrument-list :deep(.el-table td:nth-child(6)) {
+.instrument-list :deep(.el-table td:nth-child(4)),
+.instrument-list :deep(.el-table td:nth-child(7)) {
   text-align: left !important;
+}
+
+/* 管理编号列居中对齐 */
+.instrument-list :deep(.el-table td:nth-child(3)) {
+  text-align: center !important;
 }
 
 /* 表格标题行浅灰色填充 */
