@@ -203,7 +203,31 @@
           </el-col>
           <el-col :span="12">
             <el-form-item label="管理编号" prop="ManagementCode">
-              <el-input v-model="instrumentForm.ManagementCode" placeholder="请输入管理编号" />
+              <div style="display: flex; gap: 8px; align-items: center;">
+                <el-select 
+                  v-model="managementCodePrefix" 
+                  placeholder="选择前缀类型"
+                  style="width: 140px; flex-shrink: 0;"
+                  @change="onPrefixChange"
+                >
+                  <el-option label="温湿度计" value="WSJ" />
+                  <el-option label="常规仪器" value="LAB" />
+                  <el-option label="自定义" value="CUSTOM" />
+                </el-select>
+                <el-input 
+                  v-model="instrumentForm.ManagementCode" 
+                  :placeholder="getManagementCodePlaceholder()"
+                  :disabled="managementCodePrefix !== 'CUSTOM' && managementCodePrefix !== null"
+                  style="flex: 1;"
+                />
+                <el-icon 
+                  v-if="generatingCode && managementCodePrefix !== 'CUSTOM'" 
+                  class="is-loading"
+                  style="margin-left: 8px; color: #409eff;"
+                >
+                  <Loading />
+                </el-icon>
+              </div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -382,14 +406,15 @@
  * 4. 分页显示
  */
 
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, inject } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Search, 
   Refresh, 
   List, 
   Plus, 
-  Download 
+  Download,
+  Loading
 } from '@element-plus/icons-vue'
 import { instrumentApi } from '@/api/instruments'
 
@@ -401,6 +426,13 @@ const dialogVisible = ref(false)
 const detailDialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref()
+
+// 从父组件注入刷新方法
+const onInstrumentDeleted = inject('onInstrumentDeleted', null)
+
+// 管理编号生成相关
+const managementCodePrefix = ref(null)   // 默认为null，避免控制台警告
+const generatingCode = ref(false)        // 生成编号的加载状态
 
 // 搜索表单
 const searchForm = reactive({
@@ -426,7 +458,7 @@ const pagination = reactive({
 // 仪器表单
 const instrumentForm = reactive({
   InstrumentID: null,
-  InstrumentCode: '',    // 新增出厂编号字段
+  InstrumentCode: '',    // 出厂编号字段
   ManagementCode: '',
   InstrumentName: '',
   Model: '',
@@ -434,8 +466,8 @@ const instrumentForm = reactive({
   CategoryID: null,      // 修改为null，确保选择器正确初始化
   Manufacturer: '',
   PurchaseDate: '',
-  MeasurementRange: '',  // 新增量程字段
-  Accuracy: '',          // 新增准确度字段
+  MeasurementRange: '',  // 量程字段
+  Accuracy: '',          // 准确度字段
   Location: '',
   ResponsiblePerson: null, // 修改为null，确保树形选择器正确初始化
   Status: '正常',
@@ -511,6 +543,12 @@ const validateInstrumentCode = async (rule, value, callback) => {
     return
   }
   
+  // 如果对话框已关闭，跳过验证
+  if (!dialogVisible.value) {
+    callback()
+    return
+  }
+  
   try {
     // 调用后端接口检查重复性
     const params = {
@@ -559,8 +597,14 @@ const validateManagementCode = async (rule, value, callback) => {
     return
   }
   
-  // 如果是编辑模式，跳过重复性检查（因为是更新操作而不是插入操作）
+  // 如果是编辑模式，跳过管理编号和出厂编号的重复性检查
   if (isEdit.value) {
+    callback()
+    return
+  }
+  
+  // 如果对话框已关闭，跳过验证
+  if (!dialogVisible.value) {
     callback()
     return
   }
@@ -621,7 +665,7 @@ const treePersonsData = computed(() => {
       groups[departmentName] = {
         id: `dept_${departmentName}`,
         label: departmentName,
-        value: null, // 部门节点不可选择
+        value: `dept_${departmentName}`, // 修复：使用字符串而不是null
         children: []
       }
     }
@@ -786,13 +830,8 @@ async function getInstrumentList() {
  * 确保仪器类别数据已加载
  */
 async function ensureCategoriesLoaded() {
-  console.log('检查仪器类别数据是否已加载...')
-  console.log('当前categories.value:', categories.value)
   if (!categories.value || categories.value.length === 0) {
-    console.log('仪器类别数据未加载，开始加载...')
     await getCategories()
-  } else {
-    console.log('仪器类别数据已存在，跳过加载')
   }
 }
 
@@ -800,13 +839,8 @@ async function ensureCategoriesLoaded() {
  * 确保责任人数据已加载
  */
 async function ensurePersonsLoaded() {
-  console.log('检查责任人数据是否已加载...')
-  console.log('当前persons.value:', persons.value)
   if (!persons.value || persons.value.length === 0) {
-    console.log('责任人数据未加载，开始加载...')
     await getPersons()
-  } else {
-    console.log('责任人数据已存在，跳过加载')
   }
 }
 
@@ -815,21 +849,13 @@ async function ensurePersonsLoaded() {
  */
 async function getCategories() {
   try {
-    console.log('开始获取仪器类别列表...')
-    const response = await instrumentApi.getCategories()
-    console.log('仪器类别API响应:', response)
-    
+    const response = await instrumentApi.getCategories()    
     // 根据后端API返回的数据结构解析
     if (response.data && response.data.code === 200 && Array.isArray(response.data.data)) {
-      console.log('仪器类别数据:', response.data.data)
       categories.value = response.data.data
-      console.log('categories.value设置后:', categories.value)
     } else if (response.data && Array.isArray(response.data)) {
-      console.log('仪器类别数据(直接数组):', response.data)
       categories.value = response.data
-      console.log('categories.value设置后:', categories.value)
     } else {
-      console.log('仪器类别API返回错误:', response)
       categories.value = []
     }
   } catch (error) {
@@ -844,17 +870,12 @@ async function getCategories() {
  */
 async function getPersons() {
   try {
-    console.log('开始获取人员列表...')
     const response = await instrumentApi.getPersons()
-    console.log('API响应:', response)
     
     // 修复：检查response.data.code而不是response.code
     if (response.data && response.data.code === 200) {
-      console.log('人员数据:', response.data.data)
       persons.value = response.data.data
-      console.log('persons.value设置后:', persons.value)
     } else {
-      console.log('API返回错误:', response)
       persons.value = []
     }
   } catch (error) {
@@ -890,9 +911,11 @@ function handleSearch() {
  * 新增仪器
  */
 async function handleAdd() {
-  console.log('开始新增仪器，重置表单...')
   isEdit.value = false
   resetForm()
+  
+  // 重置管理编号前缀为null，避免默认触发生成
+  managementCodePrefix.value = null
   
   // 确保仪器类别和责任人数据已加载
   await Promise.all([
@@ -900,8 +923,66 @@ async function handleAdd() {
     ensurePersonsLoaded()
   ])
   
-  console.log('新增仪器表单数据:', instrumentForm)
   dialogVisible.value = true
+}
+
+/**
+ * 处理前缀选择变化
+ * 当选择"温湿度计"或"常规仪器"时自动生成管理编号
+ */
+async function onPrefixChange() {
+  // 当前缀改变时，清空管理编号
+  instrumentForm.ManagementCode = ''
+  
+  if (managementCodePrefix.value === 'CUSTOM') {
+    // 自定义模式，启用输入框，不自动生成
+    return
+  } else if (['WSJ', 'LAB'].includes(managementCodePrefix.value)) {
+    // 预设前缀模式，自动生成管理编号
+    await generateManagementCode()
+  }
+}
+
+/**
+ * 生成管理编号
+ */
+async function generateManagementCode() {
+  if (!managementCodePrefix.value) {
+    ElMessage.warning('请先选择前缀类型')
+    return
+  }
+  
+  try {
+    generatingCode.value = true
+    
+    const response = await instrumentApi.getNextManagementCode(managementCodePrefix.value)
+    
+    if (response.data && response.data.code === 200) {
+      instrumentForm.ManagementCode = response.data.data.managementCode
+    } else {
+      throw new Error(response.data?.message || '生成管理编号失败')
+    }
+  } catch (error) {
+    console.error('生成管理编号失败:', error)
+    ElMessage.error(error.message || '生成管理编号失败，请稍后重试')
+  } finally {
+    generatingCode.value = false
+  }
+}
+
+/**
+ * 获取管理编号输入框的占位符文字
+ * @returns {string} 占位符文字
+ */
+function getManagementCodePlaceholder() {
+  if (managementCodePrefix.value === null || managementCodePrefix.value === '') {
+    return '请先选择前缀类型'
+  } else if (managementCodePrefix.value === 'CUSTOM') {
+    return '请输入自定义管理编号'
+  } else if (['WSJ', 'LAB'].includes(managementCodePrefix.value)) {
+    return '选择前缀后将自动生成'
+  }
+  return '请输入管理编号'
 }
 
 /**
@@ -909,22 +990,15 @@ async function handleAdd() {
  * @param {Object} row - 仪器数据
  */
 async function handleEdit(row) {
-  console.log('开始编辑仪器，仪器数据:', row)
-  
   isEdit.value = true
   // 先重置表单，确保没有残留数据
   resetForm()
   
   // 确保仪器类别和责任人数据已加载
-  console.log('确保仪器类别和责任人数据已加载...')
   await Promise.all([
     ensureCategoriesLoaded(),
     ensurePersonsLoaded()
   ])
-  console.log('数据加载完成，准备打开编辑对话框')
-  
-  // 只复制需要的字段，避免意外的数据残留
-  console.log('填充表单数据...')
   
   // 根据后端返回的Category字段名称找到对应的CategoryID
   let categoryID = '';
@@ -957,27 +1031,17 @@ async function handleEdit(row) {
     SerialNumber: row.SerialNumber || '',
     CategoryID: categoryID,  // 使用找到的CategoryID
     Manufacturer: row.Manufacturer || '',
-    PurchaseDate: row.PurchaseDate || '',
     MeasurementRange: row.MeasurementRange || '',
     Accuracy: row.Accuracy || '',
+    PurchaseDate: row.PurchaseDate || '',
     Location: row.Location || '',
     ResponsiblePerson: responsiblePersonID,  // 使用找到的责任人ID
     Status: row.Status || '正常',
     Notes: row.Notes || ''
-  })
-  
-  console.log('字段映射详情:')
-  console.log('- 后端Category字段:', row.Category)
-  console.log('- 映射到的CategoryID:', categoryID)
-  console.log('- 后端ResponsiblePersonName字段:', row.ResponsiblePersonName)
-  console.log('- 映射到的ResponsiblePersonID:', responsiblePersonID)
-  
-  console.log('表单数据填充完成:', instrumentForm)
-  console.log('当前仪器类别数据:', categories.value)
-  console.log('当前责任人数据:', persons.value)
+  }) 
+
   
   dialogVisible.value = true
-  console.log('编辑对话框已打开')
 }
 
 /**
@@ -1005,9 +1069,14 @@ async function handleDelete(row) {
       }
     )
     
-    await instrumentApi.deleteInstrument(row.InstrumentID)
+    await instrumentApi.deleteInstrument(row.ID)
     ElMessage.success('删除成功')
     getInstrumentList()
+    
+    // 通知父组件刷新校准检定结果列表
+    if (onInstrumentDeleted) {
+      onInstrumentDeleted()
+    }
   } catch (error) {
     if (error !== 'cancel') {
       ElMessage.error('删除失败：' + error.message)
@@ -1039,7 +1108,11 @@ async function handleSubmit() {
     submitLoading.value = true
     
     // 准备提交数据，处理字段映射
-    const submitData = { ...instrumentForm }
+    const submitData = {
+      ...instrumentForm,
+      ResponsiblePerson: instrumentForm.ResponsiblePerson || null,
+      Category: instrumentForm.CategoryID || null
+    }
     
     // 将CategoryID映射为Category字段名称
     if (submitData.CategoryID) {
@@ -1047,26 +1120,13 @@ async function handleSubmit() {
       if (selectedCategory) {
         submitData.Category = selectedCategory.CategoryName || selectedCategory.CategoryCode
       }
-      delete submitData.CategoryID  // 删除前端字段
     }
-    
-    // 添加调试输出：显示提交的数据
-    console.log('=== 仪器保存调试信息 ===')
-    console.log('是否为编辑模式:', isEdit.value)
-    console.log('仪器ID:', instrumentForm.InstrumentID)
-    console.log('原始表单数据:', JSON.stringify(instrumentForm, null, 2))
-    console.log('处理后的提交数据:', JSON.stringify(submitData, null, 2))
-    console.log('ResponsiblePerson字段类型:', typeof submitData.ResponsiblePerson)
-    console.log('ResponsiblePerson字段值:', submitData.ResponsiblePerson)
-    console.log('Category字段值:', submitData.Category)
-    console.log('========================')
+    delete submitData.CategoryID  // 删除前端字段
     
     if (isEdit.value) {
-      console.log('调用更新接口，URL:', `/api/instruments/${instrumentForm.InstrumentID}`)
       await instrumentApi.updateInstrument(instrumentForm.InstrumentID, submitData)
       ElMessage.success('更新成功')
     } else {
-      console.log('调用创建接口，URL:', '/api/instruments')
       await instrumentApi.createInstrument(submitData)
       ElMessage.success('创建成功')
     }
@@ -1074,18 +1134,17 @@ async function handleSubmit() {
     dialogVisible.value = false
     getInstrumentList()
   } catch (error) {
-    console.error('=== 仪器保存错误信息 ===')
-    console.error('错误对象:', error)
-    console.error('错误消息:', error.message)
-    console.error('错误响应:', error.response)
-    if (error.response) {
-      console.error('响应状态:', error.response.status)
-      console.error('响应数据:', error.response.data)
+    // 处理表单验证错误
+    if (error && typeof error === 'object' && !error.message) {
+      // Element Plus表单验证失败，不显示错误信息，让用户看到表单中的验证提示
+      return
     }
-    console.error('========================')
     
+    // 处理其他类型的错误
     if (error.message) {
       ElMessage.error('操作失败：' + error.message)
+    } else {
+      ElMessage.error('操作失败，请检查输入信息')
     }
   } finally {
     submitLoading.value = false
@@ -1093,29 +1152,28 @@ async function handleSubmit() {
 }
 
 /**
-  * 重置表单
-  */
- function resetForm() {
-   Object.assign(instrumentForm, {
-     InstrumentID: null,
-     InstrumentCode: '',     // 重置出厂编号字段
-     ManagementCode: '',
-     InstrumentName: '',
-     Model: '',
-     SerialNumber: '',
-     CategoryID: null,       // 修改为null，确保选择器正确重置
-     Manufacturer: '',
-     PurchaseDate: '',
-     MeasurementRange: '',  // 重置量程字段
-     Accuracy: '',          // 重置准确度字段
-     Location: '',
-     ResponsiblePerson: null, // 修改为null，确保树形选择器正确重置
-     Status: '正常',
-     Notes: ''
-   })
-   formRef.value?.resetFields()
-   console.log('表单已重置，当前表单数据:', instrumentForm)
- }
+ * 重置表单
+ */
+function resetForm() {
+  Object.assign(instrumentForm, {
+    InstrumentID: null,
+    InstrumentCode: '',     // 重置出厂编号字段
+    ManagementCode: '',
+    InstrumentName: '',
+    Model: '',
+    SerialNumber: '',
+    CategoryID: null,       // 修改为null，确保选择器正确重置
+    Manufacturer: '',
+    PurchaseDate: '',
+    MeasurementRange: '',  // 重置量程字段
+    Accuracy: '',          // 重置准确度字段
+    Location: '',
+    ResponsiblePerson: null, // 修改为null，确保树形选择器正确重置
+    Status: '正常',
+    Notes: ''
+  })
+  formRef.value?.resetFields()
+}
 
 /**
  * 分页大小改变

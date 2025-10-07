@@ -21,7 +21,7 @@
         
         <!-- 校准检定 -->
         <el-tab-pane label="校准检定" name="calibration">
-          <CalibrationResults />
+          <CalibrationResults ref="calibrationResultsRef" />
         </el-tab-pane>
         
         <!-- 年度计划 -->
@@ -45,7 +45,7 @@
  * 5. 根据路由参数自动切换到对应的标签页
  */
 
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, provide } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Tools } from '@element-plus/icons-vue'
 import InstrumentList from './InstrumentList.vue'
@@ -57,6 +57,23 @@ const router = useRouter()
 
 // 当前激活的标签页
 const activeTab = ref('instruments')
+
+// 组件引用
+const calibrationResultsRef = ref(null)
+
+/**
+ * 处理仪器删除后的数据刷新
+ * 当仪器删除成功后，需刷新校准检定结果列表
+ */
+const handleInstrumentDeleted = () => {
+  // 如果校准检定结果组件存在且有刷新方法，则调用刷新
+  if (calibrationResultsRef.value && calibrationResultsRef.value.refreshData) {
+    calibrationResultsRef.value.refreshData()
+  }
+}
+
+// 向子组件提供刷新方法
+provide('onInstrumentDeleted', handleInstrumentDeleted)
 
 /**
  * 根据路由路径设置激活的标签页

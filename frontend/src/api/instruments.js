@@ -5,7 +5,8 @@
  * 1. 提供仪器台账管理相关的API接口
  * 2. 提供第三方校准检定结果管理的API接口
  * 3. 提供年度校准计划管理的API接口
- * 4. 统一处理API请求和响应
+ * 4. 提供管理编号自动生成的API接口
+ * 5. 统一处理API请求和响应
  */
 
 import api from './index'
@@ -14,6 +15,17 @@ import api from './index'
  * 仪器管理API接口
  */
 export const instrumentApi = {
+  // ==================== 管理编号生成 ====================
+  
+  /**
+   * 获取下一个管理编号
+   * @param {string} prefix - 前缀类型 ('WSJ' 或 'LAB')
+   * @returns {Promise} API响应
+   */
+  getNextManagementCode(prefix) {
+    return api.get(`/api/instruments/next-management-code/${prefix}`)
+  },
+
   // ==================== 仪器台账管理 ====================
   
   /**
@@ -327,7 +339,7 @@ export const instrumentApi = {
    * @returns {Promise} API响应
    */
   checkDuplicate(params = {}) {
-    return api.get('/api/instruments/check-duplicate', { params })
+    return api.post('/api/instruments/check-duplicate', params)
   }
 }
 

@@ -853,6 +853,14 @@ onMounted(() => {
   getCalibrationList()
   getInstruments()
 })
+
+/**
+ * 暴露给父组件的方法
+ * refreshData: 刷新校准检定结果列表数据
+ */
+defineExpose({
+  refreshData: getCalibrationList
+})
 </script>
 
 <style scoped>

@@ -6,6 +6,7 @@
  * 2. 第三方校准检定结果登记
  * 3. 年度校准计划管理
  * 4. 年度检定计划和实施表导出
+ * 5. 管理编号自动生成
  * 
  * 版本：v1.0
  * 创建日期：2025-09-29
@@ -18,6 +19,88 @@ const { getConnection } = require('../db');
 const { authenticateToken, checkPermission } = require('../middleware/auth');
 const ExcelJS = require('exceljs');
 const path = require('path');
+
+// =====================================================
+// 管理编号生成功能
+// =====================================================
+
+/**
+ * 生成仪器管理编号
+ * @param {string} prefix - 前缀类型 ('WSJ' 或 'LAB')
+ * @returns {string} 生成的管理编号
+ */
+async function generateManagementCode(prefix) {
+  try {
+    const pool = await getConnection();
+    
+    // 查询当前前缀的最大编号
+    const query = `
+      SELECT MAX(ManagementCode) as maxCode
+      FROM Instruments 
+      WHERE ManagementCode LIKE @prefix + '%'
+    `;
+    
+    const request = pool.request();
+    request.input('prefix', sql.NVarChar, prefix);
+    const result = await request.query(query);
+    
+    let sequence = 1;
+    if (result && result.recordset && result.recordset.length > 0 && result.recordset[0].maxCode) {
+      const maxCode = result.recordset[0].maxCode;
+      // 提取编号中的数字部分并加1
+      const match = maxCode.match(new RegExp(`${prefix}-(\\d+)`));
+      if (match) {
+        sequence = parseInt(match[1]) + 1;
+      }
+    }
+    
+    // 生成流水号：格式化为2位数字
+    const sequenceStr = sequence.toString().padStart(2, '0');
+    
+    // 返回格式：前缀-流水号
+    return `${prefix}-${sequenceStr}`;
+  } catch (error) {
+    console.error('生成管理编号失败:', error);
+    throw error;
+  }
+}
+
+/**
+ * 获取下一个管理编号预览
+ * GET /api/instruments/next-management-code/:prefix
+ * @param {string} prefix - 前缀类型 ('WSJ' 或 'LAB')
+ */
+router.get('/next-management-code/:prefix', authenticateToken, async (req, res) => {
+  try {
+    const { prefix } = req.params;
+    
+    // 验证前缀类型
+    if (!['WSJ', 'LAB'].includes(prefix)) {
+      return res.status(400).json({
+        code: 400,
+        message: '无效的前缀类型，只支持 WSJ 或 LAB'
+      });
+    }
+    
+    const nextCode = await generateManagementCode(prefix);
+    
+    res.json({
+      code: 200,
+      data: {
+        managementCode: nextCode,
+        prefix: prefix,
+        description: prefix === 'WSJ' ? '温湿度计' : '常规仪器'
+      }
+    });
+  } catch (error) {
+    console.error('获取下一个管理编号失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '获取管理编号失败',
+      error: error.message
+    });
+  }
+});
 
 // =====================================================
 // 仪器台账管理
@@ -310,7 +393,7 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
     const pool = await getConnection();
 
     // 构建查询条件
-    let whereConditions = ['1=1'];
+    let whereConditions = ['1=1', 'i.IsActive = 1']; // 只查询未删除的仪器
     const request = pool.request();
 
     if (instrumentName) {
@@ -1324,7 +1407,7 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
     const pool = await getConnection();
 
     // 构建查询条件
-    let whereConditions = ['1=1'];
+    let whereConditions = ['1=1', 'i.IsActive = 1']; // 只查询未删除的仪器
     const request = pool.request();
 
     if (instrumentName) {
