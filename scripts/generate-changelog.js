@@ -190,7 +190,10 @@ function generateChangelog(version, categories, commits) {
     const date = new Date().toISOString().split('T')[0];
     const totalCommits = commits.length;
     
-    let changelog = `## v${version} (${date})\n\n`;
+    // 确保版本号只有一个v前缀
+    const displayVersion = version.startsWith('v') ? version : `v${version}`;
+    
+    let changelog = `## ${displayVersion} (${date})\n\n`;
     
     // 版本概述
     changelog += `### 📊 版本概述\n`;

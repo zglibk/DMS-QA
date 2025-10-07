@@ -280,6 +280,186 @@ function filterCommits(commits, config) {
 }
 
 /**
+ * 智能生成描述内容
+ * @param {Object} commit - 提交对象
+ * @param {string} category - 分类名称
+ * @returns {string} 生成的描述内容
+ */
+function generateSmartDescription(commit, category) {
+    const subject = commit.subject.toLowerCase();
+    const author = commit.author || '开发者';
+    
+    // 基于提交类型的描述模板
+    const templates = {
+        // 功能相关
+        feat: [
+            '新增功能特性，提升用户体验',
+            '实现新的业务功能模块',
+            '添加用户请求的新特性'
+        ],
+        feature: [
+            '新增功能特性，提升用户体验',
+            '实现新的业务功能模块',
+            '添加用户请求的新特性'
+        ],
+        
+        // 修复相关
+        fix: [
+            '修复系统缺陷，提高稳定性',
+            '解决用户反馈的问题',
+            '修复影响用户体验的bug'
+        ],
+        bugfix: [
+            '修复系统缺陷，提高稳定性',
+            '解决用户反馈的问题',
+            '修复影响用户体验的bug'
+        ],
+        
+        // 优化相关
+        optimize: [
+            '优化系统性能，提升运行效率',
+            '改进代码结构，增强可维护性',
+            '优化用户界面和交互体验'
+        ],
+        perf: [
+            '优化系统性能，提升运行效率',
+            '改进代码结构，增强可维护性',
+            '优化用户界面和交互体验'
+        ],
+        
+        // 更新相关
+        update: [
+            '更新系统组件，保持技术先进性',
+            '升级依赖库，提高安全性',
+            '更新配置文件，适应新需求'
+        ],
+        
+        // 重构相关
+        refactor: [
+            '重构代码结构，提高代码质量',
+            '优化架构设计，增强扩展性',
+            '改进代码组织，便于维护'
+        ],
+        
+        // 文档相关
+        docs: [
+            '完善项目文档，提高可读性',
+            '更新使用说明，帮助用户理解',
+            '补充技术文档，便于开发维护'
+        ],
+        
+        // 样式相关
+        style: [
+            '优化界面样式，提升视觉效果',
+            '调整布局设计，改善用户体验',
+            '美化界面元素，增强交互感受'
+        ],
+        
+        // 测试相关
+        test: [
+            '完善测试用例，提高代码质量',
+            '增加自动化测试，确保功能稳定',
+            '优化测试流程，提升开发效率'
+        ]
+    };
+    
+    // 基于关键词的智能描述
+    const keywordDescriptions = {
+        '页面': '优化页面功能和用户交互体验',
+        '界面': '改进界面设计和视觉效果',
+        '数据库': '优化数据存储和查询性能',
+        '接口': '完善API接口功能和稳定性',
+        '权限': '加强系统安全和权限控制',
+        '配置': '优化系统配置和参数设置',
+        '日志': '完善系统日志记录和监控',
+        '导出': '优化数据导出功能和格式',
+        '导入': '改进数据导入流程和验证',
+        '统计': '完善数据统计和分析功能',
+        '报表': '优化报表生成和展示效果',
+        '搜索': '改进搜索功能和结果准确性',
+        '筛选': '优化数据筛选和过滤功能',
+        '排序': '完善数据排序和显示逻辑',
+        '分页': '优化分页功能和加载性能',
+        '上传': '改进文件上传功能和处理',
+        '下载': '优化文件下载和传输效率',
+        '预览': '完善文件预览和显示功能',
+        '编辑': '优化数据编辑和保存功能',
+        '删除': '完善数据删除和确认机制',
+        '添加': '优化数据添加和验证流程',
+        '修改': '改进数据修改和更新逻辑',
+        '查询': '优化数据查询和检索功能',
+        '验证': '加强数据验证和错误处理',
+        '提示': '完善用户提示和反馈机制',
+        '弹窗': '优化弹窗交互和用户体验',
+        '表单': '改进表单设计和数据处理',
+        '表格': '优化表格显示和操作功能',
+        '菜单': '完善导航菜单和路由功能',
+        '按钮': '优化按钮样式和交互效果',
+        '图标': '更新图标设计和视觉效果',
+        '颜色': '调整配色方案和视觉风格',
+        '字体': '优化字体显示和阅读体验',
+        '布局': '改进页面布局和响应式设计',
+        '响应': '优化移动端适配和响应速度',
+        '加载': '改进页面加载和性能优化',
+        '缓存': '优化缓存策略和数据存储',
+        '安全': '加强系统安全和防护机制',
+        '性能': '提升系统性能和运行效率',
+        '兼容': '改进浏览器兼容性和稳定性',
+        '错误': '完善错误处理和异常捕获',
+        '异常': '优化异常处理和系统稳定性'
+    };
+    
+    // 1. 尝试根据提交类型匹配模板
+    for (const [type, descriptions] of Object.entries(templates)) {
+        if (subject.includes(type) || category.toLowerCase().includes(type)) {
+            const randomIndex = Math.floor(Math.random() * descriptions.length);
+            return descriptions[randomIndex];
+        }
+    }
+    
+    // 2. 根据关键词生成描述
+    for (const [keyword, description] of Object.entries(keywordDescriptions)) {
+        if (subject.includes(keyword)) {
+            return description;
+        }
+    }
+    
+    // 3. 基于分类生成通用描述
+    const categoryDescriptions = {
+        '新功能': '实现新的功能特性，丰富系统功能',
+        '功能优化': '优化现有功能，提升用户体验',
+        '问题修复': '修复系统问题，提高稳定性',
+        '性能优化': '优化系统性能，提升运行效率',
+        '界面优化': '改进用户界面，提升视觉效果',
+        '代码重构': '重构代码结构，提高代码质量',
+        '文档更新': '完善项目文档，提高可读性',
+        '配置调整': '调整系统配置，适应新需求',
+        '依赖更新': '更新项目依赖，保持技术先进性',
+        '测试完善': '完善测试用例，提高代码质量',
+        '其他更新': '进行系统维护和改进工作'
+    };
+    
+    if (categoryDescriptions[category]) {
+        return categoryDescriptions[category];
+    }
+    
+    // 4. 默认描述（基于提交主题生成）
+    if (subject.includes('修复') || subject.includes('fix')) {
+        return '修复系统问题，提高稳定性和用户体验';
+    } else if (subject.includes('优化') || subject.includes('improve')) {
+        return '优化系统功能，提升性能和用户体验';
+    } else if (subject.includes('新增') || subject.includes('add')) {
+        return '新增系统功能，丰富产品特性';
+    } else if (subject.includes('更新') || subject.includes('update')) {
+        return '更新系统组件，保持技术先进性';
+    } else if (subject.includes('调整') || subject.includes('adjust')) {
+        return '调整系统配置，适应业务需求';
+    } else {
+        return `${author}进行的系统改进，提升整体质量和用户体验`;
+    }
+}
+
+/**
  * 智能分类提交
  * @param {Array} commits - 提交数组
  * @param {Object} config - 配置对象
@@ -334,11 +514,14 @@ function generateMarkdownChangelog(version, categories, commits, config) {
     const date = new Date().toISOString().split('T')[0];
     const totalCommits = commits.length;
     
+    // 确保版本号只有一个v前缀
+    const displayVersion = version.startsWith('v') ? version : `v${version}`;
+    
     let changelog = '';
     
     // 版本标题
-    changelog += config.templates?.version?.replace('{version}', version).replace('{date}', date) || 
-                `## v${version} (${date})\n\n`;
+    changelog += config.templates?.version?.replace('{version}', displayVersion).replace('{date}', date) || 
+                `## ${displayVersion} (${date})\n\n`;
     
     // 版本概述
     if (config.options?.includeOverview !== false) {
@@ -463,12 +646,15 @@ function generateHtmlChangelog(version, categories, commits, config) {
     const date = new Date().toISOString().split('T')[0];
     const contributors = [...new Set(commits.map(c => c.author))];
     
+    // 确保版本号只有一个v前缀
+    const displayVersion = version.startsWith('v') ? version : `v${version}`;
+    
     let html = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${config.title || '更新日志'} - v${version}</title>
+    <title>${config.title || '更新日志'} - ${displayVersion}</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; max-width: 800px; margin: 0 auto; padding: 20px; }
         h1, h2, h3 { color: #333; }
@@ -483,7 +669,7 @@ function generateHtmlChangelog(version, categories, commits, config) {
 <body>
     <h1>${config.title || '更新日志'}</h1>
     <div class="version">
-        <h2>v${version} (${date})</h2>
+        <h2>${displayVersion} (${date})</h2>
         <p><strong>📊 版本概述：</strong>本版本包含 ${commits.length} 个提交</p>
 `;
     
@@ -669,7 +855,19 @@ async function saveToDatabase(version, categories, commits, config, options = {}
                         itemRequest.input('VersionUpdateID', versionId);
                         itemRequest.input('category', categoryTitle);
                         itemRequest.input('title', commit.subject);
-                        itemRequest.input('description', commit.body || commit.subject);
+                        
+                        // 智能生成 Description 字段内容
+                        let description = null;
+                        
+                        // 1. 优先使用 commit.body（如果存在且与 subject 不同）
+                        if (commit.body && commit.body.trim() !== commit.subject.trim()) {
+                            description = commit.body.trim();
+                        } else {
+                            // 2. 基于提交类型和内容自动生成描述
+                            description = generateSmartDescription(commit, categoryTitle);
+                        }
+                        
+                        itemRequest.input('description', description);
                         itemRequest.input('CommitHash', commit.hash);
                         itemRequest.input('CommitAuthor', commit.author);
                         itemRequest.input('CommitDate', new Date(commit.date));
@@ -774,11 +972,14 @@ async function sendVersionUpdateNotification(transaction, version, categories, c
     // 判断是否为重要更新（根据提交数量或版本号变化）
     const isMajorUpdate = commits.length >= 20 || version.includes('.0.0') || version.includes('.0');
     
+    // 确保版本号只有一个v前缀
+    const displayVersion = version.startsWith('v') ? version : `v${version}`;
+    
     // 构建通知内容（纯文本格式，避免HTML标签）
-    const noticeTitle = `🚀 系统版本更新 - v${version}`;
+    const noticeTitle = `🚀 系统版本更新 - ${displayVersion}`;
     const noticeContent = `🎉 系统版本更新通知
 
-📦 版本号：v${version}
+📦 版本号：${displayVersion}
 📅 发布时间：${new Date().toLocaleString('zh-CN')}
 📊 更新统计：本次更新包含 ${commits.length} 个代码提交
 

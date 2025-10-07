@@ -1679,8 +1679,12 @@ const resetNoticeForm = () => {
 /**
  * 处理详情对话框关闭
  */
-const handleDetailClose = () => {
+const handleDetailClose = async () => {
   currentNotice.value = null
+  // 刷新通知列表状态，确保已读状态同步显示
+  await getNoticeList()
+  // 刷新未读数量
+  await getUnreadCount()
 }
 
 /**

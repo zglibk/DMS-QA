@@ -131,7 +131,8 @@
             >
               <div class="version-header">
                 <div class="version-info">
-                  <span class="version-number">v{{ version.Version }}</span>
+                  <!-- 确保版本号格式正确，避免双重'v'前缀 -->
+                  <span class="version-number">{{ version.Version.startsWith('v') ? version.Version : 'v' + version.Version }}</span>
                   <el-tag 
                     :type="getStatusType(version.Status)" 
                     size="small"

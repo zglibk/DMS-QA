@@ -345,7 +345,12 @@ router.post('/', authenticateToken, async (req, res) => {
                     itemRequest.input('versionUpdateId', sql.Int, versionUpdateId);
                 itemRequest.input('category', sql.NVarChar, item.category || 'other');
                 itemRequest.input('title', sql.NVarChar, item.title);
-                itemRequest.input('description', sql.NVarChar, item.description || null);
+                // 优化：避免 Title 和 Description 内容重复
+                // 如果 description 存在且不同于 title，使用 description；否则使用 null
+                const description = item.description && item.description.trim() !== item.title.trim() 
+                    ? item.description 
+                    : null;
+                itemRequest.input('description', sql.NVarChar, description);
                 itemRequest.input('commitHash', sql.NVarChar, item.commitHash || null);
                 itemRequest.input('commitShortHash', sql.NVarChar, item.commitShortHash || null);
                 itemRequest.input('commitAuthor', sql.NVarChar, item.commitAuthor || null);
@@ -362,10 +367,12 @@ router.post('/', authenticateToken, async (req, res) => {
             let noticeId = null;
             if (sendNotification) {
                 const noticeRequest = transaction.request();
-                const noticeTitle = `系统更新通知 - v${version}`;
+                // 确保版本号格式正确，避免双重'v'前缀
+                const displayVersion = version.startsWith('v') ? version : `v${version}`;
+                const noticeTitle = `系统更新通知 - ${displayVersion}`;
                 const noticeContent = `
                     <h3>🎉 系统版本更新</h3>
-                    <p><strong>版本号：</strong>v${version}</p>
+                    <p><strong>版本号：</strong>${displayVersion}</p>
                     <p><strong>发布时间：</strong>${new Date(releaseDate || Date.now()).toLocaleDateString()}</p>
                     ${description ? `<p><strong>更新说明：</strong>${description}</p>` : ''}
                     <hr>
@@ -545,33 +552,81 @@ router.put('/:id', authenticateToken, async (req, res) => {
 /**
  * 删除版本更新记录（软删除）
  * DELETE /api/version-updates/:id
+ * 功能：删除版本更新记录时，同步删除相关的通知公告
  */
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         const connection = await getConnection();
-        const request = connection.request();
+        const transaction = connection.transaction();
         
-        const deleteQuery = `
-            UPDATE VersionUpdates
-            SET IsActive = 0, UpdatedAt = GETDATE()
-            WHERE ID = @id AND IsActive = 1
-        `;
-        
-        request.input('id', sql.Int, id);
-        const result = await request.query(deleteQuery);
-        
-        if (result.rowsAffected[0] === 0) {
-            return res.status(404).json({
-                success: false,
-                message: '版本更新记录不存在'
+        try {
+            await transaction.begin();
+            
+            // 首先获取版本更新记录信息，包括关联的通知ID
+            const getVersionRequest = transaction.request();
+            getVersionRequest.input('id', sql.Int, id);
+            
+            const getVersionQuery = `
+                SELECT ID, Version, NoticeID
+                FROM VersionUpdates
+                WHERE ID = @id AND IsActive = 1
+            `;
+            
+            const versionResult = await getVersionRequest.query(getVersionQuery);
+            
+            if (versionResult.recordset.length === 0) {
+                await transaction.rollback();
+                return res.status(404).json({
+                    success: false,
+                    message: '版本更新记录不存在'
+                });
+            }
+            
+            const versionData = versionResult.recordset[0];
+            const noticeId = versionData.NoticeID;
+            
+            // 软删除版本更新记录
+            const deleteVersionRequest = transaction.request();
+            deleteVersionRequest.input('id', sql.Int, id);
+            
+            const deleteVersionQuery = `
+                UPDATE VersionUpdates
+                SET IsActive = 0, UpdatedAt = GETDATE()
+                WHERE ID = @id AND IsActive = 1
+            `;
+            
+            await deleteVersionRequest.query(deleteVersionQuery);
+            
+            // 如果存在关联的通知公告，同步软删除通知公告
+            if (noticeId) {
+                const deleteNoticeRequest = transaction.request();
+                deleteNoticeRequest.input('noticeId', sql.Int, noticeId);
+                
+                const deleteNoticeQuery = `
+                    UPDATE Notices
+                    SET IsActive = 0
+                    WHERE ID = @noticeId AND IsActive = 1
+                `;
+                
+                const noticeDeleteResult = await deleteNoticeRequest.query(deleteNoticeQuery);
+                
+                console.log(`版本 ${versionData.Version} 删除成功，同步删除了关联的通知公告 (ID: ${noticeId})`);
+            }
+            
+            await transaction.commit();
+            
+            res.json({
+                success: true,
+                message: noticeId ? 
+                    '版本更新记录及相关通知公告删除成功' : 
+                    '版本更新记录删除成功'
             });
+            
+        } catch (error) {
+            await transaction.rollback();
+            throw error;
         }
-        
-        res.json({
-            success: true,
-            message: '版本更新记录删除成功'
-        });
         
     } catch (error) {
         console.error('删除版本更新记录失败:', error);
@@ -623,10 +678,12 @@ router.post('/:id/notify', authenticateToken, async (req, res) => {
             
             // 创建通知记录
             const noticeRequest = transaction.request();
-            const noticeTitle = customTitle || `系统更新通知 - v${versionData.Version}`;
+            // 确保版本号格式正确，避免双重'v'前缀
+            const displayVersion = versionData.Version.startsWith('v') ? versionData.Version : `v${versionData.Version}`;
+            const noticeTitle = customTitle || `系统更新通知 - ${displayVersion}`;
             const noticeContent = customContent || `
                 <h3>🎉 系统版本更新</h3>
-                <p><strong>版本号：</strong>v${versionData.Version}</p>
+                <p><strong>版本号：</strong>${displayVersion}</p>
                 <p><strong>发布时间：</strong>${new Date(versionData.ReleaseDate).toLocaleDateString()}</p>
                 ${versionData.Description ? `<p><strong>更新说明：</strong>${versionData.Description}</p>` : ''}
                 <hr>
