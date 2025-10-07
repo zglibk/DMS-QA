@@ -2,13 +2,13 @@
   <div class="markdown-editor">
     <!-- 工具栏 -->
     <div v-if="!readonly" class="toolbar">
-      <button @click="togglePreview" class="btn btn-primary">
+      <button type="button" @click="togglePreview" class="btn btn-primary">
         {{ showPreview ? '隐藏预览' : '显示预览' }}
       </button>
-      <button @click="exportMarkdown" class="btn btn-secondary">
+      <button type="button" @click="exportMarkdown" class="btn btn-secondary">
         导出 Markdown
       </button>
-      <button @click="exportHtml" class="btn btn-secondary">
+      <button type="button" @click="exportHtml" class="btn btn-secondary">
         导出 HTML
       </button>
       <input 
@@ -18,10 +18,10 @@
         accept="image/*" 
         style="display: none;"
       >
-      <button @click="triggerFileUpload" class="btn btn-info">
+      <button type="button" @click="triggerFileUpload" class="btn btn-info">
         上传图片
       </button>
-      <button @click="clearContent" class="btn btn-warning">
+      <button type="button" @click="clearContent" class="btn btn-warning">
         清空内容
       </button>
     </div>

@@ -91,6 +91,8 @@ router.get('/', authenticateToken, async (req, res) => {
                     vu.FixesCount,
                     vu.ImprovementsCount,
                     vu.OtherCount,
+                    vu.ChangelogMarkdown,
+                    vu.Contributors,
                     vu.NotificationSent,
                     vu.NotificationDate,
                     vu.CreatedAt,
