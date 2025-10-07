@@ -197,17 +197,14 @@
         <el-table-column prop="productNo" label="产品编号" width="160" align="center" header-align="center" class-name="no-wrap-column" />
         <el-table-column prop="productName" label="品名" width="200" show-overflow-tooltip />
         <el-table-column prop="productSpec" label="产品规格" width="150" align="center" header-align="center" show-overflow-tooltip />
-        <el-table-column label="产品图纸" width="100" align="center" header-align="center">
+        <el-table-column label="图片预览" width="100" align="center" header-align="center">
           <template #default="scope">
-            <el-button v-if="scope.row.productDrawing" type="primary" link @click="viewImage(scope.row.productDrawing)">
-              查看
-            </el-button>
-            <span v-else>-</span>
-          </template>
-        </el-table-column>
-        <el-table-column label="色卡图像" width="100" align="center" header-align="center">
-          <template #default="scope">
-            <el-button v-if="scope.row.colorCardImage" type="primary" link @click="viewImage(scope.row.colorCardImage)">
+            <el-button 
+              v-if="scope.row.productDrawing || scope.row.colorCardImage" 
+              type="primary" 
+              link 
+              @click="viewImages(scope.row)"
+            >
               查看
             </el-button>
             <span v-else>-</span>
@@ -344,31 +341,41 @@
           <el-col :span="12">
             <el-form-item label="产品图纸" prop="productDrawing">
               <el-upload
-                class="upload-demo"
-                :action="uploadUrl"
-                :data="{ fileType: 'productDrawing' }"
-                :on-success="handleDrawingSuccess"
+                class="upload-demo upload-no-filename"
+                :auto-upload="false"
+                :on-change="handleDrawingFileChange"
+                :on-remove="handleDrawingFileRemove"
+                :on-preview="handleDrawingPreview"
                 :before-upload="beforeUpload"
                 :file-list="drawingFileList"
-                list-type="picture"
+                list-type="picture-card"
+                multiple
+                :limit="5"
+                accept="image/*"
               >
-                <el-button type="primary">上传图纸</el-button>
+                <el-icon class="upload-plus-icon"><Plus /></el-icon>
               </el-upload>
+              <div class="upload-tip">最多可选择5张图片</div>
             </el-form-item>
           </el-col>
           <el-col :span="12">
             <el-form-item label="色卡图像" prop="colorCardImage">
               <el-upload
-                class="upload-demo"
-                :action="uploadUrl"
-                :data="{ fileType: 'colorCard' }"
-                :on-success="handleColorCardSuccess"
+                class="upload-demo upload-no-filename"
+                :auto-upload="false"
+                :on-change="handleColorCardFileChange"
+                :on-remove="handleColorCardFileRemove"
+                :on-preview="handleColorCardPreview"
                 :before-upload="beforeUpload"
                 :file-list="colorCardFileList"
-                list-type="picture"
+                list-type="picture-card"
+                multiple
+                :limit="5"
+                accept="image/*"
               >
-                <el-button type="primary">上传色卡</el-button>
+                <el-icon class="upload-plus-icon"><Plus /></el-icon>
               </el-upload>
+              <div class="upload-tip">最多可选择5张图片</div>
             </el-form-item>
           </el-col>
         </el-row>
@@ -623,7 +630,7 @@
     </el-dialog>
 
     <!-- 图片预览组件 - 使用封装的ImgPreview组件 -->
-    <ImgPreview v-model="imageViewerVisible" :imgs="[previewImageUrl]" />
+<ImgPreview v-model="imageViewerVisible" :imgs="previewImageUrls" />
   </div>
 </template>
 
@@ -707,7 +714,7 @@ const loading = ref(false)
 const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
 const imagePreviewVisible = ref(false)
-const previewImageUrl = ref('')
+const previewImageUrls = ref([]) // 修改为数组，支持多图片预览
 const imageViewerVisible = ref(false) // 新增：控制el-image-viewer显示状态
 const selectedRows = ref([])
 const formRef = ref(null)
@@ -980,6 +987,7 @@ async function handleAdd() {
 
 /**
  * 编辑处理
+ * 支持多图片路径的加载和显示
  */
 function handleEdit(row) {
   // 权限检查
@@ -994,6 +1002,29 @@ function handleEdit(row) {
   // 如果没有有效期字段，设置默认值
   if (!formData.validityPeriod) {
     formData.validityPeriod = 1
+  }
+  
+  // 处理多图片路径加载到文件列表（编辑模式下显示已有文件）
+  if (formData.productDrawing) {
+    const drawingPaths = formData.productDrawing.split(';').filter(path => path.trim())
+    drawingFileList.value = drawingPaths.map((path, index) => ({
+      name: `图纸${index + 1}`,
+      url: path,
+      status: 'success' // 标记为已上传状态
+    }))
+  } else {
+    drawingFileList.value = []
+  }
+  
+  if (formData.colorCardImage) {
+    const colorCardPaths = formData.colorCardImage.split(';').filter(path => path.trim())
+    colorCardFileList.value = colorCardPaths.map((path, index) => ({
+      name: `色卡${index + 1}`,
+      url: path,
+      status: 'success' // 标记为已上传状态
+    }))
+  } else {
+    colorCardFileList.value = []
   }
   
   // 重新计算到期日期（以防数据不一致）
@@ -1354,42 +1385,64 @@ function getAdaptedImageUrl(imagePath, preventCache = false) {
   const hostname = window.location.hostname
   const protocol = window.location.protocol
   
-  // 调试信息：输出环境判断结果
-  console.log('🔍 图片URL构建调试信息:')
-  console.log('原始图片路径:', imagePath)
-  console.log('当前hostname:', hostname)
-  console.log('当前protocol:', protocol)
-  
   // 构建图片URL
   let url
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
     // 开发环境：没有文件服务器，直接使用相对路径访问文件
     // 确保路径以/files/开头，用于Vite开发服务器的静态文件代理
     url = imagePath.startsWith('/files/') ? imagePath : `/files/${imagePath.replace(/^\/+/, '')}`
-    console.log('🏠 开发环境 - 构建的URL:', url)
   } else {
     // 生产环境：使用Nginx文件服务器，文件访问需要通过8080端口
     const cleanPath = imagePath.startsWith('/files/') ? imagePath : `/files/${imagePath.replace(/^\/+/, '')}`
     url = `${protocol}//${hostname}:8080${cleanPath}`
-    console.log('🏭 生产环境 - 清理后的路径:', cleanPath)
-    console.log('🏭 生产环境 - 构建的URL:', url)
   }
   
   // 只在需要防止缓存时添加时间戳参数
   if (preventCache) {
     const timestamp = Date.now()
     url += `?t=${timestamp}`
-    console.log('⏰ 添加防缓存时间戳后的URL:', url)
   }
-  
-  console.log('✅ 最终返回的URL:', url)
-  console.log('---')
   
   return url
 }
 
 /**
- * 图片查看 - 使用封装的ImgPreview组件
+ * 多图片查看 - 支持同时显示产品图纸和色卡图像
+ * 支持多图片路径的解析（分号分隔）
+ * @param {Object} row - 表格行数据，包含 productDrawing 和 colorCardImage 字段
+ */
+function viewImages(row) {
+  const imageUrls = []
+  
+  // 处理产品图纸路径（支持多图片）
+  if (row.productDrawing && row.productDrawing.trim()) {
+    const drawingPaths = row.productDrawing.split(';').filter(path => path.trim())
+    drawingPaths.forEach(path => {
+      imageUrls.push(getAdaptedImageUrl(path))
+    })
+  }
+  
+  // 处理色卡图像路径（支持多图片）
+  if (row.colorCardImage && row.colorCardImage.trim()) {
+    const colorCardPaths = row.colorCardImage.split(';').filter(path => path.trim())
+    colorCardPaths.forEach(path => {
+      imageUrls.push(getAdaptedImageUrl(path))
+    })
+  }
+  
+  // 如果没有图片，显示提示信息
+  if (imageUrls.length === 0) {
+    ElMessage.warning('暂无图片可预览')
+    return
+  }
+  
+  // 设置图片URL数组并显示预览器
+  previewImageUrls.value = imageUrls
+  imageViewerVisible.value = true
+}
+
+/**
+ * 图片查看 - 使用封装的ImgPreview组件（支持单图片和多图片路径）
  */
 function viewImage(imageUrl) {
   // 如果传入的图片URL为空或无效，显示提示信息
@@ -1398,13 +1451,27 @@ function viewImage(imageUrl) {
     return
   }
 
-  // 使用环境自适应的URL构建函数
-  previewImageUrl.value = getAdaptedImageUrl(imageUrl)
-  console.log('🔍 设置预览图片URL:', previewImageUrl.value)
+  const imageUrls = []
+  
+  // 处理图片路径（支持多图片，分号分隔）
+  if (imageUrl && imageUrl.trim()) {
+    const imagePaths = imageUrl.split(';').filter(path => path.trim())
+    imagePaths.forEach(path => {
+      imageUrls.push(getAdaptedImageUrl(path))
+    })
+  }
+  
+  // 如果没有有效的图片路径，显示提示信息
+  if (imageUrls.length === 0) {
+    ElMessage.warning('暂无图片可预览')
+    return
+  }
+
+  // 使用环境自适应的URL构建函数，转换为数组格式
+  previewImageUrls.value = imageUrls
   
   // 通过v-model双向绑定显示图片预览器
   imageViewerVisible.value = true
-  console.log('✅ 图片预览器已打开')
 }
 
 /**
@@ -1413,7 +1480,6 @@ function viewImage(imageUrl) {
  */
 function closeImageViewer() {
   imageViewerVisible.value = false
-  console.log('✅ 图片预览器已关闭')
 }
 
 /**
@@ -1485,20 +1551,183 @@ function beforeUpload(file) {
 }
 
 /**
- * 产品图纸上传成功
+ * 产品图纸文件选择变化处理
+ */
+function handleDrawingFileChange(file, fileList) {
+  drawingFileList.value = fileList
+}
+
+/**
+ * 产品图纸文件移除处理
+ */
+function handleDrawingFileRemove(file, fileList) {
+  drawingFileList.value = fileList
+  
+  // 同步更新formData中的productDrawing字段
+  const remainingPaths = fileList
+    .filter(f => f.url && !f.raw) // 只保留已上传的文件（有url且没有raw的）
+    .map(f => f.url)
+    .filter(path => path.trim()) // 过滤空路径
+  
+  formData.productDrawing = remainingPaths.join(';')
+  console.log('产品图纸删除后更新formData.productDrawing:', formData.productDrawing)
+}
+
+/**
+ * 色卡图像文件选择变化处理
+ */
+function handleColorCardFileChange(file, fileList) {
+  colorCardFileList.value = fileList
+}
+
+/**
+ * 色卡图像文件移除处理
+ */
+function handleColorCardFileRemove(file, fileList) {
+  colorCardFileList.value = fileList
+  
+  // 同步更新formData中的colorCardImage字段
+  const remainingPaths = fileList
+    .filter(f => f.url && !f.raw) // 只保留已上传的文件（有url且没有raw的）
+    .map(f => f.url)
+    .filter(path => path.trim()) // 过滤空路径
+  
+  formData.colorCardImage = remainingPaths.join(';')
+  console.log('色卡图像删除后更新formData.colorCardImage:', formData.colorCardImage)
+}
+
+/**
+ * 产品图纸预览处理
+ */
+function handleDrawingPreview(file) {
+  if (file.url && !file.raw) {
+    // 已上传的文件，使用getAdaptedImageUrl确保URL正确构建
+    const adaptedUrl = getAdaptedImageUrl(file.url)
+    previewImageUrls.value = [adaptedUrl]
+    imageViewerVisible.value = true
+  } else if (file.raw) {
+    // 新选择的文件，创建临时URL预览
+    const tempUrl = URL.createObjectURL(file.raw)
+    previewImageUrls.value = [tempUrl]
+    imageViewerVisible.value = true
+  }
+}
+
+/**
+ * 色卡图像预览处理
+ */
+function handleColorCardPreview(file) {
+  if (file.url && !file.raw) {
+    // 已上传的文件，使用getAdaptedImageUrl确保URL正确构建
+    const adaptedUrl = getAdaptedImageUrl(file.url)
+    previewImageUrls.value = [adaptedUrl]
+    imageViewerVisible.value = true
+  } else if (file.raw) {
+    // 新选择的文件，创建临时URL预览
+    const tempUrl = URL.createObjectURL(file.raw)
+    previewImageUrls.value = [tempUrl]
+    imageViewerVisible.value = true
+  }
+}
+
+/**
+ * 批量上传文件到服务器
+ * @param {Array} fileList - 文件列表
+ * @param {string} fileType - 文件类型
+ * @returns {Promise<Array>} 上传成功的文件URL数组
+ */
+async function uploadFiles(fileList, fileType) {
+  const uploadPromises = []
+  
+  console.log('uploadFiles 调用:', { fileList, fileType })
+  
+  for (const fileItem of fileList) {
+    console.log('处理文件项:', fileItem)
+    if (fileItem.raw) { // 只上传新选择的文件（有raw属性的是新文件）
+      console.log('发现新文件，准备上传:', fileItem.name)
+      const formData = new FormData()
+      formData.append('file', fileItem.raw)
+      formData.append('fileType', fileType)
+      
+      const uploadPromise = api.post('/upload', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      })
+      
+      uploadPromises.push(uploadPromise)
+    } else {
+      console.log('跳过已存在文件:', fileItem.name || fileItem.url)
+    }
+  }
+  
+  console.log('准备上传的文件数量:', uploadPromises.length)
+  
+  try {
+    const results = await Promise.all(uploadPromises)
+    console.log('上传结果:', results)
+    console.log('上传结果详细信息:', results.map(r => ({ data: r.data, status: r.status })))
+    
+    // 处理不同的响应格式
+    const urls = results.map(result => {
+      if (result.data && result.data.url) {
+        return result.data.url
+      } else if (result.data && result.data.data && result.data.data.url) {
+        return result.data.data.url
+      } else if (result.url) {
+        return result.url
+      } else {
+        console.warn('无法从响应中提取URL:', result)
+        return null
+      }
+    }).filter(url => url)
+    
+    console.log('提取的URL列表:', urls)
+    return urls
+  } catch (error) {
+    console.error('文件上传失败:', error)
+    ElMessage.error('文件上传失败')
+    throw error
+  }
+}
+
+/**
+ * 产品图纸上传成功处理
+ * 支持多图片上传，将多个图片路径用分号分隔存储
  */
 function handleDrawingSuccess(response, file) {
-  formData.productDrawing = response.url
-  drawingFileList.value = [{ name: file.name, url: response.url }]
+  // 获取当前已有的图片路径
+  const existingPaths = formData.productDrawing ? formData.productDrawing.split(';').filter(path => path.trim()) : []
+  
+  // 添加新上传的图片路径
+  existingPaths.push(response.url)
+  
+  // 合并路径并存储到表单数据
+  formData.productDrawing = existingPaths.join(';')
+  
+  // 更新文件列表显示
+  drawingFileList.value.push({ name: file.name, url: response.url })
+  
   ElMessage.success('图纸上传成功')
 }
 
 /**
- * 色卡图像上传成功
+ * 色卡图像上传成功处理
+ * 支持多图片上传，将多个图片路径用分号分隔存储
  */
 function handleColorCardSuccess(response, file) {
-  formData.colorCardImage = response.url
-  colorCardFileList.value = [{ name: file.name, url: response.url }]
+  // 获取当前已有的图片路径
+  const existingPaths = formData.colorCardImage ? formData.colorCardImage.split(';').filter(path => path.trim()) : []
+  
+  // 添加新上传的图片路径
+  existingPaths.push(response.url)
+  
+  // 合并路径并存储到表单数据
+  formData.colorCardImage = existingPaths.join(';')
+  
+  // 更新文件列表显示
+  colorCardFileList.value.push({ name: file.name, url: response.url })
+  
   ElMessage.success('色卡上传成功')
 }
 
@@ -1620,7 +1849,65 @@ async function handleSubmit() {
   }
   
   try {
+    // 显示上传进度
+    loading.value = true
+    
+    // 上传产品图纸文件
+    let productDrawingUrls = []
+    console.log('准备上传产品图纸，文件列表:', drawingFileList.value)
+    if (drawingFileList.value && drawingFileList.value.length > 0) {
+      try {
+        productDrawingUrls = await uploadFiles(drawingFileList.value, 'productDrawing')
+        console.log('产品图纸上传结果:', productDrawingUrls)
+        console.log('产品图纸上传结果类型:', typeof productDrawingUrls, Array.isArray(productDrawingUrls))
+      } catch (error) {
+        loading.value = false
+        return // 上传失败，停止提交
+      }
+    }
+    
+    // 上传色卡图像文件
+    let colorCardUrls = []
+    console.log('准备上传色卡图像，文件列表:', colorCardFileList.value)
+    if (colorCardFileList.value && colorCardFileList.value.length > 0) {
+      try {
+        colorCardUrls = await uploadFiles(colorCardFileList.value, 'colorCard')
+        console.log('色卡图像上传结果:', colorCardUrls)
+        console.log('色卡图像上传结果类型:', typeof colorCardUrls, Array.isArray(colorCardUrls))
+      } catch (error) {
+        loading.value = false
+        return // 上传失败，停止提交
+      }
+    }
+    
     const submitData = { ...formData }
+    
+    // 处理图片路径数据
+    if (productDrawingUrls.length > 0) {
+      // 获取现有的图片路径（编辑时可能已有）
+      const existingDrawingPaths = submitData.productDrawing ? 
+        submitData.productDrawing.split(';').filter(path => path.trim()) : []
+      
+      // 合并现有路径和新上传的路径
+      const allDrawingPaths = [...existingDrawingPaths, ...productDrawingUrls]
+      submitData.productDrawing = allDrawingPaths.join(';')
+    } else if (submitData.id) {
+      // 编辑模式下，如果没有新上传的文件，使用当前formData中的路径（可能已被删除操作更新）
+      submitData.productDrawing = formData.productDrawing || ''
+    }
+    
+    if (colorCardUrls.length > 0) {
+      // 获取现有的图片路径（编辑时可能已有）
+      const existingColorCardPaths = submitData.colorCardImage ? 
+        submitData.colorCardImage.split(';').filter(path => path.trim()) : []
+      
+      // 合并现有路径和新上传的路径
+      const allColorCardPaths = [...existingColorCardPaths, ...colorCardUrls]
+      submitData.colorCardImage = allColorCardPaths.join(';')
+    } else if (submitData.id) {
+      // 编辑模式下，如果没有新上传的文件，使用当前formData中的路径（可能已被删除操作更新）
+      submitData.colorCardImage = formData.colorCardImage || ''
+    }
     
     // 处理分发部门数据 - 确保数据格式正确
     if (Array.isArray(submitData.distributionDepartment)) {
@@ -1652,6 +1939,8 @@ async function handleSubmit() {
   } catch (error) {
     console.error('保存失败:', error)
     ElMessage.error('保存失败')
+  } finally {
+    loading.value = false
   }
 }
 
@@ -2177,5 +2466,49 @@ onMounted(async () => {
 .el-button.is-link:disabled {
   color: #c0c4cc !important;
   cursor: not-allowed;
+}
+
+/* 隐藏上传组件文件名，节省空间 */
+.upload-no-filename :deep(.el-upload-list__item-name) {
+  display: none !important;
+}
+
+.upload-no-filename :deep(.el-upload-list--picture-card .el-upload-list__item) {
+  width: 60px;
+  height: 60px;
+  margin-right: 8px;
+  margin-bottom: 8px;
+}
+
+.upload-no-filename :deep(.el-upload--picture-card) {
+  width: 60px;
+  height: 60px;
+  line-height: 58px;
+}
+
+.upload-no-filename :deep(.el-upload-list--picture-card .el-upload-list__item-thumbnail) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.upload-no-filename :deep(.el-upload-list--picture-card .el-upload-list__item-actions) {
+  font-size: 12px;
+}
+
+.upload-no-filename :deep(.el-upload-list--picture-card .el-upload-list__item-actions .el-icon) {
+  font-size: 12px;
+}
+
+/* 十字加号按钮样式 */
+.upload-plus-icon {
+  font-size: 24px;
+  color: #8c939d;
+  cursor: pointer;
+  transition: color 0.3s;
+}
+
+.upload-no-filename :deep(.el-upload--picture-card:hover) .upload-plus-icon {
+  color: #409eff;
 }
 </style>

@@ -29,31 +29,52 @@ if (!fs.existsSync(customerComplaintDir)) {
 // 配置multer存储 - 网站图片
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    // 根据文件类型确定存储目录
-    const fileType = req.body.fileType || req.body.type || 'image';
-    let targetDir = siteImagesDir;
+    console.log('=== Multer destination 函数调用 ===');
+    console.log('req.body:', req.body);
+    console.log('req.query:', req.query);
+    console.log('file:', {
+      fieldname: file.fieldname,
+      originalname: file.originalname,
+      encoding: file.encoding,
+      mimetype: file.mimetype
+    });
     
+    // 尝试从查询参数或请求体获取文件类型
+    const fileType = req.query.fileType || req.body.fileType || req.body.type || 'image';
+    console.log('文件类型:', fileType);
+    
+    // 根据文件类型确定子目录
+    let subDir = '';
     if (fileType === 'productDrawing' || fileType === 'drawing') {
-      // 产品图纸存储到产品图纸目录
-      targetDir = path.join(siteImagesDir, '产品图纸');
+      subDir = '产品图纸';
     } else if (fileType === 'colorCard' || fileType === 'sample') {
-      // 样板图像存储到样板图像目录
-      targetDir = path.join(siteImagesDir, '样板图像');
+      subDir = '色卡图片';
     }
+    
+    // 构建完整的目标目录路径
+    const targetDir = subDir ? path.join(siteImagesDir, subDir) : siteImagesDir;
+    console.log('目标目录:', targetDir);
     
     // 确保目标目录存在
     if (!fs.existsSync(targetDir)) {
       fs.mkdirSync(targetDir, { recursive: true });
+      console.log('创建目录:', targetDir);
     }
     
     cb(null, targetDir);
   },
   filename: function (req, file, cb) {
+    console.log('=== Multer filename 函数调用 ===');
+    console.log('file.originalname:', file.originalname);
+    
     // 生成唯一文件名
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     const ext = path.extname(file.originalname);
     const type = req.body.type || 'image';
-    cb(null, `${type}-${uniqueSuffix}${ext}`);
+    const filename = `${type}-${uniqueSuffix}${ext}`;
+    
+    console.log('生成的文件名:', filename);
+    cb(null, filename);
   }
 });
 
@@ -290,24 +311,51 @@ const customPathAttachmentUpload = multer({
 // 样品图片上传接口
 router.post('/', upload.single('file'), (req, res) => {
   try {
+    console.log('=== 文件上传请求开始 ===');
+    console.log('请求体:', req.body);
+    console.log('文件信息:', req.file);
+    
     if (!req.file) {
+      console.log('错误: 没有接收到文件');
       return res.status(400).json({
         success: false,
         message: '没有上传文件'
       });
     }
 
-    // 根据文件类型构建访问URL
+    // 根据文件类型构建访问URL和移动文件
     const fileType = req.body.fileType || req.body.type || 'image';
     let subDir = '';
     
     if (fileType === 'productDrawing' || fileType === 'drawing') {
-      subDir = '/产品图纸';
+      subDir = '产品图纸';
     } else if (fileType === 'colorCard' || fileType === 'sample') {
-      subDir = '/样板图像';
+      subDir = '色卡图片';
     }
     
-    const fileUrl = `/files/site-images${subDir}/${req.file.filename}`;
+    // 如果需要移动到子目录
+    if (subDir) {
+      const targetDir = path.join(siteImagesDir, subDir);
+      const newFilePath = path.join(targetDir, req.file.filename);
+      
+      // 确保目标目录存在
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+        console.log('创建目录:', targetDir);
+      }
+      
+      // 移动文件到正确的子目录
+      if (req.file.path !== newFilePath) {
+        fs.renameSync(req.file.path, newFilePath);
+        console.log('文件移动:', req.file.path, '->', newFilePath);
+        
+        // 更新文件信息
+        req.file.path = newFilePath;
+        req.file.destination = targetDir;
+      }
+    }
+    
+    const fileUrl = `/files/site-images${subDir ? '/' + subDir : ''}/${req.file.filename}`;
 
     console.log('样品图片上传成功:', {
       originalName: req.file.originalname,
@@ -332,7 +380,7 @@ router.post('/', upload.single('file'), (req, res) => {
     });
 
   } catch (error) {
-
+    console.error('文件上传错误:', error);
     res.status(500).json({
       success: false,
       message: '图片上传失败: ' + error.message

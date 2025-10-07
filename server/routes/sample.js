@@ -11,6 +11,8 @@
 const express = require('express');
 const router = express.Router();
 const sql = require('mssql');
+const fs = require('fs');
+const path = require('path');
 const { executeQuery } = require('../db');
 const { authenticateToken } = require('../middleware/auth');
 
@@ -326,7 +328,7 @@ router.post('/create', authenticateToken, async (req, res) => {
       request.input('signDate', sql.Date, signDate || null);
       request.input('receiveDate', sql.Date, receiveDate || null);
       request.input('judgment', sql.NVarChar, judgment);
-      request.input('distributionDepartment', sql.NVarChar, JSON.stringify(distributionDepartment));
+      request.input('distributionDepartment', sql.NVarChar, distributionDepartmentStr);
       request.input('distributionQuantity', sql.Int, distributionQuantity);
       request.input('sampleStatus', sql.NVarChar, sampleStatus);
       request.input('expiryDate', sql.Date, expiryDate || null);
@@ -387,6 +389,64 @@ router.put('/update/:id', authenticateToken, async (req, res) => {
       remark
     } = req.body;
 
+    // 添加详细的字段长度调试日志
+    console.log('=== 样品更新字段长度检查 ===');
+    console.log('certificateNo:', certificateNo, '长度:', certificateNo ? certificateNo.length : 0);
+    console.log('customerNo:', customerNo, '长度:', customerNo ? customerNo.length : 0);
+    console.log('workOrderNo:', workOrderNo, '长度:', workOrderNo ? workOrderNo.length : 0);
+    console.log('productNo:', productNo, '长度:', productNo ? productNo.length : 0);
+    console.log('productName:', productName, '长度:', productName ? productName.length : 0);
+    console.log('productSpec:', productSpec, '长度:', productSpec ? productSpec.length : 0);
+    console.log('productDrawing:', productDrawing, '长度:', productDrawing ? productDrawing.length : 0);
+    console.log('colorCardImage:', colorCardImage, '长度:', colorCardImage ? colorCardImage.length : 0);
+    console.log('creator:', creator, '长度:', creator ? creator.length : 0);
+    console.log('follower:', follower, '长度:', follower ? follower.length : 0);
+    console.log('receiver:', receiver, '长度:', receiver ? receiver.length : 0);
+    console.log('signer:', signer, '长度:', signer ? signer.length : 0);
+    console.log('judgment:', judgment, '长度:', judgment ? judgment.length : 0);
+    console.log('distributionDepartment:', distributionDepartment, '类型:', typeof distributionDepartment);
+    
+    // 处理 distributionDepartment 字段，避免多次 JSON.stringify
+    let distributionDepartmentStr;
+    if (typeof distributionDepartment === 'string') {
+      // 如果已经是字符串，直接使用
+      distributionDepartmentStr = distributionDepartment;
+    } else {
+      // 如果是数组或对象，进行 JSON.stringify
+      distributionDepartmentStr = JSON.stringify(distributionDepartment);
+    }
+    
+    console.log('distributionDepartment JSON:', distributionDepartmentStr, '长度:', distributionDepartmentStr.length);
+    console.log('sampleStatus:', sampleStatus, '长度:', sampleStatus ? sampleStatus.length : 0);
+    console.log('remark:', remark, '长度:', remark ? remark.length : 0);
+    console.log('=== 字段长度检查结束 ===');
+
+    // 获取原有的图片路径信息，用于对比删除
+    const getOriginalQuery = `
+      SELECT ProductDrawing, ColorCardImage 
+      FROM SampleApproval 
+      WHERE ID = @id
+    `;
+    
+    const originalResult = await executeQuery(async (pool) => {
+      const request = pool.request();
+      request.input('id', sql.Int, id);
+      return await request.query(getOriginalQuery);
+    });
+
+    if (!originalResult || originalResult.recordset.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        message: '样板承认书记录不存在'
+      });
+    }
+
+    const originalData = originalResult.recordset[0];
+    
+    // 处理图片物理删除
+    await handleImageDeletion(originalData.ProductDrawing, productDrawing, 'product-drawing');
+    await handleImageDeletion(originalData.ColorCardImage, colorCardImage, 'color-card');
+
     const query = `
       UPDATE SampleApproval SET
         CertificateNo = @certificateNo,
@@ -436,7 +496,7 @@ router.put('/update/:id', authenticateToken, async (req, res) => {
       request.input('signDate', sql.Date, signDate);
       request.input('receiveDate', sql.Date, receiveDate);
       request.input('judgment', sql.NVarChar, judgment);
-      request.input('distributionDepartment', sql.NVarChar, JSON.stringify(distributionDepartment));
+      request.input('distributionDepartment', sql.NVarChar, distributionDepartmentStr);
       request.input('distributionQuantity', sql.Int, distributionQuantity);
       request.input('sampleStatus', sql.NVarChar, sampleStatus);
       request.input('expiryDate', sql.Date, expiryDate);
@@ -629,5 +689,74 @@ router.get('/statistics', authenticateToken, async (req, res) => {
     });
   }
 });
+
+/**
+ * 处理图片物理删除
+ * @param {string} originalPaths - 原有的图片路径字符串（分号分隔）
+ * @param {string} newPaths - 新的图片路径字符串（分号分隔）
+ * @param {string} imageType - 图片类型（用于日志标识）
+ */
+async function handleImageDeletion(originalPaths, newPaths, imageType) {
+  try {
+    // 解析原有路径和新路径
+    const originalPathList = originalPaths ? 
+      originalPaths.split(';').filter(path => path.trim()) : [];
+    const newPathList = newPaths ? 
+      newPaths.split(';').filter(path => path.trim()) : [];
+    
+    // 找出被删除的图片路径
+    const deletedPaths = originalPathList.filter(originalPath => 
+      !newPathList.includes(originalPath)
+    );
+    
+    if (deletedPaths.length === 0) {
+      console.log(`[${imageType}] 没有需要删除的图片`);
+      return;
+    }
+    
+    console.log(`[${imageType}] 开始删除 ${deletedPaths.length} 个图片文件:`, deletedPaths);
+    
+    // 删除物理文件
+    for (const deletedPath of deletedPaths) {
+      try {
+        // 构建完整的文件路径
+        let filePath;
+        
+        // 处理不同的路径格式
+        if (deletedPath.startsWith('/files/')) {
+          // /files/ 开头的路径需要转换为 uploads/ 路径
+          // /files/site-images/产品图纸/xxx.jpg -> uploads/site-images/产品图纸/xxx.jpg
+          const relativePath = deletedPath.replace('/files/', 'uploads/');
+          filePath = path.join(__dirname, '..', relativePath);
+        } else if (deletedPath.startsWith('uploads/')) {
+          // 相对路径格式：uploads/site-images/filename.jpg
+          filePath = path.join(__dirname, '..', deletedPath);
+        } else if (deletedPath.includes('uploads')) {
+          // 包含uploads的路径：/uploads/site-images/filename.jpg
+          const uploadsIndex = deletedPath.indexOf('uploads');
+          const relativePath = deletedPath.substring(uploadsIndex);
+          filePath = path.join(__dirname, '..', relativePath);
+        } else {
+          // 纯文件名格式：filename.jpg，默认存储在 uploads/site-images 目录
+          filePath = path.join(__dirname, '../uploads/site-images', deletedPath);
+        }
+        
+        // 检查文件是否存在并删除
+        if (fs.existsSync(filePath)) {
+          fs.unlinkSync(filePath);
+          console.log(`[${imageType}] 成功删除文件:`, filePath);
+        } else {
+          console.log(`[${imageType}] 文件不存在，跳过删除:`, filePath);
+        }
+      } catch (deleteError) {
+        console.error(`[${imageType}] 删除文件失败:`, deletedPath, deleteError.message);
+        // 继续处理其他文件，不中断整个删除流程
+      }
+    }
+  } catch (error) {
+    console.error(`[${imageType}] 处理图片删除失败:`, error.message);
+    // 不抛出错误，避免影响主要的更新流程
+  }
+}
 
 module.exports = router;

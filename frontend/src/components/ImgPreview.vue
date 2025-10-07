@@ -47,6 +47,7 @@
 <script setup>
 import { reactive } from 'vue'
 import { useVModel } from '@vueuse/core'
+import { ElMessageBox } from 'element-plus'
 import { 
   ArrowLeft, 
   ArrowRight, 
@@ -97,7 +98,7 @@ function close() {
  * 下载图片功能
  * @param {number} activeIndex - 当前图片索引
  */
-function downloadImage(activeIndex) {
+async function downloadImage(activeIndex) {
   if (!props.imgs || props.imgs.length === 0) {
     console.warn('没有可下载的图片')
     return
@@ -109,21 +110,42 @@ function downloadImage(activeIndex) {
     return
   }
   
-  // 创建一个临时的a标签来触发下载
-  const link = document.createElement('a')
-  link.href = imageUrl
-  
-  // 从URL中提取文件名，如果没有则使用默认名称
-  const urlParts = imageUrl.split('/')
-  const fileName = urlParts[urlParts.length - 1] || `image_${activeIndex + 1}.jpg`
-  
-  link.download = fileName
-  link.target = '_blank'
-  
-  // 触发下载
-  document.body.appendChild(link)
-  link.click()
-  document.body.removeChild(link)
+  try {
+    // 使用 Element Plus MessageBox 询问用户是否确定要下载
+    await ElMessageBox.confirm(
+      '确定要下载这张图片吗？',
+      '下载确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info',
+        customStyle: {
+          width: '320px',
+          minHeight: '200px'
+        },
+        customClass: 'square-message-box'
+      }
+    )
+    
+    // 创建临时的a标签来触发下载
+    const link = document.createElement('a')
+    link.href = imageUrl
+    
+    // 从URL中提取文件名，如果没有则使用默认名称
+    const urlParts = imageUrl.split('/')
+    const fileName = urlParts[urlParts.length - 1] || `image_${activeIndex + 1}.jpg`
+    
+    link.download = fileName
+    link.target = '_blank'
+    
+    // 触发下载
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+  } catch (error) {
+    // 用户取消下载，不需要处理
+    console.log('用户取消下载')
+  }
 }
 </script>
 
@@ -144,6 +166,32 @@ function downloadImage(activeIndex) {
 .toolbar-icon:hover {
   color: #409eff;
 }
+</style>
 
-/* 下载按钮样式已移除，与其他按钮保持一致 */
+<style>
+/* 全局样式：自定义 MessageBox 为更接近正方形的比例 */
+.square-message-box {
+  border-radius: 8px;
+}
+
+.square-message-box .el-message-box {
+  width: 320px !important;
+  min-height: 220px !important;
+}
+
+.square-message-box .el-message-box__content {
+  padding: 25px 24px 40px !important;
+  text-align: center;
+  line-height: 1.6;
+}
+
+.square-message-box .el-message-box__btns {
+  padding: 25px 24px 25px !important;
+  text-align: center;
+  margin-top: 10px;
+}
+
+.square-message-box .el-message-box__btns .el-button {
+  margin: 0 8px;
+}
 </style>
