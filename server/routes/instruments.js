@@ -372,135 +372,59 @@ router.get('/', authenticateToken, async (req, res) => {
 // =====================================================
 
 /**
- * 获取校准结果列表
- * GET /api/instruments/calibration-results
- * 支持分页、搜索、筛选
+ * 生成校准结果编号
+ * GET /api/instruments/generate-result-code
  */
-router.get('/calibration-results', authenticateToken, async (req, res) => {
+router.get('/generate-result-code', authenticateToken, async (req, res) => {
   try {
-    const {
-      page = 1,
-      size = 20,
-      instrumentName,
-      managementCode,
-      calibrationResult,
-      calibrationAgency,
-      startDate,
-      endDate
-    } = req.query;
-
-    const offset = (page - 1) * size;
     const pool = await getConnection();
-
-    // 构建查询条件
-    let whereConditions = ['1=1', 'i.IsActive = 1']; // 只查询未删除的仪器
-    const request = pool.request();
-
-    if (instrumentName) {
-      whereConditions.push('i.InstrumentName LIKE @instrumentName');
-      request.input('instrumentName', sql.NVarChar, `%${instrumentName}%`);
-    }
-
-    if (managementCode) {
-      whereConditions.push('i.ManagementCode LIKE @managementCode');
-      request.input('managementCode', sql.NVarChar, `%${managementCode}%`);
-    }
-
-    if (calibrationResult) {
-      whereConditions.push('cr.CalibrationResult = @calibrationResult');
-      request.input('calibrationResult', sql.NVarChar, calibrationResult);
-    }
-
-    if (calibrationAgency) {
-      whereConditions.push('cr.CalibrationAgency LIKE @calibrationAgency');
-      request.input('calibrationAgency', sql.NVarChar, `%${calibrationAgency}%`);
-    }
-
-    if (startDate) {
-      whereConditions.push('cr.CalibrationDate >= @startDate');
-      request.input('startDate', sql.DateTime, new Date(startDate));
-    }
-
-    if (endDate) {
-      whereConditions.push('cr.CalibrationDate <= @endDate');
-      request.input('endDate', sql.DateTime, new Date(endDate));
-    }
-
-    const whereClause = whereConditions.join(' AND ');
-
-    // 查询总数
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM CalibrationResults cr
-      LEFT JOIN Instruments i ON cr.InstrumentID = i.ID
-      WHERE ${whereClause}
+    
+    const currentYear = new Date().getFullYear();
+    const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+    
+    // 查询当前年月的最大序号
+    const maxCodeQuery = `
+      SELECT TOP 1 ResultCode 
+      FROM CalibrationResults 
+      WHERE ResultCode LIKE 'CAL-${currentYear}${currentMonth}-%' 
+      ORDER BY ResultCode DESC
     `;
-
-    const countResult = await request.query(countQuery);
-    const total = countResult.recordset[0].total;
-
-    // 查询数据
-    const dataQuery = `
-      SELECT * FROM (
-        SELECT 
-          cr.ID,
-          cr.ResultCode,
-          cr.InstrumentID,
-          i.InstrumentCode,
-          i.ManagementCode,
-          i.InstrumentName,
-          i.Model,
-          i.Manufacturer,
-          cr.CalibrationDate,
-          cr.CalibrationAgency,
-          cr.CertificateNumber,
-          cr.CalibrationResult,
-          cr.ExpiryDate,
-          cr.CalibrationCost,
-          cr.CalibrationStandard,
-          cr.CalibrationData,
-          cr.Issues,
-          cr.Recommendations,
-          cr.Attachments,
-          cr.Remarks,
-          creator.RealName as CreatorName,
-          cr.CreatedAt,
-          cr.UpdatedAt,
-          ROW_NUMBER() OVER (ORDER BY cr.CalibrationDate DESC) as RowNum
-        FROM CalibrationResults cr
-        LEFT JOIN Instruments i ON cr.InstrumentID = i.ID
-        LEFT JOIN [User] creator ON cr.CreatedBy = creator.ID
-        WHERE ${whereClause}
-      ) AS PagedResults
-      WHERE RowNum BETWEEN @startRow AND @endRow
-    `;
-
-    request.input('startRow', sql.Int, offset + 1);
-    request.input('endRow', sql.Int, offset + parseInt(size));
-
-    const dataResult = await request.query(dataQuery);
-
+    
+    const maxCodeResult = await pool.request().query(maxCodeQuery);
+    let nextSequence = 1;
+    
+    if (maxCodeResult.recordset.length > 0) {
+      const lastCode = maxCodeResult.recordset[0].ResultCode;
+      const lastSequence = parseInt(lastCode.split('-')[2]);
+      nextSequence = lastSequence + 1;
+    }
+    
+    const resultCode = `CAL-${currentYear}${currentMonth}-${String(nextSequence).padStart(3, '0')}`;
+    
     res.json({
       code: 200,
       data: {
-        list: dataResult.recordset,
-        total: total,
-        page: parseInt(page),
-        size: parseInt(size),
-        totalPages: Math.ceil(total / size)
+        resultCode: resultCode
       },
-      message: '获取校准结果列表成功'
+      message: '生成校准结果编号成功'
     });
 
   } catch (error) {
-    console.error('获取校准结果列表失败:', error);
+    console.error('生成校准结果编号失败:', error);
     res.status(500).json({
       code: 500,
-      message: '获取校准结果列表失败',
+      message: '生成校准结果编号失败',
       error: error.message
     });
   }
 });
+
+/**
+ * 获取校准结果列表
+ * GET /api/instruments/calibration-results
+ * 支持分页、搜索、筛选
+ */
+// 旧的重复路由已删除，使用下方包含证书编号搜索功能的新路由
 
 /**
  * 创建校准结果记录
@@ -510,19 +434,25 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
   try {
     const {
       instrumentID,
+      resultCode,           // 添加检定结果编号字段
       calibrationDate,
       calibrationAgency,
       certificateNumber,
+      calibrationStandard,
       calibrationResult,
       expiryDate,
+      nextCalibrationDate,
       calibrationCost,
-      calibrationStandard,
+      calibrationData,      // 添加校准数据字段
+      issues,               // 添加发现问题字段
+      recommendations,      // 添加建议字段
       environmentalConditions,
+      calibrationCycle,
       remarks
     } = req.body;
 
     // 验证必填字段
-    if (!instrumentID || !calibrationDate || !calibrationAgency || !certificateNumber || !calibrationResult) {
+    if (!instrumentID || !calibrationDate || !calibrationAgency || !certificateNumber || !calibrationStandard || !calibrationResult) {
       return res.status(400).json({
         code: 400,
         message: '请填写所有必填字段'
@@ -531,10 +461,10 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
 
     const pool = await getConnection();
 
-    // 检查仪器是否存在
+    // 检查仪器是否存在并获取相关信息
     const instrumentCheck = await pool.request()
       .input('instrumentID', sql.Int, instrumentID)
-      .query('SELECT ID FROM Instruments WHERE ID = @instrumentID');
+      .query('SELECT ID, InstrumentCode, ManagementCode FROM Instruments WHERE ID = @instrumentID');
 
     if (instrumentCheck.recordset.length === 0) {
       return res.status(404).json({
@@ -543,30 +473,66 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       });
     }
 
+    const instrument = instrumentCheck.recordset[0];
+
+    // 如果没有提供检定结果编号，则自动生成
+    let finalResultCode = resultCode;
+    if (!finalResultCode) {
+      const currentYear = new Date().getFullYear();
+      const currentMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+      
+      // 查询当前年月的最大序号
+      const maxCodeQuery = `
+        SELECT TOP 1 ResultCode 
+        FROM CalibrationResults 
+        WHERE ResultCode LIKE 'CAL-${currentYear}${currentMonth}-%' 
+        ORDER BY ResultCode DESC
+      `;
+      
+      const maxCodeResult = await pool.request().query(maxCodeQuery);
+      let nextSequence = 1;
+      
+      if (maxCodeResult.recordset.length > 0) {
+        const lastCode = maxCodeResult.recordset[0].ResultCode;
+        const lastSequence = parseInt(lastCode.split('-')[2]);
+        nextSequence = lastSequence + 1;
+      }
+      
+      finalResultCode = `CAL-${currentYear}${currentMonth}-${String(nextSequence).padStart(3, '0')}`;
+    }
+
     // 插入校准结果记录
     const insertQuery = `
       INSERT INTO CalibrationResults (
-        InstrumentID, CalibrationDate, CalibrationAgency, CertificateNumber,
-        CalibrationResult, ExpiryDate, CalibrationCost, CalibrationStandard,
-        EnvironmentalConditions, Remarks, CreatedBy, CreatedAt
+        ResultCode, InstrumentID, InstrumentCode, ManagementCode, CalibrationDate, CalibrationAgency, CertificateNumber,
+        CalibrationStandard, CalibrationResult, ExpiryDate, NextCalibrationDate, CalibrationCost, 
+        CalibrationData, Issues, Recommendations, EnvironmentalConditions, CalibrationCycle, Remarks, CreatedBy, CreatedAt
       ) VALUES (
-        @instrumentID, @calibrationDate, @calibrationAgency, @certificateNumber,
-        @calibrationResult, @expiryDate, @calibrationCost, @calibrationStandard,
-        @environmentalConditions, @remarks, @createdBy, GETDATE()
+        @resultCode, @instrumentID, @instrumentCode, @managementCode, @calibrationDate, @calibrationAgency, @certificateNumber,
+        @calibrationStandard, @calibrationResult, @expiryDate, @nextCalibrationDate, @calibrationCost,
+        @calibrationData, @issues, @recommendations, @environmentalConditions, @calibrationCycle, @remarks, @createdBy, GETDATE()
       );
       SELECT SCOPE_IDENTITY() as ID;
     `;
 
     const result = await pool.request()
+      .input('resultCode', sql.NVarChar, finalResultCode)
       .input('instrumentID', sql.Int, instrumentID)
+      .input('instrumentCode', sql.NVarChar, instrument.InstrumentCode)
+      .input('managementCode', sql.NVarChar, instrument.ManagementCode)
       .input('calibrationDate', sql.DateTime, new Date(calibrationDate))
       .input('calibrationAgency', sql.NVarChar, calibrationAgency)
       .input('certificateNumber', sql.NVarChar, certificateNumber)
+      .input('calibrationStandard', sql.NVarChar, calibrationStandard || null)
       .input('calibrationResult', sql.NVarChar, calibrationResult)
       .input('expiryDate', sql.DateTime, expiryDate ? new Date(expiryDate) : null)
+      .input('nextCalibrationDate', sql.DateTime, nextCalibrationDate ? new Date(nextCalibrationDate) : null)
       .input('calibrationCost', sql.Decimal(10, 2), calibrationCost || null)
-      .input('calibrationStandard', sql.NVarChar, calibrationStandard || null)
+      .input('calibrationData', sql.NVarChar, calibrationData || null)
+      .input('issues', sql.NVarChar, issues || null)
+      .input('recommendations', sql.NVarChar, recommendations || null)
       .input('environmentalConditions', sql.NVarChar, environmentalConditions || null)
+      .input('calibrationCycle', sql.Int, calibrationCycle || null)
       .input('remarks', sql.NVarChar, remarks || null)
       .input('createdBy', sql.Int, req.user.id)
       .query(insertQuery);
@@ -889,6 +855,226 @@ router.get('/persons', authenticateToken, async (req, res) => {
     res.status(500).json({
       code: 500,
       message: '获取人员列表失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取可用于校准的仪器列表（没有校准记录的仪器）
+ * GET /api/instruments/available-for-calibration
+ */
+router.get('/available-for-calibration', authenticateToken, async (req, res) => {
+  try {
+    const pool = await getConnection();
+
+    const query = `
+      SELECT 
+        i.ID,
+        i.InstrumentCode,
+        i.ManagementCode,
+        i.InstrumentName,
+        i.Model,
+        i.Manufacturer,
+        i.Category,
+        d.Name as DepartmentName
+      FROM Instruments i
+      LEFT JOIN Department d ON i.DepartmentID = d.ID
+      LEFT JOIN CalibrationResults cr ON i.ID = cr.InstrumentID
+      WHERE i.IsActive = 1 
+        AND cr.InstrumentID IS NULL
+      ORDER BY i.ManagementCode ASC, i.InstrumentName ASC
+    `;
+
+    const result = await pool.request().query(query);
+
+    res.json({
+      code: 200,
+      data: result.recordset,
+      message: '获取可校准仪器列表成功'
+    });
+
+  } catch (error) {
+    console.error('获取可校准仪器列表失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '获取可校准仪器列表失败',
+      error: error.message
+    });
+  }
+});
+
+// =====================================================
+// 校准结果管理
+// =====================================================
+
+/**
+ * 获取校准结果列表
+ * GET /api/instruments/calibration-results
+ * 支持分页、搜索、筛选
+ */
+router.get('/calibration-results', authenticateToken, async (req, res) => {
+  try {
+    const {
+      page = 1,
+      size = 20,
+      instrumentName,
+      managementCode,
+      calibrationAgency,
+      certificateNumber,
+      calibrationResult,
+      startDate,
+      endDate
+    } = req.query;
+
+    // 调试日志：检查接收到的参数
+    console.log('接收到的查询参数:', req.query);
+    if (certificateNumber) {
+      console.log('证书编号参数:', certificateNumber);
+    }
+
+    const offset = (page - 1) * size;
+    const pool = await getConnection();
+    
+    // 构建基础查询
+    let baseQuery = `
+      SELECT 
+        cr.ID,
+        cr.ResultCode,
+        cr.InstrumentID,
+        i.InstrumentName,
+        i.ManagementCode,
+        i.InstrumentCode,
+        cr.CalibrationDate,
+        cr.CalibrationAgency,
+        cr.CertificateNumber,
+        cr.CalibrationStandard,
+        cr.CalibrationResult,
+        cr.ExpiryDate,
+        cr.NextCalibrationDate,
+        cr.CalibrationCost,
+        cr.CalibrationData,
+        cr.Issues,
+        cr.Recommendations,
+        cr.Remarks,
+        cr.CreatedAt,
+        cr.UpdatedAt
+      FROM CalibrationResults cr
+      LEFT JOIN Instruments i ON cr.InstrumentID = i.ID
+      WHERE 1=1
+    `;
+
+    const conditions = [];
+    const parameters = [];
+
+    // 添加搜索条件
+    if (instrumentName) {
+      conditions.push(`i.InstrumentName LIKE @instrumentName`);
+      parameters.push({ name: 'instrumentName', type: sql.NVarChar, value: `%${instrumentName}%` });
+    }
+
+    if (managementCode) {
+      conditions.push(`i.ManagementCode LIKE @managementCode`);
+      parameters.push({ name: 'managementCode', type: sql.NVarChar, value: `%${managementCode}%` });
+    }
+
+    if (calibrationAgency) {
+      conditions.push(`cr.CalibrationAgency LIKE @calibrationAgency`);
+      parameters.push({ name: 'calibrationAgency', type: sql.NVarChar, value: `%${calibrationAgency}%` });
+    }
+
+    if (certificateNumber) {
+      console.log('添加证书编号搜索条件:', certificateNumber);
+      conditions.push(`cr.CertificateNumber LIKE @certificateNumber`);
+      parameters.push({ name: 'certificateNumber', type: sql.NVarChar, value: `%${certificateNumber}%` });
+    }
+
+    if (calibrationResult) {
+      conditions.push(`cr.CalibrationResult = @calibrationResult`);
+      parameters.push({ name: 'calibrationResult', type: sql.NVarChar, value: calibrationResult });
+    }
+
+    if (startDate) {
+      conditions.push(`cr.CalibrationDate >= @startDate`);
+      parameters.push({ name: 'startDate', type: sql.DateTime, value: new Date(startDate) });
+    }
+
+    if (endDate) {
+      conditions.push(`cr.CalibrationDate <= @endDate`);
+      parameters.push({ name: 'endDate', type: sql.DateTime, value: new Date(endDate) });
+    }
+
+    // 添加条件到查询
+    if (conditions.length > 0) {
+      baseQuery += ` AND ${conditions.join(' AND ')}`;
+    }
+
+    console.log('构建的SQL查询:', baseQuery);
+    console.log('查询参数:', parameters);
+
+    // 获取总数
+    const countQuery = `
+      SELECT COUNT(*) as total
+      FROM CalibrationResults cr
+      LEFT JOIN Instruments i ON cr.InstrumentID = i.ID
+      WHERE 1=1 ${conditions.length > 0 ? ` AND ${conditions.join(' AND ')}` : ''}
+    `;
+
+    const countRequest = pool.request();
+    parameters.forEach(param => {
+      countRequest.input(param.name, param.type, param.value);
+    });
+
+    const countResult = await countRequest.query(countQuery);
+    const total = countResult.recordset[0].total;
+
+    // 分页查询 - 使用兼容的分页方式
+    let dataQuery;
+    if (offset === 0) {
+      // 第一页，使用TOP
+      dataQuery = baseQuery.replace('SELECT', `SELECT TOP ${size}`) + ` ORDER BY cr.CreatedAt DESC`;
+    } else {
+      // 其他页，使用ROW_NUMBER()
+      dataQuery = `
+        WITH PaginatedResults AS (
+          ${baseQuery.replace('SELECT', 'SELECT ROW_NUMBER() OVER (ORDER BY cr.CreatedAt DESC) as RowNum,')}
+        )
+        SELECT * FROM PaginatedResults 
+        WHERE RowNum > @offset AND RowNum <= @offset + @size
+        ORDER BY RowNum
+      `;
+    }
+
+    const dataRequest = pool.request();
+    parameters.forEach(param => {
+      dataRequest.input(param.name, param.type, param.value);
+    });
+    // 添加分页参数
+    dataRequest.input('offset', sql.Int, offset);
+    dataRequest.input('size', sql.Int, size);
+
+    const dataResult = await dataRequest.query(dataQuery);
+
+    console.log('查询结果数量:', dataResult.recordset.length);
+    console.log('总记录数:', total);
+
+    res.json({
+      code: 200,
+      message: '获取成功',
+      data: {
+        list: dataResult.recordset,
+        total,
+        page: parseInt(page),
+        size: parseInt(size),
+        pages: Math.ceil(total / size)
+      }
+    });
+
+  } catch (error) {
+    console.error('获取校准结果列表失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '获取校准结果列表失败',
       error: error.message
     });
   }
@@ -1385,219 +1571,8 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 // 第三方校准检定结果登记
 // =====================================================
 
-/**
- * 获取校准结果列表
- * GET /api/instruments/calibration-results
- * 支持分页、搜索、筛选
- */
-router.get('/calibration-results', authenticateToken, async (req, res) => {
-  try {
-    const {
-      page = 1,
-      size = 20,
-      instrumentName,
-      managementCode,
-      calibrationAgency,
-      calibrationResult,
-      startDate,
-      endDate
-    } = req.query;
-
-    const offset = (page - 1) * size;
-    const pool = await getConnection();
-
-    // 构建查询条件
-    let whereConditions = ['1=1', 'i.IsActive = 1']; // 只查询未删除的仪器
-    const request = pool.request();
-
-    if (instrumentName) {
-      whereConditions.push('i.InstrumentName LIKE @instrumentName');
-      request.input('instrumentName', sql.NVarChar, `%${instrumentName}%`);
-    }
-
-    if (managementCode) {
-      whereConditions.push('i.ManagementCode LIKE @managementCode');
-      request.input('managementCode', sql.NVarChar, `%${managementCode}%`);
-    }
-
-    if (calibrationResult) {
-      whereConditions.push('cr.CalibrationResult = @calibrationResult');
-      request.input('calibrationResult', sql.NVarChar, calibrationResult);
-    }
-
-    if (startDate) {
-      whereConditions.push('cr.CalibrationDate >= @startDate');
-      request.input('startDate', sql.Date, startDate);
-    }
-
-    if (endDate) {
-      whereConditions.push('cr.CalibrationDate <= @endDate');
-      request.input('endDate', sql.Date, endDate);
-    }
-
-    const whereClause = whereConditions.join(' AND ');
-
-    // 查询总数
-    const countQuery = `
-      SELECT COUNT(*) as total
-      FROM CalibrationResults cr
-      LEFT JOIN Instruments i ON cr.InstrumentID = i.ID
-      WHERE ${whereClause}
-    `;
-
-    const countResult = await request.query(countQuery);
-    const total = countResult.recordset[0].total;
-
-    // 查询数据
-    const dataQuery = `
-      SELECT * FROM (
-        SELECT 
-          cr.ID,
-          cr.ResultCode,
-          cr.InstrumentID,
-          i.InstrumentCode,
-          i.ManagementCode,
-          i.InstrumentName,
-          i.Model,
-          i.Manufacturer,
-          cr.CalibrationDate,
-          cr.CalibrationAgency,
-          cr.CertificateNumber,
-          cr.CalibrationResult,
-          cr.ExpiryDate,
-          cr.CalibrationCost,
-          cr.CalibrationStandard,
-          cr.CalibrationData,
-          cr.Issues,
-          cr.Recommendations,
-          cr.Attachments,
-          cr.Remarks,
-          creator.RealName as CreatorName,
-          cr.CreatedAt,
-          cr.UpdatedAt,
-          ROW_NUMBER() OVER (ORDER BY cr.CalibrationDate DESC) as RowNum
-        FROM CalibrationResults cr
-        LEFT JOIN Instruments i ON cr.InstrumentID = i.ID
-        LEFT JOIN [User] creator ON cr.CreatedBy = creator.ID
-        WHERE ${whereClause}
-      ) AS PagedResults
-      WHERE RowNum BETWEEN @startRow AND @endRow
-    `;
-
-    request.input('startRow', sql.Int, offset + 1);
-    request.input('endRow', sql.Int, offset + parseInt(size));
-
-    const dataResult = await request.query(dataQuery);
-
-    res.json({
-      code: 200,
-      data: {
-        list: dataResult.recordset,
-        total: total,
-        page: parseInt(page),
-        size: parseInt(size),
-        totalPages: Math.ceil(total / size)
-      },
-      message: '获取校准结果列表成功'
-    });
-
-  } catch (error) {
-    console.error('获取校准结果列表失败:', error);
-    res.status(500).json({
-      code: 500,
-      message: '获取校准结果列表失败',
-      error: error.message
-    });
-  }
-});
-
-/**
- * 创建校准结果记录
- * POST /api/instruments/calibration-results
- */
-router.post('/calibration-results', authenticateToken, async (req, res) => {
-  try {
-    const {
-      instrumentID,
-      calibrationDate,
-      calibrationAgency,
-      certificateNumber,
-      calibrationResult,
-      expiryDate,
-      calibrationCost,
-      calibrationStandard,
-      environmentalConditions,
-      remarks
-    } = req.body;
-
-    // 验证必填字段
-    if (!instrumentID || !calibrationDate || !calibrationAgency) {
-      return res.status(400).json({
-        code: 400,
-        message: '仪器、校准日期和校准机构为必填项'
-      });
-    }
-
-    const pool = await getConnection();
-
-    // 计算到期日期（如果没有提供expiryDate的话）
-    let calculatedExpiryDate = expiryDate;
-    if (!calculatedExpiryDate && calibrationDate) {
-      calculatedExpiryDate = new Date(calibrationDate);
-      calculatedExpiryDate.setDate(calculatedExpiryDate.getDate() + (validityPeriod || 365));
-    }
-
-    // 插入校准结果
-    const insertQuery = `
-      INSERT INTO CalibrationResults (
-        InstrumentID, CalibrationDate, CalibrationAgency,
-        CertificateNumber, CalibrationStandard, CalibrationResult, ValidityPeriod,
-        ExpiryDate, CalibrationCost, CalibrationData, Issues, Recommendations,
-        Attachments, Remarks, CreatedBy, CreatedAt, UpdatedAt
-      ) VALUES (
-        @instrumentID, @calibrationDate, @calibrationAgency,
-        @certificateNumber, @calibrationStandard, @calibrationResult, @validityPeriod,
-        @expiryDate, @calibrationCost, @calibrationData, @issues, @recommendations,
-        @attachments, @remarks, @createdBy, GETDATE(), GETDATE()
-      );
-      SELECT SCOPE_IDENTITY() as id;
-    `;
-
-    const result = await pool.request()
-      .input('instrumentID', sql.Int, instrumentID)
-      .input('calibrationDate', sql.Date, calibrationDate)
-      .input('calibrationAgency', sql.NVarChar, calibrationAgency)
-      .input('certificateNumber', sql.NVarChar, certificateNumber)
-      .input('calibrationStandard', sql.NVarChar, calibrationStandard)
-      .input('calibrationResult', sql.NVarChar, calibrationResult)
-      .input('validityPeriod', sql.Int, validityPeriod)
-      .input('expiryDate', sql.Date, calculatedExpiryDate)
-      .input('calibrationCost', sql.Decimal(10, 2), calibrationCost)
-      .input('calibrationData', sql.NVarChar, calibrationData)
-      .input('issues', sql.NVarChar, issues)
-      .input('recommendations', sql.NVarChar, recommendations)
-      .input('attachments', sql.NVarChar, attachments)
-      .input('remarks', sql.NVarChar, remarks)
-      .input('createdBy', sql.Int, req.user.id)
-      .query(insertQuery);
-
-    const newId = result.recordset[0].id;
-
-    res.json({
-      code: 200,
-      data: { id: newId },
-      message: '创建校准结果记录成功'
-    });
-
-  } catch (error) {
-    console.error('创建校准结果记录失败:', error);
-    res.status(500).json({
-      code: 500,
-      message: '创建校准结果记录失败',
-      error: error.message
-    });
-  }
-});
+// 删除重复的 calibration-results 路由定义 (原第1534行)
+// 该路由已移动到 /:id 路由之前以解决路由冲突问题
 
 // =====================================================
 // 年度校准计划管理
@@ -2005,6 +1980,10 @@ router.get('/export/annual-plan/:year', authenticateToken, async (req, res) => {
 // =====================================================
 
 /**
+ * 获取没有校准记录的仪器列表（用于校准结果登记）
+ * GET /api/instruments/available-for-calibration
+ */
+/**
  * 获取部门列表
  * GET /api/instruments/departments
  */
@@ -2089,6 +2068,174 @@ router.get('/statistics', authenticateToken, async (req, res) => {
     res.status(500).json({
       code: 500,
       message: '获取仪器统计信息失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 更新校准结果记录
+ * PUT /api/instruments/calibration-results/:id
+ */
+router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      instrumentID,
+      resultCode,           // 添加检定结果编号字段
+      calibrationDate,
+      calibrationAgency,
+      certificateNumber,
+      calibrationResult,
+      expiryDate,
+      nextCalibrationDate,  // 添加下次校准日期字段
+      calibrationCost,
+      calibrationStandard,
+      calibrationData,      // 添加校准数据字段
+      issues,               // 添加发现问题字段
+      recommendations,      // 添加建议字段
+      environmentalConditions,
+      calibrationCycle,     // 添加校准周期字段
+      remarks
+    } = req.body;
+
+    // 验证必填字段
+    if (!instrumentID || !calibrationDate || !calibrationAgency || !certificateNumber || !calibrationResult) {
+      return res.status(400).json({
+        code: 400,
+        message: '请填写所有必填字段'
+      });
+    }
+
+    const pool = await getConnection();
+
+    // 检查校准结果是否存在
+    const checkQuery = `SELECT ID FROM CalibrationResults WHERE ID = @id`;
+    const checkResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query(checkQuery);
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        message: '校准结果记录不存在'
+      });
+    }
+
+    // 检查仪器是否存在并获取相关信息
+    const instrumentCheck = await pool.request()
+      .input('instrumentID', sql.Int, instrumentID)
+      .query('SELECT ID, InstrumentCode, ManagementCode FROM Instruments WHERE ID = @instrumentID');
+
+    if (instrumentCheck.recordset.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        message: '仪器不存在'
+      });
+    }
+
+    const instrument = instrumentCheck.recordset[0];
+
+    // 更新校准结果记录
+    const updateQuery = `
+      UPDATE CalibrationResults SET
+        ResultCode = @resultCode,
+        InstrumentID = @instrumentID,
+        InstrumentCode = @instrumentCode,
+        ManagementCode = @managementCode,
+        CalibrationDate = @calibrationDate,
+        CalibrationAgency = @calibrationAgency,
+        CertificateNumber = @certificateNumber,
+        CalibrationResult = @calibrationResult,
+        ExpiryDate = @expiryDate,
+        NextCalibrationDate = @nextCalibrationDate,
+        CalibrationCost = @calibrationCost,
+        CalibrationStandard = @calibrationStandard,
+        CalibrationData = @calibrationData,
+        Issues = @issues,
+        Recommendations = @recommendations,
+        EnvironmentalConditions = @environmentalConditions,
+        CalibrationCycle = @calibrationCycle,
+        Remarks = @remarks,
+        UpdatedAt = GETDATE()
+      WHERE ID = @id
+    `;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('resultCode', sql.NVarChar, resultCode || null)
+      .input('instrumentID', sql.Int, instrumentID)
+      .input('instrumentCode', sql.NVarChar, instrument.InstrumentCode)
+      .input('managementCode', sql.NVarChar, instrument.ManagementCode)
+      .input('calibrationDate', sql.DateTime, new Date(calibrationDate))
+      .input('calibrationAgency', sql.NVarChar, calibrationAgency)
+      .input('certificateNumber', sql.NVarChar, certificateNumber)
+      .input('calibrationResult', sql.NVarChar, calibrationResult)
+      .input('expiryDate', sql.DateTime, expiryDate ? new Date(expiryDate) : null)
+      .input('nextCalibrationDate', sql.DateTime, nextCalibrationDate ? new Date(nextCalibrationDate) : null)
+      .input('calibrationCost', sql.Decimal(10, 2), calibrationCost || null)
+      .input('calibrationStandard', sql.NVarChar, calibrationStandard || null)
+      .input('calibrationData', sql.NVarChar, calibrationData || null)
+      .input('issues', sql.NVarChar, issues || null)
+      .input('recommendations', sql.NVarChar, recommendations || null)
+      .input('environmentalConditions', sql.NVarChar, environmentalConditions || null)
+      .input('calibrationCycle', sql.Int, calibrationCycle || null)
+      .input('remarks', sql.NVarChar, remarks || null)
+      .query(updateQuery);
+
+    res.json({
+      code: 200,
+      message: '更新校准结果记录成功'
+    });
+
+  } catch (error) {
+    console.error('更新校准结果记录失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '更新校准结果记录失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 删除校准检定结果
+ * DELETE /api/instruments/calibration-results/:id
+ */
+router.delete('/calibration-results/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = await getConnection();
+
+    // 检查校准检定结果是否存在
+    const checkQuery = `SELECT ID FROM CalibrationResults WHERE ID = @id`;
+    const checkResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query(checkQuery);
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        message: '校准检定结果不存在'
+      });
+    }
+
+    // 删除校准检定结果
+    const deleteQuery = `DELETE FROM CalibrationResults WHERE ID = @id`;
+    await pool.request()
+      .input('id', sql.Int, id)
+      .query(deleteQuery);
+
+    res.json({
+      code: 200,
+      message: '删除校准检定结果成功'
+    });
+
+  } catch (error) {
+    console.error('删除校准检定结果失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '删除校准检定结果失败',
       error: error.message
     });
   }

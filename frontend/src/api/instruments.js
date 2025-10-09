@@ -44,6 +44,14 @@ export const instrumentApi = {
   },
 
   /**
+   * 获取没有校准记录的仪器列表（用于校准结果登记）
+   * @returns {Promise} API响应
+   */
+  getAvailableInstrumentsForCalibration() {
+    return api.get('/api/instruments/available-for-calibration')
+  },
+
+  /**
    * 获取仪器详情
    * @param {number} id - 仪器ID
    * @returns {Promise} API响应
@@ -93,6 +101,14 @@ export const instrumentApi = {
   },
 
   // ==================== 校准检定结果管理 ====================
+
+  /**
+   * 生成校准结果编号
+   * @returns {Promise} API响应
+   */
+  generateResultCode() {
+    return api.get('/api/instruments/generate-result-code')
+  },
 
   /**
    * 获取校准结果列表

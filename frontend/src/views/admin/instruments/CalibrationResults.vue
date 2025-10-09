@@ -22,11 +22,35 @@
           </el-form-item>
           <el-form-item label="校准机构">
             <el-input 
-              v-model="searchForm.calibrationOrganization" 
+              v-model="searchForm.calibrationAgency" 
               placeholder="请输入校准机构"
               clearable
               style="width: 200px"
             />
+          </el-form-item>
+          <el-form-item label="证书编号">
+            <el-input 
+              v-model="searchForm.certificateNumber" 
+              placeholder="请输入证书编号"
+              clearable
+              style="width: 200px"
+            />
+          </el-form-item>
+          <el-form-item label="校准结果">
+            <el-select 
+              v-model="searchForm.calibrationResult" 
+              placeholder="请选择校准结果"
+              clearable
+              style="width: 200px"
+            >
+              <el-option label="偏差在允许范围内" value="偏差在允许范围内" />
+              <el-option label="偏差超出允许范围" value="偏差超出允许范围" />
+              <el-option label="需修正使用" value="需修正使用" />
+              <el-option label="建议停用" value="建议停用" />
+              <el-option label="合格" value="合格" />
+              <el-option label="不合格" value="不合格" />
+              <el-option label="限制使用" value="限制使用" />
+            </el-select>
           </el-form-item>
           <el-form-item label="校准日期">
             <el-date-picker
@@ -80,17 +104,19 @@
           stripe
           border
           style="width: 100%"
+          header-align="center"
         >
-          <el-table-column prop="ManagementCode" label="管理编号" width="120" />
-          <el-table-column prop="InstrumentName" label="仪器名称" min-width="150" />
-          <el-table-column prop="CalibrationDate" label="校准日期" width="110">
+          <el-table-column prop="InstrumentCode" label="仪器编号" width="120" align="center" />
+          <el-table-column prop="ManagementCode" label="管理编号" width="120" align="center" />
+          <el-table-column prop="InstrumentName" label="仪器名称" min-width="150" header-align="center" />
+          <el-table-column prop="CalibrationDate" label="校准日期" width="110" align="center">
             <template #default="{ row }">
               {{ formatDate(row.CalibrationDate) }}
             </template>
           </el-table-column>
-          <el-table-column prop="CalibrationOrganization" label="校准机构" min-width="150" />
-          <el-table-column prop="CertificateNumber" label="证书编号" width="150" />
-          <el-table-column prop="CalibrationResult" label="校准结果" width="100">
+          <el-table-column prop="CalibrationAgency" label="校准机构" min-width="150" header-align="center" />
+          <el-table-column prop="CertificateNumber" label="证书编号" width="150" header-align="center" />
+          <el-table-column prop="CalibrationResult" label="校准结果" width="100" align="center">
             <template #default="{ row }">
               <el-tag 
                 :type="getResultType(row.CalibrationResult)"
@@ -100,17 +126,17 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="ValidUntil" label="有效期至" width="110">
+          <el-table-column prop="ExpiryDate" label="有效期至" width="110" align="center">
             <template #default="{ row }">
-              {{ formatDate(row.ValidUntil) }}
+              {{ formatDate(row.ExpiryDate) }}
             </template>
           </el-table-column>
-          <el-table-column prop="NextCalibrationDate" label="下次校准" width="110">
+          <el-table-column prop="NextCalibrationDate" label="下次校准" width="110" align="center">
             <template #default="{ row }">
               {{ formatDate(row.NextCalibrationDate) }}
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="200" fixed="right">
+          <el-table-column label="操作" width="200" fixed="right" align="center">
             <template #default="{ row }">
               <el-button 
                 type="primary" 
@@ -167,93 +193,133 @@
     <el-dialog 
       :title="dialogTitle" 
       v-model="dialogVisible" 
-      width="900px"
+      width="750px"
       :close-on-click-modal="false"
+      @close="handleDialogClose"
+      class="calibration-dialog"
+      top="5vh"
     >
       <el-form 
         :model="calibrationForm" 
         :rules="formRules" 
         ref="formRef"
         label-width="120px"
+        class="compact-form"
       >
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="选择仪器" prop="InstrumentID">
+            <el-form-item label="选择仪器" prop="instrumentID">
               <el-select 
-                v-model="calibrationForm.InstrumentID" 
+                v-model="calibrationForm.instrumentID" 
                 placeholder="请选择仪器"
                 filterable
                 style="width: 100%"
+                :disabled="isEdit"
                 @change="handleInstrumentChange"
               >
                 <el-option 
                   v-for="instrument in instruments" 
-                  :key="instrument.InstrumentID" 
+                  :key="instrument.ID" 
                   :label="`${instrument.ManagementCode} - ${instrument.InstrumentName}`" 
-                  :value="instrument.InstrumentID"
+                  :value="instrument.ID"
                 />
               </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="12">
-            <el-form-item label="校准日期" prop="CalibrationDate">
+            <el-form-item label="检定结果编号" prop="resultCode">
+              <el-input 
+                v-model="calibrationForm.resultCode" 
+                placeholder="系统自动生成" 
+                disabled
+                readonly
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="校准日期" prop="calibrationDate">
               <el-date-picker
-                v-model="calibrationForm.CalibrationDate"
+                v-model="calibrationForm.calibrationDate"
                 type="date"
                 placeholder="请选择校准日期"
                 style="width: 100%"
               />
             </el-form-item>
           </el-col>
-        </el-row>
-        <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="校准机构" prop="CalibrationOrganization">
-              <el-input v-model="calibrationForm.CalibrationOrganization" placeholder="请输入校准机构" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="证书编号" prop="CertificateNumber">
-              <el-input v-model="calibrationForm.CertificateNumber" placeholder="请输入证书编号" />
+            <el-form-item label="校准机构" prop="calibrationAgency">
+              <el-input v-model="calibrationForm.calibrationAgency" placeholder="请输入校准机构" />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="校准结果" prop="CalibrationResult">
-              <el-select v-model="calibrationForm.CalibrationResult" placeholder="请选择校准结果" style="width: 100%">
+            <el-form-item label="证书编号" prop="certificateNumber">
+              <el-input v-model="calibrationForm.certificateNumber" placeholder="请输入证书编号" />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="校准结果" prop="calibrationResult">
+              <el-select v-model="calibrationForm.calibrationResult" placeholder="请选择校准结果" style="width: 100%">
+                <!-- 校准结果选项（区别于检定结果） -->
+                <el-option label="偏差在允许范围内" value="偏差在允许范围内" />
+                <el-option label="偏差超出允许范围" value="偏差超出允许范围" />
+                <el-option label="需修正使用" value="需修正使用" />
+                <el-option label="建议停用" value="建议停用" />
+                <!-- 保留原有检定结果选项（兼容性） -->
                 <el-option label="合格" value="合格" />
                 <el-option label="不合格" value="不合格" />
                 <el-option label="限制使用" value="限制使用" />
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
-            <el-form-item label="有效期至" prop="ValidUntil">
-              <el-date-picker
-                v-model="calibrationForm.ValidUntil"
-                type="date"
-                placeholder="请选择有效期"
+        </el-row>
+        <el-row :gutter="5">
+          <el-col :span="8">
+            <el-form-item label="校准周期" prop="calibrationCycle">
+              <el-input-number 
+                v-model="calibrationForm.calibrationCycle" 
+                :min="1"
+                :max="120"
+                placeholder="请输入校准周期"
                 style="width: 100%"
+              >
+                <template #append>月</template>
+              </el-input-number>
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="有效期至" prop="expiryDate">
+              <el-date-picker
+                v-model="calibrationForm.expiryDate"
+                type="date"
+                placeholder="自动计算"
+                style="width: 100%"
+                disabled
+                readonly
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="8">
+            <el-form-item label="下次校准日期" prop="nextCalibrationDate">
+              <el-date-picker
+                v-model="calibrationForm.nextCalibrationDate"
+                type="date"
+                placeholder="自动计算"
+                style="width: 100%"
+                disabled
+                readonly
               />
             </el-form-item>
           </el-col>
         </el-row>
         <el-row :gutter="20">
-          <el-col :span="12">
-            <el-form-item label="下次校准日期" prop="NextCalibrationDate">
-              <el-date-picker
-                v-model="calibrationForm.NextCalibrationDate"
-                type="date"
-                placeholder="请选择下次校准日期"
-                style="width: 100%"
-              />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="校准费用" prop="CalibrationCost">
+          <el-col :span="10">
+            <el-form-item label="校准费用" prop="calibrationCost">
               <el-input-number 
-                v-model="calibrationForm.CalibrationCost" 
+                v-model="calibrationForm.calibrationCost" 
                 :precision="2"
                 :min="0"
                 placeholder="请输入校准费用"
@@ -261,24 +327,68 @@
               />
             </el-form-item>
           </el-col>
+          <el-col :span="14">
+            <el-form-item label="校准标准" prop="calibrationStandard">
+              <el-input 
+                v-model="calibrationForm.calibrationStandard" 
+                placeholder="请输入校准标准"
+              />
+            </el-form-item>
+          </el-col>
         </el-row>
-        <el-form-item label="校准内容" prop="CalibrationContent">
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="环境条件" prop="environmentalConditions">
+              <el-input 
+                v-model="calibrationForm.environmentalConditions" 
+                type="textarea" 
+                :rows="2"
+                placeholder="请输入环境条件"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="发现问题" prop="issues">
+              <el-input 
+                v-model="calibrationForm.issues" 
+                type="textarea" 
+                :rows="2"
+                placeholder="请输入发现的问题"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
+            <el-form-item label="建议" prop="recommendations">
+              <el-input 
+                v-model="calibrationForm.recommendations" 
+                type="textarea" 
+                :rows="2"
+                placeholder="请输入建议"
+              />
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="备注" prop="remarks">
+              <el-input 
+                v-model="calibrationForm.remarks" 
+                type="textarea" 
+                :rows="2"
+                placeholder="请输入备注信息"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-form-item label="校准数据" prop="calibrationData">
           <el-input 
-            v-model="calibrationForm.CalibrationContent" 
-            type="textarea" 
-            :rows="3"
-            placeholder="请输入校准内容和项目"
-          />
-        </el-form-item>
-        <el-form-item label="备注" prop="Notes">
-          <el-input 
-            v-model="calibrationForm.Notes" 
+            v-model="calibrationForm.calibrationData" 
             type="textarea" 
             :rows="2"
-            placeholder="请输入备注信息"
+            placeholder="请输入校准数据"
           />
         </el-form-item>
-        <el-form-item label="证书文件" prop="CertificateFile">
+        <el-form-item label="证书文件" prop="certificateFile">
           <el-upload
             ref="uploadRef"
             :action="uploadUrl"
@@ -321,19 +431,34 @@
     >
       <div class="calibration-detail" v-if="currentCalibration">
         <el-descriptions :column="2" border>
-          <el-descriptions-item label="管理编号">{{ currentCalibration.ManagementCode }}</el-descriptions-item>
-          <el-descriptions-item label="仪器名称">{{ currentCalibration.InstrumentName }}</el-descriptions-item>
+          <!-- 基本信息 -->
+          <el-descriptions-item label="检定结果编号">{{ currentCalibration.ResultCode || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="仪器编号">{{ currentCalibration.InstrumentCode || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="管理编号">{{ currentCalibration.ManagementCode || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="仪器名称">{{ currentCalibration.InstrumentName || '无' }}</el-descriptions-item>
+          
+          <!-- 校准信息 -->
           <el-descriptions-item label="校准日期">{{ formatDate(currentCalibration.CalibrationDate) }}</el-descriptions-item>
-          <el-descriptions-item label="校准机构">{{ currentCalibration.CalibrationOrganization }}</el-descriptions-item>
-          <el-descriptions-item label="证书编号">{{ currentCalibration.CertificateNumber }}</el-descriptions-item>
+          <el-descriptions-item label="校准机构">{{ currentCalibration.CalibrationAgency || currentCalibration.CalibrationOrganization || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="证书编号">{{ currentCalibration.CertificateNumber || '无' }}</el-descriptions-item>
+          <el-descriptions-item label="校准标准">{{ currentCalibration.CalibrationStandard || '无' }}</el-descriptions-item>
           <el-descriptions-item label="校准结果">
             <el-tag :type="getResultType(currentCalibration.CalibrationResult)">
-              {{ currentCalibration.CalibrationResult }}
+              {{ currentCalibration.CalibrationResult || '无' }}
             </el-tag>
           </el-descriptions-item>
-          <el-descriptions-item label="有效期至">{{ formatDate(currentCalibration.ValidUntil) }}</el-descriptions-item>
+          
+          <!-- 日期信息 -->
+          <el-descriptions-item label="有效期至">{{ formatDate(currentCalibration.ExpiryDate || currentCalibration.ValidUntil) }}</el-descriptions-item>
           <el-descriptions-item label="下次校准">{{ formatDate(currentCalibration.NextCalibrationDate) }}</el-descriptions-item>
+          
+          <!-- 校准周期信息 -->
+          <el-descriptions-item label="校准周期">{{ currentCalibration.CalibrationCycle ? `${currentCalibration.CalibrationCycle}个月` : '未设置' }}</el-descriptions-item>
+          
+          <!-- 费用信息 -->
           <el-descriptions-item label="校准费用">{{ currentCalibration.CalibrationCost ? `¥${currentCalibration.CalibrationCost}` : '未填写' }}</el-descriptions-item>
+          
+          <!-- 证书文件 -->
           <el-descriptions-item label="证书文件">
             <el-button 
               v-if="currentCalibration.CertificateFile" 
@@ -345,8 +470,29 @@
             </el-button>
             <span v-else>无</span>
           </el-descriptions-item>
-          <el-descriptions-item label="校准内容" :span="2">{{ currentCalibration.CalibrationContent || '无' }}</el-descriptions-item>
-          <el-descriptions-item label="备注" :span="2">{{ currentCalibration.Notes || '无' }}</el-descriptions-item>
+          
+          <!-- 环境条件 -->
+          <el-descriptions-item label="环境条件" :span="2">{{ currentCalibration.EnvironmentalConditions || '无' }}</el-descriptions-item>
+          
+          <!-- 校准数据详情 -->
+          <el-descriptions-item label="校准数据详情" :span="2">
+            <div v-if="currentCalibration.CalibrationData" class="calibration-data">
+              <pre>{{ currentCalibration.CalibrationData }}</pre>
+            </div>
+            <span v-else>无</span>
+          </el-descriptions-item>
+          
+          <!-- 发现问题 -->
+          <el-descriptions-item label="发现问题" :span="2">{{ currentCalibration.Issues || '无' }}</el-descriptions-item>
+          
+          <!-- 建议 -->
+          <el-descriptions-item label="建议" :span="2">{{ currentCalibration.Recommendations || '无' }}</el-descriptions-item>
+          
+          <!-- 备注 -->
+          <el-descriptions-item label="备注" :span="2">{{ currentCalibration.Remarks || currentCalibration.Notes || '无' }}</el-descriptions-item>
+          
+          <!-- 创建信息 -->
+          <el-descriptions-item label="创建人">{{ currentCalibration.CreatorName || '无' }}</el-descriptions-item>
           <el-descriptions-item label="创建时间">{{ formatDateTime(currentCalibration.CreatedAt) }}</el-descriptions-item>
           <el-descriptions-item label="更新时间">{{ formatDateTime(currentCalibration.UpdatedAt) }}</el-descriptions-item>
         </el-descriptions>
@@ -390,7 +536,7 @@
  * 4. 支持按多条件筛选和导出
  */
 
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Search, 
@@ -421,7 +567,9 @@ const uploadRef = ref()
 const searchForm = reactive({
   instrumentName: '',
   managementCode: '',
-  calibrationOrganization: '',
+  calibrationAgency: '',
+  certificateNumber: '',
+  calibrationResult: '',
   calibrationDateRange: []
 })
 
@@ -441,17 +589,23 @@ const pagination = reactive({
 // 校准表单
 const calibrationForm = reactive({
   CalibrationID: null,
-  InstrumentID: '',
-  CalibrationDate: '',
-  CalibrationOrganization: '',
-  CertificateNumber: '',
-  CalibrationResult: '',
-  ValidUntil: '',
-  NextCalibrationDate: '',
-  CalibrationCost: null,
-  CalibrationContent: '',
-  Notes: '',
-  CertificateFile: ''
+  instrumentID: '',
+  resultCode: '',              // 检定结果编号
+  calibrationDate: '',
+  calibrationAgency: '',
+  certificateNumber: '',
+  calibrationStandard: '',
+  calibrationResult: '',
+  expiryDate: '',
+  nextCalibrationDate: '',
+  calibrationCost: null,
+  calibrationCycle: 12,        // 默认校准周期为12个月（前端计算用）
+  calibrationData: '',         // 校准数据
+  issues: '',                  // 发现问题
+  recommendations: '',         // 建议
+  environmentalConditions: '',
+  certificateFile: '',
+  remarks: ''
 })
 
 // 文件上传
@@ -463,22 +617,25 @@ const uploadHeaders = computed(() => ({
 
 // 表单验证规则
 const formRules = {
-  InstrumentID: [
+  instrumentID: [
     { required: true, message: '请选择仪器', trigger: 'change' }
   ],
-  CalibrationDate: [
+  calibrationDate: [
     { required: true, message: '请选择校准日期', trigger: 'change' }
   ],
-  CalibrationOrganization: [
+  calibrationAgency: [
     { required: true, message: '请输入校准机构', trigger: 'blur' }
   ],
-  CertificateNumber: [
+  certificateNumber: [
     { required: true, message: '请输入证书编号', trigger: 'blur' }
   ],
-  CalibrationResult: [
+  calibrationStandard: [
+    { required: true, message: '请输入校准标准', trigger: 'blur' }
+  ],
+  calibrationResult: [
     { required: true, message: '请选择校准结果', trigger: 'change' }
   ],
-  ValidUntil: [
+  expiryDate: [
     { required: true, message: '请选择有效期', trigger: 'change' }
   ]
 }
@@ -493,6 +650,12 @@ const dialogTitle = computed(() => isEdit.value ? '编辑校准结果' : '登记
  */
 function getResultType(result) {
   const resultMap = {
+    // 校准结果类型
+    '偏差在允许范围内': 'success',
+    '偏差超出允许范围': 'warning',
+    '需修正使用': 'warning',
+    '建议停用': 'danger',
+    // 检定结果类型（兼容性保留）
     '合格': 'success',
     '不合格': 'danger',
     '限制使用': 'warning'
@@ -547,8 +710,21 @@ async function getCalibrationList() {
     const params = {
       page: pagination.page,
       size: pagination.size,
-      ...searchForm
+      instrumentName: searchForm.instrumentName,
+      managementCode: searchForm.managementCode,
+      calibrationAgency: searchForm.calibrationAgency,
+      certificateNumber: searchForm.certificateNumber,
+      calibrationResult: searchForm.calibrationResult,
+      startDate: searchForm.calibrationDateRange && searchForm.calibrationDateRange[0] ? searchForm.calibrationDateRange[0] : '',
+      endDate: searchForm.calibrationDateRange && searchForm.calibrationDateRange[1] ? searchForm.calibrationDateRange[1] : ''
     }
+    
+    // 调试日志：检查搜索参数
+    console.log('搜索参数:', params)
+    if (params.certificateNumber) {
+      console.log('证书编号搜索参数:', params.certificateNumber)
+    }
+    
     const response = await instrumentApi.getCalibrationResults(params)
     
     // 确保返回的数据是数组，并过滤掉无效的仪器数据（防错处理）
@@ -586,18 +762,22 @@ async function getCalibrationList() {
 }
 
 /**
- * 获取仪器列表
+ * 获取仪器列表（用于校准结果登记）
+ * @param {boolean} includeAll - 是否包含所有仪器（编辑时需要）
  */
-async function getInstruments() {
+/**
+ * 获取仪器列表
+ * @param {boolean} includeAll - 是否包含所有仪器（现在始终获取所有仪器，支持重复校准）
+ */
+async function getInstruments(includeAll = false) {
   try {
+    // 始终获取所有仪器，支持仪器重复校准
     const response = await instrumentApi.getInstruments({ page: 1, size: 1000 })
-    // 确保返回的数据是数组，并过滤掉无效数据
     if (response.data && response.data.data && Array.isArray(response.data.data.list)) {
       instruments.value = response.data.data.list.filter(item => 
-        item && item.InstrumentID && (item.InstrumentName || item.ManagementCode)
+        item && item.ID && (item.InstrumentName || item.ManagementCode)
       )
     } else {
-      console.warn('获取仪器列表返回的数据格式不正确:', response.data)
       instruments.value = []
     }
   } catch (error) {
@@ -622,7 +802,9 @@ function handleReset() {
   Object.assign(searchForm, {
     instrumentName: '',
     managementCode: '',
-    calibrationOrganization: '',
+    calibrationAgency: '',
+    certificateNumber: '',
+    calibrationResult: '',
     calibrationDateRange: []
   })
   pagination.page = 1
@@ -632,10 +814,60 @@ function handleReset() {
 /**
  * 新增校准结果
  */
-function handleAdd() {
+async function handleAdd() {
   isEdit.value = false
-  resetForm()
-  dialogVisible.value = true
+  
+  // 第一步：完全清空对话框中可能的加载数据
+  // 清空仪器列表，避免显示之前的数据
+  instruments.value = []
+  // 清空文件列表
+  fileList.value = []
+  
+  // 第二步：完全重置表单数据，确保没有任何残留
+  Object.assign(calibrationForm, {
+    CalibrationID: null,
+    instrumentID: '',
+    resultCode: '',
+    calibrationDate: '',
+    calibrationAgency: '',
+    certificateNumber: '',
+    calibrationStandard: '',
+    calibrationResult: '',
+    expiryDate: '',
+    nextCalibrationDate: '',
+    calibrationCost: null,
+    calibrationCycle: 12,
+    calibrationData: '',
+    issues: '',
+    recommendations: '',
+    environmentalConditions: '',
+    certificateFile: '',
+    remarks: ''
+  })
+  
+  // 第三步：在DOM更新后进行初始化
+  nextTick(async () => {
+    // 清除表单验证状态
+    formRef.value?.resetFields()
+    formRef.value?.clearValidate()
+    
+    // 获取可校准的仪器列表
+    getInstruments(false)
+    
+    // 自动生成ResultCode编号
+    try {
+      const response = await instrumentApi.generateResultCode()
+      if (response.data && response.data.code === 200) {
+        calibrationForm.resultCode = response.data.data.resultCode
+      }
+    } catch (error) {
+      console.error('生成校准结果编号失败:', error)
+      ElMessage.warning('自动生成编号失败，请手动输入')
+    }
+    
+    // 显示对话框
+    dialogVisible.value = true
+  })
 }
 
 /**
@@ -644,7 +876,24 @@ function handleAdd() {
  */
 function handleEdit(row) {
   isEdit.value = true
-  Object.assign(calibrationForm, row)
+  getInstruments(true) // 编辑时获取所有仪器
+  Object.assign(calibrationForm, {
+    CalibrationID: row.ID,
+    instrumentID: row.InstrumentID,
+    resultCode: row.ResultCode,  // 添加 ResultCode 字段绑定
+    calibrationDate: row.CalibrationDate,
+    calibrationAgency: row.CalibrationAgency || row.CalibrationOrganization,  // 兼容两种字段名
+    certificateNumber: row.CertificateNumber,
+    calibrationResult: row.CalibrationResult,
+    expiryDate: row.ExpiryDate || row.ValidUntil,  // 兼容两种字段名
+    nextCalibrationDate: row.NextCalibrationDate,
+    calibrationCost: row.CalibrationCost,
+    calibrationCycle: row.CalibrationCycle,        // 添加校准周期字段
+    calibrationStandard: row.CalibrationStandard,
+    environmentalConditions: row.EnvironmentalConditions,
+    remarks: row.Remarks || row.Notes,  // 兼容两种字段名
+    certificateFile: row.CertificateFile
+  })
   // 设置文件列表
   if (row.CertificateFile) {
     fileList.value = [{
@@ -693,7 +942,7 @@ async function handleDelete(row) {
       }
     )
     
-    await instrumentApi.deleteCalibrationResult(row.CalibrationID)
+    await instrumentApi.deleteCalibrationResult(row.ID)
     ElMessage.success('删除成功')
     getCalibrationList()
   } catch (error) {
@@ -808,25 +1057,47 @@ async function handleSubmit() {
 }
 
 /**
+ * 对话框关闭处理
+ */
+function handleDialogClose() {
+  // 确保对话框关闭时完全重置表单
+  resetForm()
+  // 清空仪器列表，避免数据残留
+  instruments.value = []
+}
+
+/**
  * 重置表单
  */
 function resetForm() {
+  // 完全重置表单对象的所有属性
   Object.assign(calibrationForm, {
     CalibrationID: null,
-    InstrumentID: '',
-    CalibrationDate: '',
-    CalibrationOrganization: '',
-    CertificateNumber: '',
-    CalibrationResult: '',
-    ValidUntil: '',
-    NextCalibrationDate: '',
-    CalibrationCost: null,
-    CalibrationContent: '',
-    Notes: '',
-    CertificateFile: ''
+    instrumentID: '',
+    resultCode: '',              // 添加检定结果编号字段重置
+    calibrationDate: '',
+    calibrationAgency: '',
+    certificateNumber: '',
+    calibrationResult: '',
+    expiryDate: '',
+    nextCalibrationDate: '',
+    calibrationCost: null,
+    calibrationCycle: 12,        // 重置时也设置默认校准周期为12个月
+    calibrationStandard: '',
+    calibrationData: '',         // 添加校准数据字段重置
+    issues: '',                  // 添加发现问题字段重置
+    recommendations: '',         // 添加建议字段重置
+    environmentalConditions: '',
+    remarks: '',
+    certificateFile: ''
   })
+  // 清空文件列表
   fileList.value = []
-  formRef.value?.resetFields()
+  // 重置表单验证状态
+  nextTick(() => {
+    formRef.value?.resetFields()
+    formRef.value?.clearValidate()
+  })
 }
 
 /**
@@ -848,10 +1119,66 @@ function handleCurrentChange(page) {
   getCalibrationList()
 }
 
+/**
+ * 计算有效期至日期
+ * @param {string} calibrationDate - 校准日期
+ * @param {number} calibrationCycle - 校准周期（月）
+ * @returns {string} 有效期至日期
+ */
+function calculateExpiryDate(calibrationDate, calibrationCycle) {
+  if (!calibrationDate || !calibrationCycle) return ''
+  
+  const date = new Date(calibrationDate)
+  if (isNaN(date.getTime())) return ''
+  
+  // 添加校准周期月数
+  date.setMonth(date.getMonth() + calibrationCycle)
+  
+  // 格式化为 YYYY-MM-DD
+  return date.toISOString().split('T')[0]
+}
+
+/**
+ * 计算下次校准日期
+ * @param {string} expiryDate - 有效期至日期
+ * @returns {string} 下次校准日期
+ */
+function calculateNextCalibrationDate(expiryDate) {
+  if (!expiryDate) return ''
+  
+  const date = new Date(expiryDate)
+  if (isNaN(date.getTime())) return ''
+  
+  // 提前半个月（15天）
+  date.setDate(date.getDate() - 15)
+  
+  // 格式化为 YYYY-MM-DD
+  return date.toISOString().split('T')[0]
+}
+
+// 监听校准日期和校准周期变化，自动计算有效期至
+watch([() => calibrationForm.calibrationDate, () => calibrationForm.calibrationCycle], 
+  ([newCalibrationDate, newCalibrationCycle]) => {
+    if (newCalibrationDate && newCalibrationCycle) {
+      const expiryDate = calculateExpiryDate(newCalibrationDate, newCalibrationCycle)
+      calibrationForm.expiryDate = expiryDate
+    }
+  }
+)
+
+// 监听有效期至变化，自动计算下次校准日期
+watch(() => calibrationForm.expiryDate, (newExpiryDate) => {
+  if (newExpiryDate) {
+    const nextCalibrationDate = calculateNextCalibrationDate(newExpiryDate)
+    calibrationForm.nextCalibrationDate = nextCalibrationDate
+  }
+})
+
 // 组件挂载时初始化数据
 onMounted(() => {
   getCalibrationList()
-  getInstruments()
+  // 移除初始化时的getInstruments调用，避免不必要的数据加载
+  // getInstruments()
 })
 
 /**
@@ -864,20 +1191,26 @@ defineExpose({
 </script>
 
 <style scoped>
-.calibration-results-container {
-  padding: 0;
+.calibration-container {
+  padding: 20px;
 }
 
-/* 搜索筛选样式 */
 .search-filters {
+  margin-bottom: 24px;
+}
+
+.search-card {
   margin-bottom: 20px;
 }
 
 .search-form {
-  margin: 0;
+  margin-bottom: 0;
 }
 
-/* 表格样式 */
+.calibration-list {
+  margin-bottom: 20px;
+}
+
 .table-header {
   display: flex;
   justify-content: space-between;
@@ -885,51 +1218,68 @@ defineExpose({
 }
 
 .table-title {
+  font-size: 16px;
+  font-weight: 600;
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 16px;
-  font-weight: 600;
-  color: #303133;
 }
 
 .table-actions {
   display: flex;
-  gap: 8px;
+  gap: 10px;
 }
 
-/* 分页样式 */
-.pagination-wrapper {
-  margin-top: 20px;
-  text-align: right;
-  padding-top: 20px;
-  border-top: 1px solid #ebeef5;
-}
-
-/* 对话框样式 */
 .dialog-footer {
   text-align: right;
 }
 
-.dialog-footer .el-button {
-  margin-left: 10px;
-}
-
-/* 详情样式 */
 .calibration-detail {
   padding: 10px 0;
 }
 
-/* 证书查看样式 */
 .certificate-viewer {
   text-align: center;
-  padding: 20px 0;
 }
 
-/* 上传组件样式 */
-.el-upload__tip {
-  color: #909399;
+.form-tip {
   font-size: 12px;
-  line-height: 1.4;
+  color: #909399;
+  margin-top: 4px;
+}
+
+/* 校准对话框内边距优化 */
+.calibration-dialog :deep(.el-dialog__body) {
+  padding: 20px 30px !important;
+}
+
+.calibration-dialog :deep(.el-dialog__header) {
+  padding: 15px 30px 10px !important;
+}
+
+.calibration-dialog :deep(.el-dialog__footer) {
+  padding: 10px 30px 20px !important;
+}
+
+/* 紧凑表单样式 */
+.compact-form :deep(.el-form-item) {
+  margin-bottom: 16px !important;
+}
+
+.compact-form :deep(.el-row) {
+  margin-bottom: 0 !important;
+}
+
+/* 备用方案 - 全局样式 */
+.el-dialog.calibration-dialog .el-dialog__body {
+  padding: 20px 30px !important;
+}
+
+.el-dialog.calibration-dialog .el-dialog__header {
+  padding: 15px 30px 10px !important;
+}
+
+.el-dialog.calibration-dialog .el-dialog__footer {
+  padding: 10px 30px 20px !important;
 }
 </style>

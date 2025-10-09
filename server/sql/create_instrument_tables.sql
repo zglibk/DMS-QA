@@ -77,7 +77,6 @@ BEGIN
         [CertificateNumber] NVARCHAR(100),                 -- 证书编号
         [CalibrationStandard] NVARCHAR(200),               -- 校准标准
         [CalibrationResult] NVARCHAR(20) DEFAULT 'qualified', -- 校准结论：qualified/unqualified/limited
-        [ValidityPeriod] INT DEFAULT 365,                  -- 有效期(天)
         [ExpiryDate] DATE,                                 -- 到期日期
         [CalibrationCost] DECIMAL(10,2),                   -- 校准费用
         [CalibrationData] NVARCHAR(MAX),                   -- 校准数据详情
