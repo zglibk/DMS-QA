@@ -792,9 +792,7 @@ const formRules = {
   validityPeriod: [
     { required: true, message: '请输入有效期', trigger: 'blur' },
     { type: 'number', min: 0.5, max: 2, message: '有效期必须在0.5-2年之间', trigger: 'blur' }
-  ],
-  creator: [{ required: true, message: '请输入制作人', trigger: 'blur' }],
-  follower: [{ required: true, message: '请输入跟单员', trigger: 'blur' }]
+  ]
 }
 
 // 上传地址

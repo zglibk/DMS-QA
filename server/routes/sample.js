@@ -250,6 +250,7 @@ router.get('/list', authenticateToken, async (req, res) => {
  */
 router.post('/create', authenticateToken, async (req, res) => {
   try {
+    console.log('收到样板创建请求:', req.body);    
     const {
       customerNo,
       workOrderNo,
@@ -275,20 +276,29 @@ router.post('/create', authenticateToken, async (req, res) => {
       remark
     } = req.body;
 
+    console.log('解构后的字段:', {
+      customerNo, workOrderNo, productNo, productName, productSpec,
+      createDate, creator, follower, sampleStatus
+    });
+
     // 验证必填字段
     if (!customerNo || !workOrderNo || !productName || !productSpec) {
+      console.log('必填字段验证失败 - 基本信息');
       return res.status(400).json({
         code: 400,
         message: '客户编号、工单号、品名和产品规格为必填字段'
       });
     }
 
-    if (!createDate || !creator || !follower) {
+    if (!colorCardQuantity || !createDate) {
+      console.log('必填字段验证失败 - 制作信息');
       return res.status(400).json({
         code: 400,
-        message: '制作日期、制作人和跟单员为必填字段'
+        message: '色卡数量和制作日期为必填字段'
       });
     }
+
+    console.log('字段验证通过，开始生成样版编号...');
 
     // 自动生成样版编号
     const certificateNo = await generateCertificateNo();
@@ -308,27 +318,75 @@ router.post('/create', authenticateToken, async (req, res) => {
       )
     `;
 
+    // 处理ProductNo字段：如果为空则设置为空字符串以满足数据库NOT NULL约束
+    const processedProductNo = productNo || '';
+    // 处理Creator和Follower字段：如果为空则设置为空字符串以满足数据库NOT NULL约束
+    const processedCreator = creator || '';
+    const processedFollower = follower || '';
+
+    // 处理distributionDepartment字段：转换为JSON字符串并限制长度
+    let processedDistributionDepartment = '';
+    if (distributionDepartment) {
+      if (Array.isArray(distributionDepartment)) {
+        const jsonStr = JSON.stringify(distributionDepartment);
+        processedDistributionDepartment = jsonStr.length > 500 ? jsonStr.substring(0, 497) + '...' : jsonStr;
+        if (jsonStr.length > 500) {
+          console.warn('分发部门数据过长，已截断:', jsonStr.length, '->', processedDistributionDepartment.length);
+        }
+      } else {
+        processedDistributionDepartment = String(distributionDepartment).substring(0, 500);
+      }
+    }
+
+    // 处理ProductDrawing字段：限制长度
+    let processedProductDrawing = '';
+    if (productDrawing) {
+      if (Array.isArray(productDrawing)) {
+        const joinedStr = productDrawing.join(',');
+        processedProductDrawing = joinedStr.length > 500 ? joinedStr.substring(0, 497) + '...' : joinedStr;
+        if (joinedStr.length > 500) {
+          console.warn('产品图纸路径过长，已截断:', joinedStr.length, '->', processedProductDrawing.length);
+        }
+      } else {
+        processedProductDrawing = String(productDrawing).substring(0, 500);
+      }
+    }
+
+    // 处理ColorCardImage字段：限制长度
+    let processedColorCardImage = '';
+    if (colorCardImage) {
+      if (Array.isArray(colorCardImage)) {
+        const joinedStr = colorCardImage.join(',');
+        processedColorCardImage = joinedStr.length > 500 ? joinedStr.substring(0, 497) + '...' : joinedStr;
+        if (joinedStr.length > 500) {
+          console.warn('色卡图像路径过长，已截断:', joinedStr.length, '->', processedColorCardImage.length);
+        }
+      } else {
+        processedColorCardImage = String(colorCardImage).substring(0, 500);
+      }
+    }
+
     const result = await executeQuery(async (pool) => {
       const request = pool.request();
       request.input('certificateNo', sql.NVarChar, certificateNo);
       request.input('customerNo', sql.NVarChar, customerNo);
       request.input('workOrderNo', sql.NVarChar, workOrderNo);
-      request.input('productNo', sql.NVarChar, productNo);
+      request.input('productNo', sql.NVarChar, processedProductNo);
       request.input('productName', sql.NVarChar, productName);
       request.input('productSpec', sql.NVarChar, productSpec);
-      request.input('productDrawing', sql.NVarChar, productDrawing);
-      request.input('colorCardImage', sql.NVarChar, colorCardImage);
+      request.input('productDrawing', sql.NVarChar, processedProductDrawing);
+      request.input('colorCardImage', sql.NVarChar, processedColorCardImage);
       request.input('colorCardQuantity', sql.Int, colorCardQuantity);
       request.input('createDate', sql.Date, createDate);
-      request.input('creator', sql.NVarChar, creator);
-      request.input('follower', sql.NVarChar, follower);
+      request.input('creator', sql.NVarChar, processedCreator);
+      request.input('follower', sql.NVarChar, processedFollower);
       request.input('receiver', sql.NVarChar, receiver);
       request.input('returnQuantity', sql.Int, returnQuantity);
       request.input('signer', sql.NVarChar, signer);
       request.input('signDate', sql.Date, signDate || null);
       request.input('receiveDate', sql.Date, receiveDate || null);
       request.input('judgment', sql.NVarChar, judgment);
-      request.input('distributionDepartment', sql.NVarChar, distributionDepartmentStr);
+      request.input('distributionDepartment', sql.NVarChar, processedDistributionDepartment);
       request.input('distributionQuantity', sql.Int, distributionQuantity);
       request.input('sampleStatus', sql.NVarChar, sampleStatus);
       request.input('expiryDate', sql.Date, expiryDate || null);
@@ -347,11 +405,30 @@ router.post('/create', authenticateToken, async (req, res) => {
       message: '创建成功'
     });
   } catch (error) {
-    console.error('创建样板承认书失败:', error);
+    console.error('=== 样板创建失败详细信息 ===');
+    console.error('错误类型:', error.constructor.name);
+    console.error('错误消息:', error.message);
+    console.error('错误堆栈:', error.stack);
+    console.error('请求数据:', {
+      certificateNo,
+      customerNo,
+      workOrderNo,
+      productNo,
+      productName,
+      productSpec,
+      colorCardQuantity,
+      createDate,
+      distributionDepartment: typeof distributionDepartment,
+      distributionDepartmentValue: distributionDepartment
+    });
+    console.error('================================');
+    
     res.status(500).json({
       code: 500,
       message: '创建样板承认书失败',
-      error: error.message
+      error: error.message,
+      errorType: error.constructor.name,
+      details: error.stack
     });
   }
 });
