@@ -57,6 +57,9 @@ const routes = [
   // 版本更新日志页面
   { path: '/version-updates', component: () => import('../views/VersionUpdates.vue') },
 
+  // 二维码扫描页面
+  { path: '/qr-scan', component: () => import('../views/QrScanPage.vue') },
+
   // 个人资料页面（懒加载）
   {
     path: '/profile',

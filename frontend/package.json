@@ -39,6 +39,8 @@
     "exceljs": "^4.4.0",
     "file-saver": "^2.0.5",
     "highlight.js": "^11.11.1",
+    "html5-qrcode": "^2.3.8",
+    "jsqr": "^1.4.0",
     "marked": "^16.2.1",
     "md-editor-v3": "^5.8.4",
     "mime-types": "^3.0.1",
