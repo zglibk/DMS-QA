@@ -2132,7 +2132,6 @@ BEGIN
         [FollowUpActions] NTEXT,                                       /* 后续行动 */
         [PreventiveMeasures] NTEXT,                                    /* 预防措施 */
         [SupplierResponse] NTEXT,                                      /* 供应商回复 */
-        [InternalNotes] NTEXT,                                         /* 内部备注 */
         [AttachmentPaths] NTEXT,                                       /* 附件路径 */
         [CompletedDate] DATETIME,                                      /* 完成日期 */
         [ClosedDate] DATETIME,                                         /* 关闭日期 */
@@ -2141,6 +2140,26 @@ BEGIN
         [CreatedAt] DATETIME DEFAULT GETDATE(),                       /* 创建时间 */
         [UpdatedBy] INT,                                               /* 更新人ID */
         [UpdatedAt] DATETIME DEFAULT GETDATE(),                       /* 更新时间 */
+        [MaterialSpecification] NVARCHAR(200),                        /* 材料规格 */
+        [MaterialUnit] NVARCHAR(20),                                  /* 材料单位 */
+        [CustomerCode] NVARCHAR(50),                                  /* 客户代码 */
+        [ProductCode] NVARCHAR(100),                                  /* 产品代码 */
+        [CPO] NVARCHAR(100),                                          /* CPO */
+        [ProductQuantity] DECIMAL(18,2) DEFAULT 0,                   /* 产品数量 */
+        [ProductUnit] NVARCHAR(20),                                   /* 产品单位 */
+        [DefectQuantity] DECIMAL(18,2) DEFAULT 0,                    /* 缺陷数量 */
+        [DefectCategory] NVARCHAR(100),                               /* 缺陷类别 */
+        [DefectItem] NVARCHAR(200),                                   /* 缺陷项目 */
+        [DefectCauseAnalysis] NTEXT,                                  /* 缺陷原因分析 */
+        [FeedbackUnit] NVARCHAR(100),                                 /* 反馈单位 */
+        [Inspector] NVARCHAR(50),                                     /* 检验员 */
+        [AbnormalDisposal] NTEXT,                                     /* 异常处置 */
+        [ComplaintDocument] NTEXT,                                    /* 投诉文档 */
+        [ReplyDate] DATETIME,                                         /* 回复日期 */
+        [ImprovementEffectEvaluation] NTEXT,                          /* 改善效果评价 */
+        [ActualClaim] DECIMAL(18,2) DEFAULT 0,                       /* 实际索赔 */
+        [QA] NVARCHAR(50),                                            /* QA */
+        [Remarks] NTEXT,                                              /* 备注 */
         
         /* 外键约束 */
         CONSTRAINT [FK_SupplierComplaints_CreatedBy] FOREIGN KEY ([CreatedBy]) REFERENCES [User]([ID]),
@@ -2197,6 +2216,48 @@ IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_Sta
 BEGIN
     CREATE INDEX [IX_SupplierComplaints_Status] ON [SupplierComplaints] ([Status])
     PRINT '状态索引创建成功'
+END
+
+/* CPO索引 */
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_CPO')
+BEGIN
+    CREATE INDEX [IX_SupplierComplaints_CPO] ON [SupplierComplaints] ([CPO])
+    PRINT 'CPO索引创建成功'
+END
+
+/* 客户代码索引 */
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_CustomerCode')
+BEGIN
+    CREATE INDEX [IX_SupplierComplaints_CustomerCode] ON [SupplierComplaints] ([CustomerCode])
+    PRINT '客户代码索引创建成功'
+END
+
+/* 缺陷类别索引 */
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_DefectCategory')
+BEGIN
+    CREATE INDEX [IX_SupplierComplaints_DefectCategory] ON [SupplierComplaints] ([DefectCategory])
+    PRINT '缺陷类别索引创建成功'
+END
+
+/* 检验员索引 */
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_Inspector')
+BEGIN
+    CREATE INDEX [IX_SupplierComplaints_Inspector] ON [SupplierComplaints] ([Inspector])
+    PRINT '检验员索引创建成功'
+END
+
+/* 产品代码索引 */
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_ProductCode')
+BEGIN
+    CREATE INDEX [IX_SupplierComplaints_ProductCode] ON [SupplierComplaints] ([ProductCode])
+    PRINT '产品代码索引创建成功'
+END
+
+/* QA索引 */
+IF NOT EXISTS (SELECT * FROM sys.indexes WHERE name = 'IX_SupplierComplaints_QA')
+BEGIN
+    CREATE INDEX [IX_SupplierComplaints_QA] ON [SupplierComplaints] ([QA])
+    PRINT 'QA索引创建成功'
 END
 GO
 

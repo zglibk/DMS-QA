@@ -90,7 +90,70 @@ router.get('/', async (req, res) => {
     dataRequest.input('size', sql.Int, parseInt(size))
     
     const dataResult = await dataRequest.query(`
-      SELECT * FROM (
+      SELECT 
+        ID,
+        ComplaintNo,
+        ComplaintDate,
+        SupplierName,
+        MaterialName,
+        MaterialCode,
+        MaterialSpecification,
+        MaterialUnit,
+        CustomerCode,
+        ProductCode,
+        CPO,
+        ProductQuantity,
+        ProductUnit,
+        DefectQuantity,
+        DefectCategory,
+        DefectItem,
+        DefectCauseAnalysis,
+        FeedbackUnit,
+        Inspector,
+        AbnormalDisposal,
+        ComplaintDocument,
+        ReplyDate,
+        ImprovementEffectEvaluation,
+        ActualClaim,
+        QA,
+        Remarks,
+        PurchaseOrderNo,
+        IncomingDate,
+        BatchQuantity,
+        InspectionDate,
+        WorkOrderNo,
+        SampleQuantity,
+        AttachedImages,
+        IQCResult,
+        ComplaintType,
+        UrgencyLevel,
+        Description,
+        Quantity,
+        UnitPrice,
+        TotalAmount,
+        ProcessStatus,
+        ProcessResult,
+        InitiatedBy,
+        ExpectedSolution,
+        SolutionDescription,
+        VerificationResult,
+        ClaimAmount,
+        ActualLoss,
+        CompensationAmount,
+        ReworkCost,
+        ReplacementCost,
+        ReturnQuantity,
+        ReturnAmount,
+        FollowUpActions,
+        PreventiveMeasures,
+        SupplierResponse,
+        CompletedDate,
+        ClosedDate,
+        CreatedBy,
+        CreatedAt,
+        UpdatedAt,
+        RowNum
+      FROM (
         SELECT 
           sc.ID,
           sc.ComplaintNo,
@@ -98,6 +161,26 @@ router.get('/', async (req, res) => {
           sc.SupplierName,
           sc.MaterialName,
           sc.MaterialCode,
+          sc.MaterialSpecification,
+          sc.MaterialUnit,
+          sc.CustomerCode,
+          sc.ProductCode,
+          sc.CPO,
+          sc.ProductQuantity,
+          sc.ProductUnit,
+          sc.DefectQuantity,
+          sc.DefectCategory,
+          sc.DefectItem,
+          sc.DefectCauseAnalysis,
+          sc.FeedbackUnit,
+          sc.Inspector,
+          sc.AbnormalDisposal,
+          sc.ComplaintDocument,
+          sc.ReplyDate,
+          sc.ImprovementEffectEvaluation,
+          sc.ActualClaim,
+          sc.QA,
+          sc.Remarks,
           sc.PurchaseOrderNo,
           sc.IncomingDate,
           sc.BatchQuantity,
@@ -115,6 +198,21 @@ router.get('/', async (req, res) => {
           sc.ProcessStatus,
           sc.ProcessResult,
           sc.InitiatedBy,
+          sc.ExpectedSolution,
+          sc.SolutionDescription,
+          sc.VerificationResult,
+          sc.ClaimAmount,
+          sc.ActualLoss,
+          sc.CompensationAmount,
+          sc.ReworkCost,
+          sc.ReplacementCost,
+          sc.ReturnQuantity,
+          sc.ReturnAmount,
+          sc.FollowUpActions,
+          sc.PreventiveMeasures,
+          sc.SupplierResponse,
+          sc.CompletedDate,
+          sc.ClosedDate,
           sc.CreatedBy,
           sc.CreatedAt,
           sc.UpdatedAt,
@@ -272,7 +370,6 @@ router.get('/table-fields', async (req, res) => {
       'TotalAmount': '总金额',
       'UrgencyLevel': '紧急程度',
       'ExpectedSolution': '期望解决方案',
-      'ResponsiblePerson': '负责人',
       'ProcessStatus': '处理状态',
       'ProcessResult': '处理结果',
       'SolutionDescription': '解决方案描述',
@@ -287,7 +384,6 @@ router.get('/table-fields', async (req, res) => {
       'FollowUpActions': '后续行动',
       'PreventiveMeasures': '预防措施',
       'SupplierResponse': '供应商回复',
-      'InternalNotes': '内部备注',
       'AttachmentPaths': '附件路径',
       'CompletedDate': '完成日期',
       'ClosedDate': '关闭日期',
@@ -378,21 +474,44 @@ router.post('/', async (req, res) => {
       supplierName,
       materialName,
       materialCode,
+      materialSpecification,
+      materialUnit,
       purchaseOrderNo,
       incomingDate,
       batchQuantity,
       inspectionDate,
       workOrderNo,
+      customerCode,
+      productCode,
+      cpo,
+      productQuantity,
+      productUnit,
       sampleQuantity,
+      defectQuantity,
+      defectCategory,
+      defectItem,
+      defectCauseAnalysis,
       attachedImages,
+      feedbackUnit,
+      inspector,
       iqcResult,
+      abnormalDisposal,
+      complaintDocument,
+      replyDate,
+      improvementEffectEvaluation,
+      claimAmount,
+      actualClaim,
+      qa,
+      remarks,
       complaintType,
       description,
       quantity,
       unitPrice,
       initiatedBy,
       urgencyLevel = 'medium',
-      expectedSolution
+      expectedSolution,
+      processResult,
+      verificationResult
     } = req.body
     
     // 验证必填字段
@@ -455,14 +574,35 @@ router.post('/', async (req, res) => {
       .input('supplierName', sql.NVarChar(200), supplierName)
       .input('materialName', sql.NVarChar(200), materialName)
       .input('materialCode', sql.NVarChar(100), materialCode || '')
+      .input('materialSpecification', sql.NVarChar(200), materialSpecification || '')
+      .input('materialUnit', sql.NVarChar(20), materialUnit || '')
       .input('purchaseOrderNo', sql.NVarChar(100), purchaseOrderNo || '')
       .input('incomingDate', sql.DateTime, incomingDate || null)
       .input('batchQuantity', sql.Decimal(18, 2), batchQuantity || 0)
       .input('inspectionDate', sql.DateTime, inspectionDate || null)
       .input('workOrderNo', sql.NVarChar(100), workOrderNo || '')
+      .input('customerCode', sql.NVarChar(50), customerCode || '')
+      .input('productCode', sql.NVarChar(100), productCode || '')
+      .input('cpo', sql.NVarChar(100), cpo || '')
+      .input('productQuantity', sql.Decimal(18, 2), productQuantity || 0)
+      .input('productUnit', sql.NVarChar(20), productUnit || '')
       .input('sampleQuantity', sql.Decimal(18, 2), sampleQuantity || 0)
+      .input('defectQuantity', sql.Decimal(18, 2), defectQuantity || 0)
+      .input('defectCategory', sql.NVarChar(100), defectCategory || '')
+      .input('defectItem', sql.NVarChar(200), defectItem || '')
+      .input('defectCauseAnalysis', sql.NText, defectCauseAnalysis || '')
       .input('attachedImages', sql.NText, attachedImages || '')
+      .input('feedbackUnit', sql.NVarChar(100), feedbackUnit || '')
+      .input('inspector', sql.NVarChar(50), inspector || '')
       .input('iqcResult', sql.NVarChar(50), iqcResult || '')
+      .input('abnormalDisposal', sql.NText, abnormalDisposal || '')
+      .input('complaintDocument', sql.NText, complaintDocument || '')
+      .input('replyDate', sql.DateTime, replyDate || null)
+      .input('improvementEffectEvaluation', sql.NText, improvementEffectEvaluation || '')
+      .input('claimAmount', sql.Decimal(18, 2), claimAmount || 0)
+      .input('actualClaim', sql.Decimal(18, 2), actualClaim || 0)
+      .input('qa', sql.NVarChar(50), qa || '')
+      .input('remarks', sql.NText, remarks || '')
       .input('complaintType', sql.NVarChar(50), complaintType)
       .input('description', sql.NText, description)
       .input('quantity', sql.Decimal(18, 2), quantity || 0)
@@ -472,20 +612,32 @@ router.post('/', async (req, res) => {
       .input('expectedSolution', sql.NText, expectedSolution || '')
       .input('initiatedBy', sql.NVarChar(100), initiatedBy || '')
       .input('processStatus', sql.NVarChar(50), 'pending')
+      .input('processResult', sql.NVarChar(50), processResult || '')
+      .input('verificationResult', sql.NText, verificationResult || '')
       .input('createdBy', sql.Int, req.user?.id || 1)
       .query(`
         INSERT INTO SupplierComplaints (
           ComplaintNo, ComplaintDate, SupplierName, MaterialName, MaterialCode,
-          PurchaseOrderNo, IncomingDate, BatchQuantity, InspectionDate, WorkOrderNo,
-          SampleQuantity, AttachedImages, IQCResult, ComplaintType,
+          MaterialSpecification, MaterialUnit, PurchaseOrderNo, IncomingDate, BatchQuantity,
+          InspectionDate, WorkOrderNo, CustomerCode, ProductCode, CPO,
+          ProductQuantity, ProductUnit, SampleQuantity, DefectQuantity, DefectCategory,
+          DefectItem, DefectCauseAnalysis, AttachedImages, FeedbackUnit, Inspector,
+          IQCResult, AbnormalDisposal, ComplaintDocument, ReplyDate, ImprovementEffectEvaluation,
+          ClaimAmount, ActualClaim, QA, Remarks, ComplaintType,
           Description, Quantity, UnitPrice, TotalAmount, UrgencyLevel,
-          ExpectedSolution, InitiatedBy, ProcessStatus, CreatedBy, CreatedAt
+          ExpectedSolution, InitiatedBy, ProcessStatus, ProcessResult,
+          VerificationResult, CreatedBy, CreatedAt
         ) VALUES (
           @complaintNo, @complaintDate, @supplierName, @materialName, @materialCode,
-          @purchaseOrderNo, @incomingDate, @batchQuantity, @inspectionDate, @workOrderNo,
-          @sampleQuantity, @attachedImages, @iqcResult, @complaintType,
+          @materialSpecification, @materialUnit, @purchaseOrderNo, @incomingDate, @batchQuantity,
+          @inspectionDate, @workOrderNo, @customerCode, @productCode, @cpo,
+          @productQuantity, @productUnit, @sampleQuantity, @defectQuantity, @defectCategory,
+          @defectItem, @defectCauseAnalysis, @attachedImages, @feedbackUnit, @inspector,
+          @iqcResult, @abnormalDisposal, @complaintDocument, @replyDate, @improvementEffectEvaluation,
+          @claimAmount, @actualClaim, @qa, @remarks, @complaintType,
           @description, @quantity, @unitPrice, @totalAmount, @urgencyLevel,
-          @expectedSolution, @initiatedBy, @processStatus, @createdBy, GETDATE()
+          @expectedSolution, @initiatedBy, @processStatus, @processResult,
+          @verificationResult, @createdBy, GETDATE()
         );
         SELECT SCOPE_IDENTITY() as ID;
       `)
@@ -511,21 +663,98 @@ router.post('/', async (req, res) => {
  * 更新供应商投诉记录
  * PUT /api/supplier-complaints/:id
  */
-router.put('/:id', async (req, res) => {
+router.put('/:id', authenticateToken, async (req, res) => {
   try {
     const { id } = req.params
     const {
+      // 前端字段名（大写开头）
+      SupplierName,
+      MaterialName,
+      MaterialCode,
+      MaterialSpecification,
+      MaterialUnit,
+      PurchaseOrderNo,
+      IncomingDate,
+      BatchQuantity,
+      InspectionDate,
+      WorkOrderNo,
+      CustomerCode,
+      ProductCode,
+      CPO,
+      ProductQuantity,
+      ProductUnit,
+      SampleQuantity,
+      DefectQuantity,
+      DefectCategory,
+      DefectItem,
+      DefectCauseAnalysis,
+      AttachedImages,
+      FeedbackUnit,
+      Inspector,
+      IQCResult,
+      AbnormalDisposal,
+      ComplaintDocument,
+      ReplyDate,
+      ImprovementEffectEvaluation,
+      ClaimAmount,
+      ActualClaim,
+      QA,
+      Remarks,
+      ComplaintType,
+      Description,
+      Quantity,
+      UnitPrice,
+      InitiatedBy,
+      UrgencyLevel,
+      ExpectedSolution,
+      ProcessStatus,
+      ProcessResult,
+      VerificationResult,
+      SolutionDescription,
+      CompensationAmount,
+      ReworkCost,
+      ReplacementCost,
+      ReturnQuantity,
+      ReturnAmount,
+      FollowUpActions,
+      PreventiveMeasures,
+      SupplierResponse,
+      CompletedDate,
+      ClosedDate,
+      ActualLoss,
+      // 兼容小写开头的字段名
       supplierName,
       materialName,
       materialCode,
+      materialSpecification,
+      materialUnit,
       purchaseOrderNo,
       incomingDate,
       batchQuantity,
       inspectionDate,
       workOrderNo,
+      customerCode,
+      productCode,
+      cpo,
+      productQuantity,
+      productUnit,
       sampleQuantity,
+      defectQuantity,
+      defectCategory,
+      defectItem,
+      defectCauseAnalysis,
       attachedImages,
+      feedbackUnit,
+      inspector,
       iqcResult,
+      abnormalDisposal,
+      complaintDocument,
+      replyDate,
+      improvementEffectEvaluation,
+      claimAmount,
+      actualClaim,
+      qa,
+      remarks,
       complaintType,
       description,
       quantity,
@@ -535,67 +764,190 @@ router.put('/:id', async (req, res) => {
       expectedSolution,
       processStatus,
       processResult,
+      verificationResult,
       solutionDescription,
-      verificationResult
+      compensationAmount,
+      reworkCost,
+      replacementCost,
+      returnQuantity,
+      returnAmount,
+      followUpActions,
+      preventiveMeasures,
+      supplierResponse,
+      completedDate,
+      closedDate,
+      actualLoss,
+      // 兼容前端ResponsiblePerson字段（映射到InitiatedBy）
+      ResponsiblePerson,
+      responsiblePerson
     } = req.body
-    
+
     const pool = await getConnection()
-    
+
     // 检查记录是否存在
     const checkResult = await pool.request()
       .input('id', sql.Int, parseInt(id))
       .query('SELECT ID FROM SupplierComplaints WHERE ID = @id AND Status != 0')
-    
+
     if (checkResult.recordset.length === 0) {
       return res.status(404).json({
         success: false,
         message: '投诉记录不存在'
       })
     }
-    
+
+    // 使用大写开头的字段名优先，如果没有则使用小写开头的字段名
+    const finalSupplierName = SupplierName || supplierName || ''
+    const finalMaterialName = MaterialName || materialName || ''
+    const finalMaterialCode = MaterialCode || materialCode || ''
+    const finalMaterialSpecification = MaterialSpecification || materialSpecification || ''
+    const finalMaterialUnit = MaterialUnit || materialUnit || ''
+    const finalPurchaseOrderNo = PurchaseOrderNo || purchaseOrderNo || ''
+    const finalIncomingDate = IncomingDate || incomingDate || null
+    const finalBatchQuantity = BatchQuantity || batchQuantity || 0
+    const finalInspectionDate = InspectionDate || inspectionDate || null
+    const finalWorkOrderNo = WorkOrderNo || workOrderNo || ''
+    const finalCustomerCode = CustomerCode || customerCode || ''
+    const finalProductCode = ProductCode || productCode || ''
+    const finalCPO = CPO || cpo || ''
+    const finalProductQuantity = ProductQuantity || productQuantity || 0
+    const finalProductUnit = ProductUnit || productUnit || ''
+    const finalSampleQuantity = SampleQuantity || sampleQuantity || 0
+    const finalDefectQuantity = DefectQuantity || defectQuantity || 0
+    const finalDefectCategory = DefectCategory || defectCategory || ''
+    const finalDefectItem = DefectItem || defectItem || ''
+    const finalDefectCauseAnalysis = DefectCauseAnalysis || defectCauseAnalysis || ''
+    const finalAttachedImages = AttachedImages || attachedImages || ''
+    const finalFeedbackUnit = FeedbackUnit || feedbackUnit || ''
+    const finalInspector = Inspector || inspector || ''
+    const finalIQCResult = IQCResult || iqcResult || ''
+    const finalAbnormalDisposal = AbnormalDisposal || abnormalDisposal || ''
+    const finalComplaintDocument = ComplaintDocument || complaintDocument || ''
+    const finalReplyDate = ReplyDate || replyDate || null
+    const finalImprovementEffectEvaluation = ImprovementEffectEvaluation || improvementEffectEvaluation || ''
+    const finalClaimAmount = ClaimAmount || claimAmount || 0
+    const finalActualClaim = ActualClaim || actualClaim || 0
+    const finalQA = QA || qa || ''
+    const finalRemarks = Remarks || remarks || ''
+    const finalComplaintType = ComplaintType || complaintType || ''
+    const finalDescription = Description || description || ''
+    const finalQuantity = Quantity || quantity || 0
+    const finalUnitPrice = UnitPrice || unitPrice || 0
+    const finalInitiatedBy = InitiatedBy || initiatedBy || ResponsiblePerson || responsiblePerson || ''
+    const finalUrgencyLevel = UrgencyLevel || urgencyLevel || ''
+    const finalExpectedSolution = ExpectedSolution || expectedSolution || ''
+    const finalProcessStatus = ProcessStatus || processStatus || ''
+    const finalProcessResult = ProcessResult || processResult || ''
+    const finalVerificationResult = VerificationResult || verificationResult || ''
+    const finalSolutionDescription = SolutionDescription || solutionDescription || ''
+    const finalCompensationAmount = CompensationAmount || compensationAmount || 0
+    const finalReworkCost = ReworkCost || reworkCost || 0
+    const finalReplacementCost = ReplacementCost || replacementCost || 0
+    const finalReturnQuantity = ReturnQuantity || returnQuantity || 0
+    const finalReturnAmount = ReturnAmount || returnAmount || 0
+    const finalFollowUpActions = FollowUpActions || followUpActions || ''
+    const finalPreventiveMeasures = PreventiveMeasures || preventiveMeasures || ''
+    const finalSupplierResponse = SupplierResponse || supplierResponse || ''
+    const finalCompletedDate = CompletedDate || completedDate || null
+    const finalClosedDate = ClosedDate || closedDate || null
+    const finalActualLoss = ActualLoss || actualLoss || 0
+
     // 计算总金额
-    const totalAmount = quantity && unitPrice ? quantity * unitPrice : 0
-    
-    // 更新记录
+    const totalAmount = finalQuantity && finalUnitPrice ? finalQuantity * finalUnitPrice : 0
+
+    // 更新记录 - 更新所有字段
     await pool.request()
       .input('id', sql.Int, parseInt(id))
-      .input('supplierName', sql.NVarChar(200), supplierName)
-      .input('materialName', sql.NVarChar(200), materialName)
-      .input('materialCode', sql.NVarChar(100), materialCode || '')
-      .input('purchaseOrderNo', sql.NVarChar(100), purchaseOrderNo || '')
-      .input('incomingDate', sql.DateTime, incomingDate || null)
-      .input('batchQuantity', sql.Decimal(18, 2), batchQuantity || 0)
-      .input('inspectionDate', sql.DateTime, inspectionDate || null)
-      .input('workOrderNo', sql.NVarChar(100), workOrderNo || '')
-      .input('sampleQuantity', sql.Decimal(18, 2), sampleQuantity || 0)
-      .input('attachedImages', sql.NText, attachedImages || '')
-      .input('iqcResult', sql.NVarChar(50), iqcResult || '')
-      .input('complaintType', sql.NVarChar(50), complaintType)
-      .input('description', sql.NText, description)
-      .input('quantity', sql.Decimal(18, 2), quantity || 0)
-      .input('unitPrice', sql.Decimal(18, 2), unitPrice || 0)
+      .input('supplierName', sql.NVarChar(200), finalSupplierName)
+      .input('materialName', sql.NVarChar(200), finalMaterialName)
+      .input('materialCode', sql.NVarChar(100), finalMaterialCode)
+      .input('materialSpecification', sql.NVarChar(200), finalMaterialSpecification)
+      .input('materialUnit', sql.NVarChar(20), finalMaterialUnit)
+      .input('purchaseOrderNo', sql.NVarChar(100), finalPurchaseOrderNo)
+      .input('incomingDate', sql.DateTime, finalIncomingDate)
+      .input('batchQuantity', sql.Decimal(18, 2), finalBatchQuantity)
+      .input('inspectionDate', sql.DateTime, finalInspectionDate)
+      .input('workOrderNo', sql.NVarChar(100), finalWorkOrderNo)
+      .input('customerCode', sql.NVarChar(50), finalCustomerCode)
+      .input('productCode', sql.NVarChar(100), finalProductCode)
+      .input('cpo', sql.NVarChar(100), finalCPO)
+      .input('productQuantity', sql.Decimal(18, 2), finalProductQuantity)
+      .input('productUnit', sql.NVarChar(20), finalProductUnit)
+      .input('sampleQuantity', sql.Decimal(18, 2), finalSampleQuantity)
+      .input('defectQuantity', sql.Decimal(18, 2), finalDefectQuantity)
+      .input('defectCategory', sql.NVarChar(100), finalDefectCategory)
+      .input('defectItem', sql.NVarChar(200), finalDefectItem)
+      .input('defectCauseAnalysis', sql.NText, finalDefectCauseAnalysis)
+      .input('attachedImages', sql.NText, finalAttachedImages)
+      .input('feedbackUnit', sql.NVarChar(100), finalFeedbackUnit)
+      .input('inspector', sql.NVarChar(50), finalInspector)
+      .input('iqcResult', sql.NVarChar(50), finalIQCResult)
+      .input('abnormalDisposal', sql.NText, finalAbnormalDisposal)
+      .input('complaintDocument', sql.NText, finalComplaintDocument)
+      .input('replyDate', sql.DateTime, finalReplyDate)
+      .input('improvementEffectEvaluation', sql.NText, finalImprovementEffectEvaluation)
+      .input('claimAmount', sql.Decimal(18, 2), finalClaimAmount)
+      .input('actualClaim', sql.Decimal(18, 2), finalActualClaim)
+      .input('qa', sql.NVarChar(50), finalQA)
+      .input('remarks', sql.NText, finalRemarks)
+      .input('complaintType', sql.NVarChar(50), finalComplaintType)
+      .input('description', sql.NText, finalDescription)
+      .input('quantity', sql.Decimal(18, 2), finalQuantity)
+      .input('unitPrice', sql.Decimal(18, 2), finalUnitPrice)
       .input('totalAmount', sql.Decimal(18, 2), totalAmount)
-      .input('urgencyLevel', sql.NVarChar(20), urgencyLevel)
-      .input('expectedSolution', sql.NText, expectedSolution || '')
-      .input('initiatedBy', sql.NVarChar(100), initiatedBy || '')
-      .input('processStatus', sql.NVarChar(50), processStatus)
-      .input('processResult', sql.NVarChar(50), processResult || '')
-      .input('solutionDescription', sql.NText, solutionDescription || '')
-      .input('verificationResult', sql.NText, verificationResult || '')
+      .input('urgencyLevel', sql.NVarChar(20), finalUrgencyLevel)
+      .input('expectedSolution', sql.NText, finalExpectedSolution)
+      .input('initiatedBy', sql.NVarChar(100), finalInitiatedBy)
+      .input('processStatus', sql.NVarChar(50), finalProcessStatus)
+      .input('processResult', sql.NVarChar(50), finalProcessResult)
+      .input('verificationResult', sql.NText, finalVerificationResult)
+      .input('solutionDescription', sql.NText, finalSolutionDescription)
+      .input('compensationAmount', sql.Decimal(18, 2), finalCompensationAmount)
+      .input('reworkCost', sql.Decimal(18, 2), finalReworkCost)
+      .input('replacementCost', sql.Decimal(18, 2), finalReplacementCost)
+      .input('returnQuantity', sql.Decimal(18, 2), finalReturnQuantity)
+      .input('returnAmount', sql.Decimal(18, 2), finalReturnAmount)
+      .input('followUpActions', sql.NText, finalFollowUpActions)
+      .input('preventiveMeasures', sql.NText, finalPreventiveMeasures)
+      .input('supplierResponse', sql.NText, finalSupplierResponse)
+      .input('completedDate', sql.DateTime, finalCompletedDate)
+      .input('closedDate', sql.DateTime, finalClosedDate)
+      .input('actualLoss', sql.Decimal(18, 2), finalActualLoss)
       .input('updatedBy', sql.Int, req.user?.id || 1)
       .query(`
         UPDATE SupplierComplaints SET
           SupplierName = @supplierName,
           MaterialName = @materialName,
           MaterialCode = @materialCode,
+          MaterialSpecification = @materialSpecification,
+          MaterialUnit = @materialUnit,
           PurchaseOrderNo = @purchaseOrderNo,
           IncomingDate = @incomingDate,
           BatchQuantity = @batchQuantity,
           InspectionDate = @inspectionDate,
           WorkOrderNo = @workOrderNo,
+          CustomerCode = @customerCode,
+          ProductCode = @productCode,
+          CPO = @cpo,
+          ProductQuantity = @productQuantity,
+          ProductUnit = @productUnit,
           SampleQuantity = @sampleQuantity,
+          DefectQuantity = @defectQuantity,
+          DefectCategory = @defectCategory,
+          DefectItem = @defectItem,
+          DefectCauseAnalysis = @defectCauseAnalysis,
           AttachedImages = @attachedImages,
+          FeedbackUnit = @feedbackUnit,
+          Inspector = @inspector,
           IQCResult = @iqcResult,
+          AbnormalDisposal = @abnormalDisposal,
+          ComplaintDocument = @complaintDocument,
+          ReplyDate = @replyDate,
+          ImprovementEffectEvaluation = @improvementEffectEvaluation,
+          ClaimAmount = @claimAmount,
+          ActualClaim = @actualClaim,
+          QA = @qa,
+          Remarks = @remarks,
           ComplaintType = @complaintType,
           Description = @description,
           Quantity = @quantity,
@@ -606,8 +958,19 @@ router.put('/:id', async (req, res) => {
           InitiatedBy = @initiatedBy,
           ProcessStatus = @processStatus,
           ProcessResult = @processResult,
-          SolutionDescription = @solutionDescription,
           VerificationResult = @verificationResult,
+          SolutionDescription = @solutionDescription,
+          CompensationAmount = @compensationAmount,
+          ReworkCost = @reworkCost,
+          ReplacementCost = @replacementCost,
+          ReturnQuantity = @returnQuantity,
+          ReturnAmount = @returnAmount,
+          FollowUpActions = @followUpActions,
+          PreventiveMeasures = @preventiveMeasures,
+          SupplierResponse = @supplierResponse,
+          CompletedDate = @completedDate,
+          ClosedDate = @closedDate,
+          ActualLoss = @actualLoss,
           UpdatedBy = @updatedBy,
           UpdatedAt = GETDATE()
         WHERE ID = @id
