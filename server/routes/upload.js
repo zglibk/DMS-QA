@@ -9,6 +9,7 @@ const uploadDir = path.join(__dirname, '../uploads');
 const siteImagesDir = path.join(uploadDir, 'site-images');
 const attachmentDir = path.join(uploadDir, 'attachments');
 const customerComplaintDir = path.join(uploadDir, 'customer-complaint');
+const supplierComplaintDir = path.join(uploadDir, 'supplier-complaint');
 
 if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -24,6 +25,10 @@ if (!fs.existsSync(attachmentDir)) {
 
 if (!fs.existsSync(customerComplaintDir)) {
   fs.mkdirSync(customerComplaintDir, { recursive: true });
+}
+
+if (!fs.existsSync(supplierComplaintDir)) {
+  fs.mkdirSync(supplierComplaintDir, { recursive: true });
 }
 
 // 配置multer存储 - 网站图片
@@ -43,16 +48,21 @@ const storage = multer.diskStorage({
     const fileType = req.query.fileType || req.body.fileType || req.body.type || 'image';
     console.log('文件类型:', fileType);
     
-    // 根据文件类型确定子目录
+    // 根据文件类型确定目标目录
+    let targetDir = siteImagesDir;
     let subDir = '';
-    if (fileType === 'productDrawing' || fileType === 'drawing') {
+    
+    if (fileType === 'supplier-complaint') {
+      // 供应商投诉图片存储到专门目录
+      targetDir = supplierComplaintDir;
+    } else if (fileType === 'productDrawing' || fileType === 'drawing') {
       subDir = '产品图纸';
+      targetDir = path.join(siteImagesDir, subDir);
     } else if (fileType === 'colorCard' || fileType === 'sample') {
       subDir = '色卡图片';
+      targetDir = path.join(siteImagesDir, subDir);
     }
     
-    // 构建完整的目标目录路径
-    const targetDir = subDir ? path.join(siteImagesDir, subDir) : siteImagesDir;
     console.log('目标目录:', targetDir);
     
     // 确保目标目录存在
@@ -569,6 +579,124 @@ router.get('/site-images', (req, res) => {
     res.status(500).json({
       success: false,
       message: '获取图片列表失败: ' + error.message
+    });
+  }
+});
+
+// 供应商投诉图片上传接口
+router.post('/supplier-complaint', upload.single('file'), (req, res) => {
+  try {
+    console.log('=== 供应商投诉图片上传请求开始 ===');
+    console.log('请求体:', req.body);
+    console.log('文件信息:', req.file);
+    
+    if (!req.file) {
+      console.log('错误: 没有接收到文件');
+      return res.status(400).json({
+        success: false,
+        message: '没有上传文件'
+      });
+    }
+
+    // 移动文件到供应商投诉专用目录
+    const targetDir = supplierComplaintDir;
+    const newFilePath = path.join(targetDir, req.file.filename);
+    
+    // 如果文件不在目标目录，移动文件
+    if (req.file.path !== newFilePath) {
+      fs.renameSync(req.file.path, newFilePath);
+      console.log('文件移动:', req.file.path, '->', newFilePath);
+      
+      // 更新文件信息
+      req.file.path = newFilePath;
+      req.file.destination = targetDir;
+    }
+    
+    const fileUrl = `/files/supplier-complaint/${req.file.filename}`;
+
+    console.log('供应商投诉图片上传成功:', {
+      originalName: req.file.originalname,
+      filename: req.file.filename,
+      size: req.file.size,
+      path: req.file.path,
+      url: fileUrl
+    });
+
+    res.json({
+      success: true,
+      message: '图片上传成功',
+      url: fileUrl,
+      data: {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        path: req.file.path,
+        relativePath: `supplier-complaint/${req.file.filename}`
+      }
+    });
+
+  } catch (error) {
+    console.error('供应商投诉图片上传错误:', error);
+    res.status(500).json({
+      success: false,
+      message: '图片上传失败: ' + error.message
+    });
+  }
+});
+
+// 删除图片接口
+router.delete('/delete-image', (req, res) => {
+  try {
+    const { filename, category = 'supplier-complaint' } = req.body;
+    
+    if (!filename) {
+      return res.status(400).json({
+        success: false,
+        message: '缺少文件名参数'
+      });
+    }
+
+    // 根据分类确定文件路径
+    let filePath;
+    switch (category) {
+      case 'supplier-complaint':
+        filePath = path.join(supplierComplaintDir, filename);
+        break;
+      case 'customer-complaint':
+        filePath = path.join(customerComplaintDir, filename);
+        break;
+      case 'notice-images':
+        filePath = path.join(uploadDir, 'notice-images', filename);
+        break;
+      case 'site-images':
+        filePath = path.join(siteImagesDir, filename);
+        break;
+      default:
+        filePath = path.join(uploadDir, category, filename);
+    }
+
+    // 检查文件是否存在
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: '文件不存在'
+      });
+    }
+
+    // 删除文件
+    fs.unlinkSync(filePath);
+    console.log('图片删除成功:', filePath);
+
+    res.json({
+      success: true,
+      message: '图片删除成功'
+    });
+
+  } catch (error) {
+    console.error('图片删除失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '图片删除失败: ' + error.message
     });
   }
 });

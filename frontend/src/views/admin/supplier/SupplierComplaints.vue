@@ -232,7 +232,7 @@
       :title="dialogTitle" 
       width="50%"
       :close-on-click-modal="false"
-      @close="handleDialogClose"
+      :before-close="handleDialogClose"
     >
       <el-form 
         ref="formRef" 
@@ -242,7 +242,9 @@
         class="complaint-form"
       >
         <!-- 基本信息区域 -->
-        <el-divider content-position="left">基本信息</el-divider>
+        <div class="section-title">
+          <span class="title-text">基本信息</span>
+        </div>
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="投诉编号" prop="complaintNo">
@@ -316,8 +318,10 @@
         </el-row>
         
         <!-- 供应商和材料信息区域 -->
-        <el-divider content-position="left">供应商和材料信息</el-divider>
-        <el-row :gutter="20">
+        <div class="section-title">
+          <span class="title-text">供应商和材料信息</span>
+        </div>
+        <el-row :gutter="10">
           <el-col :span="12">
             <el-form-item label="供应商名称" prop="SupplierName">
               <el-select
@@ -337,12 +341,12 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="7">
             <el-form-item label="材料编码">
               <el-input v-model="formData.MaterialCode" placeholder="请输入材料编码" />
             </el-form-item>
           </el-col>
-          <el-col :span="6">
+          <el-col :span="5">
             <el-form-item label="材料单位">
               <el-select v-model="formData.MaterialUnit" placeholder="请选择材料单位" style="width: 100%">
                 <el-option label="个" value="个" />
@@ -359,6 +363,7 @@
                 <el-option label="ml" value="ml" />
                 <el-option label="m²" value="m²" />
                 <el-option label="m³" value="m³" />
+                <el-option label="pcs" value="pcs" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -378,7 +383,9 @@
         </el-row>
         
         <!-- 产品和客户信息区域 -->
-        <el-divider content-position="left">产品和客户信息</el-divider>
+        <div class="section-title">
+          <span class="title-text">产品和客户信息</span>
+        </div>
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="客户编号">
@@ -425,6 +432,7 @@
                 <el-option label="ml" value="ml" />
                 <el-option label="m²" value="m²" />
                 <el-option label="m³" value="m³" />
+                <el-option label="pcs" value="pcs" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -441,7 +449,9 @@
         </el-row>
         
         <!-- 检验和质量信息区域 -->
-        <el-divider content-position="left">检验和质量信息</el-divider>
+        <div class="section-title">
+          <span class="title-text">检验和质量信息</span>
+        </div>
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="来料日期">
@@ -534,7 +544,9 @@
         </el-row>
         
         <!-- 不良信息区域 -->
-        <el-divider content-position="left">不良信息</el-divider>
+        <div class="section-title">
+          <span class="title-text">不良信息</span>
+        </div>
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="不良类别">
@@ -565,7 +577,9 @@
         </el-row>
         
         <!-- 订单信息区域 -->
-        <el-divider content-position="left">订单信息</el-divider>
+        <div class="section-title">
+          <span class="title-text">订单信息</span>
+        </div>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="采购单号">
@@ -594,7 +608,9 @@
         </el-row>
         
         <!-- 金额信息区域 -->
-        <el-divider content-position="left">金额信息</el-divider>
+        <div class="section-title">
+          <span class="title-text">金额信息</span>
+        </div>
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="问题数量" prop="Quantity">
@@ -655,24 +671,84 @@
         </el-row>
         
         <!-- 详细描述区域 -->
-        <el-divider content-position="left">详细描述</el-divider>
-        <el-form-item label="不合格描述" prop="Description">
-          <el-input 
-            v-model="formData.Description" 
-            type="textarea" 
-            :rows="4" 
-            placeholder="请详细描述不合格问题"
-          />
-        </el-form-item>
+        <div class="section-title">
+          <span class="title-text">详细描述</span>
+        </div>
+        <!-- 不合格描述和原因分析区域 - 左右布局 -->
+        <el-row :gutter="20">
+          <!-- 左侧表单区域 (70%) -->
+          <el-col :span="17">
+            <el-form-item label="不合格描述" prop="Description">
+              <el-input 
+                v-model="formData.Description" 
+                type="textarea" 
+                :rows="4" 
+                placeholder="请详细描述不合格问题"
+              />
+            </el-form-item>
+
+            <el-form-item label="不合格原因分析">
+              <el-input 
+                v-model="formData.DefectCauseAnalysis" 
+                type="textarea" 
+                :rows="3" 
+                placeholder="请分析不合格原因"
+              />
+            </el-form-item>
+          </el-col>
+          
+          <!-- 右侧图片显示区域 (30%) -->
+          <el-col :span="7">
+            <div class="image-upload-area">
+              <div class="image-upload-label">
+                相关图片
+                <el-tag 
+                  v-if="formData.imageFileList.length > 0" 
+                  :type="isProductionEnvironment() ? 'success' : 'primary'" 
+                  size="small" 
+                  style="margin-left: 8px;"
+                >
+                  {{ isProductionEnvironment() ? '生产环境' : '开发环境' }}
+                </el-tag>
+              </div>
+              <el-upload
+                class="image-upload-container"
+                :auto-upload="false"
+                :on-change="handleImageFileChange"
+                :on-remove="handleImageFileRemove"
+                :on-preview="handleImagePreview"
+                :before-upload="beforeImageUpload"
+                :file-list="formData.imageFileList"
+                list-type="picture-card"
+                :limit="1"
+                accept="image/*"
+                @paste="handleImagePaste"
+                @drop="handleImageDrop"
+                @dragover.prevent
+              >
+                <el-icon class="upload-icon"><Plus /></el-icon>
+                <template #tip>
+                  <div class="upload-hint">
+                    支持Ctrl+ V 粘贴上传，最大5MB
+                    <div v-if="formData.imageFileList.length > 0 && formData.imageFileList[0].isExisting" 
+                         style="font-size: 11px; color: #909399; margin-top: 4px;">
+                      已存在图片，支持环境自适应显示
+                    </div>
+                  </div>
+                </template>
+              </el-upload>
+            </div>
+          </el-col>
+        </el-row>
         
-        <el-form-item label="不合格原因分析">
+        <el-form-item label="期望解决方案">
           <el-input 
-            v-model="formData.DefectCauseAnalysis" 
+            v-model="formData.ExpectedSolution" 
             type="textarea" 
             :rows="3" 
-            placeholder="请分析不合格原因"
+            placeholder="请描述期望的解决方案"
           />
-        </el-form-item>
+        </el-form-item>        
         
         <el-form-item label="异常处置">
           <el-input 
@@ -701,20 +777,20 @@
           />
         </el-form-item>
         
-        <!-- 备注区域 - 移动到最底部 -->
-        <el-divider content-position="left">备注信息</el-divider>
-        <el-form-item label="备注">
+        <el-form-item label="期望解决方案">
           <el-input 
-            v-model="formData.Remarks" 
-            type="textarea"
-            :rows="2"
-            placeholder="请输入备注信息"
+            v-model="formData.ExpectedSolution" 
+            type="textarea" 
+            :rows="3" 
+            placeholder="请描述期望的解决方案"
           />
-        </el-form-item>       
+        </el-form-item>
        
         <!-- 处理结果相关字段 -->
         <div v-if="formData.ProcessStatus !== 'pending'" class="process-section">
-          <el-divider content-position="left">处理结果</el-divider>
+          <div class="section-title">
+          <span class="title-text">处理结果</span>
+        </div>
           
           <el-row :gutter="20">
             <el-col :span="8">
@@ -852,6 +928,19 @@
             />
           </el-form-item>
         </div>
+        
+        <!-- 备注信息 - 移动到最底部 -->
+        <div class="section-title">
+          <span class="title-text">备注信息</span>
+        </div>
+        <el-form-item label="备注">
+          <el-input 
+            v-model="formData.Remarks" 
+            type="textarea"
+            :rows="2"
+            placeholder="请输入备注信息"
+          />
+        </el-form-item>
       </el-form>
       
       <template #footer>
@@ -866,7 +955,7 @@
     <el-dialog 
       v-model="viewDialogVisible" 
       title="投诉详情" 
-      width="43%"
+      width="50%"
       :close-on-click-modal="false"
     >
       <div class="complaint-detail" v-if="viewData">
@@ -887,16 +976,15 @@
           <el-descriptions-item label="供应商名称">{{ viewData.SupplierName }}</el-descriptions-item>
           <el-descriptions-item label="材料编号">{{ viewData.MaterialCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="材料单位">{{ viewData.MaterialUnit || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="材料名称">{{ viewData.MaterialName }}</el-descriptions-item>
-          <el-descriptions-item label="材料规格" :span="2">{{ viewData.MaterialSpecification || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="材料名称" :span="2">{{ viewData.MaterialName }}</el-descriptions-item>
+          <el-descriptions-item label="材料规格">{{ viewData.MaterialSpecification || '-' }}</el-descriptions-item>
           
           <el-descriptions-item label="客户编号">{{ viewData.CustomerCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="产品编号">{{ viewData.ProductCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="CPO">{{ viewData.CPO || '-' }}</el-descriptions-item>
           <el-descriptions-item label="产品数量">{{ formatNumber(viewData.ProductQuantity) || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="产品单位">{{ viewData.ProductUnit || '-' }}</el-descriptions-item>
           <el-descriptions-item label="不合格数">{{ formatNumber(viewData.DefectQuantity) || '-' }}</el-descriptions-item>
-          
+          <el-descriptions-item label="数量单位">{{ viewData.ProductUnit || '-' }}</el-descriptions-item>
           <el-descriptions-item label="来料日期">{{ formatDate(viewData.IncomingDate) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="检验日期">{{ formatDate(viewData.InspectionDate) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="回复日期">{{ formatDate(viewData.ReplyDate) || '-' }}</el-descriptions-item>
@@ -926,23 +1014,90 @@
           <el-descriptions-item label="创建时间">{{ formatDateTime(viewData.CreatedAt) }}</el-descriptions-item>
         </el-descriptions>
         
-        <el-divider content-position="left">问题描述</el-divider>
-        <p class="description-text">{{ viewData.Description }}</p>
-        
-        <el-divider content-position="left" v-if="viewData.DefectCauseAnalysis">不合格原因分析</el-divider>
-        <p class="description-text" v-if="viewData.DefectCauseAnalysis">{{ viewData.DefectCauseAnalysis }}</p>
-        
-        <el-divider content-position="left" v-if="viewData.AbnormalDisposal">异常处置</el-divider>
-        <p class="description-text" v-if="viewData.AbnormalDisposal">{{ viewData.AbnormalDisposal }}</p>
-        
-        <el-divider content-position="left" v-if="viewData.ImprovementEffectEvaluation">改善效果评估</el-divider>
-        <p class="description-text" v-if="viewData.ImprovementEffectEvaluation">{{ viewData.ImprovementEffectEvaluation }}</p>
-        
-        <el-divider content-position="left" v-if="viewData.ExpectedSolution">期望解决方案</el-divider>
-        <p class="description-text" v-if="viewData.ExpectedSolution">{{ viewData.ExpectedSolution }}</p>
+        <!-- 问题描述区域 - 左右分栏布局 -->
+        <div class="problem-description-section">
+          <div class="content-layout">
+            <!-- 左侧文本信息区域 (70%) -->
+            <div class="text-content">
+              <el-divider content-position="left" class="detail-section-divider">问题描述</el-divider>
+              <p class="description-text">{{ viewData.Description }}</p>
+              
+              <el-divider content-position="left" class="detail-section-divider" v-if="viewData.ExpectedSolution">期望解决方案</el-divider>
+              <p class="description-text" v-if="viewData.ExpectedSolution">{{ viewData.ExpectedSolution }}</p>
+              
+              <el-divider content-position="left" class="detail-section-divider" v-if="viewData.DefectCauseAnalysis">不合格原因分析</el-divider>
+              <p class="description-text" v-if="viewData.DefectCauseAnalysis">{{ viewData.DefectCauseAnalysis }}</p>
+              
+              <el-divider content-position="left" class="detail-section-divider" v-if="viewData.AbnormalDisposal">异常处置</el-divider>
+              <p class="description-text" v-if="viewData.AbnormalDisposal">{{ viewData.AbnormalDisposal }}</p>
+              
+              <el-divider content-position="left" class="detail-section-divider" v-if="viewData.ImprovementEffectEvaluation">改善效果评估</el-divider>
+              <p class="description-text" v-if="viewData.ImprovementEffectEvaluation">{{ viewData.ImprovementEffectEvaluation }}</p>
+            </div>
+            
+            <!-- 右侧图片显示区域 (30%) -->
+            <div class="image-content">
+              <div class="image-section-title">异常问题图片</div>
+              <div class="image-gallery" v-if="viewData.AttachedImages">
+                <!-- 显示实际的图片 -->
+                <el-image
+                  :src="getAdaptedImageUrl(viewData.AttachedImages)"
+                  :preview-src-list="[getAdaptedImageUrl(viewData.AttachedImages)]"
+                  fit="cover"
+                  style="width: 100%; max-height: 300px; border-radius: 8px; cursor: pointer;"
+                  :preview-teleported="true"
+                  @error="handleImageError"
+                  lazy
+                >
+                  <template #placeholder>
+                    <div class="image-loading">
+                      <el-icon class="is-loading"><Loading /></el-icon>
+                      <p>图片加载中...</p>
+                    </div>
+                  </template>
+                  <template #error>
+                    <div class="image-error">
+                      <el-icon><Picture /></el-icon>
+                      <p>图片加载失败</p>
+                      <p class="image-path" :title="viewData.AttachedImages">{{ viewData.AttachedImages }}</p>
+                      <el-button 
+                        size="small" 
+                        type="primary" 
+                        link 
+                        @click="retryLoadImage"
+                      >
+                        重新加载
+                      </el-button>
+                    </div>
+                  </template>
+                </el-image>
+                
+                <!-- 图片信息显示 -->
+                <div class="image-info">
+                  <div class="image-url-info">
+                    <span class="info-label">图片路径：</span>
+                    <span class="info-value" :title="getAdaptedImageUrl(viewData.AttachedImages)">
+                      {{ getAdaptedImageUrl(viewData.AttachedImages) }}
+                    </span>
+                  </div>
+                  <div class="environment-info">
+                    <span class="info-label">当前环境：</span>
+                    <el-tag :type="isProductionEnvironment() ? 'success' : 'warning'" size="small">
+                      {{ isProductionEnvironment() ? '生产环境' : '开发环境' }}
+                    </el-tag>
+                  </div>
+                </div>
+              </div>
+              <div class="no-image" v-else>
+                <el-icon><Picture /></el-icon>
+                <p>暂无图片</p>
+              </div>
+            </div>
+          </div>
+        </div>    
         
         <div v-if="viewData.ProcessStatus !== 'pending'">
-          <el-divider content-position="left">处理结果</el-divider>
+          <el-divider content-position="left" class="detail-section-divider">处理结果</el-divider>
           <el-descriptions :column="3" border>
             <el-descriptions-item label="处理结果">{{ viewData.ProcessResult }}</el-descriptions-item>
             <el-descriptions-item label="实际损失">¥{{ formatNumber(viewData.ActualLoss) }}</el-descriptions-item>
@@ -953,25 +1108,37 @@
             <el-descriptions-item label="退货金额">¥{{ formatNumber(viewData.ReturnAmount) }}</el-descriptions-item>
           </el-descriptions>
           
-          <el-divider content-position="left" v-if="viewData.SolutionDescription">解决方案描述</el-divider>
+          <el-divider content-position="left" class="detail-section-divider" v-if="viewData.SolutionDescription">解决方案描述</el-divider>
           <p class="description-text" v-if="viewData.SolutionDescription">{{ viewData.SolutionDescription }}</p>
           
-          <el-divider content-position="left" v-if="viewData.VerificationResult">验证结果</el-divider>
+          <el-divider content-position="left" class="detail-section-divider" v-if="viewData.VerificationResult">验证结果</el-divider>
           <p class="description-text" v-if="viewData.VerificationResult">{{ viewData.VerificationResult }}</p>
           
-          <el-divider content-position="left" v-if="viewData.FollowUpActions">后续行动</el-divider>
+          <el-divider content-position="left" class="detail-section-divider" v-if="viewData.FollowUpActions">后续行动</el-divider>
           <p class="description-text" v-if="viewData.FollowUpActions">{{ viewData.FollowUpActions }}</p>
           
-          <el-divider content-position="left" v-if="viewData.PreventiveMeasures">预防措施</el-divider>
+          <el-divider content-position="left" class="detail-section-divider" v-if="viewData.PreventiveMeasures">预防措施</el-divider>
           <p class="description-text" v-if="viewData.PreventiveMeasures">{{ viewData.PreventiveMeasures }}</p>
           
-          <el-divider content-position="left" v-if="viewData.SupplierResponse">供应商回复</el-divider>
+          <el-divider content-position="left" class="detail-section-divider" v-if="viewData.SupplierResponse">供应商回复</el-divider>
           <p class="description-text" v-if="viewData.SupplierResponse">{{ viewData.SupplierResponse }}</p>
         </div>
         
-        <!-- 备注信息 - 移动到最底部 -->
-        <el-divider content-position="left" v-if="viewData.Remarks">备注信息</el-divider>
-        <p class="description-text" v-if="viewData.Remarks">{{ viewData.Remarks }}</p>
+        <!-- 备注信息 -->
+        <div class="remarks-section">
+          <div class="content-layout">
+            <!-- 左侧备注信息 (70%) -->
+            <div class="text-content">
+              <el-divider content-position="left" class="detail-section-divider" v-if="viewData.Remarks">备注信息</el-divider>
+              <p class="description-text" v-if="viewData.Remarks">{{ viewData.Remarks }}</p>
+            </div>
+            
+            <!-- 右侧空白区域保持布局一致性 (30%) -->
+            <div class="image-content">
+              <!-- 保持布局一致性的空白区域 -->
+            </div>
+          </div>
+        </div>
       </div>
       
       <template #footer>
@@ -1045,11 +1212,14 @@
         </div>
       </template>
     </el-dialog>
+
+    <!-- 图片预览组件 - 使用封装的ImgPreview组件 -->
+    <ImgPreview v-model="imageViewerVisible" :imgs="previewImageUrls" />
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import {
   Search, Refresh, Plus, Download, DataAnalysis,
@@ -1058,6 +1228,7 @@ import {
 } from '@element-plus/icons-vue'
 import api from '@/services/api'
 import { useUserStore } from '@/store/user'
+import ImgPreview from '@/components/ImgPreview.vue'
 
 // 用户store
 const userStore = useUserStore()
@@ -1105,6 +1276,10 @@ const viewDialogVisible = ref(false)
 const isEdit = ref(false)
 const viewData = ref(null)
 
+// 图片预览相关状态
+const imageViewerVisible = ref(false)
+const previewImageUrls = ref([])
+
 // 表单数据
 const formData = reactive({
   ID: null,
@@ -1143,8 +1318,12 @@ const formData = reactive({
   ReturnAmount: 0,
   FollowUpActions: '',
   PreventiveMeasures: '',
-  SupplierResponse: ''
+  SupplierResponse: '',
+  imageFileList: [] // 添加图片文件列表属性
 })
+
+// 原始表单数据，用于比较是否有变化
+const originalFormData = ref({})
 
 // 表单引用
 const formRef = ref(null)
@@ -1184,7 +1363,77 @@ onMounted(async () => {
   loadSuppliers()
   loadPersonList() // 加载人员列表
   loadStatistics()
+  
+  // 添加全局粘贴事件监听器，支持Ctrl+V粘贴图片
+  document.addEventListener('paste', handleGlobalPaste)
 })
+
+// 组件卸载时清理事件监听器
+onUnmounted(() => {
+  document.removeEventListener('paste', handleGlobalPaste)
+})
+
+/**
+ * 全局粘贴事件处理函数
+ * @param {ClipboardEvent} e - 粘贴事件对象
+ */
+const handleGlobalPaste = (e) => {
+  // 检查是否在对话框中且焦点在表单区域内
+  const isInDialog = dialogVisible.value || viewDialogVisible.value
+  
+  if (!isInDialog) {
+    return
+  }
+  
+  // 检查是否有图片数据
+  const items = e.clipboardData?.items
+  
+  if (!items) {
+    return
+  }
+  
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    
+    if (item.type.indexOf('image') !== -1) {
+      e.preventDefault() // 阻止默认粘贴行为
+      
+      const file = item.getAsFile()
+      
+      if (file && beforeImageUpload(file)) {
+        // 创建文件对象，模拟el-upload的文件结构
+        const uploadFile = {
+          name: `pasted-image-${Date.now()}.png`,
+          raw: file,
+          size: file.size,
+          type: file.type,
+          url: URL.createObjectURL(file),
+          status: 'ready'
+        }
+        
+        // 添加到文件列表
+        if (formData.imageFileList.length === 0) {
+          formData.imageFileList = [uploadFile]
+          ElMessage.success('图片粘贴成功')
+          
+          // 手动触发文件变化事件，确保UI更新
+          handleImageFileChange(uploadFile, formData.imageFileList)
+        } else {
+          // 如果已有文件，替换第一个
+          if (formData.imageFileList[0].url && formData.imageFileList[0].url.startsWith('blob:')) {
+            URL.revokeObjectURL(formData.imageFileList[0].url)
+          }
+          formData.imageFileList = [uploadFile]
+          ElMessage.success('图片已替换')
+          
+          // 手动触发文件变化事件，确保UI更新
+          handleImageFileChange(uploadFile, formData.imageFileList)
+        }
+      }
+      break
+    }
+  }
+}
 
 // 方法定义
 
@@ -1233,6 +1482,11 @@ const loadData = async () => {
   }
 }
 
+/**
+ * 处理图片数量超出限制时的替换逻辑
+ * @param {Array} files - 新选择的文件数组
+ * @param {Array} fileList - 当前文件列表
+ */
 /**
  * 加载供应商列表
  */
@@ -1364,6 +1618,34 @@ const handleEdit = (row) => {
   if (row.ReplyDate) {
     formData.ReplyDate = new Date(row.ReplyDate).toISOString().split('T')[0]
   }
+  
+  // 处理图片回显 - 支持开发和生产环境
+  if (row.AttachedImages) {
+    formData.imageUrl = row.AttachedImages
+    
+    // 创建已上传文件的文件列表项，用于显示，使用环境自适应的URL
+    const adaptedImageUrl = getAdaptedImageUrl(row.AttachedImages)
+    
+    formData.imageFileList = [{
+      name: '已上传图片',
+      url: adaptedImageUrl,
+      status: 'success',
+      uid: Date.now(), // 添加唯一标识
+      // 添加原始路径信息，便于调试
+      originalPath: row.AttachedImages,
+      // 标记为已存在的文件
+      isExisting: true
+    }]
+    
+    // 验证图片是否可以正常加载
+    validateImageUrl(adaptedImageUrl, row.AttachedImages)
+  } else {
+    formData.imageUrl = ''
+    formData.imageFileList = []
+  }
+  
+  // 保存原始数据的深拷贝，用于后续比较
+  originalFormData.value = JSON.parse(JSON.stringify(formData))
   
   dialogVisible.value = true
 }
@@ -1882,13 +2164,71 @@ const calculateTotalAmount = () => {
 }
 
 /**
+ * 检查表单数据是否有变化
+ */
+const hasFormDataChanged = () => {
+  if (!isEdit.value || !originalFormData.value) {
+    return true // 新增模式或没有原始数据时，总是允许提交
+  }
+  
+  // 比较当前表单数据与原始数据
+  const currentData = JSON.stringify(formData)
+  const originalData = JSON.stringify(originalFormData.value)
+  
+  return currentData !== originalData
+}
+
+/**
  * 提交表单
  */
 const handleSubmit = async () => {
   try {
     await formRef.value.validate()
     
+    // 编辑模式下检查是否有变化
+    if (isEdit.value && !hasFormDataChanged()) {
+      await ElMessageBox.alert('表单内容未发生变化，无需更新', '提示', {
+        confirmButtonText: '确定',
+        type: 'warning'
+      })
+      return
+    }
+    
     submitLoading.value = true
+    
+    // 如果有图片文件需要上传，先上传图片
+    if (formData.imageFileList && formData.imageFileList.length > 0) {
+      try {
+        // 记录原有的图片URL，用于后续清理
+        const oldImageUrl = isEdit.value ? originalFormData.value.imageUrl : null
+        
+        const uploadedUrls = await uploadImageFiles(formData.imageFileList)
+        if (uploadedUrls.length > 0) {
+          formData.imageUrl = uploadedUrls[0] // 取第一个上传成功的URL
+          
+          // 如果是编辑模式且有新图片上传，需要清理旧图片
+          if (isEdit.value && oldImageUrl && oldImageUrl !== formData.imageUrl) {
+            try {
+              await deleteOldImage(oldImageUrl)
+            } catch (deleteError) {
+              console.warn('清理旧图片失败:', deleteError)
+              // 不阻断主流程，只记录警告
+            }
+          }
+        }
+      } catch (uploadError) {
+        ElMessage.error('图片上传失败，请重试')
+        submitLoading.value = false
+        return
+      }
+    } else if (isEdit.value && originalFormData.value.imageUrl && !formData.imageUrl) {
+      // 如果编辑模式下删除了图片，需要清理旧图片
+      try {
+        await deleteOldImage(originalFormData.value.imageUrl)
+      } catch (deleteError) {
+        console.warn('清理旧图片失败:', deleteError)
+      }
+    }
     
     const url = isEdit.value 
       ? `/supplier-complaints/${formData.ID}`
@@ -1896,7 +2236,21 @@ const handleSubmit = async () => {
     
     const method = isEdit.value ? 'put' : 'post'
     
-    const response = await api[method](url, formData)
+    // 创建提交数据的副本，移除不需要提交的字段
+    const submitData = { ...formData }
+    delete submitData.imageFileList // 移除文件列表字段，只保留imageUrl
+    
+    // 将前端的imageUrl字段映射到后端的AttachedImages字段
+    // 重要修复：确保当imageUrl为空时，AttachedImages也为空或null
+    if (submitData.imageUrl && submitData.imageUrl.trim()) {
+      submitData.AttachedImages = submitData.imageUrl
+    } else {
+      // 明确设置为null，确保数据库字段被清空
+      submitData.AttachedImages = null
+    }
+    delete submitData.imageUrl // 移除前端专用的imageUrl字段
+    
+    const response = await api[method](url, submitData)
     
     if (response.data.success) {
       ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
@@ -1914,11 +2268,14 @@ const handleSubmit = async () => {
 }
 
 /**
- * 对话框关闭处理
+ * 处理对话框关闭事件
+ * @param {Function} done - 关闭对话框的回调函数
  */
-const handleDialogClose = () => {
+const handleDialogClose = (done) => {
   formRef.value?.resetFields()
   resetFormData()
+  dialogVisible.value = false
+  if (done) done()
 }
 
 /**
@@ -1934,16 +2291,18 @@ const resetFormData = () => {
     MaterialName: '',
     MaterialCode: '', // 材料编号
     MaterialSpecification: '', // 材料规格
-    MaterialUnit: '', // 材料单位
+    MaterialUnit: 'm', // 材料单位默认为'm'
     CustomerCode: '', // 客户编号
     ProductCode: '', // 产品编号
     CPO: '', // CPO
     ProductQuantity: 0, // 产品数量
-    ProductUnit: '', // 产品单位
+    ProductUnit: 'pcs', // 产品单位默认为'pcs'
     DefectQuantity: 0, // 不合格数
     DefectCategory: '', // 不良类别
     DefectItem: '', // 不良项
     DefectCauseAnalysis: '', // 不合格原因分析
+    imageUrl: '', // 相关图片URL
+    imageFileList: [], // 图片文件列表，用于本地预览
     FeedbackUnit: '', // 反馈单位
     Inspector: '', // 检验员
     AbnormalDisposal: '', // 异常处置
@@ -2128,6 +2487,356 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
   }
   
   return baseStyle
+}
+
+/**
+ * 文件上传前的验证
+ * @param {File} file - 要上传的文件
+ * @returns {boolean} - 是否通过验证
+ */
+const beforeImageUpload = (file) => {
+  const isImage = file.type.startsWith('image/')
+  const isLt5M = file.size / 1024 / 1024 < 5
+
+  if (!isImage) {
+    ElMessage.error('只能上传图片文件!')
+    return false
+  }
+  if (!isLt5M) {
+    ElMessage.error('图片大小不能超过 5MB!')
+    return false
+  }
+  return true
+}
+
+/**
+ * 处理图片文件选择变化
+ * @param {Object} file - 文件对象
+ * @param {Array} fileList - 文件列表
+ */
+const handleImageFileChange = (file, fileList) => {
+  // 更新文件列表
+  formData.imageFileList = fileList
+  
+  // 如果有新文件，创建本地预览URL
+  if (file.raw) {
+    file.url = URL.createObjectURL(file.raw)
+  }
+}
+
+/**
+ * 处理图片文件移除
+ * @param {Object} file - 被移除的文件对象
+ * @param {Array} fileList - 更新后的文件列表
+ */
+const handleImageFileRemove = (file, fileList) => {
+  // 更新文件列表
+  formData.imageFileList = fileList
+  
+  // 如果移除的是本地预览文件，释放URL
+  if (file.url && file.url.startsWith('blob:')) {
+    URL.revokeObjectURL(file.url)
+  }
+  
+  // 重要修复：当删除图片时，无论是新上传还是已存在的图片，都要清空imageUrl
+  // 这样确保提交时数据库中的AttachedImages字段也会被清空
+  if (fileList.length === 0) {
+    // 如果文件列表为空，说明所有图片都被删除了
+    formData.imageUrl = ''
+    console.log('图片已删除，清空imageUrl字段')
+  } else {
+    // 如果还有其他图片，更新imageUrl为剩余图片的URL
+    const remainingFile = fileList[0]
+    if (remainingFile.url && !remainingFile.url.startsWith('blob:')) {
+      // 已上传的文件，使用其URL
+      formData.imageUrl = remainingFile.originalPath || remainingFile.url
+    } else {
+      // 新上传的文件，暂时清空，等上传后再设置
+      formData.imageUrl = ''
+    }
+  }
+}
+
+/**
+ * 处理图片预览
+ * @param {Object} file - 要预览的文件对象
+ */
+const handleImagePreview = (file) => {
+  // 获取图片预览URL
+  const previewUrl = file.url || file.response?.data?.url
+  if (previewUrl) {
+    // 设置预览图片数组并显示预览
+    previewImageUrls.value = [previewUrl]
+    imageViewerVisible.value = true
+  } else {
+    ElMessage.warning('无法获取图片预览')
+  }
+}
+
+/**
+ * 关闭图片预览
+ */
+const closeImagePreview = () => {
+  imageViewerVisible.value = false
+  previewImageUrls.value = []
+}
+
+/**
+ * 处理图片粘贴事件
+ * @param {ClipboardEvent} e - 粘贴事件对象
+ */
+const handleImagePaste = (e) => {
+  const items = e.clipboardData?.items
+  if (items) {
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.type.indexOf('image') !== -1) {
+        const file = item.getAsFile()
+        if (file && beforeImageUpload(file)) {
+          // 创建文件对象，模拟el-upload的文件结构
+          const uploadFile = {
+            name: `pasted-image-${Date.now()}.png`,
+            raw: file,
+            size: file.size,
+            type: file.type,
+            url: URL.createObjectURL(file),
+            status: 'ready'
+          }
+          
+          // 添加到文件列表
+          if (formData.imageFileList.length === 0) {
+            formData.imageFileList = [uploadFile]
+          } else {
+            // 如果已有文件，替换第一个
+            if (formData.imageFileList[0].url && formData.imageFileList[0].url.startsWith('blob:')) {
+              URL.revokeObjectURL(formData.imageFileList[0].url)
+            }
+            formData.imageFileList = [uploadFile]
+          }
+        }
+        break
+      }
+    }
+  }
+}
+
+/**
+ * 处理图片拖拽上传事件
+ * @param {DragEvent} e - 拖拽事件对象
+ */
+const handleImageDrop = (e) => {
+  const files = e.dataTransfer?.files
+  if (files && files.length > 0) {
+    const file = files[0]
+    if (file.type.indexOf('image') !== -1 && beforeImageUpload(file)) {
+      // 创建文件对象，模拟el-upload的文件结构
+      const uploadFile = {
+        name: file.name,
+        raw: file,
+        size: file.size,
+        type: file.type,
+        url: URL.createObjectURL(file),
+        status: 'ready'
+      }
+      
+      // 添加到文件列表
+      if (formData.imageFileList.length === 0) {
+        formData.imageFileList = [uploadFile]
+      } else {
+        // 如果已有文件，替换第一个
+        if (formData.imageFileList[0].url && formData.imageFileList[0].url.startsWith('blob:')) {
+          URL.revokeObjectURL(formData.imageFileList[0].url)
+        }
+        formData.imageFileList = [uploadFile]
+      }
+    }
+  }
+}
+
+/**
+ * 删除旧图片文件
+ * @param {string} imageUrl - 要删除的图片URL
+ */
+const deleteOldImage = async (imageUrl) => {
+  if (!imageUrl) return
+  
+  try {
+    // 从URL中提取文件路径
+    const urlParts = imageUrl.split('/')
+    const filename = urlParts[urlParts.length - 1]
+    const category = urlParts[urlParts.length - 2] // 获取分类目录
+    
+    // 调用后端删除接口
+    const response = await api.delete(`/upload/delete-image`, {
+      data: {
+        filename: filename,
+        category: category || 'supplier-complaint'
+      }
+    })
+    
+    if (response.data.success) {
+      console.log('旧图片删除成功:', imageUrl)
+    } else {
+      console.warn('旧图片删除失败:', response.data.message)
+    }
+  } catch (error) {
+    console.error('删除旧图片时发生错误:', error)
+    throw error
+  }
+}
+
+/**
+ * 批量上传图片文件
+ * @param {Array} fileList - 要上传的文件列表
+ * @returns {Promise<Array>} - 上传成功的URL列表
+ */
+const uploadImageFiles = async (fileList) => {
+  const uploadPromises = []
+  
+  for (const file of fileList) {
+    // 只上传新选择的文件（有raw属性的）
+    if (file.raw) {
+      const formData = new FormData()
+      formData.append('file', file.raw)
+      formData.append('type', 'supplier-complaint')
+      
+      const uploadPromise = api.post('/upload/supplier-complaint', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }).then(response => {
+        if (response.data.success) {
+          return response.data.url
+        } else {
+          throw new Error(response.data.message || '图片上传失败')
+        }
+      })
+      
+      uploadPromises.push(uploadPromise)
+    } else if (file.url && !file.url.startsWith('blob:')) {
+      // 已上传的文件，直接使用其URL
+      uploadPromises.push(Promise.resolve(file.url))
+    }
+  }
+  
+  try {
+    const urls = await Promise.all(uploadPromises)
+    return urls
+  } catch (error) {
+    console.error('图片上传失败:', error)
+    throw error
+  }
+}
+
+/**
+ * 处理图片加载错误
+ * @param {Event} error - 图片加载错误事件
+ */
+const handleImageError = (error) => {
+  console.warn('图片加载失败:', error)
+}
+
+/**
+ * 重新加载图片
+ * 强制刷新图片，通过添加时间戳参数避免缓存
+ */
+const retryLoadImage = () => {
+  if (viewData.value && viewData.value.AttachedImages) {
+    // 通过修改图片URL来触发重新加载
+    const originalPath = viewData.value.AttachedImages
+    const newUrl = getAdaptedImageUrl(originalPath, true) // 使用防缓存参数
+    
+    // 创建新的图片元素来测试加载
+    const img = new Image()
+    img.onload = () => {
+      ElMessage.success('图片重新加载成功')
+      // 触发组件重新渲染
+      viewData.value = { ...viewData.value }
+    }
+    img.onerror = () => {
+      ElMessage.error('图片重新加载失败，请检查图片路径或网络连接')
+    }
+    img.src = newUrl
+  }
+}
+
+/**
+ * 判断是否为生产环境
+ * @returns {boolean} 是否为生产环境
+ */
+const isProductionEnvironment = () => {
+  const hostname = window.location.hostname
+  return hostname !== 'localhost' && hostname !== '127.0.0.1'
+}
+
+/**
+ * 验证图片URL是否可以正常加载
+ * @param {string} imageUrl - 要验证的图片URL
+ * @param {string} originalPath - 原始图片路径
+ */
+const validateImageUrl = (imageUrl, originalPath) => {
+  if (!imageUrl) return
+  
+  const img = new Image()
+  img.onload = () => {
+    console.log(`✅ 图片加载成功: ${imageUrl}`)
+  }
+  img.onerror = () => {
+    console.warn(`❌ 图片加载失败: ${imageUrl}`)
+    console.warn(`原始路径: ${originalPath}`)
+    console.warn(`当前环境: ${isProductionEnvironment() ? '生产环境' : '开发环境'}`)
+    
+    // 可以在这里添加用户提示
+    ElMessage.warning({
+      message: '图片预览可能无法正常显示，请检查图片路径',
+      duration: 3000
+    })
+  }
+  img.src = imageUrl
+}
+
+/**
+ * 环境自适应的图片URL构建函数
+ * 根据当前环境（开发/生产）动态构建图片访问URL
+ * @param {string} imagePath - 图片路径
+ * @param {boolean} preventCache - 是否防止缓存，默认false
+ * @returns {string} 完整的图片URL
+ */
+const getAdaptedImageUrl = (imagePath, preventCache = false) => {
+  if (!imagePath) return ''
+  
+  // 如果已经是完整的HTTP URL，直接返回
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath
+  }
+  
+  // 如果是data URL或blob URL，直接返回
+  if (imagePath.startsWith('data:') || imagePath.startsWith('blob:')) {
+    return imagePath
+  }
+  
+  // 根据当前页面的hostname判断环境
+  const hostname = window.location.hostname
+  const protocol = window.location.protocol
+  
+  // 构建图片URL
+  let url
+  if (hostname === 'localhost' || hostname === '127.0.0.1') {
+    // 开发环境：使用Vite代理，确保路径以/files/开头
+    url = imagePath.startsWith('/files/') ? imagePath : `/files/${imagePath.replace(/^\/+/, '')}`
+  } else {
+    // 生产环境：使用Nginx文件服务器，文件访问需要通过8080端口
+    const cleanPath = imagePath.startsWith('/files/') ? imagePath : `/files/${imagePath.replace(/^\/+/, '')}`
+    url = `${protocol}//${hostname}:8080${cleanPath}`
+  }
+  
+  // 只在需要防止缓存时添加时间戳参数
+  if (preventCache) {
+    const timestamp = Date.now()
+    url += `?t=${timestamp}`
+  }
+  
+  return url
 }
 </script>
 
@@ -2357,6 +3066,8 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
 .complaint-detail {
   max-height: 75vh;
   overflow-y: auto;
+  overflow-x: hidden;
+  word-wrap: break-word;
 }
 
 .description-text {
@@ -2366,6 +3077,9 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
   margin: 8px 0;
   line-height: 1.6;
   color: #606266;
+  word-wrap: break-word;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .amount-text {
@@ -2574,6 +3288,79 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
   width: 120px !important;
 }
 
+/* 版块标题样式 */
+.section-title {
+  display: flex;
+  align-items: center;
+  margin: 10px 0 15px 0;
+  position: relative;
+  padding-top: 5px;
+}
+
+.section-title::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  background-color: #409eff;
+  margin-right: 8px;
+  border-radius: 2px;
+}
+
+.title-text {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  line-height: 16px;
+}
+
+/* 详情页版块标题样式 */
+.detail-section-divider {
+  margin: 20px 0 15px 0 !important;
+}
+
+:deep(.detail-section-divider .el-divider__text) {
+  position: relative;
+  padding-left: 12px;
+  font-weight: 600;
+  color: #303133;
+  font-size: 14px;
+}
+
+:deep(.detail-section-divider .el-divider__text::before) {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 16px;
+  background-color: #409eff;
+  border-radius: 2px;
+}
+
+:deep(.detail-section-divider.el-divider--horizontal) {
+  border-top: 1px solid #e4e7ed;
+}
+
+/* 详情页表格样式优化 */
+:deep(.complaint-detail .el-descriptions) {
+  table-layout: auto;
+  width: 100%;
+}
+
+:deep(.complaint-detail .el-descriptions__label) {
+  width: 100px;
+  word-wrap: break-word;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
+:deep(.complaint-detail .el-descriptions__content) {
+  word-wrap: break-word;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+
 :deep(.el-transfer__button) {
   border-radius: 4px;
   padding: 8px 16px;
@@ -2597,6 +3384,274 @@ const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
   margin-bottom: 5px;
   color: #606266;
   font-size: 13px;
+}
+
+/* 问题描述区域左右分栏布局样式 */
+.problem-description-section,
+.remarks-section {
+  margin: 20px 0;
+}
+
+.content-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.text-content {
+  flex: 0 0 70%;
+  min-width: 0; /* 防止flex项目溢出 */
+}
+
+.image-content {
+  flex: 0 0 30%;
+  padding-left: 20px;
+  border-left: 1px solid #e4e7ed;
+}
+
+.image-section-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 15px;
+  padding-left: 12px;
+  position: relative;
+}
+
+.image-section-title::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 4px;
+  height: 16px;
+  background-color: #409eff;
+  border-radius: 2px;
+}
+
+.image-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.image-placeholder,
+.no-image,
+.image-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  border: 2px dashed #dcdfe6;
+  border-radius: 6px;
+  background-color: #fafafa;
+  color: #909399;
+  min-height: 120px;
+}
+
+.image-placeholder:hover,
+.no-image:hover {
+  border-color: #409eff;
+  color: #409eff;
+}
+
+.image-placeholder .el-icon,
+.no-image .el-icon,
+.image-error .el-icon {
+  font-size: 32px;
+  margin-bottom: 8px;
+}
+
+.image-placeholder p,
+.no-image p,
+.image-error p {
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+  word-break: break-all;
+}
+
+.image-error {
+  border-color: #f56c6c;
+  background-color: #fef0f0;
+  color: #f56c6c;
+}
+
+.image-path {
+  font-size: 10px;
+  color: #909399;
+  margin-top: 5px;
+}
+
+/* 图片上传区域样式 */
+.image-upload-area {
+  height: 100%;
+}
+
+.image-upload-label {
+  font-size: 14px;
+  color: #606266;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.image-upload-container {
+  width: 100%;
+}
+
+/* 优化 el-upload 的 picture-card 样式 */
+.image-upload-container :deep(.el-upload-list--picture-card) {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.image-upload-container :deep(.el-upload--picture-card) {
+  width: 100%;
+  height: 120px;
+  border: 2px dashed #d9d9d9;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: border-color 0.3s;
+  background-color: #fafafa;
+}
+
+.image-upload-container :deep(.el-upload--picture-card:hover) {
+  border-color: #409eff;
+}
+
+.image-upload-container :deep(.el-upload-list__item) {
+  width: 100%;
+  height: 120px;
+  margin: 0;
+  border-radius: 6px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid #c0ccda;
+}
+
+.image-upload-container :deep(.el-upload-list__item-thumbnail) {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.image-upload-container :deep(.el-upload-list__item-actions) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.image-upload-container :deep(.el-upload-list__item:hover .el-upload-list__item-actions) {
+  opacity: 1;
+}
+
+.image-upload-container :deep(.el-upload-list__item-actions .el-icon) {
+  color: white;
+  font-size: 24px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.3s;
+  min-width: 40px;
+  min-height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.image-upload-container :deep(.el-upload-list__item-actions .el-icon:hover) {
+  background-color: rgba(255, 255, 255, 0.2);
+}
+
+.upload-placeholder {
+  text-align: center;
+  color: #8c939d;
+}
+
+.upload-icon {
+  font-size: 28px;
+  color: #8c939d;
+  margin-bottom: 8px;
+}
+
+.upload-text {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.upload-hint {
+  font-size: 12px;
+  color: #a8abb2;
+  text-align: center;
+  margin-top: 8px;
+  padding: 0 10px;
+}
+
+.image-preview {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 4px;
+}
+
+.image-actions {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+.remove-btn {
+  background-color: rgba(0, 0, 0, 0.5);
+  border: none;
+  color: white;
+  padding: 4px;
+  min-height: auto;
+}
+
+.remove-btn:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+}
+
+/* 响应式设计 */
+@media (max-width: 1200px) {
+  .content-layout {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .text-content,
+  .image-content {
+    flex: none;
+    width: 100%;
+  }
+  
+  .image-content {
+    padding-left: 0;
+    border-left: none;
+    border-top: 1px solid #e4e7ed;
+    padding-top: 15px;
+  }
 }
 
 /* 导出对话框响应式设计 */

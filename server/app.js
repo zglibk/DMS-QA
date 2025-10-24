@@ -336,6 +336,7 @@ const staticCorsMiddleware = (req, res, next) => {
 app.use('/files/attachments', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/attachments')));
 app.use('/files/site-images', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/site-images')));
 app.use('/files/customer-complaint', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/customer-complaint')));
+app.use('/files/supplier-complaint', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/supplier-complaint')));
 app.use('/files/notice-images', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/notice-images')));
 app.use('/files/rework-attachments', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/rework-attachments')));
 app.use('/uploads/complaints', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/complaints')));

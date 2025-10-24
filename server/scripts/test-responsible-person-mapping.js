@@ -42,7 +42,7 @@ async function testResponsiblePersonMapping() {
       
       // 4. 验证更新后的数据
       console.log('\n4. 验证更新后的数据...');
-      const verifyResponse = await axios.get(`http://localhost:3001/api/supplier-complaints/${existingRecord.ID}`);
+      const verifyResponse = await axios.get(`http://localhost:3001/api/supplier-complaints/${existingRecord.id}`);
       
       if (verifyResponse.data.success) {
         const updatedRecord = verifyResponse.data.data;
