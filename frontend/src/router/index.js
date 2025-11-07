@@ -57,6 +57,11 @@ const routes = [
   // 版本更新日志页面
   { path: '/version-updates', component: () => import('../views/VersionUpdates.vue') },
 
+  // 使用文档（公共路由）
+  { path: '/docs', component: () => import('../views/docs/DocsHome.vue'), meta: { public: true } },
+  { path: '/docs/complaint-register', component: () => import('../views/docs/ComplaintRegisterDoc.vue'), meta: { public: true } },
+  { path: '/docs/complaint-batch-import', component: () => import('../views/docs/ComplaintBatchImportDoc.vue'), meta: { public: true } },
+
   // 二维码扫描页面
   { path: '/qr-scan', component: () => import('../views/QrScanPage.vue') },
 
@@ -492,9 +497,11 @@ const router = createRouter({
 router.beforeEach(async (to, from, next) => {
   // 从本地存储获取JWT token
   const token = localStorage.getItem('token')
+  // 公共路由判定：使用 meta.public 或路径前缀判断
+  const isPublicRoute = (to.meta && to.meta.public === true) || to.path.startsWith('/docs')
 
-  // 如果访问的不是登录页且没有token，跳转到登录页
-  if (to.path !== '/login' && !token) {
+  // 如果访问的不是登录页且没有token，跳转到登录页（公共路由除外）
+  if (to.path !== '/login' && !token && !isPublicRoute) {
     next('/login')
     return
   }

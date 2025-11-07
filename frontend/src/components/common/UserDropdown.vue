@@ -281,9 +281,11 @@ const goAdmin = async () => {
 
 /**
  * 跳转到使用文档
+ * 说明：跳转到系统内置的公共文档页面，无需权限校验
  */
 const goDocs = () => {
-  window.open('https://docs.example.com', '_blank')
+  // 跳转到内置使用文档路由（公共路由，无需权限）
+  router.push('/docs')
 }
 
 /**
