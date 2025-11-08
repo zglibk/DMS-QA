@@ -135,7 +135,7 @@ function Push-ToRemotes {
     Write-ColorOutput "`nStarting push to all remote repositories..." "Yellow"
     
     # Define remote repositories explicitly
-    $remoteNames = @("gitee", "github")
+    $remoteNames = @("origin", "github")
     foreach ($remote in $remoteNames) {
         Write-ColorOutput "Pushing to $remote..." "Yellow"
         git push $remote master
