@@ -135,7 +135,7 @@ function Push-ToRemotes {
     Write-ColorOutput "`nStarting push to all remote repositories..." "Yellow"
     
     # Push to all remote repositories
-    $remoteNames = git remote
+    $remoteNames = git remote | ForEach-Object { $_.Trim() }
     foreach ($remote in $remoteNames) {
         Write-ColorOutput "Pushing to $remote..." "Yellow"
         git push $remote master
