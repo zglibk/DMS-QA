@@ -969,4 +969,94 @@ router.post('/notice-image', noticeImageUpload.single('file'), async (req, res) 
   }
 });
 
+// 新增：根据相对路径删除附件
+// 用途：为文档中心等模块提供更灵活的物理文件删除能力
+// 路径：DELETE /upload/attachment
+// 参数：{ relativePath: 'help-center/topic-internal/0/image.png' }
+// 安全：严格校验路径，确保只在 uploads/attachments 目录内操作
+router.delete('/attachment', (req, res) => {
+  try {
+    const { relativePath } = req.body;
+
+    if (!relativePath) {
+      return res.status(400).json({ success: false, message: '缺少 relativePath 参数' });
+    }
+
+    // 安全校验：禁止路径穿越和绝对路径
+    if (relativePath.includes('..') || path.isAbsolute(relativePath)) {
+      return res.status(400).json({ success: false, message: '非法的文件路径' });
+    }
+
+    // 构建完整物理路径，并限定在 uploads/attachments 目录内
+    const fullPath = path.join(attachmentDir, relativePath);
+
+    // 再次校验，确保最终路径仍在 attachmentDir 管辖范围内
+    if (!fullPath.startsWith(attachmentDir)) {
+      return res.status(400).json({ success: false, message: '禁止访问非授权目录' });
+    }
+
+    // 检查文件是否存在
+    if (fs.existsSync(fullPath)) {
+      // 执行删除
+      fs.unlinkSync(fullPath);
+      res.json({ success: true, message: '文件删除成功' });
+    } else {
+      // 文件不存在也视为成功，避免前端因重复删除等原因报错
+      res.status(200).json({ success: true, message: '文件不存在，无需删除' });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, message: '文件删除失败: ' + (error?.message || error) });
+  }
+});
+
 module.exports = router;
+
+// 新增：列出附件目录下指定子路径的图片文件
+// 用途：为文档中心的步骤图片提供刷新后持久加载能力
+// 路径：GET /upload/list-attachments?customPath=help-center/topic-internal/0
+// 安全：禁止路径穿越，限定在 uploads/attachments 目录内
+router.get('/list-attachments', (req, res) => {
+  try {
+    const rawCustomPath = (req.query.customPath || '').toString();
+    if (!rawCustomPath.trim()) {
+      return res.status(400).json({ success: false, message: '缺少 customPath 参数' });
+    }
+    // 基础校验：禁止路径穿越与绝对路径
+    if (rawCustomPath.includes('..') || rawCustomPath.includes(':') || rawCustomPath.startsWith('/') || rawCustomPath.startsWith('\\')) {
+      return res.status(400).json({ success: false, message: '非法路径参数' });
+    }
+
+    // 规范化分隔符，构建目标目录
+    const normalized = rawCustomPath.replace(/\\/g, '/');
+    const targetDir = path.join(attachmentDir, normalized);
+
+    // 目录不存在时返回空列表（不视为错误）
+    if (!fs.existsSync(targetDir)) {
+      return res.json({ success: true, data: [], message: '目录不存在，返回空列表' });
+    }
+
+    // 读取目录，过滤图片类型
+    const files = fs.readdirSync(targetDir);
+    const imageExts = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp'];
+    const imageFiles = files.filter(f => imageExts.includes(path.extname(f).toLowerCase()));
+
+    // 构建返回列表
+    const list = imageFiles.map(filename => {
+      const filePath = path.join(targetDir, filename);
+      const stats = fs.statSync(filePath);
+      return {
+        filename,
+        // 静态访问 URL（前端使用 fileServerBase + 此 URL）
+        url: `/files/attachments/${normalized}/${filename}`,
+        // Windows 相对路径（与上传接口保持一致）
+        relativePath: `attachments\\${normalized.replace(/\//g, '\\')}\\${filename}`,
+        size: stats.size,
+        uploadTime: stats.mtime
+      };
+    });
+
+    res.json({ success: true, data: list, message: '获取附件列表成功' });
+  } catch (error) {
+    res.status(500).json({ success: false, message: '获取附件列表失败: ' + (error?.message || error) });
+  }
+});
