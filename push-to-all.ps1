@@ -1,7 +1,7 @@
 # DMS-QA Auto Push Script
 # Function: Automatically add, commit and push code to all remote repositories
 # Author: DMS-QA Team
-# Date: 2025-01-15
+# Date: 2025-11-08
 
 # Set error handling
 $ErrorActionPreference = "Stop"
@@ -134,8 +134,8 @@ function Push-ToRemotes {
     
     Write-ColorOutput "`nStarting push to all remote repositories..." "Yellow"
     
-    # Push to all remote repositories
-    $remoteNames = git remote | ForEach-Object { $_.Trim() }
+    # Define remote repositories explicitly
+    $remoteNames = @("gitee", "github")
     foreach ($remote in $remoteNames) {
         Write-ColorOutput "Pushing to $remote..." "Yellow"
         git push $remote master
