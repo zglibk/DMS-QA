@@ -816,7 +816,7 @@ watch([
   flex-grow: 1;
   overflow-y: auto;
   padding: 1.25rem;
-  padding-top: 5.25rem; /* 为固定头部留出空间 */
+  padding-top: 0; /* 取消为顶部固定行预留的空间，确保标题取消后不再保留多余距离 */
   background-color: #f0f2f5;
 }
 .form-card {
@@ -905,7 +905,7 @@ watch([
   }
 
   .form-content {
-    padding-top: 6.25rem; /* 为导航菜单留出额外空间 */
+    padding-top: 0; /* 取消在平板设备下为导航菜单保留的额外空间 */
     padding-left: 1rem;
     padding-right: 1rem;
   }
@@ -925,16 +925,14 @@ watch([
 
   .form-content {
     padding: 0.5rem;
-    padding-top: 6.5rem; /* 手机设备需要更多上边距 */
-  }
-
-  .form-card {
-    padding: 1rem 0.5rem 0.5rem 0.5rem;
-  }
-
-  .img-preview-large {
-    max-width: 98vw;
-    max-height: 70vh;
+    padding-top: 0; /* 取消在手机设备下为固定行预留的空间 */
   }
 }
-</style> 
+.form-card {
+  padding: 1rem 0.5rem 0.5rem 0.5rem;
+}
+.img-preview-large {
+  max-width: 98vw;
+  max-height: 70vh;
+}
+</style>

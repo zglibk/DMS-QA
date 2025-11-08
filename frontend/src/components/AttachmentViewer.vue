@@ -89,36 +89,25 @@ const getApiBaseUrl = () => {
 // 判断文件路径类型并生成正确的预览URL（参考编辑对话框的逻辑）
 const getFilePreviewUrl = (filePath, recordId = null) => {
   if (!filePath || filePath === '' || filePath === null || filePath === undefined) {
-    console.log('AttachmentViewer getFilePreviewUrl: 路径为空，返回null')
+    // 已移除调试输出：路径为空，返回null
     return null
   }
-
-  console.log('=== AttachmentViewer getFilePreviewUrl 调试信息 ===')
-  console.log('输入路径:', filePath)
-  console.log('记录ID:', recordId)
-  console.log('路径类型:', typeof filePath)
 
   try {
     const pathStr = String(filePath).trim()
 
     // 检查是否为blob URL（本地预览）
     if (pathStr.startsWith('blob:')) {
-      console.log('检测到blob URL，直接返回')
-      console.log('================================================')
       return pathStr
     }
 
     // 检查是否为HTTP/HTTPS URL（完整URL）
     if (pathStr.startsWith('http://') || pathStr.startsWith('https://')) {
-      console.log('检测到完整HTTP URL，直接返回')
-      console.log('================================================')
       return pathStr
     }
 
     // 检查是否为服务器静态文件路径（/files/开头）
     if (pathStr.startsWith('/files/')) {
-      console.log('检测到服务器静态文件路径，直接返回')
-      console.log('================================================')
       return pathStr
     }
 

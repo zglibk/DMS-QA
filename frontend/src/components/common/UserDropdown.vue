@@ -285,7 +285,7 @@ const goAdmin = async () => {
  */
 const goDocs = () => {
   // 跳转到内置使用文档路由（公共路由，无需权限）
-  router.push('/docs')
+  router.push('/docs/help')
 }
 
 /**

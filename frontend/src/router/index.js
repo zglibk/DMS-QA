@@ -58,7 +58,8 @@ const routes = [
   { path: '/version-updates', component: () => import('../views/VersionUpdates.vue') },
 
   // 使用文档（公共路由）
-  { path: '/docs', component: () => import('../views/docs/DocsHome.vue'), meta: { public: true } },
+
+  { path: '/docs/help', component: () => import('../views/docs/HelpCenter.vue'), meta: { public: true } },
   { path: '/docs/complaint-register', component: () => import('../views/docs/ComplaintRegisterDoc.vue'), meta: { public: true } },
   { path: '/docs/complaint-batch-import', component: () => import('../views/docs/ComplaintBatchImportDoc.vue'), meta: { public: true } },
 
@@ -498,7 +499,9 @@ router.beforeEach(async (to, from, next) => {
   // 从本地存储获取JWT token
   const token = localStorage.getItem('token')
   // 公共路由判定：使用 meta.public 或路径前缀判断
-  const isPublicRoute = (to.meta && to.meta.public === true) || to.path.startsWith('/docs')
+  // 公开路由：明确列出无需鉴权的路径，避免误判其他 /docs 子路径
+  const publicPaths = ['/docs/help', '/docs/complaint-register', '/docs/complaint-batch-import']
+  const isPublicRoute = (to.meta && to.meta.public === true) || publicPaths.includes(to.path)
 
   // 如果访问的不是登录页且没有token，跳转到登录页（公共路由除外）
   if (to.path !== '/login' && !token && !isPublicRoute) {

@@ -21,6 +21,18 @@
         <div class="image-overlay">
           <el-icon class="zoom-icon"><ZoomIn /></el-icon>
           <span class="zoom-text">点击查看大图</span>
+          <!-- 新增：删除按钮（可选显示），阻止冒泡避免触发放大预览 -->
+          <el-tooltip content="删除图片" placement="top" v-if="showDelete">
+            <el-button
+              size="small"
+              circle
+              type="danger"
+              class="delete-btn"
+              @click.stop="deleteItem"
+            >
+              <el-icon><Delete /></el-icon>
+            </el-button>
+          </el-tooltip>
         </div>
       </div>
       <div v-else class="image-placeholder">
@@ -169,17 +181,33 @@
 
 <script setup>
 import { ref, computed, watch, onUnmounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Document, Picture, Loading, Warning, ZoomIn, ZoomOut, 
-  RefreshLeft, RefreshRight, Refresh, FullScreen, Aim, Close
+  RefreshLeft, RefreshRight, Refresh, FullScreen, Aim, Close, Delete
 } from '@element-plus/icons-vue'
+import apiService from '@/services/apiService.js'
 import imagePreviewService from '@/services/imagePreviewService'
 
 const props = defineProps({
   filePath: {
     type: String,
     default: ''
+  },
+  // 新增：文件名（后端返回），用于删除接口参数
+  filename: {
+    type: String,
+    default: ''
+  },
+  // 新增：相对路径（如 attachments/.../xxx.png），用于删除接口参数与兼容解析
+  relativePath: {
+    type: String,
+    default: ''
+  },
+  // 新增：是否显示删除按钮（默认不显示，用于文档页面管理员）
+  showDelete: {
+    type: Boolean,
+    default: false
   },
   recordId: {
     type: [Number, String],
@@ -198,6 +226,9 @@ const props = defineProps({
     default: null
   }
 })
+
+// 事件：删除成功后通知父组件移除对应项
+const emit = defineEmits(['deleted'])
 
 // 基本状态
 const loading = ref(false)
@@ -256,7 +287,7 @@ const loadImage = async () => {
 
   // 清理旧的imageUrl（如果是blob URL）
   if (imageUrl.value && imageUrl.value.startsWith('blob:')) {
-    console.log('清理旧的blob URL:', imageUrl.value)
+    // 已移除调试输出：清理旧的 blob URL
     URL.revokeObjectURL(imageUrl.value)
   }
   imageUrl.value = ''
@@ -264,15 +295,12 @@ const loadImage = async () => {
   try {
     // 如果没有filePath但有recordId，直接通过API获取
     if (!hasFilePath && hasRecordId) {
-      console.log('没有filePath但有recordId，通过API获取图片')
-
-      // 强制清理可能存在的失效缓存
+      // 已移除调试输出：recordId 情况说明
       const cacheKey = `record_${props.recordId}`
-      console.log(`检查并清理可能的失效缓存: ${cacheKey}`)
-
+      // 已移除调试输出：清理可能的失效缓存
       try {
         const url = await imagePreviewService.getImageUrlByPath('', props.recordId)
-        console.log('API返回的URL:', url)
+        // 已移除调试输出：API 返回的 URL
         imageUrl.value = url
         loading.value = false
         return
@@ -285,17 +313,16 @@ const loadImage = async () => {
     }
 
     const pathStr = String(props.filePath).trim()
-    console.log('处理后的路径:', pathStr)
-
+    // 已移除调试输出：处理后的路径
     if (!pathStr) {
-      console.log('路径转换为字符串后为空')
+      // 已移除调试输出：路径为空说明
       loading.value = false
       return
     }
 
     // 如果是blob URL（新上传的文件），直接使用
     if (pathStr.startsWith('blob:')) {
-      console.log('使用blob URL:', pathStr)
+      // 已移除调试输出：使用 blob URL
       imageUrl.value = pathStr
       loading.value = false
       return
@@ -303,7 +330,7 @@ const loadImage = async () => {
 
     // 如果是HTTP URL，直接使用
     if (pathStr.startsWith('http://') || pathStr.startsWith('https://')) {
-      console.log('使用HTTP URL:', pathStr)
+      // 已移除调试输出：使用 HTTP URL
       imageUrl.value = pathStr
       loading.value = false
       return
@@ -311,7 +338,7 @@ const loadImage = async () => {
 
     // 如果是data URL，直接使用
     if (pathStr.startsWith('data:')) {
-      console.log('使用data URL:', pathStr)
+      // 已移除调试输出：使用 data URL
       imageUrl.value = pathStr
       loading.value = false
       return
@@ -319,16 +346,15 @@ const loadImage = async () => {
 
     // 如果是静态文件URL（/files/），直接使用
     if (pathStr.startsWith('/files/')) {
-      console.log('使用静态文件URL:', pathStr)
+      // 已移除调试输出：使用静态文件 URL
       imageUrl.value = pathStr
       loading.value = false
       return
     }
 
     // 其他情况通过服务获取
-    console.log('通过服务获取图片:', pathStr)
     const url = await imagePreviewService.getImageUrlByPath(pathStr, props.recordId, props.module)
-    console.log('服务返回的URL:', url)
+    // 已移除调试输出：服务返回的 URL
     imageUrl.value = url
   } catch (err) {
     error.value = true
@@ -348,7 +374,7 @@ const retryLoad = () => {
   // 如果有recordId，清理对应的缓存
   if (props.recordId) {
     const cacheKey = `record_${props.recordId}`
-    console.log(`清理缓存以重试: ${cacheKey}`)
+    // 已移除调试输出：清理缓存以重试
     imagePreviewService.clearCache(cacheKey)
   }
 
@@ -468,6 +494,77 @@ onUnmounted(() => {
   document.removeEventListener('mousemove', onDrag)
   document.removeEventListener('mouseup', stopDrag)
 })
+
+/**
+ * 删除当前缩略图对应的图片（物理删除）
+ * 交互：弹出确认框，确认后调用后端删除接口，成功后触发 deleted 事件让父组件移除项
+ * 参数来源：优先使用 props.relativePath 和 props.filename；否则从 props.filePath 解析
+ */
+async function deleteItem() {
+  try {
+    await ElMessageBox.confirm('确认删除该图片？此操作不可恢复。', '提示', {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+
+    // 计算删除所需参数
+    let filename = props.filename || ''
+    let category = ''
+
+    // 优先使用 relativePath（attachments/.../filename）
+    if (props.relativePath) {
+      const rel = String(props.relativePath).replace(/\\/g, '/').replace(/^\//, '')
+      const parts = rel.split('/')
+      if (parts.length >= 2) {
+        filename = filename || parts[parts.length - 1]
+        category = parts.slice(0, parts.length - 1).join('/')
+      }
+    }
+
+    // 兼容：从 filePath 中解析，例如 http://.../files/<category>/<filename>
+    if (!category || !filename) {
+      const fp = String(props.filePath || '')
+      const idx = fp.indexOf('/files/')
+      if (idx >= 0) {
+        const rest = fp.substring(idx + '/files/'.length)
+        const arr = rest.split('/')
+        if (arr.length >= 2) {
+          filename = filename || arr[arr.length - 1]
+          category = arr.slice(0, arr.length - 1).join('/')
+        }
+      }
+    }
+
+    if (!filename || !category) {
+      ElMessage.error('无法解析删除参数（文件名或分类缺失）')
+      return
+    }
+
+    const base = apiService.baseURL || '/api'
+    const token = localStorage.getItem('token') || ''
+
+    const res = await fetch(`${base}/upload/delete-image`, {
+      method: 'DELETE',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify({ filename, category })
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data?.success) {
+      throw new Error(data?.message || '删除失败')
+    }
+
+    ElMessage.success('图片已删除')
+    // 通知父组件删除当前项
+    emit('deleted', { filename, category, filePath: props.filePath, relativePath: props.relativePath })
+  } catch (e) {
+    if (String(e).includes('cancel')) return // 用户取消
+    ElMessage.error(`删除失败：${e?.message || e}`)
+  }
+}
 </script>
 
 <style scoped>
@@ -488,6 +585,383 @@ onUnmounted(() => {
   justify-content: center;
 }
 
+.image-content {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  cursor: pointer;
+}
+
+.preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain; /* 改为contain以显示完整图片，等比例缩放 */
+  transition: transform 0.3s ease;
+}
+
+.image-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.image-content:hover .image-overlay {
+  opacity: 1;
+}
+
+.zoom-icon {
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.zoom-text {
+  font-size: 14px;
+}
+
+.image-loading,
+.image-error,
+.image-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #909399;
+  font-size: 14px;
+  gap: 8px;
+}
+
+.image-error {
+  cursor: pointer;
+  color: #f56c6c;
+}
+
+.image-error:hover {
+  color: #f78989;
+}
+
+.file-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: #f8f9fa;
+  border-radius: 6px;
+  border: 1px solid #e9ecef;
+}
+
+.file-icon {
+  font-size: 18px;
+  color: #409eff;
+}
+
+.file-name {
+  font-weight: 500;
+  color: #2c3e50;
+  word-break: break-all;
+}
+
+/* 全屏预览对话框样式 */
+:deep(.image-preview-dialog) {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:deep(.image-preview-dialog .el-dialog__header) {
+  display: none;
+}
+
+:deep(.image-preview-dialog .el-dialog__body) {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+:deep(.fullscreen-dialog) {
+  border-radius: 0;
+}
+
+:deep(.fullscreen-dialog .el-dialog__body) {
+  height: 100vh;
+}
+
+/* 外部关闭按钮 */
+.external-close-btn {
+  position: fixed;
+  top: calc(10vh - 30px);
+  right: calc(20vw - 30px);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: transparent;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 3001;
+  transition: all 0.3s ease;
+  border: 2px solid white;
+  backdrop-filter: blur(8px);
+}
+
+.external-close-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  border-color: white;
+  transform: scale(1.1);
+}
+
+/* 标题栏样式 */
+.image-header {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  padding: 16px 20px;
+  text-align: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  flex-shrink: 0;
+}
+
+.image-title {
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 工具栏样式 */
+.image-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 20px;
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+  border-bottom: 1px solid #dee2e6;
+  min-height: 50px;
+  flex-shrink: 0;
+}
+
+.toolbar-center {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.tool-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: white;
+  border-radius: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tool-btn {
+  background: transparent !important;
+  transition: all 0.3s ease !important;
+}
+
+.tool-btn:hover {
+  transform: scale(1.1) !important;
+}
+
+.tool-btn:disabled {
+  opacity: 0.4 !important;
+  cursor: not-allowed !important;
+}
+
+/* 工具栏按钮颜色样式 */
+.tool-btn.zoom-out-btn {
+  border: 1px solid #409eff !important;
+  color: #409eff !important;
+}
+
+.tool-btn.zoom-out-btn:hover {
+  background: #409eff !important;
+  color: white !important;
+  border-color: #409eff !important;
+}
+
+.tool-btn.zoom-in-btn {
+  border: 1px solid #67c23a !important;
+  color: #67c23a !important;
+}
+
+.tool-btn.zoom-in-btn:hover {
+  background: #67c23a !important;
+  color: white !important;
+  border-color: #67c23a !important;
+}
+
+.tool-btn.rotate-left-btn {
+  border: 1px solid #e6a23c !important;
+  color: #e6a23c !important;
+}
+
+.tool-btn.rotate-left-btn:hover {
+  background: #e6a23c !important;
+  color: white !important;
+  border-color: #e6a23c !important;
+}
+
+.tool-btn.rotate-right-btn {
+  border: 1px solid #f56c6c !important;
+  color: #f56c6c !important;
+}
+
+.tool-btn.rotate-right-btn:hover {
+  background: #f56c6c !important;
+  color: white !important;
+  border-color: #f56c6c !important;
+}
+
+.tool-btn.reset-btn {
+  border: 1px solid #909399 !important;
+  color: #909399 !important;
+}
+
+.tool-btn.reset-btn:hover {
+  background: #909399 !important;
+  color: white !important;
+  border-color: #909399 !important;
+}
+
+.tool-btn.fullscreen-btn {
+  border: 1px solid #722ed1 !important;
+  color: #722ed1 !important;
+}
+
+.tool-btn.fullscreen-btn:hover {
+  background: #722ed1 !important;
+  color: white !important;
+  border-color: #722ed1 !important;
+}
+
+/* 全屏模式下的关闭按钮样式 */
+.close-btn-fullscreen {
+  margin-left: 20px;
+  background: #f56c6c !important;
+  border-color: #f56c6c !important;
+  color: white !important;
+}
+
+.close-btn-fullscreen:hover {
+  background: #f78989 !important;
+  border-color: #f78989 !important;
+  color: white !important;
+}
+
+.zoom-display {
+  font-size: 12px;
+  font-weight: 600;
+  color: #495057;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* 图片容器样式 */
+.image-preview-container-full {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #f8f9fa;
+  position: relative;
+  overflow: hidden;
+  height: calc(80vh - 180px);
+  min-height: 260px;
+}
+
+.fullscreen-container {
+  height: calc(100vh - 120px);
+  background: #000;
+}
+
+.image-wrapper {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+
+
+.preview-image-full {
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  user-select: none;
+  display: block;
+  margin: auto;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+  .image-toolbar {
+    padding: 8px 12px;
+    min-height: 40px;
+  }
+
+  .toolbar-center {
+    gap: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .tool-group {
+    padding: 4px 8px;
+  }
+
+  .image-header {
+    padding: 12px 16px;
+  }
+
+  .image-title {
+    font-size: 14px;
+  }
+
+  .external-close-btn {
+    top: 5px;
+    right: 5px;
+    width: 36px;
+    height: 36px;
+  }
+}
+</style>
+
+<style scoped>
+/* 新增：删除按钮定位 */
+.image-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.delete-btn {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+}
 .image-content {
   width: 100%;
   height: 100%;
