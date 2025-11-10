@@ -157,9 +157,16 @@ const addStepIndex = ref(null)
 const selectedFiles = ref([])
 const selectedPreviewUrls = ref([])
 const uploading = ref(false)
+// 计算文件服务基础地址（用于拼接附件访问路径）
+// 在生产环境中，Nginx 直接提供 /files 静态文件服务，不需要 API 路径
 const fileServerBase = computed(() => {
   const base = apiService.baseURL || ''
-  return base.replace(/\/$/, '').replace(/\/api$/, '')
+  // 如果是开发环境（localhost 或 127.0.0.1），使用代理路径
+  if (base.includes('localhost') || base.includes('127.0.0.1')) {
+    return base.replace(/\/$/, '').replace(/\/api$/, '')
+  }
+  // 生产环境直接使用当前域名，去掉 /api 部分
+  return window.location.origin
 })
 
 /**
