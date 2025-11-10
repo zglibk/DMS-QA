@@ -100,17 +100,22 @@
     >
       <div class="add-dialog-body">
         <div class="file-choose-row">
-          <input type="file" multiple accept="image/*" @change="onStepFilesSelected" />
-          <div class="choose-tip">可多选图片，大小建议 ≤ 5MB</div>
-        </div>
-        <div class="selected-previews">
-          <el-image
-            v-for="(url, i) in selectedPreviewUrls"
-            :key="i"
-            :src="url"
-            fit="cover"
-            class="preview-item"
-          />
+          <el-upload
+            ref="uploadRef"
+            :auto-upload="false"
+            :multiple="true"
+            :on-change="onStepFilesSelected"
+            :on-remove="handleRemove"
+            :file-list="[]"
+            accept="image/*"
+            list-type="picture-card"
+          >
+            <el-icon><Plus /></el-icon>
+            <div class="el-upload__text">
+              点击上传图片<br>
+              <span class="el-upload__tip">支持多选，单张 ≤ 5MB</span>
+            </div>
+          </el-upload>
         </div>
       </div>
       <template #footer>
@@ -165,8 +170,8 @@ const stepImages = ref({})
 const addDialogVisible = ref(false)
 const addStepIndex = ref(null)
 const selectedFiles = ref([])
-const selectedPreviewUrls = ref([])
 const uploading = ref(false)
+const uploadRef = ref(null)
 
 // 计算文件服务基础地址（用于拼接附件访问路径）
 const fileServerBase = computed(() => {
@@ -179,6 +184,15 @@ const fileServerBase = computed(() => {
  * 参数：idx 当前步骤索引
  * 说明：仅管理员可见，打开前会清理旧的选择状态
  */
+/**
+ * 移除文件处理函数
+ * 用途：同步 selectedFiles 列表
+ */
+const handleRemove = (removedFile, uploadFiles) => {
+  // 同步 selectedFiles 列表
+  selectedFiles.value = uploadFiles.map(f => f.raw);
+};
+
 function openAddImages(idx) {
   if (!isAdmin.value) {
     ElMessage.error('仅管理员可添加图片')
@@ -186,8 +200,9 @@ function openAddImages(idx) {
   }
   addStepIndex.value = idx
   selectedFiles.value = []
-  selectedPreviewUrls.value.forEach(url => URL.revokeObjectURL(url))
-  selectedPreviewUrls.value = []
+  if (uploadRef.value) {
+    uploadRef.value.clearFiles()
+  }
   addDialogVisible.value = true
 }
 
@@ -197,32 +212,32 @@ function openAddImages(idx) {
 function closeAddDialog() {
   addDialogVisible.value = false
   selectedFiles.value = []
-  selectedPreviewUrls.value.forEach(url => URL.revokeObjectURL(url))
-  selectedPreviewUrls.value = []
+  if (uploadRef.value) {
+    uploadRef.value.clearFiles()
+  }
 }
 
 /**
- * 选择步骤图片（生成本地预览）
- * 校验：仅图片类型，大小 ≤ 5MB
+ * 步骤图片选择事件处理（el-upload on-change 回调）
+ * 用途：同步待上传文件列表
  */
-function onStepFilesSelected(event) {
-  const files = Array.from(event.target.files || [])
-  if (!files.length) return
-  const valid = []
-  for (const f of files) {
+function onStepFilesSelected(changedFile, uploadFiles) {
+  // uploadFiles 是 el-upload 内部维护的完整文件列表
+  const rawFiles = uploadFiles.map(f => f.raw);
+
+  // 基础校验（可选，更适合在 before-upload 中做）
+  for (const f of rawFiles) {
     if (!f.type || !f.type.startsWith('image/')) {
-      ElMessage.error(`不支持的文件类型：${f.name}`)
-      continue
+      ElMessage.error(`不支持的文件类型：${f.name}`);
+      // 此处无法直接移除，仅提示
     }
     if (f.size > 5 * 1024 * 1024) {
-      ElMessage.error(`图片过大（>5MB）：${f.name}`)
-      continue
+      ElMessage.error(`图片过大（>5MB）：${f.name}`);
     }
-    valid.push(f)
   }
-  selectedFiles.value = valid
-  selectedPreviewUrls.value.forEach(url => URL.revokeObjectURL(url))
-  selectedPreviewUrls.value = valid.map(f => URL.createObjectURL(f))
+
+  // 同步 selectedFiles 列表，供 submitStepImages 使用
+  selectedFiles.value = rawFiles;
 }
 
 /**
@@ -246,34 +261,41 @@ async function submitStepImages() {
     }
     uploading.value = true
     const customPath = `help-center/topic-batch-import/${addStepIndex.value}`
-    const token = localStorage.getItem('token') || ''
 
-    const results = await Promise.all(
-      selectedFiles.value.map(async (file) => {
-        const fd = new FormData()
-        fd.append('file', file)
-        fd.append('customPath', customPath)
-        const res = await fetch(`${apiService.baseURL}/upload/complaint-attachment`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}` },
-          body: fd
-        })
-        const data = await res.json()
-        if (!res.ok || !data?.success) {
-          throw new Error(data?.message || '上传失败')
+    // 并发上传所有图片，使用与仪器台账使用指南相同的API调用方式
+    const uploadPromises = selectedFiles.value.map(file => {
+      // 使用专门为帮助中心设计的投诉附件上传接口
+      // 手动创建 FormData 并发送请求，确保 customPath 在请求体中传递
+      const formData = new FormData()
+      formData.append('file', file)
+      formData.append('customPath', customPath)
+      
+      return apiService.post('/upload/complaint-attachment', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
         }
+      }).then(response => response.data)
+    })
+    
+    const results = await Promise.all(uploadPromises)
+    const failedUploads = results.filter(r => !r.success)
+    if (failedUploads.length) {
+      ElMessage.error(`${failedUploads.length} 张图片上传失败`)
+    } else {
+      // 处理上传成功的图片
+      const uploadedImages = results.map(data => {
         const rel = (data.relativePath || data?.data?.relativePath || '').replace(/\\/g, '/')
         const relWithoutPrefix = rel.replace(/^attachments\//, '')
         const filePath = `${fileServerBase.value}/files/attachments/${relWithoutPrefix}`
         return { filePath, filename: data.filename, relativePath: rel }
       })
-    )
 
-    if (!stepImages.value[addStepIndex.value]) stepImages.value[addStepIndex.value] = []
-    stepImages.value[addStepIndex.value].push(...results)
+      if (!stepImages.value[addStepIndex.value]) stepImages.value[addStepIndex.value] = []
+      stepImages.value[addStepIndex.value].push(...uploadedImages)
 
-    ElMessage.success('图片已上传并添加到当前步骤')
-    closeAddDialog()
+      ElMessage.success('所有图片上传成功')
+      closeAddDialog()
+    }
   } catch (e) {
     ElMessage.error(`提交失败：${e?.message || e}`)
   } finally {
@@ -293,26 +315,26 @@ function buildCustomPath(idx) {
  */
 async function loadPersistedStepImages() {
   try {
-    // 采用 apiService.baseURL 以兼容 vite 代理（通常为 /api）
-    const base = apiService.baseURL || '/api'
     const token = localStorage.getItem('token') || ''
     for (let i = 0; i < steps2.length; i++) {
       const customPath = buildCustomPath(i)
-      const url = `${base}/upload/list-attachments?customPath=${encodeURIComponent(customPath)}`
-      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-      const data = await res.json()
-      if (!res.ok || !data?.success) {
-        console.warn('加载步骤图片失败', i, data?.message)
-        continue
-      }
-      const list = Array.isArray(data.data) ? data.data : []
-      const images = list.map(it => ({
-        filePath: `${fileServerBase.value}${it.url}`,
-        filename: it.filename,
-        relativePath: it.relativePath
-      }))
-      if (images.length) {
-        stepImages.value[i] = images
+      try {
+        // 使用 apiService 调用 list-attachments 接口
+        const response = await apiService.get(`/upload/list-attachments?customPath=${encodeURIComponent(customPath)}`)
+        const data = response.data
+        if (data?.success) {
+          const list = Array.isArray(data.data) ? data.data : []
+          const images = list.map(it => ({
+            filePath: `${fileServerBase.value}${it.url}`,
+            filename: it.filename,
+            relativePath: it.relativePath
+          }))
+          if (images.length) {
+            stepImages.value[i] = images
+          }
+        }
+      } catch (e) {
+        console.warn(`加载步骤 ${i} 图片失败`, e)
       }
     }
   } catch (e) {
@@ -364,8 +386,8 @@ function onImageDeleted(stepIdx, imgIndex) {
 
 /* 添加步骤图片弹窗样式 */
 .add-dialog-body { display: flex; flex-direction: column; gap: 12px; }
-.file-choose-row { display: flex; align-items: center; gap: 12px; }
-.choose-tip { font-size: 12px; color: #909399; }
+.file-choose-row { display: flex; align-items: center; margin-bottom: 15px; }
+.choose-tip { margin-left: 15px; color: #999; font-size: 13px; }
 .selected-previews { display: flex; flex-wrap: wrap; gap: 8px; }
 .preview-item { width: 120px; height: 90px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
 /* 头部标题与图标颜色：强化主标题辨识度 */

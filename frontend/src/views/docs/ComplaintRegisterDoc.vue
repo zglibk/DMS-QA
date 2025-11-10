@@ -32,12 +32,8 @@
                 v-for="(img, i) in stepImages[idx]"
                 :key="i"
                 :filePath="img.filePath"
-                :filename="img.filename"
-                :relativePath="img.relativePath"
                 :width="'180px'"
                 :height="'120px'"
-                :showDelete="isAdmin"
-                @deleted="onImageDeleted(idx, i)"
               />
             </div>
           </li>
@@ -266,7 +262,7 @@ async function submitStepImages() {
       return
     }
     uploading.value = true
-    const customPath = `help-center/topic-internal/${addStepIndex.value}`
+    const customPath = buildCustomPath(addStepIndex.value)
     const token = localStorage.getItem('token') || ''
 
     const results = await Promise.all(
@@ -301,35 +297,36 @@ async function submitStepImages() {
     uploading.value = false
   }
 }
-
-/**
- * 删除回调：从当前步骤的图片列表中移除对应项
- * 说明：ImagePreview 删除成功后会触发 @deleted 事件
- */
-function onImageDeleted(stepIdx, imgIndex) {
-  try {
-    const arr = stepImages.value[stepIdx] || []
-    if (!arr.length) return
-    arr.splice(imgIndex, 1)
-    stepImages.value[stepIdx] = [...arr]
-    ElMessage.success('已从当前步骤移除图片')
-  } catch (e) {
-    ElMessage.error(`移除失败：${e?.message || e}`)
-  }
-}
 </script>
 
 <style scoped>
-/* 列表美化：为此页面的要点与步骤统一样式（如果存在） */
+/* 统一文档主题容器宽度：与“投诉批量导入指南”保持一致，避免页面宽度塌陷 */
+.doc-theme { max-width: 1000px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+
+.doc-section { margin: 18px 0; }
 .doc-steps { list-style: none; padding-left: 0; counter-reset: step; }
 .doc-steps li { position: relative; padding-left: 42px; margin: 8px 0; line-height: 1.7; background: #f9fbff; border: 1px solid #eef3ff; border-radius: 8px; padding: 10px 12px 10px 42px; }
 .doc-steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; background: #409EFF; color: #fff; font-weight: 600; display: flex; align-items: center; justify-content: center; font-size: 13px; box-shadow: 0 2px 4px rgba(64,158,255,.3); }
-
 .bullet { list-style: none; padding-left: 0; }
 .bullet li { position: relative; padding-left: 22px; margin: 6px 0; line-height: 1.7; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px; padding: 8px 10px 8px 22px; color: #333; }
 .bullet li::before { content: ""; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border-radius: 50%; background: #a0c4ff; box-shadow: 0 2px 4px rgba(160,196,255,.4); }
-/* 基础主题与卡片风格：与“内部投诉操作指南”保持一致 */
-.doc-theme { max-width: 1000px; margin: 0 auto; }
-.doc-header h1 { display: flex; align-items: center; gap: 8px; }
-.fancy { border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
+.doc-steps li:hover, .bullet li:hover { border-color: #dbe7ff; background: #f5f9ff; }
+
+/* 头部标题与图标颜色：强化主标题辨识度 */
+.doc-header h1 { color: #303133; }
+.doc-header h1 :deep(.el-icon) { color: #409EFF; }
+
+/* 卡片头部标题与图标颜色 */
+.card-header { color: #303133; }
+.card-header .hd { color: #409EFF; }
+
+/* 信息提示颜色微调：与主题色协调 */
+.tip :deep(.el-alert__title) { color: #606266; }
+
+/* 列表项数字圆标颜色已为主题蓝（#409EFF），无需调整；如需更改可在此覆盖 */
+/* .doc-steps li::before { background: #409EFF; } */
+.bullet { list-style: none; padding-left: 0; }
+.bullet li { position: relative; padding-left: 22px; margin: 6px 0; line-height: 1.7; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px; padding: 8px 10px 8px 22px; color: #333; }
+.bullet li::before { content: ""; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border-radius: 50%; background: #a0c4ff; box-shadow: 0 2px 4px rgba(160,196,255,.4); }
+.doc-steps li:hover, .bullet li:hover { border-color: #dbe7ff; background: #f5f9ff; }
 </style>

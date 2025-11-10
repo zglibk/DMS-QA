@@ -140,8 +140,8 @@ import apiService from '@/services/apiService.js'
 import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
 import AppLayout from '@/components/common/AppLayout.vue'
 import { Tools, Document, DataBoard, Setting, Notebook, Collection, Histogram, PriceTag, Box, Files, Picture, Plus } from '@element-plus/icons-vue'
-// 新增：引入需要内联展示的文档子页面组件
-import ComplaintRegisterDoc from '@/views/docs/ComplaintRegisterDoc.vue'
+// 删除：不再需要内联展示的文档子页面组件
+// import ComplaintRegisterDoc from '@/views/docs/ComplaintRegisterDoc.vue'
 import ComplaintBatchImportDoc from '@/views/docs/ComplaintBatchImportDoc.vue'
 
 
@@ -385,20 +385,13 @@ const activeTopicKey = ref(null)
 /**
  * 处理左侧菜单点击事件
  * 参数：data - 当前节点数据；node - 树节点对象
- * 行为：在右侧内容区进行“同页切换显示”
+ * 行为：在右侧内容区进行"同页切换显示"
  * - 对特定主题显示内联文档组件（组件型视图）
  * - 其余主题显示通用说明内容（说明型视图）
  */
 function handleNodeClick(data, node) {
   if (!data.children) {
     // 组件型视图（内联显示）
-    if (data.id === 'topic-internal') {
-      activeViewComponent.value = ComplaintRegisterDoc
-      activeTopic.value = null
-      activeViewTitle.value = '内部投诉操作指南'
-      activeTopicKey.value = null
-      return
-    }
     if (data.id === 'topic-batch-import') {
       activeViewComponent.value = ComplaintBatchImportDoc
       activeTopic.value = null
@@ -406,7 +399,7 @@ function handleNodeClick(data, node) {
       activeTopicKey.value = null
       return
     }
-    // 说明型视图
+    // 说明型视图（包括内部投诉操作指南）
     activeViewComponent.value = null
     activeTopic.value = topicContentMap[data.id] || null
     activeViewTitle.value = null
@@ -692,15 +685,17 @@ async function submitStepImages() {
 
     // 并发上传所有图片
     const uploadPromises = selectedFiles.value.map(file => {
+      // 使用专门为帮助中心设计的投诉附件上传接口
+      // 手动创建 FormData 并发送请求，确保 customPath 在请求体中传递
       const formData = new FormData()
       formData.append('file', file)
       formData.append('customPath', customPath)
-      const url = `${apiService.baseURL}/upload/complaint-attachment`
-      return fetch(url, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
-        body: formData
-      }).then(res => res.json())
+      
+      return apiService.post('/upload/complaint-attachment', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data'
+        }
+      }).then(response => response.data)
     })
     const results = await Promise.all(uploadPromises)
     const failedUploads = results.filter(r => !r.success)

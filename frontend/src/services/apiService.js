@@ -162,6 +162,10 @@ class ApiService {
 
   /**
    * 上传文件
+   * @param {string} url - 上传地址
+   * @param {File} file - 要上传的文件
+   * @param {Function} [onProgress] - 上传进度回调函数
+   * @returns {Promise} - 上传请求的 Promise
    */
   async upload(url, file, onProgress = null) {
     const instance = await this.getInstance()
