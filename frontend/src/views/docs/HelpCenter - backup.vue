@@ -64,11 +64,11 @@
                       </el-button>
                     </div>
                     <!-- 已上传到当前步骤的图片缩略图：使用 el-upload 显示 -->
-                    <div class="step-images" v-if="getStepImageList(idx).length">
+                    <div class="step-images" v-if="stepImages[idx] && stepImages[idx].length">
                       <el-upload
-                        :file-list="getStepImageList(idx)"
+                        :file-list="stepImages[idx]"
                         list-type="picture-card"
-                        :on-preview="(file) => handlePictureCardPreview(file, idx)"
+                        :on-preview="handlePictureCardPreview"
                         :before-remove="(file) => handleFileRemove(file, idx)"
                         :class="{ 'display-only': !isAdmin }"
                       >
@@ -91,13 +91,11 @@
               <div class="add-dialog-body">
                 <div class="file-choose-row">
                   <el-upload
-                    ref="uploadRef"
                     action="#"
                     list-type="picture-card"
-                    :on-preview="handleDialogPreview"
-                    :on-remove="handleDialogRemove"
+                    :on-preview="handlePictureCardPreview"
+                    :on-remove="handleRemove"
                     :on-change="onStepFilesSelected"
-                    :before-upload="beforeUpload"
                     :auto-upload="false"
                     multiple
                   >
@@ -105,6 +103,7 @@
                   </el-upload>
                   <span class="choose-tip">支持多选，单张不超过 5MB，仅图片类型</span>
                 </div>
+                <!-- el-upload list-type="picture-card" 已提供预览，移除自定义预览区 -->
               </div>
               <template #footer>
                 <el-button @click="closeAddDialog">取消</el-button>
@@ -132,32 +131,66 @@
  * 帮助中心页面（公共路由）
  * 目标：
  * - 在同一路由内，左侧树点击后于右侧内容区切换显示，不再跳转到新页面
- * - 保留通用说明内容的同时，支持内嵌文档子页面的"内联展示"
+ * - 保留通用说明内容的同时，支持内嵌文档子页面的“内联展示”
  */
-import { ref, computed, shallowRef, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, shallowRef, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
 import apiService from '@/services/apiService.js'
-import { ElMessage, ElMessageBox } from 'element-plus'
+import { ElMessage, ElMessageBox, ElImageViewer } from 'element-plus'
 import AppLayout from '@/components/common/AppLayout.vue'
-import { 
-  Tools, 
-  Document, 
-  DataBoard, 
-  Setting, 
-  Notebook, 
-  Collection, 
-  Histogram, 
-  PriceTag, 
-  Box, 
-  Files, 
-  Picture, 
-  Plus 
-} from '@element-plus/icons-vue'
+import { Tools, Document, DataBoard, Setting, Notebook, Collection, Histogram, PriceTag, Box, Files, Picture, Plus } from '@element-plus/icons-vue'
+// 删除：不再需要内联展示的文档子页面组件
+// import ComplaintRegisterDoc from '@/views/docs/ComplaintRegisterDoc.vue'
 import ComplaintBatchImportDoc from '@/views/docs/ComplaintBatchImportDoc.vue'
+
+
+// 路由实例
+const router = useRouter()
 
 // 用户与管理员状态（响应式）
 const userStore = useUserStore()
 const isAdmin = computed(() => userStore.isAdmin)
+
+// 删除：上传地址与鉴权头部（兼容开发与生产环境）
+// const uploadAction = computed(() => `${apiService.baseURL}/upload/notice-image`)
+// const uploadHeaders = computed(() => ({ Authorization: `Bearer ${localStorage.getItem('token') || ''}` }))
+
+// 删除：管理员图片上传前校验
+// function beforeTopicImageUpload(file) {
+//   if (!isAdmin.value) {
+//     ElMessage.error('仅管理员可添加说明图片')
+//     return false
+//   }
+//   if (!file.type || !file.type.startsWith('image/')) {
+//     ElMessage.error('请上传图片文件（jpg/png/webp 等）')
+//     return false
+//   }
+//   const limitMB = 5
+//   if (file.size > limitMB * 1024 * 1024) {
+//     ElMessage.error(`图片大小不能超过 ${limitMB}MB`)
+//     return false
+//   }
+//   return true
+// }
+
+// 删除：管理员图片上传成功回调
+// function handleTopicImageUploadSuccess(response, file) {
+//   const url = response?.fileInfo?.fullUrl || response?.fileInfo?.accessUrl || response?.url
+//   if (!url) {
+//     ElMessage.error('上传成功但未返回图片地址')
+//     return
+//   }
+//   if (!activeTopic.value) {
+//     ElMessage.warning('当前无说明主题，图片未追加')
+//     return
+//   }
+//   if (!Array.isArray(activeTopic.value.images)) {
+//     activeTopic.value.images = []
+//   }
+//   activeTopic.value.images.push({ src: url, alt: activeTopic.value.title })
+//   ElMessage.success('图片已添加到当前说明的示例区')
+// }
 
 /**
  * 返回帮助中心首页（同页切换）
@@ -189,8 +222,8 @@ const iconMap = {
 
 /**
  * 获取图标组件
- * @param {string} iconName - 图标名称字符串
- * @returns {Component} 图标组件，默认使用 Document
+ * 参数：iconName - 图标名称字符串
+ * 返回：图标组件，默认使用 Document
  */
 function getIconComponent(iconName) {
   return iconMap[iconName] || Document
@@ -198,148 +231,163 @@ function getIconComponent(iconName) {
 
 /**
  * 获取图标颜色
- * @param {string} iconName - 图标名称字符串
- * @returns {string} 颜色字符串
+ * 用途：根据树节点的 icon 名称返回建议的主题色，增强侧边栏辨识度
+ * 参数：iconName - 图标名称字符串（与 iconMap 的键一致）
+ * 返回：颜色字符串（十六进制或 CSS 颜色值），默认回退为次要文字色
  */
 function getIconColor(iconName) {
   const iconColorMap = {
-    Collection: '#409EFF',
-    Notebook: '#67C23A',
-    Files: '#E6A23C',
-    Histogram: '#909399',
-    DataBoard: '#8D9AE8',
-    Setting: '#909399',
-    PriceTag: '#E6A23C',
-    Box: '#8D9AE8',
-    Document: '#909399',
-    Picture: '#409EFF'
+    Collection: '#409EFF',     // 投诉管理：主题蓝
+    Notebook: '#67C23A',       // 文档与说明：成功绿
+    Files: '#E6A23C',          // 文件与导入：警示橙
+    Histogram: '#909399',      // 质量与统计：中性灰
+    DataBoard: '#8D9AE8',      // 数据看板：柔和紫
+    Setting: '#909399',        // 系统设置：中性灰
+    PriceTag: '#E6A23C',       // 价格标签：橙色
+    Box: '#8D9AE8',            // 设备与资产：柔和紫
+    Document: '#909399',       // 默认文档：中性灰
+    Picture: '#409EFF'         // 图片与示例：主题蓝
   }
   return iconColorMap[iconName] || '#909399'
 }
 
 /**
  * 左侧菜单树数据结构
+ * 说明：按功能模块分组，子节点为具体使用指南
+ * 注意：不展示数据库真实字段名，仅描述操作行为
  */
-const topicTree = ref([
-  {
-    id: 'group-complaint',
-    label: '投诉管理',
-    icon: 'Collection',
-    children: [
-      { id: 'topic-internal', label: '内部投诉操作指南', icon: 'Notebook' },
-      { id: 'topic-batch-import', label: '投诉批量导入指南', icon: 'Files' }
-    ]
-  },
-  {
-    id: 'group-quality',
-    label: '质量管理',
-    icon: 'Histogram',
-    children: [
-      { id: 'topic-quality-targets', label: '质量目标使用指引', icon: 'DataBoard' },
-      { id: 'topic-rework', label: '返工登记操作指南', icon: 'Tools' }
-    ]
-  },
-  {
-    id: 'group-assets',
-    label: '仪器与材料',
-    icon: 'Box',
-    children: [
-      { id: 'topic-instruments', label: '仪器台账使用指南', icon: 'Document' },
-      { id: 'topic-material-price', label: '材料价格管理指南', icon: 'PriceTag' }
-    ]
-  },
-  {
-    id: 'group-system',
-    label: '系统管理',
-    icon: 'Setting',
-    children: [
-      { id: 'topic-config', label: '系统配置快速指引', icon: 'Setting' }
-    ]
-  }
-])
-
+/** 
+ * 左侧菜单树数据结构 
+ * 优化：统一图标配置，便于维护 
+ */ 
+ const topicTree = ref([ 
+   { 
+     id: 'group-complaint', 
+     label: '投诉管理', 
+     icon: 'Collection', 
+     children: [ 
+       { id: 'topic-internal', label: '内部投诉操作指南', icon: 'Notebook' }, 
+       { id: 'topic-batch-import', label: '投诉批量导入指南', icon: 'Files' } 
+     ] 
+   }, 
+   { 
+     id: 'group-quality', 
+     label: '质量管理', 
+     icon: 'Histogram', 
+     children: [ 
+       { id: 'topic-quality-targets', label: '质量目标使用指引', icon: 'DataBoard' }, 
+       { id: 'topic-rework', label: '返工登记操作指南', icon: 'Tools' } 
+     ] 
+   }, 
+   { 
+     id: 'group-assets', 
+     label: '仪器与材料', 
+     icon: 'Box', 
+     children: [ 
+       { id: 'topic-instruments', label: '仪器台账使用指南', icon: 'Document' }, 
+       { id: 'topic-material-price', label: '材料价格管理指南', icon: 'PriceTag' } 
+     ] 
+   }, 
+   { 
+     id: 'group-system', 
+     label: '系统管理', 
+     icon: 'Setting', 
+     children: [ 
+       { id: 'topic-config', label: '系统配置快速指引', icon: 'Setting' } 
+     ] 
+   } 
+ ]) 
+ 
+ /** 
+  * 主题内容字典 
+  * ⚠️ 修复：删除重复定义 
+  */ 
+ const topicContentMap = { 
+   'topic-internal': { 
+     title: '内部投诉操作指南', 
+     steps: [ 
+       '登录账号，进入"首页"，或点击用户头像下三角后，在弹出对菜单中，依次点击"登录后台 > 质量管理 > 投诉管理 > 内部投诉"页面。', 
+       '点击页面上的"新增"按钮，打开登记表单。', 
+       '依次填写基础信息、问题描述、处置措施等内容。', 
+       '如需上传图片，点击"上传图片"并在右侧预览区查看。', 
+       '确认信息无误后点击"提交"，系统将提示提交结果。' 
+     ] 
+   }, 
+   'topic-batch-import': { 
+     title: '投诉批量导入指南', 
+     steps: [ 
+       '进入"系统管理 > 质量异常数据导入"。', 
+       '下载模板并逐条填入投诉记录按说明准备 Excel 文件。或直接使用现使用中的投诉记录表 Excel 文件进入导入。', 
+       '上传文件后，根据将进行字段映射与数据预览。', 
+       '选择校验模式（严格/宽松），确认无误后执行导入。', 
+       '查看导入结果与校验提示，必要时修正后重试。' 
+     ] 
+   }, 
+   'topic-instruments': { 
+     title: '仪器台账使用指南', 
+     steps: [ 
+       '进入"仪器管理 > 仪器台账"。', 
+       '使用搜索和筛选快速定位设备。', 
+       '点击某条记录查看详情并进行维护或校准登记。' 
+     ] 
+   }, 
+   'topic-material-price': { 
+     title: '材料价格管理指南', 
+     steps: [ 
+       '进入"成本管理 > 材料价格管理"。', 
+       '通过筛选条件查看材料与价格信息。', 
+       '支持新增、编辑和导出价格数据以便分析。' 
+     ] 
+   }, 
+   'topic-quality-targets': { 
+     title: '质量目标使用指引', 
+     steps: [ 
+       '进入"质量管理 > 质量目标管理"。', 
+       '选择目标项查看指标与统计数据。', 
+       '可在目标详情页面查看月度趋势与达成情况。' 
+     ] 
+   }, 
+   'topic-rework': { 
+     title: '返工登记操作指南', 
+     steps: [ 
+       '进入"质量管理 > 返工登记"。', 
+       '填写返工原因、数量和涉及批次。', 
+       '提交后可在列表页面查看与导出记录。' 
+     ] 
+   }, 
+   'topic-config': { 
+     title: '系统配置快速指引', 
+     steps: [ 
+       '进入"系统管理 > 系统配置"。', 
+       '根据业务需要调整参数与开关设置。', 
+       '保存后刷新页面使配置生效。' 
+     ] 
+   } 
+ } 
+ 
 /**
- * 主题内容字典
+ * 树组件属性配置
+ * 用途：定义使用 label 与 children 字段
  */
-const topicContentMap = {
-  'topic-internal': {
-    title: '内部投诉操作指南',
-    steps: [
-      '登录账号，进入"首页"，或点击用户头像下三角后，在弹出对菜单中，依次点击"登录后台 > 质量管理 > 投诉管理 > 内部投诉"页面。',
-      '点击页面上的"新增"按钮，打开登记表单。',
-      '依次填写基础信息、问题描述、处置措施等内容。',
-      '如需上传图片，点击"上传图片"并在右侧预览区查看。',
-      '确认信息无误后点击"提交"，系统将提示提交结果。'
-    ]
-  },
-  'topic-batch-import': {
-    title: '投诉批量导入指南',
-    steps: [
-      '进入"系统管理 > 质量异常数据导入"。',
-      '下载模板并逐条填入投诉记录按说明准备 Excel 文件。或直接使用现使用中的投诉记录表 Excel 文件进入导入。',
-      '上传文件后，根据将进行字段映射与数据预览。',
-      '选择校验模式（严格/宽松），确认无误后执行导入。',
-      '查看导入结果与校验提示，必要时修正后重试。'
-    ]
-  },
-  'topic-instruments': {
-    title: '仪器台账使用指南',
-    steps: [
-      '进入"仪器管理 > 仪器台账"。',
-      '使用搜索和筛选快速定位设备。',
-      '点击某条记录查看详情并进行维护或校准登记。'
-    ]
-  },
-  'topic-material-price': {
-    title: '材料价格管理指南',
-    steps: [
-      '进入"成本管理 > 材料价格管理"。',
-      '通过筛选条件查看材料与价格信息。',
-      '支持新增、编辑和导出价格数据以便分析。'
-    ]
-  },
-  'topic-quality-targets': {
-    title: '质量目标使用指引',
-    steps: [
-      '进入"质量管理 > 质量目标管理"。',
-      '选择目标项查看指标与统计数据。',
-      '可在目标详情页面查看月度趋势与达成情况。'
-    ]
-  },
-  'topic-rework': {
-    title: '返工登记操作指南',
-    steps: [
-      '进入"质量管理 > 返工登记"。',
-      '填写返工原因、数量和涉及批次。',
-      '提交后可在列表页面查看与导出记录。'
-    ]
-  },
-  'topic-config': {
-    title: '系统配置快速指引',
-    steps: [
-      '进入"系统管理 > 系统配置"。',
-      '根据业务需要调整参数与开关设置。',
-      '保存后刷新页面使配置生效。'
-    ]
-  }
-}
-
-// 树组件属性配置
 const treeProps = { label: 'label', children: 'children' }
 
 // 当前激活主题内容（通用说明型）
 const activeTopic = ref(null)
-// 当前右侧激活的"内联文档组件"（组件型视图）
+// 新增：当前右侧激活的“内联文档组件”（组件型视图）
 const activeViewComponent = shallowRef(null)
-// 右侧内联视图的动态标题
+// 新增：右侧内联视图的动态标题
 const activeViewTitle = ref(null)
-// 记录当前激活主题的键（用于构建上传自定义路径）
+// 新增：记录当前激活主题的键（用于构建上传自定义路径）
 const activeTopicKey = ref(null)
+
+
 
 /**
  * 处理左侧菜单点击事件
- * @param {Object} data - 当前节点数据
- * @param {Object} node - 树节点对象
+ * 参数：data - 当前节点数据；node - 树节点对象
+ * 行为：在右侧内容区进行"同页切换显示"
+ * - 对特定主题显示内联文档组件（组件型视图）
+ * - 其余主题显示通用说明内容（说明型视图）
  */
 function handleNodeClick(data, node) {
   if (!data.children) {
@@ -361,15 +409,30 @@ function handleNodeClick(data, node) {
   }
 }
 
+/**
+ * 步骤图片：选择与上传
+ * 说明：在每条步骤记录下添加图片，选择后在该 li 下方展示缩略图，点击放大镜进行放大预览，提交后保存到 uploads/attachments 的指定子路径
+ */
 // 每个步骤下的图片列表（key 为步骤索引）
 const stepImages = ref({})
 // 弹窗可见性与上下文
 const addDialogVisible = ref(false)
 const addStepIndex = ref(null)
-// 选择的待上传文件
+// 选择的待上传文件与预览 URL
 const selectedFiles = ref([])
+const selectedPreviewUrls = ref([])
 const uploading = ref(false)
-const uploadRef = ref(null)
+// 计算文件服务器基础地址（用于拼接附件访问路径）
+// 在生产环境中，Nginx 在8080端口提供 /files 静态文件服务
+const fileServerBase = computed(() => {
+  const base = apiService.baseURL || ''
+  // 如果是开发环境（localhost 或 127.0.0.1），使用代理路径
+  if (base.includes('localhost') || base.includes('127.0.0.1')) {
+    return base.replace(/\/$/, '').replace(/\/api$/, '')
+  }
+  // 生产环境使用当前域名的8080端口
+  return window.location.origin.replace(/:\d+$/, '') + ':8080'
+})
 
 // 图片预览
 const imageViewerVisible = ref(false)
@@ -377,41 +440,11 @@ const imageUrls = ref([])
 const initialIndex = ref(0)
 
 /**
- * 计算文件服务器基础地址
- * - 开发环境：使用空字符串，让 Vite 代理处理 /files 路径
- * - 生产环境：使用 8080 端口的文件服务器
- */
-const fileServerBase = (() => {
-  // 在生产环境中，根据主机名动态构建基础URL
-  if (import.meta.env.PROD) {
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    // 假设文件服务器与应用部署在同一服务器，但端口不同
-    return `${protocol}//${hostname}:8080`;
-  }
-  // 在开发环境中，返回空字符串，依赖Vite的代理
-  return '';
-})();
-
-/**
- * 将内部图片数据转换为 el-upload 期望的格式
- * @param {number} idx - 步骤索引
- * @returns {Array} el-upload 格式的文件列表
- */
-function getStepImageList(idx) {
-  const images = stepImages.value[idx] || []
-  return images.map(img => ({
-    name: img.name || img.filename,
-    url: img.url || img.filePath,
-    status: 'success',
-    relativePath: img.relativePath
-  }))
-}
-
-/**
  * 构建步骤图片的自定义存储路径
- * @param {string} topicKey - 主题键
- * @param {number} idx - 步骤索引
+ * 作用：与后端上传/列出接口保持一致，用于持久化与刷新加载
+ * 规则：help-center/<topicKey>/<stepIndex>
+ * @param {string} topicKey 主题键，如 'topic-quality-targets'
+ * @param {number} idx 步骤索引
  * @returns {string} 自定义存储路径
  */
 function buildCustomPath(topicKey, idx) {
@@ -419,67 +452,44 @@ function buildCustomPath(topicKey, idx) {
 }
 
 /**
- * 构建图片访问URL
- * @param {Object} imageInfo - 图片信息对象，包含 url, relativePath 等字段
- * @returns {string} 完整的图片访问URL
- */
-function buildImageUrl(imageInfo) {
-  const imageUrl = imageInfo.url || imageInfo.relativePath || ''
-
-  // 1. 如果已经是完整的 http/https URL，直接返回
-  if (imageUrl.startsWith('http://') || imageUrl.startsWith('https://')) {
-    return imageUrl
-  }
-
-  // 2. 如果是 /files/ 开头的路径（通常是开发环境代理或生产环境 nginx 转发）
-  if (imageUrl.startsWith('/files')) {
-    return import.meta.env.PROD ? `${fileServerBase}${imageUrl}` : imageUrl
-  }
-
-  // 3. 处理相对路径（例如：complaints/xxx.png）
-  // 移除可能的 attachments/ 前缀并统一斜杠
-  const cleanPath = imageUrl.replace(/\\/g, '/').replace(/^attachments[\\\/]?/, '')
-  const staticUrl = `/files/attachments/${cleanPath}`
-
-  return import.meta.env.PROD ? `${fileServerBase}${staticUrl}` : staticUrl
-}
-
-/**
  * 刷新加载：为当前说明型主题加载已上传图片
+ * 场景：页面刷新或切换主题时调用，确保缩略图持久显示
+ * 实现：遍历 activeTopic.steps，根据自定义路径调用 /upload/list-attachments
+ * 成功后，将返回的 url/relativePath 组装为 ImagePreview 的入参写入 stepImages
  */
 async function loadPersistedStepImagesForActiveTopic() {
   try {
     const key = activeTopicKey.value
     const topic = activeTopic.value
     if (!key || !topic || !Array.isArray(topic.steps)) return
-
+    const base = apiService.baseURL || '/api'
+    const token = localStorage.getItem('token') || ''
     for (let i = 0; i < topic.steps.length; i++) {
       const customPath = buildCustomPath(key, i)
-      try {
-        const response = await apiService.get(`/upload/list-attachments?customPath=${encodeURIComponent(customPath)}`)
-        const data = response.data
-        
-        if (data?.success) {
-          const list = Array.isArray(data.data) ? data.data : []
-          const images = list.map((it) => {
-            // 构建图片访问路径
-            const filePath = buildImageUrl(it)
-            return {
-              name: it.filename || (it.relativePath || '').split('/').pop(),
-              url: filePath,
-              status: 'success',
-              relativePath: (it.relativePath || '').replace(/\\/g, '/').replace(/^attachments[\\\/]/, '')
-            }
-          })
-          if (images.length) {
-            stepImages.value = {
-              ...stepImages.value,
-              [i]: images
-            }
-          }
+      const url = `${base}/upload/list-attachments?customPath=${encodeURIComponent(customPath)}`
+      const res = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json()
+      if (!res.ok || !data?.success) {
+        console.warn('加载步骤图片失败', i, data?.message)
+        continue
+      }
+      const list = Array.isArray(data.data) ? data.data : []
+      const images = list.map((it) => {
+        // 后端可能返回 url 或 relativePath，均做兼容
+        const rel = (it.relativePath || '').replace(/\\/g, '/')
+        const relWithoutPrefix = rel.replace(/^attachments[\\\/]/, '')
+        const staticUrl = `/files/attachments/${relWithoutPrefix}`
+        const mergedUrl = it.url || staticUrl
+        const filePath = `${fileServerBase.value}${mergedUrl}`
+        return {
+          name: it.filename || relWithoutPrefix.split('/').pop(),
+          url: filePath,
+          status: 'success',
+          relativePath: relWithoutPrefix // 修正：使用移除前缀的路径
         }
-      } catch (e) {
-        console.warn(`加载步骤 ${i} 图片失败`, e)
+      })
+      if (images.length) {
+        stepImages.value[i] = images
       }
     }
   } catch (e) {
@@ -487,44 +497,28 @@ async function loadPersistedStepImagesForActiveTopic() {
   }
 }
 
+/**
+ * 生命周期：组件挂载后尝试加载（若未来实现主题持久化可直接生效）
+ */
 onMounted(() => {
   if (activeTopicKey.value && activeTopic.value && Array.isArray(activeTopic.value.steps)) {
     loadPersistedStepImagesForActiveTopic()
   }
 })
 
-onBeforeUnmount(() => {
-  // 组件卸载时清理资源
-  imageUrls.value = []
-})
-
-// 监听主题键变化：切换说明型主题时重置并加载对应步骤图片
+/**
+ * 监听主题键变化：切换说明型主题时重置并加载对应步骤图片
+ */
 watch(activeTopicKey, async (key) => {
+  // 切换主题时，重置步骤图片缓存
   stepImages.value = {}
   if (!key || !activeTopic.value || !Array.isArray(activeTopic.value.steps)) return
   await loadPersistedStepImagesForActiveTopic()
 })
 
 /**
- * 上传前校验
- * @param {File} file - 待上传文件
- * @returns {boolean} 是否允许上传
- */
-function beforeUpload(file) {
-  if (!file.type || !file.type.startsWith('image/')) {
-    ElMessage.error(`不支持的文件类型：${file.name}`)
-    return false
-  }
-  if (file.size > 5 * 1024 * 1024) {
-    ElMessage.error(`图片过大（>5MB）：${file.name}`)
-    return false
-  }
-  return true
-}
-
-/**
  * 打开添加图片弹窗（步骤级别）
- * @param {number} idx - 当前步骤索引
+ * 参数：idx - 当前步骤索引
  */
 function openAddImages(idx) {
   if (!isAdmin.value) {
@@ -533,69 +527,67 @@ function openAddImages(idx) {
   }
   addStepIndex.value = idx
   selectedFiles.value = []
-  if (uploadRef.value) {
-    uploadRef.value.clearFiles()
-  }
+  // 释放已有预览 URL
+  selectedPreviewUrls.value.forEach(url => URL.revokeObjectURL(url))
+  selectedPreviewUrls.value = []
   addDialogVisible.value = true
 }
 
 /**
- * 关闭添加图片弹窗
+ * 关闭添加图片弹窗，并清理临时预览资源
  */
 function closeAddDialog() {
   addDialogVisible.value = false
   selectedFiles.value = []
-  if (uploadRef.value) {
-    uploadRef.value.clearFiles()
-  }
+  selectedPreviewUrls.value.forEach(url => URL.revokeObjectURL(url))
+  selectedPreviewUrls.value = []
 }
 
-/**
- * 处理图片预览（已上传的步骤图片）
- * @param {Object} file - 文件对象
- * @param {number} stepIdx - 步骤索引
- */
-function handlePictureCardPreview(file, stepIdx) {
-  const images = stepImages.value[stepIdx] || []
-  if (!images.length) {
-    imageUrls.value = [file.url]
-    initialIndex.value = 0
+// 新增：处理图片预览
+const handlePictureCardPreview = (file) => {
+  // 查找被点击图片所在的图片列表
+  let currentImageList = [];
+  let allImageUrls = [];
+
+  // 场景一：预览已上传的步骤图片
+  const stepIdx = Object.keys(stepImages.value).find(idx => 
+    stepImages.value[idx].some(img => img.url === file.url)
+  );
+
+  if (stepIdx) {
+    currentImageList = stepImages.value[stepIdx];
+    allImageUrls = currentImageList.map(img => img.url);
   } else {
-    imageUrls.value = images.map(img => img.url)
-    const findIndex = images.findIndex(img => img.url === file.url)
-    initialIndex.value = findIndex > -1 ? findIndex : 0
+    // 场景二：预览在“添加图片”弹窗中新选择的图片
+    // 此时 file.url 是 blob URL，直接使用
+    // uploadFiles 是 el-upload 内部维护的列表
+    // 但我们无法直接访问，所以退而求其次，只预览当前点击的图片
+    allImageUrls = [file.url];
   }
-  imageViewerVisible.value = true
-}
 
-/**
- * 处理弹窗内的图片预览
- * @param {Object} file - 文件对象
- */
-function handleDialogPreview(file) {
-  imageUrls.value = [file.url]
-  initialIndex.value = 0
-  imageViewerVisible.value = true
-}
+  const findIndex = allImageUrls.findIndex(url => url === file.url);
+  
+  imageUrls.value = allImageUrls;
+  initialIndex.value = findIndex > -1 ? findIndex : 0;
+  imageViewerVisible.value = true;
+};
 
-/**
- * 处理已上传文件的删除
- * @param {Object} file - 文件对象
- * @param {number} stepIndex - 步骤索引
- * @returns {Promise} 删除结果
- */
-function handleFileRemove(file, stepIndex) {
+// 新增：处理已上传文件的删除
+const handleFileRemove = (file, stepIndex) => {
   return new Promise((resolve, reject) => {
-    const { relativePath } = file
+    // 从 file 对象获取 relativePath，这是删除文件的关键标识
+    const { relativePath } = file;
 
     if (!isAdmin.value) {
-      ElMessage.error('仅管理员可删除图片')
-      return reject()
+      ElMessage.error('仅管理员可删除图片');
+      return reject(); // 阻止 el-upload 立即移除文件
     }
 
     if (!relativePath) {
-      ElMessage.error('无法确定文件路径，删除失败')
-      return reject()
+      ElMessage.error('无法确定文件路径，删除失败');
+      // 对于没有 relativePath 的文件，可能是本地新选但未上传的，
+      // 或者数据结构有问题。阻止删除以防误操作。
+      return reject();
     }
 
     ElMessageBox.confirm('确定要删除该图片吗？', '提示', {
@@ -603,61 +595,79 @@ function handleFileRemove(file, stepIndex) {
       cancelButtonText: '取消',
       type: 'warning',
     }).then(async () => {
+      // 用户确认后，执行删除
       try {
-        const response = await apiService.delete('/upload/attachment', {
-          data: { relativePath }
-        })
+        const token = localStorage.getItem('token') || '';
+        const base = apiService.baseURL || '/api';
+        const url = `${base}/upload/attachment`;
 
-        if (response.data?.success) {
-          ElMessage.success('图片删除成功')
-          resolve()
+        const response = await fetch(url, {
+          method: 'DELETE',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ relativePath }),
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+          ElMessage.success('图片删除成功');
+          resolve(); // 允许 el-upload 从 UI 移除文件
         } else {
-          ElMessage.error(response.data?.message || '图片删除失败')
-          reject()
+          ElMessage.error(result.message || '图片删除失败');
+          reject(); // 后端删除失败，阻止 el-upload 从 UI 移除文件
         }
       } catch (error) {
-        ElMessage.error('请求删除接口时发生错误')
-        console.error('删除图片失败:', error)
-        reject()
+        ElMessage.error('请求删除接口时发生错误');
+        console.error('删除图片失败:', error);
+        reject(); // 网络等错误，同样阻止 UI 移除
       }
     }).catch(() => {
-      ElMessage.info('已取消删除')
-      reject()
-    })
-  })
-}
+      // 用户点击了“取消”
+      ElMessage.info('已取消删除');
+      reject();
+    });
+  });
+};
+
+// 新增：处理图片删除
+const handleRemove = (removedFile, uploadFiles) => {
+  // 同步 selectedFiles 列表
+  selectedFiles.value = uploadFiles.map(f => f.raw);
+};
 
 /**
- * 处理弹窗内图片删除
- * @param {Object} removedFile - 被删除的文件
- * @param {Array} uploadFiles - 当前文件列表
- */
-function handleDialogRemove(removedFile, uploadFiles) {
-  selectedFiles.value = uploadFiles.map(f => f.raw)
-}
-
-/**
- * 步骤图片选择事件处理
- * @param {Object} changedFile - 变更的文件
- * @param {Array} uploadFiles - 当前文件列表
+ * 步骤图片选择事件处理（el-upload on-change 回调）
+ * 用途：同步待上传文件列表
  */
 function onStepFilesSelected(changedFile, uploadFiles) {
-  // 过滤有效文件
-  const validFiles = uploadFiles.filter(f => {
-    const file = f.raw
-    if (!file.type || !file.type.startsWith('image/')) {
-      return false
+  // uploadFiles 是 el-upload 内部维护的完整文件列表
+  const rawFiles = uploadFiles.map(f => f.raw);
+
+  // 基础校验（可选，更适合在 before-upload 中做）
+  for (const f of rawFiles) {
+    if (!f.type || !f.type.startsWith('image/')) {
+      ElMessage.error(`不支持的文件类型：${f.name}`);
+      // 此处无法直接移除，仅提示
     }
-    if (file.size > 5 * 1024 * 1024) {
-      return false
+    if (f.size > 5 * 1024 * 1024) {
+      ElMessage.error(`图片过大（>5MB）：${f.name}`);
     }
-    return true
-  })
-  selectedFiles.value = validFiles.map(f => f.raw)
+  }
+
+  // 同步 selectedFiles 列表，供 submitStepImages 使用
+  selectedFiles.value = rawFiles;
+
+  // el-upload 自带预览，不再需要手动管理 selectedPreviewUrls
+  selectedPreviewUrls.value.forEach(url => URL.revokeObjectURL(url))
+  selectedPreviewUrls.value = []
 }
 
 /**
  * 提交当前步骤的选中图片到后台
+ * 目标：将图片存入 uploads/attachments/指定路径（自动创建），并在当前 li 下方展示缩略图（使用 ImagePreview）
  */
 async function submitStepImages() {
   try {
@@ -673,13 +683,16 @@ async function submitStepImages() {
       ElMessage.warning('请先选择图片')
       return
     }
-    
     uploading.value = true
     const topicKey = activeTopicKey.value || 'unknown-topic'
     const stepIdx = addStepIndex.value
     const customPath = `help-center/${topicKey}/${stepIdx}`
+    const token = localStorage.getItem('token') || ''
 
+    // 并发上传所有图片
     const uploadPromises = selectedFiles.value.map(file => {
+      // 使用专门为帮助中心设计的投诉附件上传接口
+      // 手动创建 FormData 并发送请求，确保 customPath 在请求体中传递
       const formData = new FormData()
       formData.append('file', file)
       formData.append('customPath', customPath)
@@ -690,15 +703,14 @@ async function submitStepImages() {
         }
       }).then(response => response.data)
     })
-    
     const results = await Promise.all(uploadPromises)
     const failedUploads = results.filter(r => !r.success)
-    
     if (failedUploads.length) {
       ElMessage.error(`${failedUploads.length} 张图片上传失败`)
     } else {
       ElMessage.success('所有图片上传成功')
       closeAddDialog()
+      // 刷新当前主题的图片
       await loadPersistedStepImagesForActiveTopic()
     }
   } catch (e) {
@@ -708,13 +720,16 @@ async function submitStepImages() {
     uploading.value = false
   }
 }
+
+
+
 </script>
 
 <style scoped>
 /* ============================================
-   CSS 变量定义 - 组件级变量
+   CSS 变量定义 - 统一管理主题色和尺寸
    ============================================ */
-.help-center {
+:root {
   --title-color: #303133;
   --subtitle-color: #606266;
   --border-color: #EBEEF5;
@@ -743,25 +758,26 @@ async function submitStepImages() {
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
-  --content-gap: 10px;
 
   /* 阴影 */
   --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.08);
   --shadow-primary: 0 2px 4px rgba(64, 158, 255, 0.3);
-
-  /* 主容器样式 */
+}
+/* ============================================
+   主容器布局 - 修复高度计算
+   ============================================ */
+.help-center {
+  --content-gap: 10px; /* 左侧面板与右侧内容区之间的统一间距变量，默认 20px */
   padding: var(--spacing-md) var(--spacing-xl) var(--spacing-xl);
-  height: 100vh;
+  height: 100vh; /* 修改：使用视口高度 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
   box-sizing: border-box;
 }
 
-/* ============================================
-   页面标题区域
-   ============================================ */
+/* 页面标题区域（如果需要） */
 .page-title {
   font-size: 22px;
   margin: 0 0 6px 0;
@@ -776,11 +792,11 @@ async function submitStepImages() {
 }
 
 /* ============================================
-   左右布局容器
+   左右布局容器 - 优化滚动逻辑
    ============================================ */
 .bottom-content {
   display: flex;
-  gap: var(--content-gap);
+  gap: var(--content-gap); /* 使用统一变量控制两列间距 */
   margin-top: var(--spacing-lg);
   flex: 1;
   min-height: 0;
@@ -788,18 +804,18 @@ async function submitStepImages() {
 }
 
 /* ============================================
-   左侧面板
+   左侧面板 - 固定宽度，独立滚动
    ============================================ */
 .left-panel {
-  width: clamp(240px, 20vw, 320px);
-  flex-shrink: 0;
+  width: clamp(240px, 20vw, 320px); /* 优化：调整宽度范围 */
+  flex-shrink: 0; /* 不收缩 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .menu-card {
-  height: 100%;
+  height: 100%; /* 填满左侧面板 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -807,11 +823,12 @@ async function submitStepImages() {
 
 .menu-card :deep(.el-card__body) {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; /* 关键：内容滚动 */
   overflow-x: hidden;
   padding: var(--spacing-sm);
 }
 
+/* 菜单卡片头部 */
 .card-header {
   display: flex;
   align-items: center;
@@ -820,23 +837,23 @@ async function submitStepImages() {
 }
 
 .topic-tree :deep(.tree-node .node-icon) {
-  margin-right: 5px;
+  margin-right: 5px; /* 为图标和文字之间添加间距 */
 }
 
 /* ============================================
-   右侧面板
+   右侧面板 - 内容区独立滚动
    ============================================ */
 .right-panel {
-  flex: 1;
-  min-width: 0;
+  flex: 1; /* 占据剩余空间 */
+  min-width: 0; /* 防止溢出 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
 }
 
 .content-card {
-  flex: 1;
-  min-height: 0;
+  flex: 1; /* 优化：使用 flex: 1 替代 height: 100% */
+  min-height: 0; /* 关键：确保 flex 子项可以正确缩小 */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -846,17 +863,17 @@ async function submitStepImages() {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden; /* 外层不滚动 */
   padding: 0;
 }
 
 /* ============================================
-   固定标题栏
+   固定标题栏 - 置顶不滚动
    ============================================ */
 .content-sticky-header {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 100; /* 提高层级 */
   display: flex;
   align-items: center;
   min-height: 44px;
@@ -867,31 +884,33 @@ async function submitStepImages() {
   font-size: 16px;
   color: var(--title-color);
   flex-shrink: 0;
-  box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.04); /* 添加轻微阴影 */
 }
 
 .content-sticky-header .el-icon {
-  color: var(--primary-color) !important;
+  color: var(--primary-color) !important; /* 强制应用主题色 */
   margin-right: 8px;
-  font-size: 18px;
+  font-size: 18px; /* 调整图标大小 */
 }
 
 /* ============================================
-   内联文档视图
+   内联文档视图 - 滚动容器
    ============================================ */
 .doc-inline-wrapper {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; /* 关键：内容滚动 */
   overflow-x: hidden;
   padding: 0 var(--spacing-lg) var(--spacing-lg);
-  background: #fff;
-  display: block;
+  background: #fff; /* 防止标题下方出现灰色空白（继承全局灰背景时） */
+  display: block; /* 修改：使用 block 替代 flow-root */
 }
 
+/* 隐藏子页面的返回按钮 */
 .doc-inline-wrapper :deep(.doc-footer) {
   display: none;
 }
 
+/* 移除子页面顶部空白 */
 .doc-inline-wrapper :deep(.doc-container) {
   padding-top: 0;
   margin-top: 0;
@@ -901,27 +920,32 @@ async function submitStepImages() {
   margin-top: 0;
 }
 
+/* 强制子页面占满宽度 */
 .doc-inline-wrapper :deep(.doc-theme) {
   width: 100%;
   max-width: none;
   margin: 0;
   box-sizing: border-box;
 }
+.gray-area {
+  display: none;
+}
 
+/* 隐藏子页面的标题 */
 .doc-inline-wrapper :deep(.doc-header) {
   display: none;
 }
 
 /* ============================================
-   说明型视图
+   说明型视图 - 滚动容器
    ============================================ */
 .topic-content {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; /* 关键：内容滚动 */
   overflow-x: hidden;
   padding: 0 var(--spacing-lg) var(--spacing-lg);
-  background: #fff;
-  display: flow-root;
+  background: #fff; /* 防止标题下方出现灰色空白 */
+  display: flow-root; /* 避免首个内容块的margin与父级折叠 */
 }
 
 /* ============================================
@@ -975,7 +999,7 @@ async function submitStepImages() {
   justify-content: center;
   font-size: 13px;
   box-shadow: var(--shadow-primary);
-  flex-shrink: 0;
+  flex-shrink: 0; /* 防止序号被压缩 */
 }
 
 /* ============================================
@@ -984,7 +1008,7 @@ async function submitStepImages() {
 .step-text {
   font-size: 14px;
   color: #333;
-  word-break: break-word;
+  word-break: break-word; /* 防止长文本溢出 */
 }
 
 .step-actions {
@@ -999,15 +1023,10 @@ async function submitStepImages() {
 }
 
 .step-images :deep(.image-preview-wrapper) {
-  display: inline-flex;
-  width: 180px;
-  height: 120px;
-  margin: 0 8px 8px 0 !important;
-}
-
-/* 隐藏步骤图片区域的上传按钮（纯展示模式） */
-.step-images .el-upload--picture-card {
-  display: none;
+  display: inline-flex; /* 强制内联 flex 布局 */
+  width: 180px; /* 固定宽度 */
+  height: 120px; /* 固定高度 */
+  margin: 0 8px 8px 0 !important; /* 统一外边距 */
 }
 
 /* ============================================
@@ -1019,12 +1038,19 @@ async function submitStepImages() {
   gap: var(--spacing-md);
 }
 
+/* 新增：修复 el-upload 在 picture-card 模式下的布局问题 */
 .add-dialog-body :deep(.el-upload--picture-card) {
   --el-upload-picture-card-size: 120px;
   width: var(--el-upload-picture-card-size);
   height: var(--el-upload-picture-card-size);
-  margin-bottom: 8px;
+  margin-bottom: 8px; /* 与列表项保持一致 */
 }
+
+/* 新增：当 el-upload 用于纯展示（禁用状态）时，隐藏上传按钮 */
+.step-images .el-upload--picture-card {
+  display: none;
+}
+
 
 .add-dialog-body :deep(.el-upload-list--picture-card) {
   --el-upload-list-picture-card-size: 120px;
@@ -1036,7 +1062,7 @@ async function submitStepImages() {
 .add-dialog-body :deep(.el-upload-list--picture-card .el-upload-list__item) {
   width: var(--el-upload-list-picture-card-size);
   height: var(--el-upload-list-picture-card-size);
-  margin: 0;
+  margin: 0; /* 重置 margin */
 }
 
 .file-choose-row {
@@ -1093,7 +1119,6 @@ async function submitStepImages() {
   outline: 2px solid var(--primary-color);
   background-color: var(--focus-bg);
 }
-
 .tree-node {
   display: inline-flex;
   align-items: center;
@@ -1149,7 +1174,7 @@ async function submitStepImages() {
   
   .bottom-content {
     flex-direction: column;
-    gap: var(--content-gap);
+    gap: var(--content-gap); /* 使用统一变量控制两列间距 */
     margin-top: var(--spacing-lg);
     flex: 1;
     min-height: 0;
@@ -1158,7 +1183,7 @@ async function submitStepImages() {
   
   .left-panel {
     width: 100%;
-    max-height: 300px;
+    max-height: 300px; /* 限制移动端菜单高度 */
   }
   
   .right-panel {

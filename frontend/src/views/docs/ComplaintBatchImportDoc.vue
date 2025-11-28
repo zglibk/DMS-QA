@@ -5,7 +5,7 @@
         <el-icon><Document /></el-icon>
         投诉记录批量新增与数据表初始化使用说明
       </h1>
-      <p class="doc-subtitle">路径：系统管理 > 质量异常数据导入；如有必要，使用“数据表初始化”</p>
+      <p class="doc-subtitle">路径：系统管理 > 质量异常数据导入；如有必要，使用"数据表初始化"</p>
       <el-alert type="success" :closable="false">
         <template #title>
           本文档可直接访问，无需登录和权限校验
@@ -18,8 +18,8 @@
         <div class="card-header"><el-icon class="hd"><Document /></el-icon>一、准备Excel模板</div>
       </template>
       <ul class="bullet">
-        <li>在“质量异常数据导入”页面下载最新模板（complaint_template.xlsx），模板包含字段说明与示例。</li>
-        <li>按模板列填充数据，建议保持列名与系统字段一致以便“智能映射”。</li>
+        <li>在"质量异常数据导入"页面，找到"下载模板"按钮，下载（complaint_template.xlsx）模板表，模板包含字段说明与示例。</li>
+        <li>按模板列填充数据，建议保持列名与系统字段一致以便"智能映射"。</li>
         <li>图片附件路径可为空；如需导入图片，请填写服务端可访问的URL或上传目录路径。</li>
       </ul>
     </el-card>
@@ -40,18 +40,15 @@
               添加图片
             </el-button>
           </div>
-          <div class="step-images" v-if="stepImages[idx] && stepImages[idx].length">
-            <ImagePreview
-              v-for="(img, i) in stepImages[idx]"
-              :key="i"
-              :filePath="img.filePath"
-              :filename="img.filename"
-              :relativePath="img.relativePath"
-              :width="'180px'"
-              :height="'120px'"
-              :showDelete="isAdmin"
-              @deleted="onImageDeleted(idx, i)"
-            />
+          <div class="step-images" v-if="getStepImageList(idx).length">
+            <el-upload
+              :file-list="getStepImageList(idx)"
+              list-type="picture-card"
+              :on-preview="(file) => handlePictureCardPreview(file, idx)"
+              :before-remove="(file) => handleFileRemove(file, idx)"
+              :class="{ 'display-only': !isAdmin }"
+            >
+            </el-upload>
           </div>
         </li>
       </ol>
@@ -60,7 +57,8 @@
     <el-card class="doc-section fancy" shadow="never">
       <template #header>
         <div class="card-header"><el-icon class="hd"><CircleCheck /></el-icon>三、校验模式说明</div>
-      </template>      <ul class="bullet">
+      </template>
+      <ul class="bullet">
         <li>严格模式：对投诉记录所需信息进行全面校验，涵盖日期、客户/供应商、工单/产品、发生地点、数量与类别等关键项；任何缺失或格式不符将直接阻止导入。适用于正式上线或数据质量要求高的场景。</li>
         <li>宽松模式：仅校验最关键的必填信息（如投诉日期与客户信息），其余缺失项可先导入，后续在系统内逐步补齐。适用于数据不完整或需要分步导入的情况。</li>
         <li>通用规则：两种模式都会进行基础格式校验（日期、数值范围、不重复性等），并生成校验报告；若报告仍有问题，建议先在Excel修复后再导入。</li>
@@ -72,7 +70,7 @@
         <div class="card-header"><el-icon class="hd"><QuestionFilled /></el-icon>四、常见问题与处理</div>
       </template>
       <ul class="bullet">
-        <li>导入失败：检查Excel格式、字段映射与校验报告中的错误信息；必要时切换为“宽松模式”。</li>
+        <li>导入失败：检查Excel格式、字段映射与校验报告中的错误信息；必要时切换为"宽松模式"。</li>
         <li>图片未显示：确保图片路径为HTTP可访问地址或受支持的上传目录（例如 uploads）。</li>
         <li>重复记录：请根据关键字段避免重复；系统不自动去重，必要时请先清理数据或使用初始化。</li>
       </ul>
@@ -83,7 +81,7 @@
         <div class="card-header"><el-icon class="hd"><Tools /></el-icon>五、数据表初始化（可选）</div>
       </template>
       <ul class="bullet">
-        <li>切换到“数据表初始化”标签，选择投诉登记记录，阅读风险提示，勾选全部确认项并“确认初始化”。</li>
+        <li>切换到"数据表初始化"标签，选择投诉登记记录，阅读风险提示，勾选全部确认项并"确认初始化"。</li>
         <li>结果反馈：系统弹出初始化结果对话框，成功后再执行批量导入。</li>
       </ul>
     </el-card>
@@ -105,7 +103,8 @@
             :auto-upload="false"
             :multiple="true"
             :on-change="onStepFilesSelected"
-            :on-remove="handleRemove"
+            :on-remove="handleDialogRemove"
+            :before-upload="beforeUpload"
             :file-list="[]"
             accept="image/*"
             list-type="picture-card"
@@ -123,18 +122,24 @@
         <el-button type="primary" :loading="uploading" @click="submitStepImages">提交</el-button>
       </template>
     </el-dialog>
+    
+    <!-- Element Plus 图片查看器 -->
+    <el-image-viewer
+      v-if="imageViewerVisible"
+      :url-list="previewImageUrls"
+      :initial-index="initialPreviewIndex"
+      @close="imageViewerVisible = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { useRouter } from 'vue-router'
 import { Document, Collection, CircleCheck, QuestionFilled, Tools, Plus } from '@element-plus/icons-vue'
-// 新增：批量导入步骤图片相关依赖（含刷新加载）
 import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import apiService from '@/services/apiService.js'
-import ImagePreview from '@/components/ImagePreview.vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const router = useRouter()
 
@@ -149,16 +154,16 @@ const goBack = () => {
 
 // 批量导入流程步骤（用于渲染步骤与图片区域）
 const steps2 = [
-  { text: '进入“系统管理 > 质量异常数据导入”。' },
+  { text: '进入"后台 > 质量管理 > 质量异常数据导入"执行批量导入。' },
   { text: '上传Excel文件（支持 .xlsx/.xls，单文件，20MB以内），如存在多个工作表，请先选择目标工作表。' },
   {
     text: '配置字段映射：',
     subBullets: [
-      '在“字段映射”步骤中选择要导入的字段，点击“智能映射”自动匹配列，或手动映射。',
+      '在"字段映射"步骤中选择要导入的字段，点击"智能映射"自动匹配列，或手动映射。',
       '目标表已固定为投诉登记记录。'
     ]
   },
-  { text: '导入确认：选择校验模式（严格/宽松），执行“数据校验”，通过后点击“开始导入”。' }
+  { text: '导入确认：选择校验模式（严格/宽松），执行"数据校验"，通过后点击"开始导入"。' }
 ]
 
 // 管理员状态（仅管理员可添加/提交图片）
@@ -173,32 +178,76 @@ const selectedFiles = ref([])
 const uploading = ref(false)
 const uploadRef = ref(null)
 
-// 计算文件服务基础地址（用于拼接附件访问路径）
-// 在生产环境中，Nginx 直接提供 /files 静态文件服务，不需要 API 路径
-const fileServerBase = computed(() => {
+// 图片预览相关状态
+const imageViewerVisible = ref(false)
+const previewImageUrls = ref([])
+const initialPreviewIndex = ref(0)
+
+/**
+ * 判断是否为开发环境
+ */
+const isDev = computed(() => {
   const base = apiService.baseURL || ''
-  // 如果是开发环境（localhost 或 127.0.0.1），使用代理路径
-  if (base.includes('localhost') || base.includes('127.0.0.1')) {
-    return base.replace(/\/$/, '').replace(/\/api$/, '')
-  }
-  // 生产环境直接使用当前域名，去掉 /api 部分
-  return window.location.origin
+  return base.includes('localhost') || base.includes('127.0.0.1')
 })
 
 /**
- * 打开添加图片弹窗（批量导入步骤）
- * 参数：idx 当前步骤索引
- * 说明：仅管理员可见，打开前会清理旧的选择状态
+ * 计算文件服务基础地址（用于拼接附件访问路径）
+ * - 开发环境：使用空字符串，让 Vite 代理处理 /files 路径
+ * - 生产环境：Nginx 在8080端口提供 /files 静态文件服务
  */
+const fileServerBase = computed(() => {
+  if (isDev.value) {
+    return ''
+  }
+  // 生产环境：Nginx 在8080端口提供 /files 静态文件服务
+  const protocol = window.location.protocol;
+  const hostname = window.location.hostname;
+  return `${protocol}//${hostname}:8080`;
+})
+
 /**
- * 移除文件处理函数
+ * 将内部图片数据转换为 el-upload 期望的格式
+ * @param {number} idx - 步骤索引
+ * @returns {Array} el-upload 格式的文件列表 { name, url, filePath }
+ */
+function getStepImageList(idx) {
+  // 直接返回已加载并格式化好的图片列表
+  return stepImages.value[idx] || []
+}
+
+/**
+ * 上传前校验
+ * @param {File} file - 待上传文件
+ * @returns {boolean} 是否允许上传
+ */
+function beforeUpload(file) {
+  // 校验文件类型
+  if (!file.type || !file.type.startsWith('image/')) {
+    ElMessage.error(`不支持的文件类型：${file.name}`)
+    return false
+  }
+  // 校验文件大小（5MB）
+  if (file.size > 5 * 1024 * 1024) {
+    ElMessage.error(`图片过大（>5MB）：${file.name}`)
+    return false
+  }
+  return true
+}
+
+/**
+ * 弹窗内移除文件处理函数
  * 用途：同步 selectedFiles 列表
  */
-const handleRemove = (removedFile, uploadFiles) => {
-  // 同步 selectedFiles 列表
-  selectedFiles.value = uploadFiles.map(f => f.raw);
-};
+function handleDialogRemove(removedFile, uploadFiles) {
+  selectedFiles.value = uploadFiles.map(f => f.raw)
+}
 
+/**
+ * 打开添加图片弹窗（批量导入步骤）
+ * @param {number} idx - 当前步骤索引
+ * 说明：仅管理员可见，打开前会清理旧的选择状态
+ */
 function openAddImages(idx) {
   if (!isAdmin.value) {
     ElMessage.error('仅管理员可添加图片')
@@ -228,22 +277,20 @@ function closeAddDialog() {
  * 用途：同步待上传文件列表
  */
 function onStepFilesSelected(changedFile, uploadFiles) {
-  // uploadFiles 是 el-upload 内部维护的完整文件列表
-  const rawFiles = uploadFiles.map(f => f.raw);
-
-  // 基础校验（可选，更适合在 before-upload 中做）
-  for (const f of rawFiles) {
-    if (!f.type || !f.type.startsWith('image/')) {
-      ElMessage.error(`不支持的文件类型：${f.name}`);
-      // 此处无法直接移除，仅提示
+  // 过滤掉不符合要求的文件
+  const validFiles = uploadFiles.filter(f => {
+    const file = f.raw
+    if (!file.type || !file.type.startsWith('image/')) {
+      return false
     }
-    if (f.size > 5 * 1024 * 1024) {
-      ElMessage.error(`图片过大（>5MB）：${f.name}`);
+    if (file.size > 5 * 1024 * 1024) {
+      return false
     }
-  }
+    return true
+  })
 
   // 同步 selectedFiles 列表，供 submitStepImages 使用
-  selectedFiles.value = rawFiles;
+  selectedFiles.value = validFiles.map(f => f.raw)
 }
 
 /**
@@ -268,10 +315,8 @@ async function submitStepImages() {
     uploading.value = true
     const customPath = `help-center/topic-batch-import/${addStepIndex.value}`
 
-    // 并发上传所有图片，使用与仪器台账使用指南相同的API调用方式
+    // 并发上传所有图片
     const uploadPromises = selectedFiles.value.map(file => {
-      // 使用专门为帮助中心设计的投诉附件上传接口
-      // 手动创建 FormData 并发送请求，确保 customPath 在请求体中传递
       const formData = new FormData()
       formData.append('file', file)
       formData.append('customPath', customPath)
@@ -288,18 +333,8 @@ async function submitStepImages() {
     if (failedUploads.length) {
       ElMessage.error(`${failedUploads.length} 张图片上传失败`)
     } else {
-      // 处理上传成功的图片
-      const uploadedImages = results.map(data => {
-        const rel = (data.relativePath || data?.data?.relativePath || '').replace(/\\/g, '/')
-        const relWithoutPrefix = rel.replace(/^attachments\//, '')
-        const filePath = `${fileServerBase.value}/files/attachments/${relWithoutPrefix}`
-        return { filePath, filename: data.filename, relativePath: rel }
-      })
-
-      if (!stepImages.value[addStepIndex.value]) stepImages.value[addStepIndex.value] = []
-      stepImages.value[addStepIndex.value].push(...uploadedImages)
-
-      ElMessage.success('所有图片上传成功')
+      // 上传成功后，调用刷新加载函数，而不是手动拼接
+      await loadPersistedStepImages() 
       closeAddDialog()
     }
   } catch (e) {
@@ -310,9 +345,37 @@ async function submitStepImages() {
 }
 
 /**
- * 构建批量导入页面的步骤图片存储路径 */
+ * 构建批量导入页面的步骤图片存储路径
+ * @param {number} idx - 步骤索引
+ * @returns {string} 存储路径
+ */
 function buildCustomPath(idx) {
   return `help-center/topic-batch-import/${idx}`
+}
+
+/**
+ * 构建图片访问URL
+ * @param {Object} imageInfo - 图片信息对象，包含 url, relativePath 等字段
+ * @returns {string} 完整的图片访问URL
+ */
+function buildImageUrl(imageInfo) {
+  // 1. 如果后端返回了完整的 url（以 /files 开头）
+  if (imageInfo.url && imageInfo.url.startsWith('/files')) {
+    return isDev.value ? imageInfo.url : `${fileServerBase.value}${imageInfo.url}`
+  }
+  
+  // 2. 如果后端返回了完整的 http/https URL，直接使用
+  if (imageInfo.url && (imageInfo.url.startsWith('http://') || imageInfo.url.startsWith('https://'))) {
+    return imageInfo.url
+  }
+  
+  // 3. 根据 relativePath 构建路径
+  const rel = (imageInfo.relativePath || imageInfo.url || '').replace(/\\/g, '/')
+  // 移除可能的 attachments/ 前缀
+  const cleanPath = rel.replace(/^attachments[\\\/]?/, '')
+  const staticUrl = `/files/attachments/${cleanPath}`
+  
+  return isDev.value ? staticUrl : `${fileServerBase.value}${staticUrl}`
 }
 
 /**
@@ -321,19 +384,21 @@ function buildCustomPath(idx) {
  */
 async function loadPersistedStepImages() {
   try {
-    const token = localStorage.getItem('token') || ''
     for (let i = 0; i < steps2.length; i++) {
       const customPath = buildCustomPath(i)
       try {
-        // 使用 apiService 调用 list-attachments 接口
         const response = await apiService.get(`/upload/list-attachments?customPath=${encodeURIComponent(customPath)}`)
         const data = response.data
         if (data?.success) {
           const list = Array.isArray(data.data) ? data.data : []
-          const images = list.map(it => ({
-            filePath: `${fileServerBase.value}${it.url}`,
-            filename: it.filename,
-            relativePath: it.relativePath
+          // 转换为 el-upload 标准格式，并兼容 url/relativePath
+          const images = list.map(item => ({
+            name: item.filename, // el-upload: name
+            url: buildImageUrl(item), // el-upload: url
+            status: 'success', // el-upload: status
+            // 保留原始数据，用于预览和删除
+            relativePath: item.relativePath,
+            raw: item // 原始数据
           }))
           if (images.length) {
             stepImages.value[i] = images
@@ -353,17 +418,91 @@ onMounted(() => {
 })
 
 /**
- * 删除回调：从当前步骤的图片列表中移除对应项（批量导入页）
+ * 图片预览处理函数
+ * 用途：处理el-upload组件的图片预览功能，支持在同一步骤的所有图片间切换
+ * @param {Object} file - 当前点击的文件对象
+ * @param {number} stepIdx - 步骤索引
  */
-function onImageDeleted(stepIdx, imgIndex) {
+function handlePictureCardPreview(file, stepIdx) {
+  // 聚合所有步骤的图片，用于在预览时左右切换
+  const allImages = Object.values(stepImages.value).flat()
+  if (!allImages.length) return
+
+  // 获取所有图片URL用于预览
+  previewImageUrls.value = allImages.map(img => img.url)
+  
+  // 找到当前点击图片的索引
+  const clickedUrl = file.url
+  const clickedIndex = allImages.findIndex(img => img.url === clickedUrl)
+  initialPreviewIndex.value = clickedIndex >= 0 ? clickedIndex : 0
+  
+  imageViewerVisible.value = true
+}
+
+/**
+ * 文件删除处理函数
+ * 用途：处理el-upload组件的文件删除确认，调用后端接口执行物理删除
+ * @param {Object} file - 待删除的文件对象（el-upload格式）
+ * @param {number} stepIdx - 步骤索引
+ * @returns {Promise<boolean>} 是否允许删除
+ */
+async function handleFileRemove(file, stepIdx) {
+  if (!isAdmin.value) {
+    ElMessage.error('仅管理员可删除图片');
+    return Promise.reject(false);
+  }
+
   try {
-    const arr = stepImages.value[stepIdx] || []
-    if (!arr.length) return
-    arr.splice(imgIndex, 1)
-    stepImages.value[stepIdx] = [...arr]
-    ElMessage.success('已从当前步骤移除图片')
-  } catch (e) {
-    ElMessage.error(`移除失败：${e?.message || e}`)
+    await ElMessageBox.confirm(
+      '确定要删除这张图片吗？此操作将从服务器永久删除文件。',
+      '确认删除',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning',
+      }
+    );
+
+    // 从 file.raw.relativePath 中提取正确的相对路径
+    // 后端需要的是 'attachments' 目录之后的部分
+    const fullRelativePath = file.raw.relativePath || '';
+    const pathParts = fullRelativePath.split(/[\\\/]/);
+    const attachmentsIndex = pathParts.indexOf('attachments');
+    const correctRelativePath = attachmentsIndex > -1 
+      ? pathParts.slice(attachmentsIndex + 1).join('/') 
+      : fullRelativePath;
+
+    if (!correctRelativePath) {
+        ElMessage.error('无法确定文件路径，删除失败');
+        return Promise.reject(false);
+    }
+
+    const response = await apiService.delete('/upload/attachment', {
+      data: { relativePath: correctRelativePath },
+    });
+
+    if (response.data?.success) {
+      ElMessage.success('图片已成功删除');
+      if (stepImages.value[stepIdx]) {
+        const imageIndex = stepImages.value[stepIdx].findIndex(
+          (img) => img.url === file.url
+        );
+        if (imageIndex !== -1) {
+          stepImages.value[stepIdx].splice(imageIndex, 1);
+        }
+      }
+      return true;
+    } else {
+      ElMessage.error(response.data?.message || '删除失败');
+      return Promise.reject(false);
+    }
+  } catch (error) {
+    if (error === 'cancel') {
+      ElMessage.info('已取消删除');
+    } else {
+      ElMessage.error(`删除操作失败: ${error?.message || '未知错误'}`);
+    }
+    return Promise.reject(false);
   }
 }
 </script>
@@ -377,7 +516,7 @@ function onImageDeleted(stepIdx, imgIndex) {
 .bullet { list-style: none; padding-left: 0; }
 .bullet li { position: relative; padding-left: 22px; margin: 6px 0; line-height: 1.7; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px; padding: 8px 10px 8px 22px; color: #333; }
 .bullet li::before { content: ""; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border-radius: 50%; background: #a0c4ff; box-shadow: 0 2px 4px rgba(160,196,255,.4); }
-/* 基础主题与卡片风格：与“内部投诉操作指南”保持一致 */
+/* 基础主题与卡片风格：与"内部投诉操作指南"保持一致 */
 .doc-theme { max-width: 1000px; margin: 0 auto; }
 .doc-header h1 { display: flex; align-items: center; gap: 8px; }
 .fancy { border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
@@ -388,7 +527,7 @@ function onImageDeleted(stepIdx, imgIndex) {
 /* 步骤内操作与图片区域样式（与内部投诉说明页保持一致） */
 .step-text { font-size: 14px; color: #333; }
 .step-actions { margin-top: 8px; }
-.step-images { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 10px; margin-top: 8px; }
+.step-images { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 
 /* 添加步骤图片弹窗样式 */
 .add-dialog-body { display: flex; flex-direction: column; gap: 12px; }
