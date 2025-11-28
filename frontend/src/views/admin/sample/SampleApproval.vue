@@ -1191,27 +1191,33 @@ function handleEdit(row) {
   }
   
   // 处理多图片路径加载到文件列表（编辑模式下显示已有文件）
-  if (formData.productDrawing) {
-    const drawingPaths = formData.productDrawing.split(';').filter(path => path.trim())
-    drawingFileList.value = drawingPaths.map((path, index) => ({
-      name: `图纸${index + 1}`,
-      url: path,
-      status: 'success' // 标记为已上传状态
-    }))
-  } else {
-    drawingFileList.value = []
-  }
-  
-  if (formData.colorCardImage) {
-    const colorCardPaths = formData.colorCardImage.split(';').filter(path => path.trim())
-    colorCardFileList.value = colorCardPaths.map((path, index) => ({
-      name: `色卡${index + 1}`,
-      url: path,
-      status: 'success' // 标记为已上传状态
-    }))
-  } else {
-    colorCardFileList.value = []
-  }
+if (formData.productDrawing) {
+  const drawingPaths = formData.productDrawing.split(';').filter(path => path.trim())
+  drawingFileList.value = drawingPaths.map((path, index) => ({
+    name: `图纸${index + 1}`,
+    url: getAdaptedImageUrl(path),  // 使用完整URL用于显示
+    originalPath: path,  // 保存原始路径用于保存
+    status: 'success',
+    uid: Date.now() + index
+  }))
+  console.log('✓ 产品图纸加载完成，数量:', drawingFileList.value.length)
+} else {
+  drawingFileList.value = []
+}
+
+if (formData.colorCardImage) {
+  const colorCardPaths = formData.colorCardImage.split(';').filter(path => path.trim())
+  colorCardFileList.value = colorCardPaths.map((path, index) => ({
+    name: `色卡${index + 1}`,
+    url: getAdaptedImageUrl(path),  // 使用完整URL用于显示
+    originalPath: path,  // 保存原始路径用于保存
+    status: 'success',
+    uid: Date.now() + index + 1000
+  }))
+  console.log('✓ 色卡图像加载完成，数量:', colorCardFileList.value.length)
+} else {
+  colorCardFileList.value = []
+}
   
   // 重新计算到期日期（以防数据不一致）
   calculateExpiryDate()
@@ -1760,10 +1766,11 @@ function handleDrawingFileRemove(file, fileList) {
   drawingFileList.value = fileList
   
   // 同步更新formData中的productDrawing字段
+  // 使用 originalPath 而不是 url
   const remainingPaths = fileList
-    .filter(f => f.url && !f.raw) // 只保留已上传的文件（有url且没有raw的）
-    .map(f => f.url)
-    .filter(path => path.trim()) // 过滤空路径
+    .filter(f => f.status === 'success')
+    .map(f => f.originalPath || extractPathFromUrl(f.url))  // 优先使用原始路径
+    .filter(path => path)
   
   formData.productDrawing = remainingPaths.join(';')
   console.log('产品图纸删除后更新formData.productDrawing:', formData.productDrawing)
@@ -1783,10 +1790,11 @@ function handleColorCardFileRemove(file, fileList) {
   colorCardFileList.value = fileList
   
   // 同步更新formData中的colorCardImage字段
+  // 使用 originalPath 而不是 url
   const remainingPaths = fileList
-    .filter(f => f.url && !f.raw) // 只保留已上传的文件（有url且没有raw的）
-    .map(f => f.url)
-    .filter(path => path.trim()) // 过滤空路径
+    .filter(f => f.status === 'success')
+    .map(f => f.originalPath || extractPathFromUrl(f.url))  // 优先使用原始路径
+    .filter(path => path)
   
   formData.colorCardImage = remainingPaths.join(';')
   console.log('色卡图像删除后更新formData.colorCardImage:', formData.colorCardImage)
@@ -1796,16 +1804,19 @@ function handleColorCardFileRemove(file, fileList) {
  * 产品图纸预览处理
  */
 function handleDrawingPreview(file) {
+  console.log('预览图纸文件:', file)
+  
   if (file.url && !file.raw) {
-    // 已上传的文件，使用getAdaptedImageUrl确保URL正确构建
-    const adaptedUrl = getAdaptedImageUrl(file.url)
-    previewImageUrls.value = [adaptedUrl]
+    // 已上传的文件，file.url 已经是完整URL，直接使用
+    previewImageUrls.value = [file.url]  // ✅ 直接使用，不再调用 getAdaptedImageUrl
     imageViewerVisible.value = true
+    console.log('使用已处理的URL预览:', file.url)
   } else if (file.raw) {
     // 新选择的文件，创建临时URL预览
     const tempUrl = URL.createObjectURL(file.raw)
     previewImageUrls.value = [tempUrl]
     imageViewerVisible.value = true
+    console.log('使用临时URL预览:', tempUrl)
   }
 }
 
@@ -1813,16 +1824,19 @@ function handleDrawingPreview(file) {
  * 色卡图像预览处理
  */
 function handleColorCardPreview(file) {
+  console.log('预览色卡文件:', file)
+  
   if (file.url && !file.raw) {
-    // 已上传的文件，使用getAdaptedImageUrl确保URL正确构建
-    const adaptedUrl = getAdaptedImageUrl(file.url)
-    previewImageUrls.value = [adaptedUrl]
+    // 已上传的文件，file.url 已经是完整URL，直接使用
+    previewImageUrls.value = [file.url]  // ✅ 直接使用，不再调用 getAdaptedImageUrl
     imageViewerVisible.value = true
+    console.log('使用已处理的URL预览:', file.url)
   } else if (file.raw) {
     // 新选择的文件，创建临时URL预览
     const tempUrl = URL.createObjectURL(file.raw)
     previewImageUrls.value = [tempUrl]
     imageViewerVisible.value = true
+    console.log('使用临时URL预览:', tempUrl)
   }
 }
 
@@ -2137,6 +2151,30 @@ async function handleSubmit() {
     ElMessage.error('保存失败')
   } finally {
     loading.value = false
+  }
+}
+
+/**
+ * 从完整URL中提取原始路径
+ * @param {string} url - 完整的图片URL
+ * @returns {string} 提取的路径
+ */
+function extractPathFromUrl(url) {
+  if (!url) return ''
+  
+  // 如果包含 /files/，提取该部分
+  const match = url.match(/\/files\/.+/)
+  if (match) {
+    return match[0]
+  }
+  
+  // 如果是完整URL，提取路径部分
+  try {
+    const urlObj = new URL(url)
+    return urlObj.pathname
+  } catch (e) {
+    // 如果不是有效URL，直接返回
+    return url
   }
 }
 
