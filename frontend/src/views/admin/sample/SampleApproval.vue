@@ -184,19 +184,21 @@
     <!-- 数据表格 -->
     <el-card class="table-card" shadow="never">
       <el-table
-        :data="tableData"
+        :data="sortedTableData"
         v-loading="loading"
         @selection-change="handleSelectionChange"
+        @sort-change="handleSortChange"
+        :default-sort="{ prop: 'certificateNo', order: 'descending' }"
         stripe
         border
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="certificateNo" label="样板编号" width="120" fixed="left" align="center" header-align="center" />
-        <el-table-column prop="customerNo" label="客户编号" width="100" align="center" header-align="center" />
-        <el-table-column prop="workOrderNo" label="工单号" width="120" align="center" header-align="center" />
-        <el-table-column prop="productNo" label="产品编号" width="160" align="center" header-align="center" class-name="no-wrap-column" />
-        <el-table-column prop="productName" label="品名" width="200" show-overflow-tooltip />
-        <el-table-column prop="productSpec" label="产品规格" width="150" align="center" header-align="center" show-overflow-tooltip />
+        <el-table-column prop="certificateNo" label="样板编号" width="120" fixed="left" align="center" header-align="center" sortable="custom" />
+        <el-table-column prop="customerNo" label="客户编号" width="100" align="center" header-align="center" sortable="custom" />
+        <el-table-column prop="workOrderNo" label="工单号" width="120" align="center" header-align="center" sortable="custom" />
+        <el-table-column prop="productNo" label="产品编号" width="160" align="center" header-align="center" class-name="no-wrap-column" sortable="custom" />
+        <el-table-column prop="productName" label="品名" width="200" show-overflow-tooltip sortable />
+        <el-table-column prop="productSpec" label="产品规格" width="150" align="center" header-align="center" show-overflow-tooltip sortable />
         <el-table-column label="图片预览" width="100" align="center" header-align="center">
           <template #default="scope">
             <el-button 
@@ -210,15 +212,15 @@
             <span v-else>-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="colorCardQuantity" label="色卡数量(本)" width="100" align="center" header-align="center" />
-        <el-table-column prop="createDate" label="制作日期" width="120" align="center" header-align="center" />
-        <el-table-column prop="creator" label="制作人" width="100" align="center" header-align="center" show-overflow-tooltip />
-        <el-table-column prop="follower" label="跟单员" width="100" align="center" header-align="center" show-overflow-tooltip />
-        <el-table-column prop="returnQuantity" label="回签数量(本)" width="100" align="center" header-align="center" />
-        <el-table-column prop="signer" label="签字人" width="100" align="center" header-align="center" show-overflow-tooltip />
-        <el-table-column prop="signDate" label="签字日期" width="120" align="center" header-align="center" />
-        <el-table-column prop="receiver" label="签收人" width="100" align="center" header-align="center" show-overflow-tooltip />
-        <el-table-column prop="receiveDate" label="签收日期" width="120" align="center" header-align="center" />
+        <el-table-column prop="colorCardQuantity" label="色卡数量(本)" width="100" align="center" header-align="center" sortable />
+        <el-table-column prop="createDate" label="制作日期" width="120" align="center" header-align="center" sortable />
+        <el-table-column prop="creator" label="制作人" width="100" align="center" header-align="center" show-overflow-tooltip sortable />
+        <el-table-column prop="follower" label="跟单员" width="100" align="center" header-align="center" show-overflow-tooltip sortable />
+        <el-table-column prop="returnQuantity" label="回签数量(本)" width="100" align="center" header-align="center" sortable />
+        <el-table-column prop="signer" label="签字人" width="100" align="center" header-align="center" show-overflow-tooltip sortable />
+        <el-table-column prop="signDate" label="签字日期" width="120" align="center" header-align="center" sortable />
+        <el-table-column prop="receiver" label="签收人" width="100" align="center" header-align="center" show-overflow-tooltip sortable />
+        <el-table-column prop="receiveDate" label="签收日期" width="120" align="center" header-align="center" sortable />
         <el-table-column label="判定" width="100" align="center" header-align="center">
           <template #default="scope">
             <el-tag :type="getJudgmentType(scope.row.judgment)">{{ scope.row.judgment }}</el-tag>
@@ -230,7 +232,7 @@
             <el-tag :type="getSampleStatusType(scope.row.sampleStatus)">{{ scope.row.sampleStatus }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="expiryDate" label="到期日期" width="120" align="center" header-align="center" />
+        <el-table-column prop="expiryDate" label="到期日期" width="120" align="center" header-align="center" sortable />
         <el-table-column label="操作" width="160" fixed="right" align="center" header-align="center">
           <template #default="scope">
             <el-button type="primary" link @click="handleEdit(scope.row)" :disabled="!canEdit">编辑</el-button>
@@ -256,11 +258,13 @@
 
     <!-- 新增/编辑对话框 -->
     <el-dialog
-      :title="dialogTitle"
-      v-model="dialogVisible"
-      width="44%"
-      :before-close="handleDialogClose"
-    >
+  :title="dialogTitle"
+  v-model="dialogVisible"
+  width="44%"
+  :before-close="handleDialogClose"
+  append-to-body
+  :lock-scroll="true"
+>
       <el-form
         :model="formData"
         :rules="formRules"
@@ -745,6 +749,12 @@ const searchForm = reactive({
 // 表格数据
 const tableData = ref([])
 
+// 排序状态
+const sortState = reactive({
+  prop: 'certificateNo',
+  order: 'descending'
+})
+
 // 分页数据
 const pagination = reactive({
   currentPage: 1,
@@ -804,6 +814,46 @@ const dialogTitle = computed(() => {
 })
 
 /**
+ * 排序后的表格数据
+ * 应用自然排序算法到指定的列
+ */
+const sortedTableData = computed(() => {
+  if (!sortState.prop || !sortState.order || sortState.order === 'null') {
+    return tableData.value
+  }
+  
+  // 需要使用自然排序的字段
+  const naturalSortFields = ['certificateNo', 'customerNo', 'workOrderNo', 'productNo']
+  
+  const data = [...tableData.value]
+  const isAscending = sortState.order === 'ascending'
+  
+  // 如果是需要自然排序的字段
+  if (naturalSortFields.includes(sortState.prop)) {
+    return data.sort((a, b) => {
+      return naturalSort(a[sortState.prop], b[sortState.prop], isAscending)
+    })
+  } else {
+    // 其他字段使用默认排序
+    return data.sort((a, b) => {
+      const aVal = a[sortState.prop]
+      const bVal = b[sortState.prop]
+      
+      if (aVal === bVal) return 0
+      if (aVal === null || aVal === undefined) return 1
+      if (bVal === null || bVal === undefined) return -1
+      
+      if (typeof aVal === 'number' && typeof bVal === 'number') {
+        return isAscending ? aVal - bVal : bVal - aVal
+      }
+      
+      const result = String(aVal).localeCompare(String(bVal), 'zh-CN')
+      return isAscending ? result : -result
+    })
+  }
+})
+
+/**
  * 获取人员列表
  */
 async function loadPersonList() {
@@ -815,6 +865,53 @@ async function loadPersonList() {
   } catch (error) {
     console.error('获取人员列表失败:', error)
   }
+}
+
+// ==================== 自然排序算法 ====================
+/**
+ * 自然排序比较函数
+ * 支持字母+数字混合排序,例如: A1, A2, A10, A20, B1, B2...
+ * @param {string} a - 第一个字符串
+ * @param {string} b - 第二个字符串
+ * @param {boolean} ascending - 是否升序,默认true
+ * @returns {number} - 比较结果
+ */
+function naturalSort(a, b, ascending = true) {
+  // 处理空值
+  if (!a && !b) return 0
+  if (!a) return ascending ? 1 : -1
+  if (!b) return ascending ? -1 : 1
+  
+  // 转换为字符串
+  a = String(a)
+  b = String(b)
+  
+  // 提取字符串中的数字和非数字部分
+  const re = /(\d+)|(\D+)/g
+  const aParts = a.match(re) || []
+  const bParts = b.match(re) || []
+  
+  // 逐部分比较
+  for (let i = 0; i < Math.max(aParts.length, bParts.length); i++) {
+    const aPart = aParts[i] || ''
+    const bPart = bParts[i] || ''
+    
+    // 如果都是数字,按数值比较
+    if (/^\d+$/.test(aPart) && /^\d+$/.test(bPart)) {
+      const diff = parseInt(aPart, 10) - parseInt(bPart, 10)
+      if (diff !== 0) {
+        return ascending ? diff : -diff
+      }
+    } else {
+      // 否则按字符串比较
+      const diff = aPart.localeCompare(bPart, 'zh-CN')
+      if (diff !== 0) {
+        return ascending ? diff : -diff
+      }
+    }
+  }
+  
+  return 0
 }
 
 /**
@@ -984,6 +1081,33 @@ async function handleAdd() {
 }
 
 /**
+ * 根据部门名称查找部门ID
+ * @param {Array<string>} deptNames - 部门名称数组
+ * @returns {Array<number>} - 部门ID数组
+ */
+function findDepartmentIdsByNames(deptNames) {
+  const ids = []
+  
+  // 递归查找部门树中的部门ID
+  function searchInTree(nodes, names) {
+    for (const node of nodes) {
+      if (names.includes(node.Name)) {
+        ids.push(node.ID)
+      }
+      if (node.children && node.children.length > 0) {
+        searchInTree(node.children, names)
+      }
+    }
+  }
+  
+  if (departmentTree.value && departmentTree.value.length > 0) {
+    searchInTree(departmentTree.value, deptNames)
+  }
+  
+  return ids
+}
+
+/**
  * 编辑处理
  * 支持多图片路径的加载和显示
  */
@@ -997,6 +1121,70 @@ function handleEdit(row) {
   resetForm()
   Object.assign(formData, { ...row })
   
+  // ==================== 处理分发部门数据格式 ====================
+  // 将后端返回的各种可能格式统一转换为数组格式
+  if (row.distributionDepartment) {
+    console.log('原始分发部门数据:', row.distributionDepartment, '类型:', typeof row.distributionDepartment)
+    
+    // 情况1: 已经是数组，直接使用
+    if (Array.isArray(row.distributionDepartment)) {
+      formData.distributionDepartment = row.distributionDepartment
+      console.log('分发部门是数组，直接使用:', formData.distributionDepartment)
+    }
+    // 情况2: 是字符串，需要解析
+    else if (typeof row.distributionDepartment === 'string') {
+      const trimmed = row.distributionDepartment.trim()
+      
+      // 情况2.1: JSON字符串 "[1,2,3]"
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+        try {
+          formData.distributionDepartment = JSON.parse(trimmed)
+          console.log('分发部门是JSON字符串，解析为:', formData.distributionDepartment)
+        } catch (e) {
+          console.error('解析分发部门JSON失败:', e)
+          formData.distributionDepartment = []
+        }
+      }
+      // 情况2.2: 逗号分隔的ID字符串 "1,2,3"
+      else if (/^\d+(,\d+)*$/.test(trimmed)) {
+        formData.distributionDepartment = trimmed.split(',').map(id => parseInt(id.trim(), 10))
+        console.log('分发部门是逗号分隔的ID，解析为:', formData.distributionDepartment)
+      }
+      // 情况2.3: 逗号分隔的部门名称 "生产部,质检部"
+      else if (trimmed.includes(',')) {
+        // 需要通过部门名称查找部门ID
+        const deptNames = trimmed.split(',').map(name => name.trim())
+        formData.distributionDepartment = findDepartmentIdsByNames(deptNames)
+        console.log('分发部门是部门名称，转换为ID:', formData.distributionDepartment)
+      }
+      // 情况2.4: 单个ID字符串 "1"
+      else if (/^\d+$/.test(trimmed)) {
+        formData.distributionDepartment = [parseInt(trimmed, 10)]
+        console.log('分发部门是单个ID字符串，转换为:', formData.distributionDepartment)
+      }
+      // 情况2.5: 单个部门名称 "生产部"
+      else {
+        const deptIds = findDepartmentIdsByNames([trimmed])
+        formData.distributionDepartment = deptIds
+        console.log('分发部门是单个部门名称，转换为:', formData.distributionDepartment)
+      }
+    }
+    // 情况3: 是数字（单个部门ID）
+    else if (typeof row.distributionDepartment === 'number') {
+      formData.distributionDepartment = [row.distributionDepartment]
+      console.log('分发部门是单个数字ID，转换为数组:', formData.distributionDepartment)
+    }
+    // 情况4: 其他类型，设为空数组
+    else {
+      formData.distributionDepartment = []
+      console.warn('分发部门数据格式未知，设为空数组:', row.distributionDepartment)
+    }
+  } else {
+    // 没有分发部门数据
+    formData.distributionDepartment = []
+    console.log('没有分发部门数据，设为空数组')
+  }
+
   // 如果没有有效期字段，设置默认值
   if (!formData.validityPeriod) {
     formData.validityPeriod = 1
@@ -1351,6 +1539,16 @@ async function handleBatchDelete() {
  */
 function handleSelectionChange(selection) {
   selectedRows.value = selection
+}
+
+/**
+ * 处理表格排序变化
+ * @param {Object} param0 - 排序参数
+ */
+function handleSortChange({ column, prop, order }) {
+  console.log('排序变化:', { prop, order })
+  sortState.prop = prop
+  sortState.order = order
 }
 
 /**
@@ -1946,17 +2144,56 @@ async function handleSubmit() {
 onMounted(async () => {
   // 首先进行权限检查
   await checkPermissions()
-  
+
   // 然后加载页面数据
   loadTableData()
   loadPersonList()
   loadDepartmentTree()
+  
+  // 应用默认排序
+  sortState.prop = 'certificateNo'
+  sortState.order = 'descending'
 })
 </script>
 
 <style scoped>
+
+:deep(.el-row) {
+  margin-left: 0 !important;
+  margin-right: 0 !important;
+}
+
+/* 修复 el-col 的 padding */
+:deep(.el-col) {
+  padding-left: 8px !important;
+  padding-right: 8px !important;
+}
+
+/* 确保卡片容器不会溢出 */
+:deep(.el-card) {
+  box-sizing: border-box;
+  margin-bottom: 16px;
+}
+
+/* 确保表单不会导致滚动 */
+:deep(.el-form) {
+  box-sizing: border-box;
+}
+
+/* 修复分页容器 */
+.pagination-wrapper {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+  margin-bottom: 0; /* 确保底部没有额外 margin */
+  padding-bottom: 0;
+}
+
 .sample-approval {
   padding: 20px;
+  box-sizing: border-box;
+  overflow: hidden; /* 防止内部元素导致滚动 */
+  height: 100%; /* 如果父容器有固定高度 */
 }
 
 .page-header {
@@ -2386,9 +2623,56 @@ onMounted(async () => {
 /* 表格内容禁止换行 */
 .table-card :deep(.el-table__body td),
 .table-card :deep(.el-table__header th) {
-  white-space: nowrap;
+  white-space: nowrap !important;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* 单元格内的 .cell 容器禁止换行 */
+.table-card :deep(.el-table__body td .cell),
+.table-card :deep(.el-table__header th .cell) {
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+/* 品名列强制单行显示 */
+.table-card :deep(.el-table__body td .cell) {
+  white-space: nowrap !important;
+  word-break: keep-all !important;
+  word-wrap: normal !important;
+}
+
+/* El-tag 标签内容禁止换行 */
+.table-card :deep(.el-table__body td .el-tag) {
+  white-space: nowrap !important;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+/* 操作列按钮不换行 - 增强版 */
+.table-card :deep(.el-table__body td .el-button) {
+  margin-right: 8px;
+  white-space: nowrap !important;
+  flex-shrink: 0;
+}
+
+/* 操作列容器不换行 */
+.table-card :deep(.el-table__body td:last-child .cell) {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 确保所有文本内容都不换行 */
+.table-card :deep(.el-table__body td),
+.table-card :deep(.el-table__body td *) {
+  white-space: nowrap !important;
 }
 
 /* 操作列按钮不换行 */
