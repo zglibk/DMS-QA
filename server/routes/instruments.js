@@ -7,9 +7,11 @@
  * 3. 年度校准计划管理
  * 4. 年度检定计划和实施表导出
  * 5. 管理编号自动生成
+ * 6. 校准证书文件上传和下载
  * 
- * 版本：v1.0
+ * 版本：v1.1
  * 创建日期：2025-09-29
+ * 更新日期：2025-11-29 - 添加证书文件上传功能
  */
 
 const express = require('express');
@@ -19,6 +21,56 @@ const { getConnection } = require('../db');
 const { authenticateToken, checkPermission } = require('../middleware/auth');
 const ExcelJS = require('exceljs');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+
+// =====================================================
+// 文件上传配置
+// =====================================================
+
+// 确保上传目录存在
+const uploadDir = path.join(__dirname, '../uploads/certificates');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// 配置multer存储
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    // 保留原文件名，添加时间戳后缀以区分
+    // 格式：原文件名_时间戳.扩展名
+    const ext = path.extname(file.originalname);
+    const baseName = path.basename(file.originalname, ext);
+    // 清理文件名中的特殊字符，保留中文、字母、数字、下划线、短横线
+    const cleanBaseName = baseName.replace(/[^\u4e00-\u9fa5a-zA-Z0-9_\-]/g, '_');
+    const timestamp = Date.now();
+    const filename = `${cleanBaseName}_${timestamp}${ext}`;
+    cb(null, filename);
+  }
+});
+
+// 文件过滤器
+const fileFilter = (req, file, cb) => {
+  // 允许的文件类型
+  const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('只允许上传 PDF、JPG、PNG 格式的文件'), false);
+  }
+};
+
+// 创建multer实例
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 限制10MB
+  }
+});
 
 // =====================================================
 // 管理编号生成功能
@@ -448,7 +500,8 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       recommendations,      // 添加建议字段
       environmentalConditions,
       calibrationCycle,
-      remarks
+      remarks,
+      certificateFile       // 添加证书文件字段
     } = req.body;
 
     // 验证必填字段
@@ -506,11 +559,11 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       INSERT INTO CalibrationResults (
         ResultCode, InstrumentID, InstrumentCode, ManagementCode, CalibrationDate, CalibrationAgency, CertificateNumber,
         CalibrationStandard, CalibrationResult, ExpiryDate, NextCalibrationDate, CalibrationCost, 
-        CalibrationData, Issues, Recommendations, EnvironmentalConditions, CalibrationCycle, Remarks, CreatedBy, CreatedAt
+        CalibrationData, Issues, Recommendations, EnvironmentalConditions, CalibrationCycle, Remarks, Attachments, CreatedBy, CreatedAt
       ) VALUES (
         @resultCode, @instrumentID, @instrumentCode, @managementCode, @calibrationDate, @calibrationAgency, @certificateNumber,
         @calibrationStandard, @calibrationResult, @expiryDate, @nextCalibrationDate, @calibrationCost,
-        @calibrationData, @issues, @recommendations, @environmentalConditions, @calibrationCycle, @remarks, @createdBy, GETDATE()
+        @calibrationData, @issues, @recommendations, @environmentalConditions, @calibrationCycle, @remarks, @certificateFile, @createdBy, GETDATE()
       );
       SELECT SCOPE_IDENTITY() as ID;
     `;
@@ -534,6 +587,7 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       .input('environmentalConditions', sql.NVarChar, environmentalConditions || null)
       .input('calibrationCycle', sql.Int, calibrationCycle || null)
       .input('remarks', sql.NVarChar, remarks || null)
+      .input('certificateFile', sql.NVarChar, certificateFile || null)
       .input('createdBy', sql.Int, req.user.id)
       .query(insertQuery);
 
@@ -550,6 +604,147 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
     res.status(500).json({
       code: 500,
       message: '创建校准结果记录失败',
+      error: error.message
+    });
+  }
+});
+
+// =====================================================
+// 校准证书文件上传和下载
+// =====================================================
+
+/**
+ * 上传校准证书文件
+ * POST /api/instruments/calibration-results/upload-certificate
+ */
+router.post('/calibration-results/upload-certificate', authenticateToken, upload.single('file'), async (req, res) => {
+  try {
+    // 检查是否有文件上传
+    if (!req.file) {
+      return res.status(400).json({
+        code: 400,
+        message: '请选择要上传的文件'
+      });
+    }
+
+    // 返回上传成功的文件信息
+    res.json({
+      code: 200,
+      data: {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size,
+        mimetype: req.file.mimetype,
+        path: `/uploads/certificates/${req.file.filename}`
+      },
+      message: '文件上传成功'
+    });
+
+  } catch (error) {
+    console.error('上传校准证书文件失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '文件上传失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取/下载校准证书文件
+ * GET /api/instruments/calibration-results/:id/certificate
+ */
+router.get('/calibration-results/:id/certificate', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = await getConnection();
+
+    // 查询校准结果记录，获取证书文件名（使用Attachments字段）
+    const query = `SELECT Attachments FROM CalibrationResults WHERE ID = @id`;
+    const result = await pool.request()
+      .input('id', sql.Int, id)
+      .query(query);
+
+    if (result.recordset.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        message: '校准结果记录不存在'
+      });
+    }
+
+    const certificateFile = result.recordset[0].Attachments;
+    if (!certificateFile) {
+      return res.status(404).json({
+        code: 404,
+        message: '该记录没有关联的证书文件'
+      });
+    }
+
+    // 构建文件路径
+    const filePath = path.join(uploadDir, certificateFile);
+
+    // 检查文件是否存在
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        code: 404,
+        message: '证书文件不存在'
+      });
+    }
+
+    // 发送文件
+    res.download(filePath, certificateFile);
+
+  } catch (error) {
+    console.error('下载校准证书文件失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '下载文件失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 查看校准证书文件（用于在线预览）
+ * GET /api/instruments/files/certificate/:filename
+ */
+router.get('/files/certificate/:filename', authenticateToken, (req, res) => {
+  try {
+    const { filename } = req.params;
+    
+    // 安全检查：防止路径遍历攻击
+    const safeFilename = path.basename(filename);
+    const filePath = path.join(uploadDir, safeFilename);
+
+    // 检查文件是否存在
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        code: 404,
+        message: '文件不存在'
+      });
+    }
+
+    // 根据文件扩展名设置Content-Type
+    const ext = path.extname(safeFilename).toLowerCase();
+    const mimeTypes = {
+      '.pdf': 'application/pdf',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg',
+      '.png': 'image/png'
+    };
+
+    const contentType = mimeTypes[ext] || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+    
+    // 发送文件流
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+
+  } catch (error) {
+    console.error('查看校准证书文件失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '查看文件失败',
       error: error.message
     });
   }
@@ -957,6 +1152,7 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
         cr.Issues,
         cr.Recommendations,
         cr.Remarks,
+        cr.Attachments as CertificateFile,
         cr.CreatedAt,
         cr.UpdatedAt
       FROM CalibrationResults cr
@@ -2096,7 +2292,8 @@ router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
       recommendations,      // 添加建议字段
       environmentalConditions,
       calibrationCycle,     // 添加校准周期字段
-      remarks
+      remarks,
+      certificateFile       // 添加证书文件字段
     } = req.body;
 
     // 验证必填字段
@@ -2157,6 +2354,7 @@ router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
         EnvironmentalConditions = @environmentalConditions,
         CalibrationCycle = @calibrationCycle,
         Remarks = @remarks,
+        Attachments = @certificateFile,
         UpdatedAt = GETDATE()
       WHERE ID = @id
     `;
@@ -2181,6 +2379,7 @@ router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
       .input('environmentalConditions', sql.NVarChar, environmentalConditions || null)
       .input('calibrationCycle', sql.Int, calibrationCycle || null)
       .input('remarks', sql.NVarChar, remarks || null)
+      .input('certificateFile', sql.NVarChar, certificateFile || null)
       .query(updateQuery);
 
     res.json({

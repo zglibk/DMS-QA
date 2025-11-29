@@ -389,27 +389,68 @@
           />
         </el-form-item>
         <el-form-item label="证书文件" prop="certificateFile">
-          <el-upload
-            ref="uploadRef"
-            :action="uploadUrl"
-            :headers="uploadHeaders"
-            :on-success="handleUploadSuccess"
-            :on-error="handleUploadError"
-            :before-upload="beforeUpload"
-            :file-list="fileList"
-            accept=".pdf,.jpg,.jpeg,.png"
-            :limit="1"
-          >
-            <el-button type="primary">
+          <div class="certificate-upload-wrapper">
+            <!-- 未选择仪器时显示的禁用按钮 -->
+            <el-button 
+              v-if="!calibrationForm.instrumentID" 
+              type="primary" 
+              @click="checkInstrumentBeforeUpload"
+            >
               <el-icon><Upload /></el-icon>
-              上传证书
+              选择证书
             </el-button>
-            <template #tip>
-              <div class="el-upload__tip">
-                支持 PDF、JPG、PNG 格式，文件大小不超过 10MB
+            <!-- 已选择仪器时显示正常的上传组件 -->
+            <el-upload
+              v-else
+              ref="uploadRef"
+              :auto-upload="false"
+              :on-change="handleFileChange"
+              :on-remove="handleRemove"
+              :before-upload="beforeUpload"
+              :file-list="fileList"
+              accept=".pdf,.jpg,.jpeg,.png"
+              :limit="1"
+              :on-exceed="handleExceed"
+            >
+              <el-button type="primary">
+                <el-icon><Upload /></el-icon>
+                选择证书
+              </el-button>
+            </el-upload>
+            <div class="el-upload__tip">
+              支持 PDF、JPG、PNG 格式，文件大小不超过 10MB
+            </div>
+          </div>
+          <!-- 文件预览区域 -->
+          <div v-if="previewFile" class="file-preview">
+            <el-card shadow="hover" class="preview-card">
+              <div class="preview-header">
+                <el-icon :size="20" color="#409EFF"><Document /></el-icon>
+                <span class="preview-filename">{{ previewFile.name }}</span>
+                <span class="preview-size">({{ formatFileSize(previewFile.size) }})</span>
               </div>
-            </template>
-          </el-upload>
+              <div class="preview-actions">
+                <el-button type="primary" size="small" @click="handlePreviewFile" link>
+                  <el-icon><View /></el-icon>
+                  预览
+                </el-button>
+                <el-button type="danger" size="small" @click="handleRemovePreview" link>
+                  <el-icon><Delete /></el-icon>
+                  移除
+                </el-button>
+              </div>
+            </el-card>
+          </div>
+          <!-- 显示已上传到服务器的文件信息（编辑时） -->
+          <div v-if="calibrationForm.certificateFile && !previewFile && !fileList.length" class="uploaded-file-info">
+            <el-tag type="success" closable @close="handleRemoveExisting">
+              <el-icon><Document /></el-icon>
+              <span class="file-name-link" @click="handleViewExistingFile">{{ calibrationForm.certificateFile }}</span>
+              <el-button type="primary" size="small" @click="handleViewExistingFile" link style="margin-left: 8px;">
+                预览
+              </el-button>
+            </el-tag>
+          </div>
         </el-form-item>
       </el-form>
       
@@ -417,12 +458,12 @@
         <div class="dialog-footer">
           <el-button @click="dialogVisible = false">取消</el-button>
           <el-button type="primary" @click="handleSubmit" :loading="submitLoading">
-            确定
+            {{ submitLoading ? '提交中...' : '确定' }}
           </el-button>
         </div>
       </template>
     </el-dialog>
-
+    
     <!-- 详情对话框 -->
     <el-dialog 
       title="校准结果详情" 
@@ -499,29 +540,6 @@
       </div>
     </el-dialog>
 
-    <!-- 证书查看对话框 -->
-    <el-dialog 
-      title="校准证书" 
-      v-model="certificateDialogVisible" 
-      width="80%"
-      :close-on-click-modal="false"
-    >
-      <div class="certificate-viewer" v-if="currentCertificate">
-        <iframe 
-          v-if="isPdf(currentCertificate.CertificateFile)"
-          :src="getCertificateUrl(currentCertificate.CertificateFile)" 
-          width="100%" 
-          height="600px"
-          frameborder="0"
-        ></iframe>
-        <img 
-          v-else
-          :src="getCertificateUrl(currentCertificate.CertificateFile)" 
-          style="max-width: 100%; height: auto;"
-          alt="校准证书"
-        />
-      </div>
-    </el-dialog>
   </div>
 </template>
 
@@ -544,7 +562,9 @@ import {
   Document, 
   Plus, 
   Download,
-  Upload
+  Upload,
+  View,
+  Delete
 } from '@element-plus/icons-vue'
 import { instrumentApi } from '@/api/instruments'
 import { useUserStore } from '@/store/user'
@@ -558,7 +578,6 @@ const exportLoading = ref(false)
 const submitLoading = ref(false)
 const dialogVisible = ref(false)
 const detailDialogVisible = ref(false)
-const certificateDialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref()
 const uploadRef = ref()
@@ -577,7 +596,6 @@ const searchForm = reactive({
 const calibrationList = ref([])
 const instruments = ref([])
 const currentCalibration = ref(null)
-const currentCertificate = ref(null)
 
 // 分页数据
 const pagination = reactive({
@@ -610,10 +628,9 @@ const calibrationForm = reactive({
 
 // 文件上传
 const fileList = ref([])
-const uploadUrl = ref('/api/upload/certificate')
-const uploadHeaders = computed(() => ({
-  'Authorization': `Bearer ${userStore.token}`
-}))
+const uploadLoading = ref(false)
+const previewFile = ref(null)           // 待上传的文件对象
+const previewFileUrl = ref('')          // 本地预览URL
 
 // 表单验证规则
 const formRules = {
@@ -698,7 +715,7 @@ function isPdf(filename) {
  * @returns {string} 文件URL
  */
 function getCertificateUrl(filename) {
-  return `/api/files/certificate/${filename}`
+  return `/api/instruments/files/certificate/${filename}`
 }
 
 /**
@@ -892,14 +909,17 @@ function handleEdit(row) {
     calibrationStandard: row.CalibrationStandard,
     environmentalConditions: row.EnvironmentalConditions,
     remarks: row.Remarks || row.Notes,  // 兼容两种字段名
-    certificateFile: row.CertificateFile
+    certificateFile: row.CertificateFile || ''
   })
   // 设置文件列表
   if (row.CertificateFile) {
     fileList.value = [{
       name: row.CertificateFile,
-      url: getCertificateUrl(row.CertificateFile)
+      url: getCertificateUrl(row.CertificateFile),
+      status: 'success'
     }]
+  } else {
+    fileList.value = []
   }
   dialogVisible.value = true
 }
@@ -914,7 +934,7 @@ function handleView(row) {
 }
 
 /**
- * 查看证书
+ * 查看证书（在新标签页打开）
  * @param {Object} row - 校准结果数据
  */
 function handleViewCertificate(row) {
@@ -922,8 +942,7 @@ function handleViewCertificate(row) {
     ElMessage.warning('该记录未上传证书文件')
     return
   }
-  currentCertificate.value = row
-  certificateDialogVisible.value = true
+  openCertificateInNewTab(row.CertificateFile)
 }
 
 /**
@@ -988,6 +1007,13 @@ function handleInstrumentChange(instrumentId) {
 }
 
 /**
+ * 检查是否已选择仪器（上传证书前）
+ */
+function checkInstrumentBeforeUpload() {
+  ElMessage.warning('请先选择要登记的仪器')
+}
+
+/**
  * 文件上传前检查
  * @param {File} file - 上传的文件
  * @returns {boolean} 是否允许上传
@@ -1008,25 +1034,227 @@ function beforeUpload(file) {
 }
 
 /**
- * 文件上传成功处理
- * @param {Object} response - 上传响应
+ * 文件选择变化处理（本地预览模式）
  * @param {Object} file - 文件对象
+ * @param {Array} fileListData - 文件列表
  */
-function handleUploadSuccess(response, file) {
-  if (response.success) {
-    calibrationForm.CertificateFile = response.data.filename
-    ElMessage.success('文件上传成功')
-  } else {
-    ElMessage.error('文件上传失败：' + response.message)
+function handleFileChange(file, fileListData) {
+  // 验证文件
+  if (!beforeUpload(file.raw)) {
+    // 验证失败，从列表中移除
+    fileList.value = []
+    return
+  }
+  
+  // 保存文件对象用于后续上传
+  previewFile.value = file.raw
+  
+  // 创建本地预览URL
+  if (previewFileUrl.value) {
+    URL.revokeObjectURL(previewFileUrl.value)
+  }
+  previewFileUrl.value = URL.createObjectURL(file.raw)
+  
+  // 清空已上传的文件名（因为现在是新选择的文件）
+  calibrationForm.certificateFile = ''
+  
+  // 更新文件列表显示
+  fileList.value = []
+  
+  ElMessage.success('文件已选择，点击"预览"可查看，提交时将自动上传')
+}
+
+/**
+ * 预览选中的文件（在新标签页打开）
+ */
+function handlePreviewFile() {
+  if (previewFile.value && previewFileUrl.value) {
+    // 创建一个带有文件名标题的新窗口
+    const newWindow = window.open('', '_blank')
+    if (newWindow) {
+      const fileName = previewFile.value.name
+      const isPdf = previewFile.value.type === 'application/pdf'
+      
+      if (isPdf) {
+        // PDF 使用 iframe 嵌入
+        newWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>${fileName} - 证书预览</title>
+            <style>
+              body { margin: 0; padding: 0; }
+              iframe { width: 100%; height: 100vh; border: none; }
+            </style>
+          </head>
+          <body>
+            <iframe src="${previewFileUrl.value}"></iframe>
+          </body>
+          </html>
+        `)
+      } else {
+        // 图片直接显示
+        newWindow.document.write(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>${fileName} - 证书预览</title>
+            <style>
+              body { margin: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; background: #f5f5f5; }
+              img { max-width: 100%; height: auto; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+            </style>
+          </head>
+          <body>
+            <img src="${previewFileUrl.value}" alt="${fileName}" />
+          </body>
+          </html>
+        `)
+      }
+      newWindow.document.close()
+    }
   }
 }
 
 /**
- * 文件上传失败处理
- * @param {Error} error - 错误对象
+ * 预览已上传到服务器的文件（在新标签页打开）
  */
-function handleUploadError(error) {
-  ElMessage.error('文件上传失败：' + error.message)
+function handleViewExistingFile() {
+  if (calibrationForm.certificateFile) {
+    openCertificateInNewTab(calibrationForm.certificateFile)
+  }
+}
+
+/**
+ * 在新标签页中打开证书文件
+ * @param {string} filename - 文件名
+ */
+function openCertificateInNewTab(filename) {
+  const url = getCertificateUrl(filename)
+  const isPdfFile = filename.toLowerCase().endsWith('.pdf')
+  
+  // 创建一个带有文件名标题的新窗口
+  const newWindow = window.open('', '_blank')
+  if (newWindow) {
+    if (isPdfFile) {
+      // PDF 使用 iframe 嵌入
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${filename} - 证书预览</title>
+          <style>
+            body { margin: 0; padding: 0; }
+            iframe { width: 100%; height: 100vh; border: none; }
+          </style>
+        </head>
+        <body>
+          <iframe src="${url}"></iframe>
+        </body>
+        </html>
+      `)
+    } else {
+      // 图片直接显示
+      newWindow.document.write(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>${filename} - 证书预览</title>
+          <style>
+            body { margin: 0; padding: 20px; display: flex; justify-content: center; align-items: flex-start; min-height: 100vh; background: #f5f5f5; }
+            img { max-width: 100%; height: auto; box-shadow: 0 2px 12px rgba(0,0,0,0.1); }
+          </style>
+        </head>
+        <body>
+          <img src="${url}" alt="${filename}" />
+        </body>
+        </html>
+      `)
+    }
+    newWindow.document.close()
+  }
+}
+
+/**
+ * 移除预览文件
+ */
+function handleRemovePreview() {
+  if (previewFileUrl.value) {
+    URL.revokeObjectURL(previewFileUrl.value)
+  }
+  previewFile.value = null
+  previewFileUrl.value = ''
+  fileList.value = []
+  ElMessage.info('已移除选择的文件')
+}
+
+/**
+ * 文件移除处理
+ * @param {Object} file - 被移除的文件
+ */
+function handleRemove(file) {
+  handleRemovePreview()
+  calibrationForm.certificateFile = ''
+}
+
+/**
+ * 移除已存在的文件（编辑时）
+ */
+function handleRemoveExisting() {
+  calibrationForm.certificateFile = ''
+}
+
+/**
+ * 文件数量超出限制处理
+ * @param {Array} files - 文件列表
+ */
+function handleExceed(files) {
+  ElMessage.warning('只能上传一个证书文件，请先移除已有文件')
+}
+
+/**
+ * 格式化文件大小
+ * @param {number} bytes - 文件字节数
+ * @returns {string} 格式化后的文件大小
+ */
+function formatFileSize(bytes) {
+  if (bytes === 0) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
+}
+
+/**
+ * 上传文件到服务器
+ * @returns {Promise<string|null>} 上传成功返回文件名，失败返回null
+ */
+async function uploadFileToServer() {
+  if (!previewFile.value) {
+    return null
+  }
+  
+  try {
+    uploadLoading.value = true
+    
+    // 创建FormData
+    const formData = new FormData()
+    formData.append('file', previewFile.value)
+    
+    // 调用API上传文件
+    const response = await instrumentApi.uploadCalibrationCertificate(formData)
+    
+    if (response.data && response.data.code === 200) {
+      const filename = response.data.data.filename || response.data.data.fileName
+      return filename
+    } else {
+      throw new Error(response.data?.message || '上传失败')
+    }
+  } catch (error) {
+    console.error('文件上传错误:', error)
+    throw error
+  } finally {
+    uploadLoading.value = false
+  }
 }
 
 /**
@@ -1037,6 +1265,21 @@ async function handleSubmit() {
     await formRef.value.validate()
     submitLoading.value = true
     
+    // 如果有待上传的文件，先上传文件
+    if (previewFile.value) {
+      try {
+        const filename = await uploadFileToServer()
+        if (filename) {
+          calibrationForm.certificateFile = filename
+          ElMessage.success('证书文件上传成功')
+        }
+      } catch (uploadError) {
+        ElMessage.error('证书文件上传失败：' + (uploadError.message || '未知错误'))
+        submitLoading.value = false
+        return // 文件上传失败，中止提交
+      }
+    }
+    
     if (isEdit.value) {
       await instrumentApi.updateCalibrationResult(calibrationForm.CalibrationID, calibrationForm)
       ElMessage.success('更新成功')
@@ -1044,6 +1287,13 @@ async function handleSubmit() {
       await instrumentApi.createCalibrationResult(calibrationForm)
       ElMessage.success('创建成功')
     }
+    
+    // 清理预览文件
+    if (previewFileUrl.value) {
+      URL.revokeObjectURL(previewFileUrl.value)
+    }
+    previewFile.value = null
+    previewFileUrl.value = ''
     
     dialogVisible.value = false
     getCalibrationList()
@@ -1093,6 +1343,12 @@ function resetForm() {
   })
   // 清空文件列表
   fileList.value = []
+  // 清理预览文件
+  if (previewFileUrl.value) {
+    URL.revokeObjectURL(previewFileUrl.value)
+  }
+  previewFile.value = null
+  previewFileUrl.value = ''
   // 重置表单验证状态
   nextTick(() => {
     formRef.value?.resetFields()
@@ -1281,5 +1537,81 @@ defineExpose({
 
 .el-dialog.calibration-dialog .el-dialog__footer {
   padding: 10px 30px 20px !important;
+}
+
+/* 已上传文件信息样式 */
+.uploaded-file-info {
+  margin-top: 8px;
+}
+
+.uploaded-file-info .el-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.uploaded-file-info .file-name-link {
+  cursor: pointer;
+  color: #409EFF;
+}
+
+.uploaded-file-info .file-name-link:hover {
+  text-decoration: underline;
+}
+
+/* 证书上传包装器样式 */
+.certificate-upload-wrapper {
+  width: 100%;
+}
+
+.certificate-upload-wrapper .el-upload__tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 7px;
+}
+
+/* 文件预览区域样式 */
+.file-preview {
+  margin-top: 10px;
+}
+
+.preview-card {
+  background-color: #f5f7fa;
+}
+
+.preview-card :deep(.el-card__body) {
+  padding: 12px 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.preview-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.preview-filename {
+  font-weight: 500;
+  color: #303133;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview-size {
+  color: #909399;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.preview-actions {
+  display: flex;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-left: 16px;
 }
 </style>
