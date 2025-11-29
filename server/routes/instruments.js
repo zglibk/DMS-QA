@@ -1375,12 +1375,12 @@ router.put('/:id', authenticateToken, async (req, res) => {
     
     if (instrumentCode !== undefined) {
       updateFields.push('InstrumentCode = @instrumentCode');
-      updateRequest.input('instrumentCode', sql.NVarChar, instrumentCode);
+      updateRequest.input('instrumentCode', sql.NVarChar, instrumentCode || null);
     }
     
     if (managementCode !== undefined) {
       updateFields.push('ManagementCode = @managementCode');
-      updateRequest.input('managementCode', sql.NVarChar, managementCode);
+      updateRequest.input('managementCode', sql.NVarChar, managementCode || null);
     }
     
     if (instrumentName !== undefined) {

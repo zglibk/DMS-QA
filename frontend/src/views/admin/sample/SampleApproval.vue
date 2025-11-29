@@ -182,7 +182,7 @@
     </el-card>
 
     <!-- 数据表格 -->
-    <el-card class="table-card" shadow="never">
+    <el-card class="table-card" shadow="never" ref="tableCardRef">
       <el-table
         :data="sortedTableData"
         v-loading="loading"
@@ -191,6 +191,7 @@
         :default-sort="{ prop: 'certificateNo', order: 'descending' }"
         stripe
         border
+        :max-height="tableMaxHeight"
       >
         <el-table-column type="selection" width="55" />
         <el-table-column prop="certificateNo" label="样板编号" width="120" fixed="left" align="center" header-align="center" sortable="custom" />
@@ -243,7 +244,7 @@
       </el-table>
 
       <!-- 分页 -->
-      <div class="pagination-wrapper">
+      <div class="pagination-wrapper" ref="paginationRef">
         <el-pagination
           v-model:current-page="pagination.currentPage"
           v-model:page-size="pagination.pageSize"
@@ -639,7 +640,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { ref, reactive, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Document, Check, Clock, Close, Plus, CircleClose, SuccessFilled,
@@ -760,6 +761,61 @@ const pagination = reactive({
   currentPage: 1,
   pageSize: 5,
   total: 0
+})
+
+// 表格最大高度（用于让表格内部滚动，页面不产生滚动条）
+// 通过计算视口高度与表格卡片位置、分页器高度等得到一个合理的 px 值
+const tableMaxHeight = ref(480)
+
+// 表格卡片与分页容器的引用，用于测量位置与高度
+const tableCardRef = ref(null)
+const paginationRef = ref(null)
+
+/**
+ * 计算表格最大高度
+ * 目标：当数据较多（如每页 20/50 条）时，表格内部滚动而不是页面滚动；
+ * 当数据较少（如每页 5 条）且内容不超过视口时，页面不出现滚动条。
+ */
+function computeTableMaxHeight() {
+  // 视口高度
+  const viewportHeight = window.innerHeight || document.documentElement.clientHeight
+
+  // el-card 组件的 DOM 元素（Element Plus 组件需通过 $el 获取根元素）
+  const cardEl = tableCardRef.value && tableCardRef.value.$el ? tableCardRef.value.$el : tableCardRef.value
+
+  // 分页容器的 DOM 元素
+  const paginationEl = paginationRef.value
+
+  // 如果无法获取必要元素，则使用一个安全的默认值
+  if (!cardEl || !cardEl.getBoundingClientRect) {
+    tableMaxHeight.value = Math.max(300, viewportHeight - 320)
+    return
+  }
+
+  // 卡片到视口顶部的距离
+  const cardRect = cardEl.getBoundingClientRect()
+  const cardTop = cardRect.top
+
+  // 分页器高度（包含外边距），默认估算为 64px
+  const paginationHeight = paginationEl && paginationEl.getBoundingClientRect
+    ? Math.ceil(paginationEl.getBoundingClientRect().height + 16) // 额外加入 margin/间距估算
+    : 64
+
+  // 额外的安全内边距，避免靠近底部出现遮挡
+  const safetyPadding = 32
+
+  // 计算可用高度，并设置一个下限，避免过小
+  const available = Math.max(240, Math.floor(viewportHeight - cardTop - paginationHeight - safetyPadding))
+  tableMaxHeight.value = available
+}
+
+onMounted(() => {
+  nextTick(() => computeTableMaxHeight())
+  window.addEventListener('resize', computeTableMaxHeight)
+})
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', computeTableMaxHeight)
 })
 
 // 表单数据
@@ -1563,6 +1619,7 @@ function handleSortChange({ column, prop, order }) {
 function handleSizeChange(size) {
   pagination.pageSize = size
   loadTableData()
+  nextTick(() => computeTableMaxHeight())
 }
 
 /**
@@ -1571,6 +1628,7 @@ function handleSizeChange(size) {
 function handleCurrentChange(page) {
   pagination.currentPage = page
   loadTableData()
+  nextTick(() => computeTableMaxHeight())
 }
 
 /**
@@ -2228,10 +2286,11 @@ onMounted(async () => {
 }
 
 .sample-approval {
-  padding: 20px;
+
   box-sizing: border-box;
-  overflow: hidden; /* 防止内部元素导致滚动 */
-  height: 100%; /* 如果父容器有固定高度 */
+  min-height: 100%;
+  height: auto;
+  overflow-y: auto;
 }
 
 .page-header {

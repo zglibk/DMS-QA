@@ -445,7 +445,7 @@ onUnmounted(() => {
   background: #fafbfc;
   /* 修复高度计算，头部实际高度为4rem（64px） */
   height: calc(100vh - 4rem);
-  padding: 1.5rem;
+  padding: 0;
   overflow-y: auto;
   overflow-x: hidden;
 }

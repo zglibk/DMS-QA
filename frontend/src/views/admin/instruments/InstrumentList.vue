@@ -475,7 +475,17 @@ const instrumentForm = reactive({
 })
 
 // 表单验证规则
+const validateCode = (rule, value, callback) => {
+  if (!instrumentForm.InstrumentCode && !instrumentForm.ManagementCode) {
+    callback(new Error('出厂编号和管理编号至少需要填写其中一个'))
+  } else {
+    callback()
+  }
+}
+
 const formRules = {
+  InstrumentCode: [{ validator: validateCode, trigger: 'blur' }],
+  ManagementCode: [{ validator: validateCode, trigger: 'blur' }],
   InstrumentName: [
     { required: true, message: '请输入仪器名称', trigger: 'blur' }
   ],
@@ -1111,7 +1121,7 @@ async function handleSubmit() {
     const submitData = {
       ...instrumentForm,
       ResponsiblePerson: instrumentForm.ResponsiblePerson || null,
-      Category: instrumentForm.CategoryID || null
+      Category: null
     }
     
     // 将CategoryID映射为Category字段名称
