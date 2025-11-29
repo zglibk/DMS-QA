@@ -7,11 +7,9 @@
  * 3. 年度校准计划管理
  * 4. 年度检定计划和实施表导出
  * 5. 管理编号自动生成
- * 6. 校准证书文件上传和下载
  * 
- * 版本：v1.1
+ * 版本：v1.0
  * 创建日期：2025-09-29
- * 更新日期：2025-11-29 - 添加证书文件上传功能
  */
 
 const express = require('express');
@@ -21,56 +19,6 @@ const { getConnection } = require('../db');
 const { authenticateToken, checkPermission } = require('../middleware/auth');
 const ExcelJS = require('exceljs');
 const path = require('path');
-const fs = require('fs');
-const multer = require('multer');
-
-// =====================================================
-// 文件上传配置
-// =====================================================
-
-// 确保上传目录存在
-const uploadDir = path.join(__dirname, '../uploads/certificates');
-if (!fs.existsSync(uploadDir)) {
-  fs.mkdirSync(uploadDir, { recursive: true });
-}
-
-// 配置multer存储
-const storage = multer.diskStorage({
-  destination: function (req, file, cb) {
-    cb(null, uploadDir);
-  },
-  filename: function (req, file, cb) {
-    // 保留原文件名，添加时间戳后缀以区分
-    // 格式：原文件名_时间戳.扩展名
-    const ext = path.extname(file.originalname);
-    const baseName = path.basename(file.originalname, ext);
-    // 清理文件名中的特殊字符，保留中文、字母、数字、下划线、短横线
-    const cleanBaseName = baseName.replace(/[^\u4e00-\u9fa5a-zA-Z0-9_\-]/g, '_');
-    const timestamp = Date.now();
-    const filename = `${cleanBaseName}_${timestamp}${ext}`;
-    cb(null, filename);
-  }
-});
-
-// 文件过滤器
-const fileFilter = (req, file, cb) => {
-  // 允许的文件类型
-  const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
-  if (allowedTypes.includes(file.mimetype)) {
-    cb(null, true);
-  } else {
-    cb(new Error('只允许上传 PDF、JPG、PNG 格式的文件'), false);
-  }
-};
-
-// 创建multer实例
-const upload = multer({
-  storage: storage,
-  fileFilter: fileFilter,
-  limits: {
-    fileSize: 10 * 1024 * 1024 // 限制10MB
-  }
-});
 
 // =====================================================
 // 管理编号生成功能
@@ -500,8 +448,7 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       recommendations,      // 添加建议字段
       environmentalConditions,
       calibrationCycle,
-      remarks,
-      certificateFile       // 添加证书文件字段
+      remarks
     } = req.body;
 
     // 验证必填字段
@@ -559,11 +506,11 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       INSERT INTO CalibrationResults (
         ResultCode, InstrumentID, InstrumentCode, ManagementCode, CalibrationDate, CalibrationAgency, CertificateNumber,
         CalibrationStandard, CalibrationResult, ExpiryDate, NextCalibrationDate, CalibrationCost, 
-        CalibrationData, Issues, Recommendations, EnvironmentalConditions, CalibrationCycle, Remarks, Attachments, CreatedBy, CreatedAt
+        CalibrationData, Issues, Recommendations, EnvironmentalConditions, CalibrationCycle, Remarks, CreatedBy, CreatedAt
       ) VALUES (
         @resultCode, @instrumentID, @instrumentCode, @managementCode, @calibrationDate, @calibrationAgency, @certificateNumber,
         @calibrationStandard, @calibrationResult, @expiryDate, @nextCalibrationDate, @calibrationCost,
-        @calibrationData, @issues, @recommendations, @environmentalConditions, @calibrationCycle, @remarks, @certificateFile, @createdBy, GETDATE()
+        @calibrationData, @issues, @recommendations, @environmentalConditions, @calibrationCycle, @remarks, @createdBy, GETDATE()
       );
       SELECT SCOPE_IDENTITY() as ID;
     `;
@@ -587,7 +534,6 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       .input('environmentalConditions', sql.NVarChar, environmentalConditions || null)
       .input('calibrationCycle', sql.Int, calibrationCycle || null)
       .input('remarks', sql.NVarChar, remarks || null)
-      .input('certificateFile', sql.NVarChar, certificateFile || null)
       .input('createdBy', sql.Int, req.user.id)
       .query(insertQuery);
 
@@ -604,147 +550,6 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
     res.status(500).json({
       code: 500,
       message: '创建校准结果记录失败',
-      error: error.message
-    });
-  }
-});
-
-// =====================================================
-// 校准证书文件上传和下载
-// =====================================================
-
-/**
- * 上传校准证书文件
- * POST /api/instruments/calibration-results/upload-certificate
- */
-router.post('/calibration-results/upload-certificate', authenticateToken, upload.single('file'), async (req, res) => {
-  try {
-    // 检查是否有文件上传
-    if (!req.file) {
-      return res.status(400).json({
-        code: 400,
-        message: '请选择要上传的文件'
-      });
-    }
-
-    // 返回上传成功的文件信息
-    res.json({
-      code: 200,
-      data: {
-        filename: req.file.filename,
-        originalName: req.file.originalname,
-        size: req.file.size,
-        mimetype: req.file.mimetype,
-        path: `/uploads/certificates/${req.file.filename}`
-      },
-      message: '文件上传成功'
-    });
-
-  } catch (error) {
-    console.error('上传校准证书文件失败:', error);
-    res.status(500).json({
-      code: 500,
-      message: '文件上传失败',
-      error: error.message
-    });
-  }
-});
-
-/**
- * 获取/下载校准证书文件
- * GET /api/instruments/calibration-results/:id/certificate
- */
-router.get('/calibration-results/:id/certificate', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    const pool = await getConnection();
-
-    // 查询校准结果记录，获取证书文件名（使用Attachments字段）
-    const query = `SELECT Attachments FROM CalibrationResults WHERE ID = @id`;
-    const result = await pool.request()
-      .input('id', sql.Int, id)
-      .query(query);
-
-    if (result.recordset.length === 0) {
-      return res.status(404).json({
-        code: 404,
-        message: '校准结果记录不存在'
-      });
-    }
-
-    const certificateFile = result.recordset[0].Attachments;
-    if (!certificateFile) {
-      return res.status(404).json({
-        code: 404,
-        message: '该记录没有关联的证书文件'
-      });
-    }
-
-    // 构建文件路径
-    const filePath = path.join(uploadDir, certificateFile);
-
-    // 检查文件是否存在
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        code: 404,
-        message: '证书文件不存在'
-      });
-    }
-
-    // 发送文件
-    res.download(filePath, certificateFile);
-
-  } catch (error) {
-    console.error('下载校准证书文件失败:', error);
-    res.status(500).json({
-      code: 500,
-      message: '下载文件失败',
-      error: error.message
-    });
-  }
-});
-
-/**
- * 查看校准证书文件（用于在线预览）
- * GET /api/instruments/files/certificate/:filename
- */
-router.get('/files/certificate/:filename', authenticateToken, (req, res) => {
-  try {
-    const { filename } = req.params;
-    
-    // 安全检查：防止路径遍历攻击
-    const safeFilename = path.basename(filename);
-    const filePath = path.join(uploadDir, safeFilename);
-
-    // 检查文件是否存在
-    if (!fs.existsSync(filePath)) {
-      return res.status(404).json({
-        code: 404,
-        message: '文件不存在'
-      });
-    }
-
-    // 根据文件扩展名设置Content-Type
-    const ext = path.extname(safeFilename).toLowerCase();
-    const mimeTypes = {
-      '.pdf': 'application/pdf',
-      '.jpg': 'image/jpeg',
-      '.jpeg': 'image/jpeg',
-      '.png': 'image/png'
-    };
-
-    const contentType = mimeTypes[ext] || 'application/octet-stream';
-    res.setHeader('Content-Type', contentType);
-    
-    // 发送文件流
-    const fileStream = fs.createReadStream(filePath);
-    fileStream.pipe(res);
-
-  } catch (error) {
-    console.error('查看校准证书文件失败:', error);
-    res.status(500).json({
-      code: 500,
-      message: '查看文件失败',
       error: error.message
     });
   }
@@ -1152,7 +957,6 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
         cr.Issues,
         cr.Recommendations,
         cr.Remarks,
-        cr.Attachments as CertificateFile,
         cr.CreatedAt,
         cr.UpdatedAt
       FROM CalibrationResults cr
@@ -2171,6 +1975,273 @@ router.get('/export/annual-plan/:year', authenticateToken, async (req, res) => {
   }
 });
 
+/**
+ * 导出仪器台账（含校准信息）
+ * GET /api/instruments/export/ledger
+ */
+router.get('/export/ledger', authenticateToken, async (req, res) => {
+  try {
+    const pool = await getConnection();
+    const { instrumentName, managementCode, category, status } = req.query;
+
+    console.log('开始导出仪器台账, 参数:', { instrumentName, managementCode, category, status });
+
+    // 查询仪器台账数据（含最新校准信息）
+    let query = `
+      SELECT 
+        i.ID,
+        i.InstrumentCode,
+        i.ManagementCode,
+        i.InstrumentName,
+        i.Model,
+        i.Specifications,
+        i.Manufacturer,
+        i.SerialNumber,
+        i.PurchaseDate,
+        i.PurchasePrice,
+        i.Location,
+        i.Status,
+        i.MeasurementRange,
+        i.Accuracy,
+        i.CalibrationCycle,
+        i.Remarks,
+        i.Category,
+        d.Name as DepartmentName,
+        p.Name as ResponsiblePersonName,
+        cr.ResultCode as LatestResultCode,
+        cr.CalibrationDate as LatestCalibrationDate,
+        cr.CalibrationAgency as LatestCalibrationAgency,
+        cr.CertificateNumber as LatestCertificateNumber,
+        cr.CalibrationResult as LatestCalibrationResult,
+        cr.ExpiryDate as LatestExpiryDate,
+        cr.NextCalibrationDate
+      FROM Instruments i
+      LEFT JOIN Department d ON i.DepartmentID = d.ID
+      LEFT JOIN Person p ON i.ResponsiblePerson = p.ID
+      LEFT JOIN (
+        SELECT 
+          InstrumentID,
+          ResultCode,
+          CalibrationDate,
+          CalibrationAgency,
+          CertificateNumber,
+          CalibrationResult,
+          ExpiryDate,
+          NextCalibrationDate,
+          ROW_NUMBER() OVER (PARTITION BY InstrumentID ORDER BY CalibrationDate DESC) as rn
+        FROM CalibrationResults
+      ) cr ON i.ID = cr.InstrumentID AND cr.rn = 1
+      WHERE i.IsActive = 1
+    `;
+
+    const request = pool.request();
+
+    // 添加筛选条件
+    if (instrumentName) {
+      query += ` AND i.InstrumentName LIKE @instrumentName`;
+      request.input('instrumentName', sql.NVarChar, `%${instrumentName}%`);
+    }
+    if (managementCode) {
+      query += ` AND i.ManagementCode LIKE @managementCode`;
+      request.input('managementCode', sql.NVarChar, `%${managementCode}%`);
+    }
+    if (category) {
+      query += ` AND i.Category = @category`;
+      request.input('category', sql.NVarChar, category);
+    }
+    if (status) {
+      query += ` AND i.Status = @status`;
+      request.input('status', sql.NVarChar, status);
+    }
+
+    query += ` ORDER BY i.ManagementCode ASC, i.InstrumentCode ASC`;
+
+    console.log('执行SQL查询...');
+    const result = await request.query(query);
+    console.log('查询结果数量:', result.recordset.length);
+
+    // 创建Excel工作簿
+    const workbook = new ExcelJS.Workbook();
+    workbook.creator = 'DMS-QA System';
+    workbook.created = new Date();
+
+    // 创建仪器台账工作表
+    const worksheet = workbook.addWorksheet('仪器台账', {
+      properties: { tabColor: { argb: '4472C4' } }
+    });
+
+    // 设置表头（包含仪器基本信息和校准信息）
+    worksheet.columns = [
+      { header: '序号', key: 'index', width: 6 },
+      { header: '管理编号', key: 'managementCode', width: 12 },
+      { header: '出厂编号', key: 'instrumentCode', width: 15 },
+      { header: '仪器名称', key: 'instrumentName', width: 20 },
+      { header: '型号', key: 'model', width: 15 },
+      { header: '规格', key: 'specifications', width: 15 },
+      { header: '制造商', key: 'manufacturer', width: 18 },
+      { header: '出厂序列号', key: 'serialNumber', width: 15 },
+      { header: '仪器类别', key: 'categoryName', width: 12 },
+      { header: '所属部门', key: 'departmentName', width: 12 },
+      { header: '责任人', key: 'responsiblePersonName', width: 10 },
+      { header: '存放位置', key: 'location', width: 15 },
+      { header: '购置日期', key: 'purchaseDate', width: 12 },
+      { header: '购置价格', key: 'price', width: 10 },
+      { header: '测量范围', key: 'measurementRange', width: 15 },
+      { header: '精度等级', key: 'accuracy', width: 10 },
+      { header: '校准周期(月)', key: 'calibrationCycle', width: 12 },
+      { header: '仪器状态', key: 'status', width: 10 },
+      { header: '最近校准编号', key: 'latestResultCode', width: 15 },
+      { header: '最近校准日期', key: 'latestCalibrationDate', width: 12 },
+      { header: '校准机构', key: 'latestCalibrationAgency', width: 18 },
+      { header: '证书编号', key: 'latestCertificateNumber', width: 18 },
+      { header: '校准结论', key: 'latestCalibrationResult', width: 10 },
+      { header: '证书有效期', key: 'latestExpiryDate', width: 12 },
+      { header: '下次校准日期', key: 'nextCalibrationDate', width: 12 },
+      { header: '备注', key: 'remarks', width: 25 }
+    ];
+
+    // 表头列数
+    const columnCount = worksheet.columns.length;
+
+    // 设置表头样式 - 只填充有标题的单元格
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 25;  // 标题行高度25
+    headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    
+    // 遍历标题行的每个单元格设置样式
+    for (let col = 1; col <= columnCount; col++) {
+      const cell = headerRow.getCell(col);
+      cell.font = { bold: true, color: { argb: '000000' } };  // 黑色文字
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'D9D9D9' }  // 浅灰色背景
+      };
+    }
+
+    // 状态映射
+    const statusMap = {
+      'normal': '正常',
+      'maintenance': '维修中',
+      'retired': '已报废'
+    };
+
+    // 添加数据
+    result.recordset.forEach((row, index) => {
+      const dataRow = worksheet.addRow({
+        index: index + 1,
+        managementCode: row.ManagementCode || '',
+        instrumentCode: row.InstrumentCode || '',
+        instrumentName: row.InstrumentName || '',
+        model: row.Model || '',
+        specifications: row.Specifications || '',
+        manufacturer: row.Manufacturer || '',
+        serialNumber: row.SerialNumber || '',
+        categoryName: row.Category || '',
+        departmentName: row.DepartmentName || '',
+        responsiblePersonName: row.ResponsiblePersonName || '',
+        location: row.Location || '',
+        purchaseDate: row.PurchaseDate ? new Date(row.PurchaseDate).toISOString().split('T')[0] : '',
+        price: row.PurchasePrice || '',
+        measurementRange: row.MeasurementRange || '',
+        accuracy: row.Accuracy || '',
+        calibrationCycle: row.CalibrationCycle || '',
+        status: statusMap[row.Status] || row.Status || '',
+        latestResultCode: row.LatestResultCode || '',
+        latestCalibrationDate: row.LatestCalibrationDate ? new Date(row.LatestCalibrationDate).toISOString().split('T')[0] : '',
+        latestCalibrationAgency: row.LatestCalibrationAgency || '',
+        latestCertificateNumber: row.LatestCertificateNumber || '',
+        latestCalibrationResult: row.LatestCalibrationResult || '',
+        latestExpiryDate: row.LatestExpiryDate ? new Date(row.LatestExpiryDate).toISOString().split('T')[0] : '',
+        nextCalibrationDate: row.NextCalibrationDate ? new Date(row.NextCalibrationDate).toISOString().split('T')[0] : '',
+        remarks: row.Remarks || ''
+      });
+
+      // 设置数据行样式
+      dataRow.height = 22.5;  // 内容行高度22.5
+      dataRow.alignment = { vertical: 'middle' };
+      
+      // 隔行填充浅灰色（偶数行，比标题行灰色稍浅）
+      if (index % 2 === 1) {
+        for (let col = 1; col <= columnCount; col++) {
+          dataRow.getCell(col).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'F2F2F2' }  // 更浅的灰色
+          };
+        }
+      }
+      
+      // 根据状态设置行颜色（优先级高于隔行填充）
+      if (row.Status === 'retired') {
+        for (let col = 1; col <= columnCount; col++) {
+          dataRow.getCell(col).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFCCCC' }  // 浅红色-已报废
+          };
+        }
+      } else if (row.Status === 'maintenance') {
+        for (let col = 1; col <= columnCount; col++) {
+          dataRow.getCell(col).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFFFCC' }  // 浅黄色-维修中
+          };
+        }
+      }
+
+      // 检查校准是否过期，设置提醒颜色
+      if (row.LatestExpiryDate) {
+        const expiryDate = new Date(row.LatestExpiryDate);
+        const today = new Date();
+        const daysUntilExpiry = Math.ceil((expiryDate - today) / (1000 * 60 * 60 * 24));
+        
+        if (daysUntilExpiry < 0) {
+          // 已过期 - 红色文字
+          dataRow.getCell('latestExpiryDate').font = { color: { argb: 'FF0000' }, bold: true };
+        } else if (daysUntilExpiry <= 30) {
+          // 即将过期（30天内）- 橙色文字
+          dataRow.getCell('latestExpiryDate').font = { color: { argb: 'FF8C00' }, bold: true };
+        }
+      }
+    });
+
+    // 添加边框
+    worksheet.eachRow((row, rowNumber) => {
+      for (let col = 1; col <= columnCount; col++) {
+        const cell = row.getCell(col);
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      }
+    });
+
+    // 冻结首行，关闭网格线显示
+    worksheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: false }];
+
+    // 设置响应头
+    const filename = `仪器台账_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+
+    // 输出Excel文件
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error('导出仪器台账失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '导出仪器台账失败',
+      error: error.message
+    });
+  }
+});
+
 // =====================================================
 // 辅助功能
 // =====================================================
@@ -2292,8 +2363,7 @@ router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
       recommendations,      // 添加建议字段
       environmentalConditions,
       calibrationCycle,     // 添加校准周期字段
-      remarks,
-      certificateFile       // 添加证书文件字段
+      remarks
     } = req.body;
 
     // 验证必填字段
@@ -2354,7 +2424,6 @@ router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
         EnvironmentalConditions = @environmentalConditions,
         CalibrationCycle = @calibrationCycle,
         Remarks = @remarks,
-        Attachments = @certificateFile,
         UpdatedAt = GETDATE()
       WHERE ID = @id
     `;
@@ -2379,7 +2448,6 @@ router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
       .input('environmentalConditions', sql.NVarChar, environmentalConditions || null)
       .input('calibrationCycle', sql.Int, calibrationCycle || null)
       .input('remarks', sql.NVarChar, remarks || null)
-      .input('certificateFile', sql.NVarChar, certificateFile || null)
       .query(updateQuery);
 
     res.json({

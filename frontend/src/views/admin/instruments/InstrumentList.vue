@@ -1099,11 +1099,73 @@ async function handleDelete(row) {
  */
 async function handleExport() {
   try {
+    // 先确认是否导出
+    await ElMessageBox.confirm(
+      '确定要导出仪器台账数据吗？',
+      '导出确认',
+      {
+        confirmButtonText: '确定导出',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+    
     exportLoading.value = true
-    await instrumentApi.exportInstruments(searchForm)
+    
+    // 构建查询参数
+    const params = new URLSearchParams()
+    if (searchForm.instrumentName) {
+      params.append('instrumentName', searchForm.instrumentName)
+    }
+    if (searchForm.managementCode) {
+      params.append('managementCode', searchForm.managementCode)
+    }
+    if (searchForm.category) {
+      params.append('category', searchForm.category)
+    }
+    if (searchForm.status) {
+      params.append('status', searchForm.status)
+    }
+    
+    // 获取token
+    const token = localStorage.getItem('token')
+    
+    // 使用fetch请求下载文件
+    const response = await fetch(`/api/instruments/export/ledger?${params.toString()}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    })
+    
+    if (!response.ok) {
+      throw new Error('导出失败')
+    }
+    
+    // 生成带时间戳的文件名
+    const now = new Date()
+    const timestamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
+    const filename = `仪器台账_${timestamp}.xlsx`
+    
+    // 下载文件
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
     ElMessage.success('导出成功')
   } catch (error) {
-    ElMessage.error('导出失败：' + error.message)
+    // 用户取消不提示错误
+    if (error === 'cancel' || error.toString().includes('cancel')) {
+      return
+    }
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败：' + (error.message || '未知错误'))
   } finally {
     exportLoading.value = false
   }
