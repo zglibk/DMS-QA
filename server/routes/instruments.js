@@ -19,6 +19,138 @@ const { getConnection } = require('../db');
 const { authenticateToken, checkPermission } = require('../middleware/auth');
 const ExcelJS = require('exceljs');
 const path = require('path');
+const fs = require('fs');
+const multer = require('multer');
+
+// =====================================================
+// 文件上传配置
+// =====================================================
+
+// 确保上传目录存在
+const uploadDir = path.join(__dirname, '../uploads/certificates');
+if (!fs.existsSync(uploadDir)) {
+  fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// 配置multer存储
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    // 解码文件名（处理中文编码问题）
+    let originalName = file.originalname;
+    try {
+      originalName = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    } catch (e) {
+      originalName = file.originalname;
+    }
+    
+    // 保留原文件名，添加时间戳后缀
+    const ext = path.extname(originalName);
+    const baseName = path.basename(originalName, ext);
+    const cleanBaseName = baseName.replace(/[^\u4e00-\u9fa5a-zA-Z0-9_\-]/g, '_');
+    const timestamp = Date.now();
+    const filename = `${cleanBaseName}_${timestamp}${ext}`;
+    cb(null, filename);
+  }
+});
+
+// 文件过滤器
+const fileFilter = (req, file, cb) => {
+  const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
+  if (allowedTypes.includes(file.mimetype)) {
+    cb(null, true);
+  } else {
+    cb(new Error('只允许上传 PDF、JPG、PNG 格式的文件'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
+
+// =====================================================
+// 证书文件上传和预览接口
+// =====================================================
+
+/**
+ * 上传校准证书文件
+ * POST /api/instruments/calibration-results/upload-certificate
+ */
+router.post('/calibration-results/upload-certificate', authenticateToken, upload.single('file'), (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        code: 400,
+        message: '请选择要上传的文件'
+      });
+    }
+
+    res.json({
+      code: 200,
+      message: '文件上传成功',
+      data: {
+        filename: req.file.filename,
+        originalName: req.file.originalname,
+        size: req.file.size
+      }
+    });
+  } catch (error) {
+    console.error('文件上传失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '文件上传失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 预览/获取证书文件
+ * GET /api/instruments/files/certificate/:filename
+ */
+router.get('/files/certificate/:filename', authenticateToken, (req, res) => {
+  try {
+    const { filename } = req.params;
+    const filePath = path.join(uploadDir, filename);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        code: 404,
+        message: '文件不存在'
+      });
+    }
+
+    // 获取文件扩展名
+    const ext = path.extname(filename).toLowerCase();
+    
+    // 设置Content-Type
+    let contentType = 'application/octet-stream';
+    if (ext === '.pdf') {
+      contentType = 'application/pdf';
+    } else if (ext === '.jpg' || ext === '.jpeg') {
+      contentType = 'image/jpeg';
+    } else if (ext === '.png') {
+      contentType = 'image/png';
+    }
+
+    res.setHeader('Content-Type', contentType);
+    res.setHeader('Content-Disposition', `inline; filename="${encodeURIComponent(filename)}"`);
+    
+    const fileStream = fs.createReadStream(filePath);
+    fileStream.pipe(res);
+  } catch (error) {
+    console.error('获取文件失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '获取文件失败',
+      error: error.message
+    });
+  }
+});
 
 // =====================================================
 // 管理编号生成功能
@@ -448,7 +580,8 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       recommendations,      // 添加建议字段
       environmentalConditions,
       calibrationCycle,
-      remarks
+      remarks,
+      certificateFile       // 添加证书文件字段
     } = req.body;
 
     // 验证必填字段
@@ -506,11 +639,11 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       INSERT INTO CalibrationResults (
         ResultCode, InstrumentID, InstrumentCode, ManagementCode, CalibrationDate, CalibrationAgency, CertificateNumber,
         CalibrationStandard, CalibrationResult, ExpiryDate, NextCalibrationDate, CalibrationCost, 
-        CalibrationData, Issues, Recommendations, EnvironmentalConditions, CalibrationCycle, Remarks, CreatedBy, CreatedAt
+        CalibrationData, Issues, Recommendations, EnvironmentalConditions, CalibrationCycle, Remarks, Attachments, CreatedBy, CreatedAt
       ) VALUES (
         @resultCode, @instrumentID, @instrumentCode, @managementCode, @calibrationDate, @calibrationAgency, @certificateNumber,
         @calibrationStandard, @calibrationResult, @expiryDate, @nextCalibrationDate, @calibrationCost,
-        @calibrationData, @issues, @recommendations, @environmentalConditions, @calibrationCycle, @remarks, @createdBy, GETDATE()
+        @calibrationData, @issues, @recommendations, @environmentalConditions, @calibrationCycle, @remarks, @attachments, @createdBy, GETDATE()
       );
       SELECT SCOPE_IDENTITY() as ID;
     `;
@@ -534,6 +667,7 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       .input('environmentalConditions', sql.NVarChar, environmentalConditions || null)
       .input('calibrationCycle', sql.Int, calibrationCycle || null)
       .input('remarks', sql.NVarChar, remarks || null)
+      .input('attachments', sql.NVarChar, certificateFile || null)
       .input('createdBy', sql.Int, req.user.id)
       .query(insertQuery);
 
@@ -957,6 +1091,7 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
         cr.Issues,
         cr.Recommendations,
         cr.Remarks,
+        cr.Attachments as CertificateFile,
         cr.CreatedAt,
         cr.UpdatedAt
       FROM CalibrationResults cr
@@ -1844,6 +1979,361 @@ router.patch('/annual-plans/:id/status', authenticateToken, async (req, res) => 
   }
 });
 
+/**
+ * 更新年度校准计划
+ * PUT /api/instruments/annual-plans/:id
+ */
+router.put('/annual-plans/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      instrumentID,
+      planYear,
+      plannedDate,
+      calibrationAgency,
+      estimatedCost,
+      priority,
+      remarks
+    } = req.body;
+
+    const pool = await getConnection();
+
+    // 检查计划是否存在
+    const checkQuery = `SELECT ID FROM AnnualCalibrationPlan WHERE ID = @id`;
+    const checkResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query(checkQuery);
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        message: '计划不存在'
+      });
+    }
+
+    // 更新计划
+    const updateQuery = `
+      UPDATE AnnualCalibrationPlan SET
+        InstrumentID = @instrumentID,
+        PlanYear = @planYear,
+        PlannedDate = @plannedDate,
+        CalibrationAgency = @calibrationAgency,
+        EstimatedCost = @estimatedCost,
+        Priority = @priority,
+        Remarks = @remarks,
+        UpdatedBy = @updatedBy,
+        UpdatedAt = GETDATE()
+      WHERE ID = @id
+    `;
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('instrumentID', sql.Int, instrumentID)
+      .input('planYear', sql.Int, planYear)
+      .input('plannedDate', sql.Date, plannedDate)
+      .input('calibrationAgency', sql.NVarChar, calibrationAgency || null)
+      .input('estimatedCost', sql.Decimal(10, 2), estimatedCost || null)
+      .input('priority', sql.NVarChar, priority || '中')
+      .input('remarks', sql.NVarChar, remarks || null)
+      .input('updatedBy', sql.Int, req.user.id)
+      .query(updateQuery);
+
+    res.json({
+      code: 200,
+      message: '更新年度校准计划成功'
+    });
+
+  } catch (error) {
+    console.error('更新年度校准计划失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '更新年度校准计划失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 删除年度校准计划
+ * DELETE /api/instruments/annual-plans/:id
+ */
+router.delete('/annual-plans/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = await getConnection();
+
+    // 检查计划是否存在
+    const checkQuery = `SELECT ID, Status FROM AnnualCalibrationPlan WHERE ID = @id`;
+    const checkResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query(checkQuery);
+
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({
+        code: 404,
+        message: '计划不存在'
+      });
+    }
+
+    // 删除计划
+    const deleteQuery = `DELETE FROM AnnualCalibrationPlan WHERE ID = @id`;
+    await pool.request()
+      .input('id', sql.Int, id)
+      .query(deleteQuery);
+
+    res.json({
+      code: 200,
+      message: '删除年度校准计划成功'
+    });
+
+  } catch (error) {
+    console.error('删除年度校准计划失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '删除年度校准计划失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 自动生成年度校准计划
+ * POST /api/instruments/annual-plans/generate
+ * POST /api/instruments/annual-plan/generate (兼容路由)
+ * 
+ * 业务逻辑：
+ * 1. 查询所有正常状态的仪器
+ * 2. 获取每个仪器的最新校准记录中的"下次校准日期"（ExpiryDate）
+ * 3. 如果"下次校准日期"在目标年度内，则生成该仪器的校准计划
+ * 4. 如果"下次校准日期"不在目标年度内，则不生成计划
+ * 5. 如果仪器没有校准记录，均视为需要首次校准，生成计划
+ */
+const generateAnnualPlanHandler = async (req, res) => {
+  try {
+    const { year } = req.body;
+    
+    // 验证年度参数
+    if (!year) {
+      return res.status(400).json({
+        code: 400,
+        message: '请选择计划年度'
+      });
+    }
+    
+    const targetYear = parseInt(year);
+    console.log('生成年度计划，目标年度:', targetYear);
+    
+    const pool = await getConnection();
+
+    // 查询所有正常状态的仪器及其最新校准记录
+    const instrumentsQuery = `
+      SELECT 
+        i.ID,
+        i.InstrumentCode,
+        i.ManagementCode,
+        i.InstrumentName,
+        i.CalibrationCycle,
+        i.Status,
+        cr.CalibrationDate as LastCalibrationDate,
+        cr.ExpiryDate as NextCalibrationDate
+      FROM Instruments i
+      LEFT JOIN (
+        SELECT cr1.InstrumentID, cr1.CalibrationDate, cr1.ExpiryDate
+        FROM CalibrationResults cr1
+        INNER JOIN (
+          SELECT InstrumentID, MAX(CalibrationDate) as MaxDate
+          FROM CalibrationResults
+          GROUP BY InstrumentID
+        ) cr2 ON cr1.InstrumentID = cr2.InstrumentID AND cr1.CalibrationDate = cr2.MaxDate
+      ) cr ON i.ID = cr.InstrumentID
+      WHERE i.IsActive = 1 
+        AND (i.Status = 'normal' OR i.Status = '正常' OR i.Status IS NULL)
+    `;
+
+    const instrumentsResult = await pool.request().query(instrumentsQuery);
+    const allInstruments = instrumentsResult.recordset;
+    
+    console.log('查询到的仪器总数:', allInstruments.length);
+
+    let createdCount = 0;
+    let skippedCount = 0;
+    let notInYearCount = 0;
+
+    for (const instrument of allInstruments) {
+      // 判断该仪器是否需要在目标年度校准
+      let needsCalibrationInTargetYear = false;
+      let plannedDate = null;
+      
+      if (instrument.NextCalibrationDate) {
+        // 有校准记录，检查下次校准日期是否在目标年度
+        const nextCalDate = new Date(instrument.NextCalibrationDate);
+        if (nextCalDate.getFullYear() === targetYear) {
+          needsCalibrationInTargetYear = true;
+          plannedDate = nextCalDate;
+        }
+      } else {
+        // 没有校准记录，均视为需要首次校准，生成计划
+        needsCalibrationInTargetYear = true;
+        plannedDate = new Date(targetYear, 2, 15); // 默认设为3月15日
+      }
+      
+      // 如果不需要在目标年度校准，跳过
+      if (!needsCalibrationInTargetYear) {
+        notInYearCount++;
+        continue;
+      }
+
+      // 检查该仪器在目标年度是否已有计划
+      const existingCheck = await pool.request()
+        .input('year', sql.Int, targetYear)
+        .input('instrumentID', sql.Int, instrument.ID)
+        .query(`
+          SELECT COUNT(*) as count 
+          FROM AnnualCalibrationPlan 
+          WHERE PlanYear = @year AND InstrumentID = @instrumentID
+        `);
+
+      if (existingCheck.recordset[0].count > 0) {
+        skippedCount++;
+        continue;
+      }
+
+      // 创建计划
+      await pool.request()
+        .input('planYear', sql.Int, targetYear)
+        .input('instrumentID', sql.Int, instrument.ID)
+        .input('plannedDate', sql.Date, plannedDate)
+        .input('priority', sql.NVarChar, '中')
+        .input('status', sql.NVarChar, '计划中')
+        .input('createdBy', sql.Int, req.user.id)
+        .query(`
+          INSERT INTO AnnualCalibrationPlan (
+            PlanYear, InstrumentID, PlannedDate, Priority, Status, CreatedBy, CreatedAt, UpdatedAt
+          ) VALUES (
+            @planYear, @instrumentID, @plannedDate, @priority, @status, @createdBy, GETDATE(), GETDATE()
+          )
+        `);
+
+      createdCount++;
+    }
+
+    console.log('生成结果 - 新建:', createdCount, '跳过(已存在):', skippedCount, '不在目标年度:', notInYearCount);
+
+    res.json({
+      code: 200,
+      data: {
+        createdCount,
+        skippedCount,
+        notInYearCount,
+        totalInstruments: allInstruments.length
+      },
+      message: `年度计划生成完成，新建${createdCount}条，跳过${skippedCount}条（已存在），${notInYearCount}条不在${targetYear}年校准范围内`
+    });
+
+  } catch (error) {
+    console.error('生成年度校准计划失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '生成年度校准计划失败',
+      error: error.message
+    });
+  }
+};
+
+// 注册生成年度计划路由（两个路径兼容）
+router.post('/annual-plans/generate', authenticateToken, generateAnnualPlanHandler);
+router.post('/annual-plan/generate', authenticateToken, generateAnnualPlanHandler);
+
+/**
+ * 获取年度计划统计信息
+ * GET /api/instruments/annual-plans/statistics/:year
+ * GET /api/instruments/annual-plan/statistics/:year (兼容路由)
+ * 
+ * 统计说明：
+ * - 需校准仪器：下次校准日期在目标年度内的仪器数量
+ * - 已制定计划：目标年度已创建的计划数量
+ * - 已完成校准：目标年度已完成的计划数量
+ * - 逾期未校准：计划日期已过但未完成的计划数量
+ */
+const getStatisticsHandler = async (req, res) => {
+  try {
+    const { year } = req.params;
+    const targetYear = parseInt(year);
+    const pool = await getConnection();
+
+    // 统计需要在目标年度校准的仪器数量（基于下次校准日期）
+    const needCalibrationQuery = `
+      SELECT COUNT(DISTINCT i.ID) as totalInstruments
+      FROM Instruments i
+      LEFT JOIN (
+        SELECT cr1.InstrumentID, cr1.ExpiryDate
+        FROM CalibrationResults cr1
+        INNER JOIN (
+          SELECT InstrumentID, MAX(CalibrationDate) as MaxDate
+          FROM CalibrationResults
+          GROUP BY InstrumentID
+        ) cr2 ON cr1.InstrumentID = cr2.InstrumentID AND cr1.CalibrationDate = cr2.MaxDate
+      ) cr ON i.ID = cr.InstrumentID
+      WHERE i.IsActive = 1 
+        AND (i.Status = 'normal' OR i.Status = '正常' OR i.Status IS NULL)
+        AND (
+          -- 有校准记录且下次校准日期在目标年度
+          (cr.ExpiryDate IS NOT NULL AND YEAR(cr.ExpiryDate) = @targetYear)
+          OR
+          -- 没有校准记录但有校准周期的仪器
+          (cr.ExpiryDate IS NULL AND i.CalibrationCycle IS NOT NULL AND i.CalibrationCycle > 0)
+        )
+    `;
+
+    const needCalibrationResult = await pool.request()
+      .input('targetYear', sql.Int, targetYear)
+      .query(needCalibrationQuery);
+
+    // 统计已制定的计划数量
+    const planStatsQuery = `
+      SELECT 
+        COUNT(*) as plannedCount,
+        SUM(CASE WHEN Status = '已完成' THEN 1 ELSE 0 END) as completedCount,
+        SUM(CASE WHEN Status != '已完成' AND PlannedDate < GETDATE() THEN 1 ELSE 0 END) as overdueCount,
+        SUM(EstimatedCost) as totalEstimatedCost,
+        SUM(ActualCost) as totalActualCost
+      FROM AnnualCalibrationPlan
+      WHERE PlanYear = @year
+    `;
+
+    const planStatsResult = await pool.request()
+      .input('year', sql.Int, targetYear)
+      .query(planStatsQuery);
+
+    const stats = planStatsResult.recordset[0];
+
+    res.json({
+      code: 200,
+      data: {
+        totalInstruments: needCalibrationResult.recordset[0].totalInstruments || 0,
+        plannedCount: stats.plannedCount || 0,
+        completedCount: stats.completedCount || 0,
+        overdueCount: stats.overdueCount || 0,
+        totalEstimatedCost: stats.totalEstimatedCost || 0,
+        totalActualCost: stats.totalActualCost || 0
+      },
+      message: '获取统计信息成功'
+    });
+
+  } catch (error) {
+    console.error('获取年度计划统计失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '获取年度计划统计失败',
+      error: error.message
+    });
+  }
+};
+
+// 注册统计信息路由（两个路径兼容）
+router.get('/annual-plans/statistics/:year', authenticateToken, getStatisticsHandler);
+router.get('/annual-plan/statistics/:year', authenticateToken, getStatisticsHandler);
+
 // =====================================================
 // 导出功能
 // =====================================================
@@ -1922,39 +2412,100 @@ router.get('/export/annual-plan/:year', authenticateToken, async (req, res) => {
       { header: '备注', key: 'remarks', width: 20 }
     ];
 
-    // 设置表头样式
-    worksheet.getRow(1).font = { bold: true };
-    worksheet.getRow(1).fill = {
-      type: 'pattern',
-      pattern: 'solid',
-      fgColor: { argb: 'FFE0E0E0' }
-    };
+    // 表头列数
+    const columnCount = worksheet.columns.length;
+
+    // 设置表头样式 - 只填充有标题的单元格
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 25;  // 标题行高度25
+    headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    
+    // 遍历标题行的每个单元格设置样式
+    for (let col = 1; col <= columnCount; col++) {
+      const cell = headerRow.getCell(col);
+      cell.font = { bold: true, color: { argb: '000000' } };  // 黑色文字
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'D9D9D9' }  // 浅灰色背景
+      };
+    }
 
     // 添加数据
     result.recordset.forEach((row, index) => {
-      worksheet.addRow({
+      const dataRow = worksheet.addRow({
         index: index + 1,
-        instrumentCode: row.InstrumentCode,
-        managementCode: row.ManagementCode,
-        instrumentName: row.InstrumentName,
-        model: row.Model,
-        manufacturer: row.Manufacturer,
-        location: row.Location,
-        departmentName: row.DepartmentName,
-        responsiblePersonName: row.ResponsiblePersonName,
-        plannedDate: row.PlannedDate ? row.PlannedDate.toISOString().split('T')[0] : '',
-        calibrationAgency: row.CalibrationAgency,
-        estimatedCost: row.EstimatedCost,
-        priority: row.Priority,
-        status: row.Status,
-        actualDate: row.ActualDate ? row.ActualDate.toISOString().split('T')[0] : '',
-        actualCost: row.ActualCost,
-        certificateNumber: row.CertificateNumber,
-        calibrationResult: row.CalibrationResult,
-        expiryDate: row.ExpiryDate ? row.ExpiryDate.toISOString().split('T')[0] : '',
-        remarks: row.Remarks
+        instrumentCode: row.InstrumentCode || '',
+        managementCode: row.ManagementCode || '',
+        instrumentName: row.InstrumentName || '',
+        model: row.Model || '',
+        manufacturer: row.Manufacturer || '',
+        location: row.Location || '',
+        departmentName: row.DepartmentName || '',
+        responsiblePersonName: row.ResponsiblePersonName || '',
+        plannedDate: row.PlannedDate ? new Date(row.PlannedDate).toISOString().split('T')[0] : '',
+        calibrationAgency: row.CalibrationAgency || '',
+        estimatedCost: row.EstimatedCost || '',
+        priority: row.Priority || '',
+        status: row.Status || '',
+        actualDate: row.ActualDate ? new Date(row.ActualDate).toISOString().split('T')[0] : '',
+        actualCost: row.ActualCost || '',
+        certificateNumber: row.CertificateNumber || '',
+        calibrationResult: row.CalibrationResult || '',
+        expiryDate: row.ExpiryDate ? new Date(row.ExpiryDate).toISOString().split('T')[0] : '',
+        remarks: row.Remarks || ''
       });
+
+      // 设置数据行样式
+      dataRow.height = 22.5;  // 内容行高度22.5
+      dataRow.alignment = { vertical: 'middle' };
+      
+      // 隔行填充浅灰色
+      if (index % 2 === 1) {
+        for (let col = 1; col <= columnCount; col++) {
+          dataRow.getCell(col).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'F2F2F2' }  // 更浅的灰色
+          };
+        }
+      }
+      
+      // 根据状态设置行颜色
+      if (row.Status === '已完成') {
+        for (let col = 1; col <= columnCount; col++) {
+          dataRow.getCell(col).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'C6EFCE' }  // 浅绿色-已完成
+          };
+        }
+      } else if (row.Status === '已逾期') {
+        for (let col = 1; col <= columnCount; col++) {
+          dataRow.getCell(col).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'FFCCCC' }  // 浅红色-已逾期
+          };
+        }
+      }
     });
+
+    // 添加边框
+    worksheet.eachRow((row, rowNumber) => {
+      for (let col = 1; col <= columnCount; col++) {
+        const cell = row.getCell(col);
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      }
+    });
+
+    // 冻结首行，关闭网格线显示
+    worksheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: false }];
 
     // 设置响应头
     const filename = `${year}年度检定计划表_${new Date().toISOString().split('T')[0]}.xlsx`;
@@ -2294,10 +2845,10 @@ router.get('/statistics', authenticateToken, async (req, res) => {
     const query = `
       SELECT 
         COUNT(*) as totalInstruments,
-        COUNT(CASE WHEN Status = 'normal' THEN 1 END) as normalCount,
-        COUNT(CASE WHEN Status = 'calibration' THEN 1 END) as calibrationCount,
-        COUNT(CASE WHEN Status = 'retired' THEN 1 END) as retiredCount,
-        COUNT(CASE WHEN Status = 'damaged' THEN 1 END) as damagedCount,
+        COUNT(CASE WHEN Status = 'normal' OR Status = '正常' THEN 1 END) as normalCount,
+        COUNT(CASE WHEN Status = 'calibration' OR Status = '校准中' OR Status = '维修中' THEN 1 END) as calibrationCount,
+        COUNT(CASE WHEN Status = 'retired' OR Status = '已报废' THEN 1 END) as retiredCount,
+        COUNT(CASE WHEN Status = 'damaged' OR Status = '损坏' THEN 1 END) as damagedCount,
         -- 即将到期的仪器数量（30天内）
         (SELECT COUNT(*) 
          FROM CalibrationResults cr
@@ -2363,7 +2914,8 @@ router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
       recommendations,      // 添加建议字段
       environmentalConditions,
       calibrationCycle,     // 添加校准周期字段
-      remarks
+      remarks,
+      certificateFile       // 添加证书文件字段
     } = req.body;
 
     // 验证必填字段
@@ -2424,6 +2976,7 @@ router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
         EnvironmentalConditions = @environmentalConditions,
         CalibrationCycle = @calibrationCycle,
         Remarks = @remarks,
+        Attachments = @attachments,
         UpdatedAt = GETDATE()
       WHERE ID = @id
     `;
@@ -2448,6 +3001,7 @@ router.put('/calibration-results/:id', authenticateToken, async (req, res) => {
       .input('environmentalConditions', sql.NVarChar, environmentalConditions || null)
       .input('calibrationCycle', sql.Int, calibrationCycle || null)
       .input('remarks', sql.NVarChar, remarks || null)
+      .input('attachments', sql.NVarChar, certificateFile || null)
       .query(updateQuery);
 
     res.json({
@@ -2505,6 +3059,224 @@ router.delete('/calibration-results/:id', authenticateToken, async (req, res) =>
       message: '删除校准检定结果失败',
       error: error.message
     });
+  }
+});
+
+// =====================================================
+// 年度计划兼容路由（支持 annual-plan 单数形式）
+// =====================================================
+
+/**
+ * 获取年度计划列表（兼容路由）
+ * GET /api/instruments/annual-plan
+ */
+router.get('/annual-plan', authenticateToken, async (req, res) => {
+  try {
+    const {
+      year = new Date().getFullYear(),
+      page = 1,
+      size = 20,
+      instrumentName,
+      managementCode,
+      status,
+      priority,
+      calibrationAgency
+    } = req.query;
+
+    const offset = (page - 1) * size;
+    const pool = await getConnection();
+
+    let whereConditions = ['ap.PlanYear = @year'];
+    const request = pool.request();
+    request.input('year', sql.Int, parseInt(year));
+
+    if (instrumentName) {
+      whereConditions.push('i.InstrumentName LIKE @instrumentName');
+      request.input('instrumentName', sql.NVarChar, `%${instrumentName}%`);
+    }
+    if (managementCode) {
+      whereConditions.push('i.ManagementCode LIKE @managementCode');
+      request.input('managementCode', sql.NVarChar, `%${managementCode}%`);
+    }
+    if (status) {
+      whereConditions.push('ap.Status = @status');
+      request.input('status', sql.NVarChar, status);
+    }
+    if (priority) {
+      whereConditions.push('ap.Priority = @priority');
+      request.input('priority', sql.NVarChar, priority);
+    }
+    if (calibrationAgency) {
+      whereConditions.push('ap.CalibrationAgency LIKE @calibrationAgency');
+      request.input('calibrationAgency', sql.NVarChar, `%${calibrationAgency}%`);
+    }
+
+    const whereClause = whereConditions.join(' AND ');
+
+    const countQuery = `
+      SELECT COUNT(*) as total FROM AnnualCalibrationPlan ap
+      LEFT JOIN Instruments i ON ap.InstrumentID = i.ID
+      WHERE ${whereClause}
+    `;
+    const countResult = await request.query(countQuery);
+    const total = countResult.recordset[0].total;
+
+    const dataQuery = `
+      SELECT * FROM (
+        SELECT 
+          ap.ID, ap.PlanYear, ap.InstrumentID,
+          i.InstrumentCode, i.ManagementCode, i.InstrumentName, i.Model,
+          i.Manufacturer, i.Location, i.CalibrationCycle,
+          d.Name as DepartmentName, p.Name as ResponsiblePersonName,
+          ap.PlannedDate, ap.CalibrationAgency, ap.EstimatedCost, ap.Priority, ap.Status,
+          ap.ActualDate, ap.ActualCost, ap.CalibrationResultID,
+          cr.CertificateNumber, cr.CalibrationResult, cr.ExpiryDate,
+          ap.Remarks, creator.RealName as CreatorName, ap.CreatedAt, ap.UpdatedAt,
+          (SELECT TOP 1 CalibrationDate FROM CalibrationResults WHERE InstrumentID = i.ID ORDER BY CalibrationDate DESC) as LastCalibrationDate,
+          ROW_NUMBER() OVER (ORDER BY ap.PlannedDate ASC) as RowNum
+        FROM AnnualCalibrationPlan ap
+        LEFT JOIN Instruments i ON ap.InstrumentID = i.ID
+        LEFT JOIN Department d ON i.DepartmentID = d.ID
+        LEFT JOIN Person p ON i.ResponsiblePerson = p.ID
+        LEFT JOIN CalibrationResults cr ON ap.CalibrationResultID = cr.ID
+        LEFT JOIN [User] creator ON ap.CreatedBy = creator.ID
+        WHERE ${whereClause}
+      ) AS PagedResults
+      WHERE RowNum BETWEEN @startRow AND @endRow
+    `;
+
+    request.input('startRow', sql.Int, offset + 1);
+    request.input('endRow', sql.Int, offset + parseInt(size));
+    const dataResult = await request.query(dataQuery);
+
+    res.json({
+      code: 200,
+      data: {
+        list: dataResult.recordset,
+        total: total,
+        page: parseInt(page),
+        size: parseInt(size),
+        totalPages: Math.ceil(total / size)
+      },
+      message: '获取年度校准计划列表成功'
+    });
+  } catch (error) {
+    console.error('获取年度校准计划列表失败:', error);
+    res.status(500).json({ code: 500, message: '获取年度校准计划列表失败', error: error.message });
+  }
+});
+
+/**
+ * 创建年度计划（兼容路由）
+ * POST /api/instruments/annual-plan
+ */
+router.post('/annual-plan', authenticateToken, async (req, res) => {
+  try {
+    const { planYear, instrumentID, plannedDate, calibrationAgency, estimatedCost, priority = '中', remarks } = req.body;
+    if (!planYear || !instrumentID || !plannedDate) {
+      return res.status(400).json({ code: 400, message: '请填写必填字段（年度、仪器、计划日期）' });
+    }
+    const pool = await getConnection();
+    
+    const checkResult = await pool.request()
+      .input('planYear', sql.Int, planYear)
+      .input('instrumentID', sql.Int, instrumentID)
+      .query('SELECT COUNT(*) as count FROM AnnualCalibrationPlan WHERE PlanYear = @planYear AND InstrumentID = @instrumentID');
+    if (checkResult.recordset[0].count > 0) {
+      return res.status(400).json({ code: 400, message: '该仪器在此年度已存在校准计划' });
+    }
+
+    const result = await pool.request()
+      .input('planYear', sql.Int, planYear)
+      .input('instrumentID', sql.Int, instrumentID)
+      .input('plannedDate', sql.Date, plannedDate)
+      .input('calibrationAgency', sql.NVarChar, calibrationAgency || null)
+      .input('estimatedCost', sql.Decimal(10, 2), estimatedCost || null)
+      .input('priority', sql.NVarChar, priority)
+      .input('remarks', sql.NVarChar, remarks || null)
+      .input('createdBy', sql.Int, req.user.id)
+      .query(`INSERT INTO AnnualCalibrationPlan (PlanYear, InstrumentID, PlannedDate, CalibrationAgency, EstimatedCost, Priority, Status, Remarks, CreatedBy, CreatedAt, UpdatedAt)
+              VALUES (@planYear, @instrumentID, @plannedDate, @calibrationAgency, @estimatedCost, @priority, '计划中', @remarks, @createdBy, GETDATE(), GETDATE());
+              SELECT SCOPE_IDENTITY() as id;`);
+
+    res.status(201).json({ code: 201, data: { id: result.recordset[0].id }, message: '创建年度校准计划成功' });
+  } catch (error) {
+    console.error('创建年度校准计划失败:', error);
+    res.status(500).json({ code: 500, message: '创建年度校准计划失败', error: error.message });
+  }
+});
+
+/**
+ * 更新年度计划（兼容路由）
+ * PUT /api/instruments/annual-plan/:id
+ */
+router.put('/annual-plan/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { instrumentID, planYear, plannedDate, calibrationAgency, estimatedCost, priority, remarks } = req.body;
+    const pool = await getConnection();
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('instrumentID', sql.Int, instrumentID)
+      .input('planYear', sql.Int, planYear)
+      .input('plannedDate', sql.Date, plannedDate)
+      .input('calibrationAgency', sql.NVarChar, calibrationAgency || null)
+      .input('estimatedCost', sql.Decimal(10, 2), estimatedCost || null)
+      .input('priority', sql.NVarChar, priority || '中')
+      .input('remarks', sql.NVarChar, remarks || null)
+      .input('updatedBy', sql.Int, req.user.id)
+      .query(`UPDATE AnnualCalibrationPlan SET InstrumentID = @instrumentID, PlanYear = @planYear, PlannedDate = @plannedDate,
+              CalibrationAgency = @calibrationAgency, EstimatedCost = @estimatedCost, Priority = @priority, Remarks = @remarks,
+              UpdatedBy = @updatedBy, UpdatedAt = GETDATE() WHERE ID = @id`);
+
+    res.json({ code: 200, message: '更新年度校准计划成功' });
+  } catch (error) {
+    console.error('更新年度校准计划失败:', error);
+    res.status(500).json({ code: 500, message: '更新年度校准计划失败', error: error.message });
+  }
+});
+
+/**
+ * 删除年度计划（兼容路由）
+ * DELETE /api/instruments/annual-plan/:id
+ */
+router.delete('/annual-plan/:id', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = await getConnection();
+    await pool.request().input('id', sql.Int, id).query('DELETE FROM AnnualCalibrationPlan WHERE ID = @id');
+    res.json({ code: 200, message: '删除年度校准计划成功' });
+  } catch (error) {
+    console.error('删除年度校准计划失败:', error);
+    res.status(500).json({ code: 500, message: '删除年度校准计划失败', error: error.message });
+  }
+});
+
+/**
+ * 更新年度计划状态（兼容路由）
+ * PATCH /api/instruments/annual-plan/:id/status
+ */
+router.patch('/annual-plan/:id/status', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { status, actualDate, actualCost, calibrationResultID } = req.body;
+    const pool = await getConnection();
+
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('status', sql.NVarChar, status)
+      .input('actualDate', sql.Date, actualDate || null)
+      .input('actualCost', sql.Decimal(10, 2), actualCost || null)
+      .input('calibrationResultID', sql.Int, calibrationResultID || null)
+      .input('updatedBy', sql.Int, req.user.id)
+      .query(`UPDATE AnnualCalibrationPlan SET Status = @status, ActualDate = @actualDate, ActualCost = @actualCost,
+              CalibrationResultID = @calibrationResultID, UpdatedBy = @updatedBy, UpdatedAt = GETDATE() WHERE ID = @id`);
+
+    res.json({ code: 200, message: '更新计划状态成功' });
+  } catch (error) {
+    console.error('更新计划状态失败:', error);
+    res.status(500).json({ code: 500, message: '更新计划状态失败', error: error.message });
   }
 });
 
