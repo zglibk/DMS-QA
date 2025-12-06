@@ -454,6 +454,345 @@ router.get('/stock/product-out-sum', authenticateToken, async (req, res) => {
     }
 });
 
+/**
+ * 查询物料列表
+ * GET /api/erp/stock/material
+ * 查询参数:
+ * - StartDate: 开始时间 (yyyy-MM-dd HH:mm:ss)
+ * - EndDate: 结束时间 (yyyy-MM-dd HH:mm:ss)
+ */
+router.get('/stock/material', authenticateToken, async (req, res) => {
+    try {
+        const { StartDate, EndDate } = req.query;
+        
+        console.log('获取ERP物料列表:', { StartDate, EndDate });
+        
+        const filters = {};
+        if (StartDate) filters.StartDate = StartDate;
+        if (EndDate) filters.EndDate = EndDate;
+        
+        const materialData = await erpService.getMaterialList(filters);
+        
+        res.json({
+            code: 0,
+            message: '物料列表获取成功',
+            data: materialData
+        });
+    } catch (error) {
+        console.error('获取物料列表错误:', error.message);
+        res.status(500).json({
+            code: -1,
+            message: `获取物料列表失败: ${error.message}`,
+            data: null
+        });
+    }
+});
+
+/**
+ * 查询工单列表
+ * GET /api/erp/production/work-orders
+ * 查询参数:
+ * - StartDate: 开始日期 (yyyy-MM-dd HH:mm:ss)
+ * - EndDate: 结束日期 (yyyy-MM-dd HH:mm:ss)
+ */
+router.get('/production/work-orders', authenticateToken, async (req, res) => {
+    try {
+        const { StartDate, EndDate } = req.query;
+        
+        console.log('获取ERP工单列表:', { StartDate, EndDate });
+        
+        const filters = {};
+        if (StartDate) filters.StartDate = StartDate;
+        if (EndDate) filters.EndDate = EndDate;
+        
+        const workOrderData = await erpService.getWorkOrderList(filters);
+        
+        res.json({
+            code: 0,
+            message: '工单列表获取成功',
+            data: workOrderData
+        });
+    } catch (error) {
+        console.error('获取工单列表错误:', error.message);
+        res.status(500).json({
+            code: -1,
+            message: `获取工单列表失败: ${error.message}`,
+            data: null
+        });
+    }
+});
+
+/**
+ * 查询工单明细
+ * GET /api/erp/production/work-order/:pNum
+ * 路径参数:
+ * - pNum: 工单号
+ */
+router.get('/production/work-order/:pNum', authenticateToken, async (req, res) => {
+    try {
+        const { pNum } = req.params;
+        
+        console.log('获取ERP工单明细:', { pNum });
+        
+        if (!pNum) {
+            return res.status(400).json({
+                code: -1,
+                message: '工单号不能为空',
+                data: null
+            });
+        }
+        
+        const workOrderDetail = await erpService.getWorkOrderDetail(pNum);
+        
+        res.json({
+            code: 0,
+            message: '工单明细获取成功',
+            data: workOrderDetail
+        });
+    } catch (error) {
+        console.error('获取工单明细错误:', error.message);
+        res.status(500).json({
+            code: -1,
+            message: `获取工单明细失败: ${error.message}`,
+            data: null
+        });
+    }
+});
+
+/**
+ * 查询物料入库明细列表
+ * GET /api/erp/stock/material-in
+ * 查询参数:
+ * - StartDate: 开始时间 (yyyy-MM-dd HH:mm:ss)
+ * - EndDate: 结束时间 (yyyy-MM-dd HH:mm:ss)
+ */
+router.get('/stock/material-in', authenticateToken, async (req, res) => {
+    try {
+        const { StartDate, EndDate } = req.query;
+        
+        console.log('获取ERP物料入库明细列表:', { StartDate, EndDate });
+        
+        const filters = {};
+        if (StartDate) filters.StartDate = StartDate;
+        if (EndDate) filters.EndDate = EndDate;
+        
+        const materialInData = await erpService.getMaterialInList(filters);
+        
+        res.json({
+            code: 0,
+            message: '物料入库明细列表获取成功',
+            data: materialInData
+        });
+    } catch (error) {
+        console.error('获取物料入库明细列表错误:', error.message);
+        res.status(500).json({
+            code: -1,
+            message: `获取物料入库明细列表失败: ${error.message}`,
+            data: null
+        });
+    }
+});
+
+/**
+ * 出货报告查询接口
+ * GET /api/erp/shipment-report
+ * 查询参数:
+ * - pNum: 生产施工单号/工单号（可选）
+ * - materialId: 物料编号（可选）
+ * - materialName: 物料名称（可选）
+ * - StartDate: 开始时间 (yyyy-MM-dd HH:mm:ss)
+ * - EndDate: 结束时间 (yyyy-MM-dd HH:mm:ss)
+ */
+router.get('/shipment-report', authenticateToken, async (req, res) => {
+    try {
+        const { pNum, materialId, materialName, StartDate, EndDate } = req.query;
+        
+        console.log('出货报告查询:', { pNum, materialId, materialName, StartDate, EndDate });
+        
+        // 构建时间范围（默认查询最近30天）
+        const endDate = EndDate || new Date().toISOString().replace('T', ' ').slice(0, 19);
+        const startDate = StartDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19);
+        
+        const result = {
+            workOrderInfo: null,      // 工单信息
+            materialList: [],         // 物料列表（从工单明细获取纸张/材料信息）
+            materialInList: [],       // 物料入库明细（包含供应商信息）
+            productInfo: null         // 产品信息
+        };
+        
+        // 如果提供了工单号，先查询工单明细获取物料信息
+        if (pNum) {
+            try {
+                const workOrderDetail = await erpService.getWorkOrderDetail(pNum);
+                if (workOrderDetail) {
+                    // 处理返回数据格式
+                    const orderData = workOrderDetail.data || workOrderDetail;
+                    result.workOrderInfo = {
+                        PNum: orderData.PNum,
+                        OrderNum: orderData.OrderNum,
+                        Product: orderData.Product,
+                        CustomerID: orderData.CustomerID,
+                        DeliveryDate: orderData.DeliveryDate,
+                        Sales: orderData.Sales,
+                        StatusDes: orderData.StatusDes
+                    };
+                    
+                    // 提取纸张资料（包含品牌/供应商信息）
+                    if (orderData.PNumPaperInfoList && Array.isArray(orderData.PNumPaperInfoList)) {
+                        result.materialList = orderData.PNumPaperInfoList.map(paper => ({
+                            type: '纸张',
+                            name: paper.PaperName,
+                            brand: paper.Band,           // 品牌即供应商
+                            spec: paper.Scale,
+                            srcCount: paper.SrcCount,
+                            desScale: paper.DesScale
+                        }));
+                    }
+                    
+                    // 提取材料资料
+                    if (orderData.PNumAMInfoList && Array.isArray(orderData.PNumAMInfoList)) {
+                        const amMaterials = orderData.PNumAMInfoList.map(am => ({
+                            type: '材料',
+                            name: am.AMName,
+                            brand: '',
+                            spec: am.Scale,
+                            count: am.AMCount,
+                            unit: am.CalUnit
+                        }));
+                        result.materialList = result.materialList.concat(amMaterials);
+                    }
+                    
+                    // 提取产品信息
+                    if (orderData.PNumProductInfoList && Array.isArray(orderData.PNumProductInfoList) && orderData.PNumProductInfoList.length > 0) {
+                        result.productInfo = orderData.PNumProductInfoList.map(p => ({
+                            productId: p.ProductID,
+                            cProductId: p.CProductID,
+                            product: p.Product,
+                            cProduct: p.CProduct,
+                            scale: p.Scale,
+                            orderCount: p.OrderCount,
+                            pCount: p.PCount
+                        }));
+                    }
+                }
+            } catch (error) {
+                console.log('获取工单明细失败，继续查询物料:', error.message);
+            }
+        }
+        
+        // 查询物料入库明细（获取供应商信息）
+        try {
+            const materialInData = await erpService.getMaterialInList({
+                StartDate: startDate,
+                EndDate: endDate
+            });
+            
+            let materialInList = [];
+            if (Array.isArray(materialInData)) {
+                materialInList = materialInData;
+            } else if (materialInData && materialInData.data && Array.isArray(materialInData.data)) {
+                materialInList = materialInData.data;
+            }
+            
+            // 根据条件过滤
+            if (materialInList.length > 0) {
+                result.materialInList = materialInList.filter(item => {
+                    let match = true;
+                    
+                    // 按物料编号过滤
+                    if (materialId && item.MaterialID) {
+                        match = match && item.MaterialID.toLowerCase().includes(materialId.toLowerCase());
+                    }
+                    
+                    // 按物料名称过滤
+                    if (materialName && item.MName) {
+                        match = match && item.MName.toLowerCase().includes(materialName.toLowerCase());
+                    }
+                    
+                    return match;
+                }).map(item => ({
+                    inId: item.BInMID,              // 入库单号
+                    inDate: item.InDate,           // 入库日期
+                    dlyNum: item.DlyNum,           // 送货单号
+                    purId: item.PurID,             // 采购单号
+                    supply: item.Supply,           // 供应商（关键字段）
+                    materialId: item.MaterialID,   // 物料编码
+                    materialName: item.MName,      // 物料名称
+                    spec: item.Scale,              // 规格
+                    brand: item.Band,              // 品牌
+                    materialType: item.MType,      // 物料类型
+                    materialSubType: item.MSubType, // 子物料类型
+                    count: item.Acount || item.ACount,  // 入库数量
+                    deliveryDate: item.DeliveryDate,    // 计划交货期
+                    lastUpdateDate: item.LstUpdateDate  // 最后修改日期
+                }));
+            }
+        } catch (error) {
+            console.log('获取物料入库明细失败:', error.message);
+        }
+        
+        // 如果只按物料编号/名称查询，还需要查询基础物料信息
+        if ((materialId || materialName) && !pNum) {
+            try {
+                const materialData = await erpService.getMaterialList({
+                    StartDate: startDate,
+                    EndDate: endDate
+                });
+                
+                let materials = [];
+                if (Array.isArray(materialData)) {
+                    materials = materialData;
+                } else if (materialData && materialData.data && Array.isArray(materialData.data)) {
+                    materials = materialData.data;
+                }
+                
+                // 过滤并添加基础物料信息
+                if (materials.length > 0) {
+                    const filteredMaterials = materials.filter(item => {
+                        let match = true;
+                        
+                        if (materialId && item.MaterialID) {
+                            match = match && item.MaterialID.toLowerCase().includes(materialId.toLowerCase());
+                        }
+                        
+                        if (materialName && item.MName) {
+                            match = match && item.MName.toLowerCase().includes(materialName.toLowerCase());
+                        }
+                        
+                        return match;
+                    }).map(item => ({
+                        type: item.MType || '物料',
+                        name: item.MName,
+                        brand: item.Band,
+                        spec: item.Scale,
+                        model: item.Model,
+                        unit: item.CalUnit,
+                        weight: item.DingLiang,
+                        subType: item.MSubType
+                    }));
+                    
+                    result.materialList = result.materialList.concat(filteredMaterials);
+                }
+            } catch (error) {
+                console.log('获取物料列表失败:', error.message);
+            }
+        }
+        
+        res.json({
+            code: 0,
+            message: '出货报告查询成功',
+            data: result
+        });
+    } catch (error) {
+        console.error('出货报告查询错误:', error.message);
+        res.status(500).json({
+            code: -1,
+            message: `出货报告查询失败: ${error.message}`,
+            data: null
+        });
+    }
+});
+
 
 
 module.exports = router;

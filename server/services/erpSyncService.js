@@ -1,6 +1,6 @@
 const cron = require('node-cron');
 const erpService = require('./erpService');
-const db = require('../db');
+const { getConnection, executeQuery, sql } = require('../db');
 const erpConfigLoader = require('../utils/erpConfigLoader');
 
 /**
@@ -226,22 +226,37 @@ class ErpSyncService {
         try {
             // 正在同步生产数据
             
-            // 从ERP获取生产数据
-            const productionData = await erpService.getProductionData(dateRange);
+            // 从ERP获取生产数据（生产情况统计表）
+            const productionData = await erpService.getProductionDataAnaly({
+                StartDate: `${dateRange.startDate} 00:00:00`,
+                EndDate: `${dateRange.endDate} 23:59:59`
+            });
             
-            if (!productionData || !Array.isArray(productionData)) {
-                throw new Error('获取的生产数据格式不正确');
+            // 处理返回数据格式
+            let dataList = [];
+            if (Array.isArray(productionData)) {
+                dataList = productionData;
+            } else if (productionData && productionData.data && Array.isArray(productionData.data)) {
+                dataList = productionData.data;
+            } else {
+                console.log('生产数据格式:', typeof productionData, productionData);
+                syncResult.results.push({
+                    type: 'production',
+                    status: 'warning',
+                    message: '获取的生产数据为空或格式不正确'
+                });
+                return;
             }
 
             // 保存到本地数据库
             let insertCount = 0;
             let updateCount = 0;
 
-            for (const record of productionData) {
+            for (const record of dataList) {
                 const result = await this.saveProductionRecord(record);
-                if (result.isNew) {
+                if (result && result.isNew) {
                     insertCount++;
-                } else {
+                } else if (result) {
                     updateCount++;
                 }
             }
@@ -249,7 +264,7 @@ class ErpSyncService {
             syncResult.results.push({
                 type: 'production',
                 status: 'success',
-                totalRecords: productionData.length,
+                totalRecords: dataList.length,
                 insertCount,
                 updateCount,
                 message: `生产数据同步成功: 新增${insertCount}条，更新${updateCount}条`
@@ -276,22 +291,37 @@ class ErpSyncService {
         try {
             // 正在同步交付数据
             
-            // 从ERP获取交付数据
-            const deliveryData = await erpService.getDeliveryData(dateRange);
+            // 从ERP获取交付数据（成品出库明细）
+            const deliveryData = await erpService.getProductOutSumList({
+                StartDate: `${dateRange.startDate} 00:00:00`,
+                EndDate: `${dateRange.endDate} 23:59:59`
+            });
             
-            if (!deliveryData || !Array.isArray(deliveryData)) {
-                throw new Error('获取的交付数据格式不正确');
+            // 处理返回数据格式
+            let dataList = [];
+            if (Array.isArray(deliveryData)) {
+                dataList = deliveryData;
+            } else if (deliveryData && deliveryData.data && Array.isArray(deliveryData.data)) {
+                dataList = deliveryData.data;
+            } else {
+                console.log('交付数据格式:', typeof deliveryData, deliveryData);
+                syncResult.results.push({
+                    type: 'delivery',
+                    status: 'warning',
+                    message: '获取的交付数据为空或格式不正确'
+                });
+                return;
             }
 
             // 保存到本地数据库
             let insertCount = 0;
             let updateCount = 0;
 
-            for (const record of deliveryData) {
+            for (const record of dataList) {
                 const result = await this.saveDeliveryRecord(record);
-                if (result.isNew) {
+                if (result && result.isNew) {
                     insertCount++;
-                } else {
+                } else if (result) {
                     updateCount++;
                 }
             }
@@ -319,109 +349,133 @@ class ErpSyncService {
 
     /**
      * 保存生产记录到本地数据库
-     * @param {Object} record - 生产记录
+     * @param {Object} record - 生产记录（ERP格式）
      * @returns {Object} 保存结果
      */
     async saveProductionRecord(record) {
         try {
-            // 检查记录是否已存在
-            const existingQuery = `
-                SELECT id FROM erp_production_data 
-                WHERE batch_number = ? AND production_date = ?
-            `;
-            const existing = await db.query(existingQuery, [record.batchNumber, record.productionDate]);
+            // 映射ERP字段到本地数据库字段
+            const batchNumber = record.PNum || '';  // 工单号
+            const productionDate = record.ShiftDate || new Date().toISOString();
+            const productLine = record.DevName || '';  // 设备名称
+            const quantity = record.PCount || 0;  // 数量
+            const qualityGrade = record.StatusDes || '';  // 状态
 
-            if (existing.length > 0) {
+            const pool = await getConnection();
+            
+            // 检查记录是否已存在
+            const existResult = await pool.request()
+                .input('batchNumber', sql.NVarChar, batchNumber)
+                .input('productionDate', sql.NVarChar, productionDate)
+                .query(`
+                    SELECT id FROM erp_production_data 
+                    WHERE batch_number = @batchNumber AND production_date = @productionDate
+                `);
+
+            if (existResult.recordset.length > 0) {
                 // 更新现有记录
-                const updateQuery = `
-                    UPDATE erp_production_data SET
-                        product_line = ?,
-                        quantity = ?,
-                        quality_grade = ?,
-                        updated_at = GETDATE()
-                    WHERE id = ?
-                `;
-                await db.query(updateQuery, [
-                    record.productLine,
-                    record.quantity,
-                    record.qualityGrade,
-                    existing[0].id
-                ]);
-                return { isNew: false, id: existing[0].id };
+                await pool.request()
+                    .input('productLine', sql.NVarChar, productLine)
+                    .input('quantity', sql.Decimal(18, 2), quantity)
+                    .input('qualityGrade', sql.NVarChar, qualityGrade)
+                    .input('id', sql.Int, existResult.recordset[0].id)
+                    .query(`
+                        UPDATE erp_production_data SET
+                            product_line = @productLine,
+                            quantity = @quantity,
+                            quality_grade = @qualityGrade,
+                            updated_at = GETDATE()
+                        WHERE id = @id
+                    `);
+                return { isNew: false, id: existResult.recordset[0].id };
             } else {
                 // 插入新记录
-                const insertQuery = `
-                    INSERT INTO erp_production_data (
-                        batch_number, production_date, product_line, 
-                        quantity, quality_grade, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, GETDATE(), GETDATE())
-                `;
-                const result = await db.query(insertQuery, [
-                    record.batchNumber,
-                    record.productionDate,
-                    record.productLine,
-                    record.quantity,
-                    record.qualityGrade
-                ]);
-                return { isNew: true, id: result.insertId };
+                const insertResult = await pool.request()
+                    .input('batchNumber', sql.NVarChar, batchNumber)
+                    .input('productionDate', sql.NVarChar, productionDate)
+                    .input('productLine', sql.NVarChar, productLine)
+                    .input('quantity', sql.Decimal(18, 2), quantity)
+                    .input('qualityGrade', sql.NVarChar, qualityGrade)
+                    .query(`
+                        INSERT INTO erp_production_data (
+                            batch_number, production_date, product_line, 
+                            quantity, quality_grade, created_at, updated_at
+                        ) 
+                        OUTPUT INSERTED.id
+                        VALUES (@batchNumber, @productionDate, @productLine, 
+                                @quantity, @qualityGrade, GETDATE(), GETDATE())
+                    `);
+                return { isNew: true, id: insertResult.recordset[0]?.id };
             }
         } catch (error) {
             console.error('保存生产记录失败:', error.message);
-            throw error;
+            return null;
         }
     }
 
     /**
      * 保存交付记录到本地数据库
-     * @param {Object} record - 交付记录
+     * @param {Object} record - 交付记录（ERP格式）
      * @returns {Object} 保存结果
      */
     async saveDeliveryRecord(record) {
         try {
-            // 检查记录是否已存在
-            const existingQuery = `
-                SELECT id FROM erp_delivery_data 
-                WHERE delivery_number = ? AND delivery_date = ?
-            `;
-            const existing = await db.query(existingQuery, [record.deliveryNumber, record.deliveryDate]);
+            // 映射ERP字段到本地数据库字段
+            const deliveryNumber = record.OutID || '';  // 出库单号
+            const deliveryDate = record.OutDate || new Date().toISOString();
+            const customerCode = record.CustomerID || '';  // 客户编码
+            const quantity = record.OutCount || 0;  // 实际送货数
+            const deliveryStatus = 'delivered';  // 默认状态
 
-            if (existing.length > 0) {
+            const pool = await getConnection();
+            
+            // 检查记录是否已存在
+            const existResult = await pool.request()
+                .input('deliveryNumber', sql.NVarChar, deliveryNumber)
+                .input('deliveryDate', sql.NVarChar, deliveryDate)
+                .query(`
+                    SELECT id FROM erp_delivery_data 
+                    WHERE delivery_number = @deliveryNumber AND delivery_date = @deliveryDate
+                `);
+
+            if (existResult.recordset.length > 0) {
                 // 更新现有记录
-                const updateQuery = `
-                    UPDATE erp_delivery_data SET
-                        customer_code = ?,
-                        quantity = ?,
-                        delivery_status = ?,
-                        updated_at = GETDATE()
-                    WHERE id = ?
-                `;
-                await db.query(updateQuery, [
-                    record.customerCode,
-                    record.quantity,
-                    record.deliveryStatus,
-                    existing[0].id
-                ]);
-                return { isNew: false, id: existing[0].id };
+                await pool.request()
+                    .input('customerCode', sql.NVarChar, customerCode)
+                    .input('quantity', sql.Decimal(18, 2), quantity)
+                    .input('deliveryStatus', sql.NVarChar, deliveryStatus)
+                    .input('id', sql.Int, existResult.recordset[0].id)
+                    .query(`
+                        UPDATE erp_delivery_data SET
+                            customer_code = @customerCode,
+                            quantity = @quantity,
+                            delivery_status = @deliveryStatus,
+                            updated_at = GETDATE()
+                        WHERE id = @id
+                    `);
+                return { isNew: false, id: existResult.recordset[0].id };
             } else {
                 // 插入新记录
-                const insertQuery = `
-                    INSERT INTO erp_delivery_data (
-                        delivery_number, delivery_date, customer_code, 
-                        quantity, delivery_status, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, GETDATE(), GETDATE())
-                `;
-                const result = await db.query(insertQuery, [
-                    record.deliveryNumber,
-                    record.deliveryDate,
-                    record.customerCode,
-                    record.quantity,
-                    record.deliveryStatus
-                ]);
-                return { isNew: true, id: result.insertId };
+                const insertResult = await pool.request()
+                    .input('deliveryNumber', sql.NVarChar, deliveryNumber)
+                    .input('deliveryDate', sql.NVarChar, deliveryDate)
+                    .input('customerCode', sql.NVarChar, customerCode)
+                    .input('quantity', sql.Decimal(18, 2), quantity)
+                    .input('deliveryStatus', sql.NVarChar, deliveryStatus)
+                    .query(`
+                        INSERT INTO erp_delivery_data (
+                            delivery_number, delivery_date, customer_code, 
+                            quantity, delivery_status, created_at, updated_at
+                        ) 
+                        OUTPUT INSERTED.id
+                        VALUES (@deliveryNumber, @deliveryDate, @customerCode, 
+                                @quantity, @deliveryStatus, GETDATE(), GETDATE())
+                    `);
+                return { isNew: true, id: insertResult.recordset[0]?.id };
             }
         } catch (error) {
             console.error('保存交付记录失败:', error.message);
-            throw error;
+            return null;
         }
     }
 
@@ -462,38 +516,52 @@ class ErpSyncService {
      */
     async calculateComplaintRate() {
         try {
-            // 获取最近30天的交付数据和投诉数据
-            const deliveryQuery = `
-                SELECT COUNT(*) as total_deliveries, SUM(quantity) as total_quantity
-                FROM erp_delivery_data 
-                WHERE delivery_date >= DATEADD(day, -30, GETDATE())
-            `;
-            const deliveryResult = await db.query(deliveryQuery);
+            const pool = await getConnection();
             
-            const complaintQuery = `
-                SELECT COUNT(*) as total_complaints
-                FROM CustomerComplaints 
-                WHERE created_at >= DATEADD(day, -30, GETDATE())
-            `;
-            const complaintResult = await db.query(complaintQuery);
+            // 获取最近30天的交付数据
+            const deliveryResult = await pool.request()
+                .query(`
+                    SELECT COUNT(*) as total_deliveries, ISNULL(SUM(quantity), 0) as total_quantity
+                    FROM erp_delivery_data 
+                    WHERE delivery_date >= DATEADD(day, -30, GETDATE())
+                `);
             
-            const totalDeliveries = deliveryResult[0]?.total_deliveries || 0;
-            const totalComplaints = complaintResult[0]?.total_complaints || 0;
+            // 获取最近30天的投诉数据
+            const complaintResult = await pool.request()
+                .query(`
+                    SELECT COUNT(*) as total_complaints
+                    FROM CustomerComplaints 
+                    WHERE CreatedAt >= DATEADD(day, -30, GETDATE())
+                `);
+            
+            const totalDeliveries = deliveryResult.recordset[0]?.total_deliveries || 0;
+            const totalComplaints = complaintResult.recordset[0]?.total_complaints || 0;
             
             const complaintRate = totalDeliveries > 0 ? (totalComplaints / totalDeliveries * 100) : 0;
             
-            // 保存计算结果
-            const updateQuery = `
-                INSERT INTO quality_metrics (metric_name, metric_value, calculation_date, created_at)
-                VALUES ('complaint_rate', ?, GETDATE(), GETDATE())
-            `;
-            await db.query(updateQuery, [complaintRate]);
+            // 检查quality_metrics表是否存在
+            const tableExists = await pool.request()
+                .query(`
+                    SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_NAME = 'quality_metrics'
+                `);
+            
+            if (tableExists.recordset[0].cnt > 0) {
+                // 保存计算结果
+                await pool.request()
+                    .input('metricValue', sql.Decimal(18, 4), complaintRate)
+                    .query(`
+                        INSERT INTO quality_metrics (metric_name, metric_value, calculation_date, created_at)
+                        VALUES ('complaint_rate', @metricValue, GETDATE(), GETDATE())
+                    `);
+            }
             
             // 客户投诉率计算完成
+            console.log(`客户投诉率: ${complaintRate.toFixed(2)}% (投诉: ${totalComplaints}, 交付: ${totalDeliveries})`);
             
         } catch (error) {
             console.error('计算客户投诉率失败:', error.message);
-            throw error;
+            // 不抛出错误，允许继续执行
         }
     }
 
@@ -512,21 +580,32 @@ class ErpSyncService {
      */
     async saveSyncResult(syncResult) {
         try {
-            const insertQuery = `
-                INSERT INTO erp_sync_logs (
-                    sync_id, start_time, end_time, duration, 
-                    status, sync_types, results, created_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, GETDATE())
-            `;
-            await db.query(insertQuery, [
-                syncResult.syncId,
-                syncResult.startTime,
-                syncResult.endTime,
-                syncResult.duration,
-                syncResult.status,
-                JSON.stringify(syncResult.syncTypes),
-                JSON.stringify(syncResult.results)
-            ]);
+            const pool = await getConnection();
+            
+            // 检查erp_sync_logs表是否存在
+            const tableExists = await pool.request()
+                .query(`
+                    SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES 
+                    WHERE TABLE_NAME = 'erp_sync_logs'
+                `);
+            
+            if (tableExists.recordset[0].cnt > 0) {
+                await pool.request()
+                    .input('syncId', sql.NVarChar, syncResult.syncId)
+                    .input('startTime', sql.NVarChar, syncResult.startTime)
+                    .input('endTime', sql.NVarChar, syncResult.endTime || '')
+                    .input('duration', sql.Int, syncResult.duration || 0)
+                    .input('status', sql.NVarChar, syncResult.status)
+                    .input('syncTypes', sql.NVarChar, JSON.stringify(syncResult.syncTypes))
+                    .input('results', sql.NVarChar, JSON.stringify(syncResult.results))
+                    .query(`
+                        INSERT INTO erp_sync_logs (
+                            sync_id, start_time, end_time, duration, 
+                            status, sync_types, results, created_at
+                        ) VALUES (@syncId, @startTime, @endTime, @duration, 
+                                  @status, @syncTypes, @results, GETDATE())
+                    `);
+            }
         } catch (error) {
             console.error('保存同步结果失败:', error.message);
         }

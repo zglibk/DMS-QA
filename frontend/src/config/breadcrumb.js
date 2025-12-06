@@ -468,6 +468,32 @@ export const breadcrumbConfig = {
     icon: 'Cpu'
   },
 
+  // 仪器管理
+  '/admin/instruments': {
+    title: '仪器管理',
+    icon: 'mdi:tools'
+  },
+  '/admin/instruments/list': {
+    title: '仪器管理',
+    icon: 'mdi:tools'
+  },
+  '/admin/instruments/ledger': {
+    title: '仪器台账',
+    icon: 'mdi:clipboard-list'
+  },
+  '/admin/instruments/calibration': {
+    title: '校准检定',
+    icon: 'mdi:certificate'
+  },
+  '/admin/instruments/annual-plan': {
+    title: '年度计划',
+    icon: 'mdi:calendar-clock'
+  },
+  '/admin/instruments/import': {
+    title: '批量导入',
+    icon: 'mdi:upload'
+  },
+
   // 工作计划管理
   '/admin/work-plan': {
     title: '工作计划',
@@ -660,6 +686,11 @@ function generateDefaultTitle(segment) {
     'material': '材料管理',
     'production': '生产管理',
     'system': '系统管理',
+    'instruments': '仪器管理',
+    'ledger': '仪器台账',
+    'calibration': '校准检定',
+    'annual-plan': '年度计划',
+    'import': '批量导入',
     'list': '列表',
     'management': '管理',
     'config': '配置',

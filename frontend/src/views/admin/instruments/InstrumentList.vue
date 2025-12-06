@@ -75,59 +75,77 @@
                 <el-icon><Plus /></el-icon>
                 新增仪器
               </el-button>
+              <el-button @click="handleImport">
+                <el-icon><Upload /></el-icon>
+                批量导入
+              </el-button>
               <el-button type="success" @click="handleExport" :loading="exportLoading">
                 <el-icon><Download /></el-icon>
                 导出数据
+              </el-button>
+              <el-button 
+                type="danger" 
+                @click="handleBatchDelete" 
+                :disabled="selectedRows.length === 0"
+              >
+                <el-icon><Delete /></el-icon>
+                批量删除 {{ selectedRows.length > 0 ? `(${selectedRows.length})` : '' }}
               </el-button>
             </div>
           </div>
         </template>
 
         <el-table 
+          ref="tableRef"
           :data="instrumentList" 
           :loading="loading"
           stripe
           border
           style="width: 100%"
-          :cell-style="{ 'white-space': 'nowrap' }"
+          :cell-style="{ 'white-space': 'nowrap', 'overflow': 'hidden', 'text-overflow': 'ellipsis' }"
+          :header-cell-style="{ 'white-space': 'nowrap' }"
+          @selection-change="handleSelectionChange"
+          @sort-change="handleSortChange"
         >
-          <el-table-column prop="InstrumentCode" label="出厂编号" width="120">
+          <el-table-column type="selection" width="45" fixed="left" />
+          <el-table-column type="index" label="序号" width="60" fixed="left" align="center" />
+          <el-table-column prop="InstrumentCode" label="出厂编号" width="120" sortable="custom" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.InstrumentCode || '无' }}
             </template>
           </el-table-column>
-          <el-table-column prop="ManagementCode" label="管理编号" width="90" align="center">
+          <el-table-column prop="ManagementCode" label="管理编号" width="100" align="center" sortable="custom" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.ManagementCode || '无' }}
             </template>
           </el-table-column>
-          <el-table-column prop="InstrumentName" label="仪器名称" min-width="150" />
-          <el-table-column prop="Model" label="型号规格" width="120" />
-          <el-table-column prop="SerialNumber" label="序列号" width="120" />
+          <el-table-column prop="InstrumentName" label="仪器名称" min-width="150" sortable="custom" show-overflow-tooltip />
+          <el-table-column prop="Model" label="型号规格" width="120" show-overflow-tooltip />
+          <el-table-column prop="SerialNumber" label="序列号" width="120" show-overflow-tooltip />
           <el-table-column prop="CategoryName" label="类别" width="120" show-overflow-tooltip />
-          <el-table-column prop="Manufacturer" label="制造商" width="120" />
-          <el-table-column prop="MeasurementRange" label="量程" width="120">
+          <el-table-column prop="Manufacturer" label="制造商" width="120" show-overflow-tooltip />
+          <el-table-column prop="MeasurementRange" label="量程" width="120" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.MeasurementRange || '未设置' }}
             </template>
           </el-table-column>
-          <el-table-column prop="Accuracy" label="准确度" width="120">
+          <el-table-column prop="Accuracy" label="准确度" width="120" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.Accuracy || '未设置' }}
             </template>
           </el-table-column>
-          <el-table-column prop="PurchaseDate" label="购买日期" width="110">
+          <el-table-column prop="PurchaseDate" label="购买日期" width="110" sortable="custom">
             <template #default="{ row }">
               {{ formatDate(row.PurchaseDate) }}
             </template>
           </el-table-column>
-          <el-table-column prop="Location" label="存放位置" width="120" />
-          <el-table-column prop="ResponsiblePerson" label="责任人" width="100">
+          <el-table-column prop="Location" label="存放位置" width="120" show-overflow-tooltip />
+          <el-table-column prop="ResponsiblePerson" label="责任人" width="100" show-overflow-tooltip>
             <template #default="{ row }">
               {{ row.ResponsiblePersonName || row.ResponsiblePerson || '未指定' }}
             </template>
           </el-table-column>
-          <el-table-column prop="Status" label="状态" width="80">
+          <el-table-column prop="Status" label="状态" width="80" sortable="custom">
             <template #default="{ row }">
               <el-tag 
                 :type="getStatusType(row.Status)"
@@ -280,6 +298,18 @@
               />
             </el-form-item>
           </el-col>
+          <el-col :span="12">
+            <el-form-item label="购置价格" prop="PurchasePrice">
+              <el-input-number
+                v-model="instrumentForm.PurchasePrice"
+                :min="0"
+                :precision="2"
+                :controls="false"
+                placeholder="请输入购置价格"
+                style="width: 100%"
+              />
+            </el-form-item>
+          </el-col>
         </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
@@ -379,11 +409,12 @@
           <el-descriptions-item label="量程">{{ currentInstrument.MeasurementRange || '未设置' }}</el-descriptions-item>
           <el-descriptions-item label="准确度">{{ currentInstrument.Accuracy || '未设置' }}</el-descriptions-item>
           <el-descriptions-item label="购买日期">{{ formatDate(currentInstrument.PurchaseDate) }}</el-descriptions-item>
+          <el-descriptions-item label="购置价格">{{ currentInstrument.PurchasePrice ? `¥${currentInstrument.PurchasePrice}` : '未设置' }}</el-descriptions-item>
           <el-descriptions-item label="存放位置">{{ currentInstrument.Location }}</el-descriptions-item>
           <el-descriptions-item label="责任人">{{ currentInstrument.ResponsiblePerson }}</el-descriptions-item>
           <el-descriptions-item label="状态">
             <el-tag :type="getStatusType(currentInstrument.Status)">
-              {{ currentInstrument.Status }}
+              {{ getStatusLabel(currentInstrument.Status) }}
             </el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="备注" :span="2">{{ currentInstrument.Notes || '无' }}</el-descriptions-item>
@@ -407,6 +438,7 @@
  */
 
 import { ref, reactive, computed, onMounted, inject } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Search, 
@@ -414,9 +446,14 @@ import {
   List, 
   Plus, 
   Download,
-  Loading
+  Upload,
+  Loading,
+  Delete
 } from '@element-plus/icons-vue'
 import { instrumentApi } from '@/api/instruments'
+
+// 路由
+const router = useRouter()
 
 // 响应式数据
 const loading = ref(false)
@@ -426,6 +463,8 @@ const dialogVisible = ref(false)
 const detailDialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref()
+const tableRef = ref()
+const selectedRows = ref([])  // 选中的行
 
 // 从父组件注入刷新方法
 const onInstrumentDeleted = inject('onInstrumentDeleted', null)
@@ -440,6 +479,12 @@ const searchForm = reactive({
   managementCode: '',
   category: '',
   status: ''
+})
+
+// 排序参数
+const sortParams = reactive({
+  prop: '',
+  order: ''
 })
 
 // 仪器列表数据
@@ -466,6 +511,7 @@ const instrumentForm = reactive({
   CategoryID: null,      // 修改为null，确保选择器正确初始化
   Manufacturer: '',
   PurchaseDate: '',
+  PurchasePrice: null,   // 购置价格
   MeasurementRange: '',  // 量程字段
   Accuracy: '',          // 准确度字段
   Location: '',
@@ -782,6 +828,91 @@ function getStatusLabel(status) {
 }
 
 /**
+ * 映射状态值为中文（用于编辑表单）
+ * @param {string} status - 状态值（可能是英文或中文）
+ * @returns {string} 中文状态值
+ */
+function mapStatusToLabel(status) {
+  const statusMap = {
+    'normal': '正常',
+    'maintenance': '维修中',
+    'retired': '报废',
+    'scrapped': '报废',
+    '正常': '正常',
+    '维修中': '维修中',
+    '报废': '报废',
+    '已报废': '报废'
+  }
+  return statusMap[status] || '正常'
+}
+
+/**
+ * 处理选择变更
+ * @param {Array} selection - 选中的行
+ */
+function handleSelectionChange(selection) {
+  selectedRows.value = selection
+}
+
+/**
+ * 处理排序变更
+ * @param {Object} param - 排序参数
+ */
+function handleSortChange({ prop, order }) {
+  sortParams.prop = prop
+  sortParams.order = order
+  loadInstruments()
+}
+
+/**
+ * 批量删除
+ */
+async function handleBatchDelete() {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请先选择要删除的仪器')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定要删除选中的 ${selectedRows.value.length} 条仪器记录吗？此操作不可恢复！`,
+      '批量删除确认',
+      {
+        confirmButtonText: '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    // 逐个删除
+    let successCount = 0
+    let failCount = 0
+    
+    for (const row of selectedRows.value) {
+      try {
+        await instrumentApi.deleteInstrument(row.ID)
+        successCount++
+      } catch (error) {
+        failCount++
+        console.error(`删除仪器 ${row.ManagementCode || row.InstrumentCode} 失败:`, error)
+      }
+    }
+    
+    if (successCount > 0) {
+      ElMessage.success(`成功删除 ${successCount} 条记录${failCount > 0 ? `，${failCount} 条失败` : ''}`)
+      selectedRows.value = []
+      loadInstruments()
+    } else {
+      ElMessage.error('删除失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('操作失败')
+    }
+  }
+}
+
+/**
  * 格式化日期
  * @param {string} date - 日期字符串
  * @returns {string} 格式化后的日期
@@ -809,9 +940,16 @@ async function getInstrumentList() {
     loading.value = true
     const params = {
       page: pagination.page,
-      size: pagination.size,
+      pageSize: pagination.size,  // 后端期望pageSize参数
       ...searchForm
     }
+    
+    // 添加排序参数
+    if (sortParams.prop && sortParams.order) {
+      params.sortField = sortParams.prop
+      params.sortOrder = sortParams.order === 'ascending' ? 'ASC' : 'DESC'
+    }
+    
     const response = await instrumentApi.getInstruments(params)
     
     // 根据后端API返回的数据结构解析
@@ -834,6 +972,11 @@ async function getInstrumentList() {
   } finally {
     loading.value = false
   }
+}
+
+// 为排序变更提供的别名函数
+function loadInstruments() {
+  getInstrumentList()
 }
 
 /**
@@ -1044,9 +1187,10 @@ async function handleEdit(row) {
     MeasurementRange: row.MeasurementRange || '',
     Accuracy: row.Accuracy || '',
     PurchaseDate: row.PurchaseDate || '',
+    PurchasePrice: row.PurchasePrice || null,
     Location: row.Location || '',
     ResponsiblePerson: responsiblePersonID,  // 使用找到的责任人ID
-    Status: row.Status || '正常',
+    Status: mapStatusToLabel(row.Status),  // 映射状态为中文
     Notes: row.Notes || ''
   }) 
 
@@ -1092,6 +1236,13 @@ async function handleDelete(row) {
       ElMessage.error('删除失败：' + error.message)
     }
   }
+}
+
+/**
+ * 批量导入
+ */
+function handleImport() {
+  router.push('/admin/instruments/import')
 }
 
 /**
@@ -1237,6 +1388,7 @@ function resetForm() {
     CategoryID: null,       // 修改为null，确保选择器正确重置
     Manufacturer: '',
     PurchaseDate: '',
+    PurchasePrice: null,    // 重置购置价格
     MeasurementRange: '',  // 重置量程字段
     Accuracy: '',          // 重置准确度字段
     Location: '',

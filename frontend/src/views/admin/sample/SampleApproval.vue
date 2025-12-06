@@ -2286,11 +2286,13 @@ onMounted(async () => {
 }
 
 .sample-approval {
-
+  padding: 20px;
   box-sizing: border-box;
-  min-height: 100%;
-  height: auto;
+  /* 开启纵向滚动，避免分页数增大时列表溢出但无滚动条 */
   overflow-y: auto;
+  overflow-x: hidden;
+  /* 设置最小高度为视口高度，保证出现滚动条 */
+  min-height: 100vh;
 }
 
 .page-header {

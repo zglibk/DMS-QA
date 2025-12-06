@@ -13,6 +13,7 @@
           <el-menu-item index="stats">数据可视化</el-menu-item>
           <el-menu-item index="rework">返工分析</el-menu-item>
           <el-menu-item index="publishing-exceptions">出版异常</el-menu-item>
+          <el-menu-item index="shipment-report">出货报告</el-menu-item>
         </el-menu>
       </div>
     </div>
@@ -67,6 +68,8 @@ const activeMenu = computed(() => {
     return 'rework'
   } else if (path === '/publishing-exceptions') {
     return 'publishing-exceptions'
+  } else if (path === '/shipment-report') {
+    return 'shipment-report'
   }
   return ''
 })
@@ -81,6 +84,8 @@ const handleMenuSelect = (index) => {
     router.push('/rework-analysis')
   } else if (index === 'publishing-exceptions') {
     router.push('/publishing-exceptions')
+  } else if (index === 'shipment-report') {
+    router.push('/shipment-report')
   }
 }
 

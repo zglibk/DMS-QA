@@ -250,6 +250,15 @@ export const instrumentApi = {
   },
 
   /**
+   * 删除指定年度的所有计划
+   * @param {number} year - 计划年度
+   * @returns {Promise} API响应
+   */
+  deleteAnnualPlanByYear(year) {
+    return api.delete(`/api/instruments/annual-plans/year/${year}`)
+  },
+
+  /**
    * 自动生成年度计划
    * @param {Object} data - 生成参数
    * @param {number} data.year - 计划年度
@@ -257,6 +266,28 @@ export const instrumentApi = {
    */
   generateAnnualPlan(data) {
     return api.post('/api/instruments/annual-plan/generate', data)
+  },
+
+  /**
+   * 获取年度计划统计信息
+   * @param {number} year - 计划年度
+   * @returns {Promise} API响应
+   */
+  getAnnualPlanStatistics(year) {
+    return api.get(`/api/instruments/annual-plan/statistics/${year}`)
+  },
+
+  /**
+   * 更新年度计划状态
+   * @param {number} id - 计划ID
+   * @param {Object} data - 状态数据
+   * @param {string} data.status - 状态值
+   * @param {string} data.actualDate - 实际完成日期（可选）
+   * @param {number} data.actualCost - 实际费用（可选）
+   * @returns {Promise} API响应
+   */
+  updateAnnualPlanStatus(id, data) {
+    return api.patch(`/api/instruments/annual-plan/${id}/status`, data)
   },
 
   /**
@@ -356,6 +387,62 @@ export const instrumentApi = {
    */
   checkDuplicate(params = {}) {
     return api.post('/api/instruments/check-duplicate', params)
+  },
+
+  // ==================== 批量导入 ====================
+
+  /**
+   * 下载导入模板
+   * @returns {Promise} 文件下载
+   */
+  downloadImportTemplate() {
+    return api.get('/api/instruments/import/template', {
+      responseType: 'blob'
+    })
+  },
+
+  /**
+   * 预览导入数据
+   * @param {FormData} formData - 包含Excel文件的FormData
+   * @returns {Promise} API响应
+   */
+  previewImport(formData) {
+    return api.post('/api/instruments/import/preview', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  /**
+   * 执行批量导入
+   * @param {Array} data - 预览后确认导入的数据
+   * @returns {Promise} API响应
+   */
+  executeImport(data) {
+    return api.post('/api/instruments/import/execute', { data })
+  },
+
+  // ==================== 校准预警管理 ====================
+
+  /**
+   * 获取校准预警信息
+   * @param {Object} params - 查询参数
+   * @param {number} params.warningDays - 预警天数（默认30天）
+   * @returns {Promise} API响应
+   */
+  getCalibrationWarnings(params = {}) {
+    return api.get('/api/instruments/calibration-warnings', { params })
+  },
+
+  /**
+   * 生成校准预警通知
+   * @param {Object} data - 参数
+   * @param {number} data.warningDays - 预警天数
+   * @returns {Promise} API响应
+   */
+  generateWarningNotices(data = {}) {
+    return api.post('/api/instruments/generate-warning-notices', data)
   }
 }
 

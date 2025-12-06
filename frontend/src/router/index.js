@@ -54,6 +54,9 @@ const routes = [
   // 出版异常页面
   { path: '/publishing-exceptions', component: () => import('../views/PublishingExceptions.vue') },
 
+  // 出货报告页面
+  { path: '/shipment-report', component: () => import('../views/ShipmentReport.vue') },
+
   // 版本更新日志页面
   { path: '/version-updates', component: () => import('../views/VersionUpdates.vue') },
 
@@ -361,6 +364,11 @@ const routes = [
         path: 'instruments/annual-plan',
         component: () => import('../views/admin/instruments/InstrumentManagement.vue'), // 年度计划页面
         meta: { title: '年度计划', requiresAuth: true }
+      },
+      {
+        path: 'instruments/import',
+        component: () => import('../views/admin/instruments/InstrumentImport.vue'), // 批量导入页面
+        meta: { title: '批量导入', requiresAuth: true }
       },
 
       // 二次开发模块

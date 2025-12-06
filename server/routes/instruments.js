@@ -773,6 +773,8 @@ router.get('/annual-plans', authenticateToken, async (req, res) => {
           d.Name as DepartmentName,
           p.Name as ResponsiblePersonName,
           ap.PlannedDate,
+          ap.LastCalibrationDate,
+          ap.CalibrationCycle,
           ap.CalibrationAgency,
           ap.EstimatedCost,
           ap.Priority,
@@ -1071,6 +1073,7 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
     const pool = await getConnection();
     
     // 构建基础查询
+    // NextCalibrationDate = ExpiryDate - 7天（提前一周送检）
     let baseQuery = `
       SELECT 
         cr.ID,
@@ -1085,7 +1088,7 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
         cr.CalibrationStandard,
         cr.CalibrationResult,
         cr.ExpiryDate,
-        cr.NextCalibrationDate,
+        DATEADD(DAY, -7, cr.ExpiryDate) as NextCalibrationDate,
         cr.CalibrationCost,
         cr.CalibrationData,
         cr.Issues,
@@ -1211,6 +1214,298 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
       code: 500,
       message: '获取校准结果列表失败',
       error: error.message
+    });
+  }
+});
+
+// =====================================================
+// 校准到期预警API（必须放在 /:id 路由之前）
+// =====================================================
+
+/**
+ * 获取校准预警信息
+ * GET /api/instruments/calibration-warnings
+ * 返回即将到期和已过期的校准仪器列表
+ * 
+ * 预警来源：
+ * 1. 年度校准计划中 PlannedDate 即将到期的（计划校准日期）
+ * 2. 校准结果中 ExpiryDate 即将到期的（证书有效期）
+ */
+router.get('/calibration-warnings', authenticateToken, async (req, res) => {
+  try {
+    const { warningDays = 30 } = req.query; // 默认提前30天预警
+    const pool = await getConnection();
+    
+    // 查询即将到期的仪器（综合年度计划和校准结果）
+    const result = await pool.request()
+      .input('warningDays', sql.Int, parseInt(warningDays))
+      .query(`
+        -- 从年度校准计划获取即将到期的仪器
+        SELECT 
+          i.ID as InstrumentID,
+          i.ManagementCode,
+          i.InstrumentCode,
+          i.InstrumentName,
+          i.Model,
+          d.Name as Department,
+          p.Name as ResponsiblePerson,
+          ap.PlannedDate as WarningDate,
+          N'计划校准' as WarningSource,
+          DATEDIFF(DAY, GETDATE(), ap.PlannedDate) as DaysRemaining,
+          CASE 
+            WHEN ap.PlannedDate < GETDATE() THEN 'expired'
+            WHEN DATEDIFF(DAY, GETDATE(), ap.PlannedDate) <= 7 THEN 'critical'
+            WHEN DATEDIFF(DAY, GETDATE(), ap.PlannedDate) <= @warningDays THEN 'warning'
+            ELSE 'normal'
+          END as WarningLevel,
+          ap.CalibrationAgency,
+          NULL as CertificateNumber
+        FROM AnnualCalibrationPlan ap
+        INNER JOIN Instruments i ON ap.InstrumentID = i.ID
+        LEFT JOIN Department d ON i.DepartmentID = d.ID
+        LEFT JOIN Person p ON i.ResponsiblePerson = p.ID
+        WHERE i.IsActive = 1 
+          AND ap.PlannedDate IS NOT NULL
+          AND ap.Status IN (N'计划中', N'待校准', N'planned', 'planned')
+          AND DATEDIFF(DAY, GETDATE(), ap.PlannedDate) <= @warningDays
+        
+        UNION
+        
+        -- 从校准结果获取证书即将到期的仪器
+        SELECT 
+          i.ID as InstrumentID,
+          i.ManagementCode,
+          i.InstrumentCode,
+          i.InstrumentName,
+          i.Model,
+          d.Name as Department,
+          p.Name as ResponsiblePerson,
+          cr.ExpiryDate as WarningDate,
+          N'证书到期' as WarningSource,
+          DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) as DaysRemaining,
+          CASE 
+            WHEN cr.ExpiryDate < GETDATE() THEN 'expired'
+            WHEN DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) <= 7 THEN 'critical'
+            WHEN DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) <= @warningDays THEN 'warning'
+            ELSE 'normal'
+          END as WarningLevel,
+          cr.CalibrationAgency,
+          cr.CertificateNumber
+        FROM (
+          SELECT 
+            InstrumentID,
+            ExpiryDate,
+            CalibrationAgency,
+            CertificateNumber,
+            ROW_NUMBER() OVER (PARTITION BY InstrumentID ORDER BY CalibrationDate DESC) as rn
+          FROM CalibrationResults
+          WHERE ExpiryDate IS NOT NULL
+        ) cr
+        INNER JOIN Instruments i ON cr.InstrumentID = i.ID AND cr.rn = 1
+        LEFT JOIN Department d ON i.DepartmentID = d.ID
+        LEFT JOIN Person p ON i.ResponsiblePerson = p.ID
+        WHERE i.IsActive = 1 
+          AND DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) <= @warningDays
+        
+        ORDER BY DaysRemaining ASC, WarningDate ASC
+      `);
+    
+    // 统计各级别数量
+    const warnings = result.recordset || [];
+    const summary = {
+      total: warnings.length,
+      expired: warnings.filter(w => w.WarningLevel === 'expired').length,
+      critical: warnings.filter(w => w.WarningLevel === 'critical').length,
+      warning: warnings.filter(w => w.WarningLevel === 'warning').length
+    };
+    
+    res.json({
+      code: 200,
+      data: {
+        summary,
+        list: warnings
+      },
+      message: '获取校准预警信息成功'
+    });
+  } catch (error) {
+    console.error('获取校准预警信息失败:', error);
+    // 返回空数据而不是500错误，避免阻塞页面加载
+    res.json({
+      code: 200,
+      data: {
+        summary: { total: 0, expired: 0, critical: 0, warning: 0 },
+        list: []
+      },
+      message: '暂无预警数据'
+    });
+  }
+});
+
+/**
+ * 自动生成校准到期预警通知
+ * POST /api/instruments/generate-warning-notices
+ * 将即将到期的仪器信息写入通知公告表
+ */
+router.post('/generate-warning-notices', authenticateToken, async (req, res) => {
+  try {
+    const { warningDays = 7 } = req.body || {}; // 默认提前7天生成通知
+    const pool = await getConnection();
+    
+    // 获取用户ID，如果没有则使用默认值1
+    const userId = req.user?.id || 1;
+    
+    // 先检查CalibrationResults表是否存在
+    const checkTable = await pool.request().query(`
+      SELECT COUNT(*) as cnt FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_NAME = 'CalibrationResults'
+    `);
+    
+    if (checkTable.recordset[0].cnt === 0) {
+      return res.json({
+        code: 200,
+        data: { created: 0 },
+        message: '校准结果表不存在，无法生成预警'
+      });
+    }
+    
+    // 查询需要预警的仪器（综合年度计划和校准结果）
+    const warningResult = await pool.request()
+      .input('warningDays', sql.Int, parseInt(warningDays))
+      .query(`
+        -- 从年度校准计划获取即将到期的仪器
+        SELECT 
+          i.ID as InstrumentID,
+          i.ManagementCode,
+          i.InstrumentName,
+          d.Name as Department,
+          p.Name as ResponsiblePerson,
+          ap.PlannedDate as WarningDate,
+          N'计划校准' as WarningSource,
+          DATEDIFF(DAY, GETDATE(), ap.PlannedDate) as DaysRemaining
+        FROM AnnualCalibrationPlan ap
+        INNER JOIN Instruments i ON ap.InstrumentID = i.ID
+        LEFT JOIN Department d ON i.DepartmentID = d.ID
+        LEFT JOIN Person p ON i.ResponsiblePerson = p.ID
+        WHERE i.IsActive = 1 
+          AND ap.PlannedDate IS NOT NULL
+          AND ap.Status IN (N'计划中', N'待校准', N'planned', 'planned')
+          AND DATEDIFF(DAY, GETDATE(), ap.PlannedDate) <= @warningDays
+          AND DATEDIFF(DAY, GETDATE(), ap.PlannedDate) >= 0
+        
+        UNION
+        
+        -- 从校准结果获取证书即将到期的仪器
+        SELECT 
+          i.ID as InstrumentID,
+          i.ManagementCode,
+          i.InstrumentName,
+          d.Name as Department,
+          p.Name as ResponsiblePerson,
+          cr.ExpiryDate as WarningDate,
+          N'证书到期' as WarningSource,
+          DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) as DaysRemaining
+        FROM (
+          SELECT 
+            InstrumentID,
+            ExpiryDate,
+            ROW_NUMBER() OVER (PARTITION BY InstrumentID ORDER BY CalibrationDate DESC) as rn
+          FROM CalibrationResults
+          WHERE ExpiryDate IS NOT NULL
+        ) cr
+        INNER JOIN Instruments i ON cr.InstrumentID = i.ID AND cr.rn = 1
+        LEFT JOIN Department d ON i.DepartmentID = d.ID
+        LEFT JOIN Person p ON i.ResponsiblePerson = p.ID
+        WHERE i.IsActive = 1 
+          AND DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) <= @warningDays
+          AND DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) >= 0
+        
+        ORDER BY DaysRemaining ASC
+      `);
+    
+    const warningList = warningResult.recordset || [];
+    
+    if (warningList.length === 0) {
+      return res.json({
+        code: 200,
+        data: { created: 0 },
+        message: '当前没有需要预警的仪器'
+      });
+    }
+    
+    // 构建通知内容
+    const today = new Date().toISOString().split('T')[0];
+    const title = `【校准预警】${warningList.length}项预警 - ${today}`;
+    
+    let content = '<div style="padding: 10px;">';
+    content += '<p style="color: #E6A23C; font-weight: bold;">⚠️ 以下仪器需要关注，请及时安排处理：</p>';
+    content += '<table style="width: 100%; border-collapse: collapse; margin-top: 10px;">';
+    content += '<thead><tr style="background: #f5f7fa;">';
+    content += '<th style="padding: 8px; border: 1px solid #ebeef5; text-align: left;">管理编号</th>';
+    content += '<th style="padding: 8px; border: 1px solid #ebeef5; text-align: left;">仪器名称</th>';
+    content += '<th style="padding: 8px; border: 1px solid #ebeef5; text-align: center;">预警类型</th>';
+    content += '<th style="padding: 8px; border: 1px solid #ebeef5; text-align: left;">使用部门</th>';
+    content += '<th style="padding: 8px; border: 1px solid #ebeef5; text-align: center;">预警日期</th>';
+    content += '<th style="padding: 8px; border: 1px solid #ebeef5; text-align: center;">剩余天数</th>';
+    content += '</tr></thead><tbody>';
+    
+    warningList.forEach(item => {
+      const warningDate = item.WarningDate ? new Date(item.WarningDate).toLocaleDateString('zh-CN') : '-';
+      const daysColor = item.DaysRemaining <= 3 ? '#F56C6C' : (item.DaysRemaining <= 7 ? '#E6A23C' : '#409EFF');
+      const sourceColor = item.WarningSource === '计划校准' ? '#E6A23C' : '#409EFF';
+      content += '<tr>';
+      content += `<td style="padding: 8px; border: 1px solid #ebeef5;">${item.ManagementCode || '-'}</td>`;
+      content += `<td style="padding: 8px; border: 1px solid #ebeef5;">${item.InstrumentName || '-'}</td>`;
+      content += `<td style="padding: 8px; border: 1px solid #ebeef5; text-align: center;"><span style="background: ${sourceColor}; color: #fff; padding: 2px 8px; border-radius: 4px; font-size: 12px;">${item.WarningSource || '证书到期'}</span></td>`;
+      content += `<td style="padding: 8px; border: 1px solid #ebeef5;">${item.Department || '-'}</td>`;
+      content += `<td style="padding: 8px; border: 1px solid #ebeef5; text-align: center;">${warningDate}</td>`;
+      content += `<td style="padding: 8px; border: 1px solid #ebeef5; text-align: center; color: ${daysColor}; font-weight: bold;">${item.DaysRemaining}天</td>`;
+      content += '</tr>';
+    });
+    
+    content += '</tbody></table>';
+    content += '<p style="margin-top: 15px; color: #909399; font-size: 12px;">• 计划校准：年度计划中的校准日期即将到期<br/>• 证书到期：校准证书有效期即将到期<br/>请相关部门负责人及时安排仪器送检。</p>';
+    content += '</div>';
+    
+    // 检查今天是否已经生成过相同标题的通知
+    const existingNotice = await pool.request()
+      .input('title', sql.NVarChar, title)
+      .query(`SELECT ID FROM Notices WHERE Title = @title AND IsActive = 1`);
+    
+    if (existingNotice.recordset.length > 0) {
+      return res.json({
+        code: 200,
+        data: { created: 0, existing: true },
+        message: '今日已生成过校准预警通知'
+      });
+    }
+    
+    // 创建通知
+    await pool.request()
+      .input('title', sql.NVarChar, title)
+      .input('content', sql.NVarChar, content)
+      .input('type', sql.NVarChar, 'urgent')
+      .input('priority', sql.NVarChar, 'high')
+      .input('createdBy', sql.Int, userId)
+      .query(`
+        INSERT INTO Notices (Title, Content, Type, Priority, CreatedBy, PublishDate, CreatedAt)
+        VALUES (@title, @content, @type, @priority, @createdBy, GETDATE(), GETDATE())
+      `);
+    
+    res.json({
+      code: 200,
+      data: { 
+        created: 1,
+        instrumentCount: warningList.length
+      },
+      message: `成功生成校准预警通知，包含${warningList.length}台仪器`
+    });
+  } catch (error) {
+    console.error('生成校准预警通知失败:', error);
+    // 返回友好的错误信息
+    res.json({
+      code: 200,
+      data: { created: 0 },
+      message: '生成预警通知失败：' + (error.message || '未知错误')
     });
   }
 });
@@ -1661,7 +1956,7 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     const pool = await getConnection();
 
     // 检查仪器是否存在
-    const checkQuery = `SELECT ID FROM Instruments WHERE ID = @id AND IsActive = 1`;
+    const checkQuery = `SELECT ID, ManagementCode, InstrumentCode FROM Instruments WHERE ID = @id`;
     const checkResult = await pool.request()
       .input('id', sql.Int, id)
       .query(checkQuery);
@@ -1673,19 +1968,23 @@ router.delete('/:id', authenticateToken, async (req, res) => {
       });
     }
 
-    // 软删除仪器
-    const deleteQuery = `
-      UPDATE Instruments SET 
-        IsActive = 0,
-        UpdatedBy = @updatedBy,
-        UpdatedAt = GETDATE()
-      WHERE ID = @id
-    `;
+    const instrument = checkResult.recordset[0];
+    console.log(`物理删除仪器: ID=${id}, ManagementCode=${instrument.ManagementCode}, InstrumentCode=${instrument.InstrumentCode}`);
 
+    // 先删除关联的年度校准计划
+    await pool.request()
+      .input('instrumentId', sql.Int, id)
+      .query(`DELETE FROM AnnualCalibrationPlan WHERE InstrumentID = @instrumentId`);
+
+    // 再删除关联的校准记录
+    await pool.request()
+      .input('instrumentId', sql.Int, id)
+      .query(`DELETE FROM CalibrationResults WHERE InstrumentID = @instrumentId`);
+
+    // 最后物理删除仪器记录
     await pool.request()
       .input('id', sql.Int, id)
-      .input('updatedBy', sql.Int, req.user.id)
-      .query(deleteQuery);
+      .query(`DELETE FROM Instruments WHERE ID = @id`);
 
     res.json({
       code: 200,
@@ -1795,6 +2094,8 @@ router.get('/annual-plans', authenticateToken, async (req, res) => {
           d.Name as DepartmentName,
           p.Name as ResponsiblePersonName,
           ap.PlannedDate,
+          ap.LastCalibrationDate,
+          ap.CalibrationCycle,
           ap.CalibrationAgency,
           ap.EstimatedCost,
           ap.Priority,
@@ -2097,6 +2398,51 @@ router.delete('/annual-plans/:id', authenticateToken, async (req, res) => {
 });
 
 /**
+ * 删除指定年度的所有校准计划
+ * DELETE /api/instruments/annual-plans/year/:year
+ */
+router.delete('/annual-plans/year/:year', authenticateToken, async (req, res) => {
+  try {
+    const { year } = req.params;
+    const pool = await getConnection();
+
+    // 先查询该年度有多少条计划
+    const countResult = await pool.request()
+      .input('year', sql.Int, year)
+      .query(`SELECT COUNT(*) as count FROM AnnualCalibrationPlan WHERE PlanYear = @year`);
+    
+    const count = countResult.recordset[0].count;
+    
+    if (count === 0) {
+      return res.json({
+        code: 200,
+        data: { deletedCount: 0 },
+        message: `${year}年度没有校准计划记录`
+      });
+    }
+
+    // 删除该年度所有计划
+    const deleteResult = await pool.request()
+      .input('year', sql.Int, year)
+      .query(`DELETE FROM AnnualCalibrationPlan WHERE PlanYear = @year`);
+
+    res.json({
+      code: 200,
+      data: { deletedCount: count },
+      message: `成功删除${year}年度的${count}条校准计划`
+    });
+
+  } catch (error) {
+    console.error('删除年度校准计划失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '删除年度校准计划失败',
+      error: error.message
+    });
+  }
+});
+
+/**
  * 自动生成年度校准计划
  * POST /api/instruments/annual-plans/generate
  * POST /api/instruments/annual-plan/generate (兼容路由)
@@ -2163,18 +2509,33 @@ const generateAnnualPlanHandler = async (req, res) => {
       // 判断该仪器是否需要在目标年度校准
       let needsCalibrationInTargetYear = false;
       let plannedDate = null;
+      let lastCalibrationDate = instrument.LastCalibrationDate ? new Date(instrument.LastCalibrationDate) : null;
+      
+      // 获取校准周期（月），默认12个月
+      const calibrationCycleMonths = instrument.CalibrationCycle || 12;
       
       if (instrument.NextCalibrationDate) {
-        // 有校准记录，检查下次校准日期是否在目标年度
+        // 有下次校准日期，直接使用
         const nextCalDate = new Date(instrument.NextCalibrationDate);
         if (nextCalDate.getFullYear() === targetYear) {
           needsCalibrationInTargetYear = true;
           plannedDate = nextCalDate;
         }
+      } else if (lastCalibrationDate) {
+        // 有上次校准日期但没有下次校准日期，根据校准周期计算
+        const calculatedNextDate = new Date(lastCalibrationDate);
+        calculatedNextDate.setMonth(calculatedNextDate.getMonth() + calibrationCycleMonths);
+        
+        if (calculatedNextDate.getFullYear() === targetYear) {
+          needsCalibrationInTargetYear = true;
+          plannedDate = calculatedNextDate;
+          console.log(`仪器 ${instrument.ManagementCode || instrument.InstrumentCode}: 根据上次校准日期(${lastCalibrationDate.toISOString().split('T')[0]}) + ${calibrationCycleMonths}个月 计算出下次校准日期: ${plannedDate.toISOString().split('T')[0]}`);
+        }
       } else {
-        // 没有校准记录，均视为需要首次校准，生成计划
+        // 没有任何校准记录，视为需要首次校准，生成计划
         needsCalibrationInTargetYear = true;
         plannedDate = new Date(targetYear, 2, 15); // 默认设为3月15日
+        console.log(`仪器 ${instrument.ManagementCode || instrument.InstrumentCode}: 无校准记录，使用默认日期 ${targetYear}-03-15`);
       }
       
       // 如果不需要在目标年度校准，跳过
@@ -2198,19 +2559,23 @@ const generateAnnualPlanHandler = async (req, res) => {
         continue;
       }
 
-      // 创建计划
+      // 创建计划（包含上次校准日期和校准周期）
       await pool.request()
         .input('planYear', sql.Int, targetYear)
         .input('instrumentID', sql.Int, instrument.ID)
         .input('plannedDate', sql.Date, plannedDate)
+        .input('lastCalibrationDate', sql.Date, lastCalibrationDate)
+        .input('calibrationCycle', sql.Int, calibrationCycleMonths)
         .input('priority', sql.NVarChar, '中')
         .input('status', sql.NVarChar, '计划中')
         .input('createdBy', sql.Int, req.user.id)
         .query(`
           INSERT INTO AnnualCalibrationPlan (
-            PlanYear, InstrumentID, PlannedDate, Priority, Status, CreatedBy, CreatedAt, UpdatedAt
+            PlanYear, InstrumentID, PlannedDate, LastCalibrationDate, CalibrationCycle, 
+            Priority, Status, CreatedBy, CreatedAt, UpdatedAt
           ) VALUES (
-            @planYear, @instrumentID, @plannedDate, @priority, @status, @createdBy, GETDATE(), GETDATE()
+            @planYear, @instrumentID, @plannedDate, @lastCalibrationDate, @calibrationCycle,
+            @priority, @status, @createdBy, GETDATE(), GETDATE()
           )
         `);
 
@@ -2261,32 +2626,15 @@ const getStatisticsHandler = async (req, res) => {
     const targetYear = parseInt(year);
     const pool = await getConnection();
 
-    // 统计需要在目标年度校准的仪器数量（基于下次校准日期）
+    // 统计需要校准的仪器数量（所有活跃且状态正常的仪器都需要定期校准）
     const needCalibrationQuery = `
-      SELECT COUNT(DISTINCT i.ID) as totalInstruments
+      SELECT COUNT(*) as totalInstruments
       FROM Instruments i
-      LEFT JOIN (
-        SELECT cr1.InstrumentID, cr1.ExpiryDate
-        FROM CalibrationResults cr1
-        INNER JOIN (
-          SELECT InstrumentID, MAX(CalibrationDate) as MaxDate
-          FROM CalibrationResults
-          GROUP BY InstrumentID
-        ) cr2 ON cr1.InstrumentID = cr2.InstrumentID AND cr1.CalibrationDate = cr2.MaxDate
-      ) cr ON i.ID = cr.InstrumentID
       WHERE i.IsActive = 1 
         AND (i.Status = 'normal' OR i.Status = '正常' OR i.Status IS NULL)
-        AND (
-          -- 有校准记录且下次校准日期在目标年度
-          (cr.ExpiryDate IS NOT NULL AND YEAR(cr.ExpiryDate) = @targetYear)
-          OR
-          -- 没有校准记录但有校准周期的仪器
-          (cr.ExpiryDate IS NULL AND i.CalibrationCycle IS NOT NULL AND i.CalibrationCycle > 0)
-        )
     `;
 
     const needCalibrationResult = await pool.request()
-      .input('targetYear', sql.Int, targetYear)
       .query(needCalibrationQuery);
 
     // 统计已制定的计划数量
@@ -2415,19 +2763,22 @@ router.get('/export/annual-plan/:year', authenticateToken, async (req, res) => {
     // 表头列数
     const columnCount = worksheet.columns.length;
 
-    // 设置表头样式 - 只填充有标题的单元格
+    // 默认字体样式
+    const defaultFont = { name: 'Tahoma', size: 10 };
+
+    // 设置表头样式
     const headerRow = worksheet.getRow(1);
-    headerRow.height = 25;  // 标题行高度25
+    headerRow.height = 16.5;
     headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
     
     // 遍历标题行的每个单元格设置样式
     for (let col = 1; col <= columnCount; col++) {
       const cell = headerRow.getCell(col);
-      cell.font = { bold: true, color: { argb: '000000' } };  // 黑色文字
+      cell.font = { ...defaultFont, bold: true, color: { argb: '000000' } };
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'D9D9D9' }  // 浅灰色背景
+        fgColor: { argb: 'F0F0F0' }  // 标题行背景色
       };
     }
 
@@ -2457,21 +2808,26 @@ router.get('/export/annual-plan/:year', authenticateToken, async (req, res) => {
       });
 
       // 设置数据行样式
-      dataRow.height = 22.5;  // 内容行高度22.5
+      dataRow.height = 16.5;
       dataRow.alignment = { vertical: 'middle' };
       
-      // 隔行填充浅灰色
+      // 设置字体
+      for (let col = 1; col <= columnCount; col++) {
+        dataRow.getCell(col).font = defaultFont;
+      }
+      
+      // 隔行填充
       if (index % 2 === 1) {
         for (let col = 1; col <= columnCount; col++) {
           dataRow.getCell(col).fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'F2F2F2' }  // 更浅的灰色
+            fgColor: { argb: 'F8F8F8' }  // 隔行变色
           };
         }
       }
       
-      // 根据状态设置行颜色
+      // 根据状态设置行颜色（状态颜色优先级高于隔行变色）
       if (row.Status === '已完成') {
         for (let col = 1; col <= columnCount; col++) {
           dataRow.getCell(col).fill = {
@@ -2492,15 +2848,16 @@ router.get('/export/annual-plan/:year', authenticateToken, async (req, res) => {
     });
 
     // 添加边框
+    const borderStyle = {
+      top: { style: 'thin', color: { argb: 'A0A0A0' } },
+      left: { style: 'thin', color: { argb: 'A0A0A0' } },
+      bottom: { style: 'thin', color: { argb: 'A0A0A0' } },
+      right: { style: 'thin', color: { argb: 'A0A0A0' } }
+    };
     worksheet.eachRow((row, rowNumber) => {
       for (let col = 1; col <= columnCount; col++) {
         const cell = row.getCell(col);
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
+        cell.border = borderStyle;
       }
     });
 
@@ -2654,19 +3011,22 @@ router.get('/export/ledger', authenticateToken, async (req, res) => {
     // 表头列数
     const columnCount = worksheet.columns.length;
 
-    // 设置表头样式 - 只填充有标题的单元格
+    // 默认字体样式
+    const defaultFont = { name: 'Tahoma', size: 10 };
+
+    // 设置表头样式
     const headerRow = worksheet.getRow(1);
-    headerRow.height = 25;  // 标题行高度25
+    headerRow.height = 16.5;
     headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
     
     // 遍历标题行的每个单元格设置样式
     for (let col = 1; col <= columnCount; col++) {
       const cell = headerRow.getCell(col);
-      cell.font = { bold: true, color: { argb: '000000' } };  // 黑色文字
+      cell.font = { ...defaultFont, bold: true, color: { argb: '000000' } };
       cell.fill = {
         type: 'pattern',
         pattern: 'solid',
-        fgColor: { argb: 'D9D9D9' }  // 浅灰色背景
+        fgColor: { argb: 'F0F0F0' }  // 标题行背景色
       };
     }
 
@@ -2709,16 +3069,21 @@ router.get('/export/ledger', authenticateToken, async (req, res) => {
       });
 
       // 设置数据行样式
-      dataRow.height = 22.5;  // 内容行高度22.5
+      dataRow.height = 16.5;
       dataRow.alignment = { vertical: 'middle' };
       
-      // 隔行填充浅灰色（偶数行，比标题行灰色稍浅）
+      // 设置字体
+      for (let col = 1; col <= columnCount; col++) {
+        dataRow.getCell(col).font = defaultFont;
+      }
+      
+      // 隔行填充
       if (index % 2 === 1) {
         for (let col = 1; col <= columnCount; col++) {
           dataRow.getCell(col).fill = {
             type: 'pattern',
             pattern: 'solid',
-            fgColor: { argb: 'F2F2F2' }  // 更浅的灰色
+            fgColor: { argb: 'F8F8F8' }  // 隔行变色
           };
         }
       }
@@ -2750,24 +3115,25 @@ router.get('/export/ledger', authenticateToken, async (req, res) => {
         
         if (daysUntilExpiry < 0) {
           // 已过期 - 红色文字
-          dataRow.getCell('latestExpiryDate').font = { color: { argb: 'FF0000' }, bold: true };
+          dataRow.getCell('latestExpiryDate').font = { ...defaultFont, color: { argb: 'FF0000' }, bold: true };
         } else if (daysUntilExpiry <= 30) {
           // 即将过期（30天内）- 橙色文字
-          dataRow.getCell('latestExpiryDate').font = { color: { argb: 'FF8C00' }, bold: true };
+          dataRow.getCell('latestExpiryDate').font = { ...defaultFont, color: { argb: 'FF8C00' }, bold: true };
         }
       }
     });
 
     // 添加边框
+    const borderStyle = {
+      top: { style: 'thin', color: { argb: 'A0A0A0' } },
+      left: { style: 'thin', color: { argb: 'A0A0A0' } },
+      bottom: { style: 'thin', color: { argb: 'A0A0A0' } },
+      right: { style: 'thin', color: { argb: 'A0A0A0' } }
+    };
     worksheet.eachRow((row, rowNumber) => {
       for (let col = 1; col <= columnCount; col++) {
         const cell = row.getCell(col);
-        cell.border = {
-          top: { style: 'thin' },
-          left: { style: 'thin' },
-          bottom: { style: 'thin' },
-          right: { style: 'thin' }
-        };
+        cell.border = borderStyle;
       }
     });
 
@@ -2792,6 +3158,833 @@ router.get('/export/ledger', authenticateToken, async (req, res) => {
     });
   }
 });
+
+// =====================================================
+// 批量导入功能
+// =====================================================
+
+// Excel文件上传配置
+const excelUploadDir = path.join(__dirname, '../uploads/imports');
+if (!fs.existsSync(excelUploadDir)) {
+  fs.mkdirSync(excelUploadDir, { recursive: true });
+}
+
+const excelStorage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, excelUploadDir);
+  },
+  filename: function (req, file, cb) {
+    const timestamp = Date.now();
+    const ext = path.extname(file.originalname);
+    cb(null, `import_${timestamp}${ext}`);
+  }
+});
+
+const excelFilter = (req, file, cb) => {
+  const allowedTypes = [
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-excel'
+  ];
+  if (allowedTypes.includes(file.mimetype) || 
+      file.originalname.endsWith('.xlsx') || 
+      file.originalname.endsWith('.xls')) {
+    cb(null, true);
+  } else {
+    cb(new Error('只允许上传 Excel 文件（.xlsx, .xls）'), false);
+  }
+};
+
+const excelUpload = multer({
+  storage: excelStorage,
+  fileFilter: excelFilter,
+  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+});
+
+/**
+ * 下载导入模板
+ * GET /api/instruments/import/template
+ */
+router.get('/import/template', authenticateToken, async (req, res) => {
+  try {
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('仪器导入模板');
+
+    // 设置列（管理编号和仪器编号至少填一个）
+    worksheet.columns = [
+      { header: '管理编号', key: 'managementCode', width: 15 },
+      { header: '仪器/设备编号', key: 'instrumentCode', width: 18 },
+      { header: '仪器名称*', key: 'instrumentName', width: 20 },
+      { header: '型号', key: 'model', width: 15 },
+      { header: '量程/规格', key: 'measurementRange', width: 15 },
+      { header: '精确度', key: 'accuracy', width: 12 },
+      { header: '生产厂家', key: 'manufacturer', width: 20 },
+      { header: '购入日期', key: 'purchaseDate', width: 12 },
+      { header: '使用部门', key: 'department', width: 15 },
+      { header: '管理人', key: 'responsiblePerson', width: 12 },
+      { header: '校准周期', key: 'calibrationCycle', width: 12 },
+      { header: '校准机构', key: 'calibrationAgency', width: 22 },
+      { header: '校准日期', key: 'calibrationDate', width: 12 },
+      { header: '下次校准日期', key: 'nextCalibrationDate', width: 14 },
+      { header: '证书编号', key: 'certificateNumber', width: 18 },
+      { header: '备注', key: 'remarks', width: 25 }
+    ];
+
+    // 设置表头样式
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 20;
+    headerRow.eachCell((cell) => {
+      cell.font = { bold: true, name: 'Tahoma', size: 10 };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'F0F0F0' }
+      };
+      cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'A0A0A0' } },
+        left: { style: 'thin', color: { argb: 'A0A0A0' } },
+        bottom: { style: 'thin', color: { argb: 'A0A0A0' } },
+        right: { style: 'thin', color: { argb: 'A0A0A0' } }
+      };
+    });
+
+    // 添加示例数据
+    worksheet.addRow({
+      managementCode: 'WSJ-01',
+      instrumentCode: '23-001',
+      instrumentName: '数显温湿度计',
+      model: 'HG126D',
+      measurementRange: '-10~50°C',
+      accuracy: '±0.5°C',
+      manufacturer: '某某仪器厂',
+      purchaseDate: '2024-01-15',
+      department: '检测室',
+      responsiblePerson: '张三',
+      calibrationCycle: '1年',
+      calibrationAgency: '某某检测技术有限公司',
+      calibrationDate: '2024-05-20',
+      nextCalibrationDate: '2025-05-20',
+      certificateNumber: 'KLR202400001',
+      remarks: '示例数据，请删除'
+    });
+
+    // 添加说明行
+    worksheet.addRow({});
+    const noteRow = worksheet.addRow(['填写说明：']);
+    noteRow.getCell(1).font = { bold: true, color: { argb: 'FF0000' } };
+    worksheet.addRow(['1. 管理编号和仪器/设备编号至少填写一项，仪器名称为必填项']);
+    worksheet.addRow(['2. 校准周期支持格式：1年、半年、6个月、12等']);
+    worksheet.addRow(['3. 日期格式：YYYY-MM-DD 或 YYYYMMDD']);
+    worksheet.addRow(['4. 如果管理编号或仪器编号已存在，将更新该仪器信息']);
+    worksheet.addRow(['5. 如果有校准信息，将同时创建校准记录']);
+    worksheet.addRow(['6. 部门和人员不存在时将自动创建']);
+
+    // 冻结首行
+    worksheet.views = [{ state: 'frozen', ySplit: 1 }];
+
+    // 设置响应头
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="instrument_import_template.xlsx"');
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error('生成导入模板失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '生成导入模板失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 预览导入数据
+ * POST /api/instruments/import/preview
+ */
+router.post('/import/preview', authenticateToken, excelUpload.single('file'), async (req, res) => {
+  try {
+    console.log('=== 开始预览导入数据 ===');
+    
+    if (!req.file) {
+      return res.status(400).json({
+        code: 400,
+        message: '请选择要上传的Excel文件'
+      });
+    }
+
+    console.log('上传文件:', req.file.path);
+
+    const workbook = new ExcelJS.Workbook();
+    await workbook.xlsx.readFile(req.file.path);
+    const worksheet = workbook.worksheets[0];
+
+    if (!worksheet) {
+      return res.status(400).json({
+        code: 400,
+        message: 'Excel文件中没有找到工作表'
+      });
+    }
+
+    console.log('工作表行数:', worksheet.rowCount);
+
+    // 智能检测列头，建立列名到列索引的映射
+    const columnMap = {};
+    const headerRow = worksheet.getRow(1);
+    let actualHeaderRow = 1;
+    
+    // 检查第一行是否是标题行（如"2025年 腾佳印务检测仪器/设备校准检定计划"）
+    const firstCellValue = getCellValue(headerRow.getCell(1));
+    console.log('第一行第一列值:', firstCellValue);
+    
+    if (firstCellValue && (firstCellValue.includes('计划') || firstCellValue.includes('台账') || /^\d{4}年/.test(firstCellValue))) {
+      // 第一行是标题，第二行是列头
+      actualHeaderRow = 2;
+      console.log('检测到标题行，列头在第2行');
+    }
+    
+    // 读取列头行
+    const headerRowData = worksheet.getRow(actualHeaderRow);
+    console.log('列头行号:', actualHeaderRow);
+    
+    // 遍历并记录所有列头
+    const allHeaders = [];
+    headerRowData.eachCell((cell, colNumber) => {
+      const headerName = getCellValue(cell);
+      allHeaders.push({ col: colNumber, name: headerName });
+      
+      if (headerName) {
+        // 标准化列名映射
+        if (headerName.includes('管理编号')) columnMap['managementCode'] = colNumber;
+        else if (headerName.includes('设备编号') || headerName.includes('仪器编号') || headerName.includes('仪器/设备编号')) columnMap['instrumentCode'] = colNumber;
+        else if (headerName.includes('器具名称') || headerName.includes('仪器名称')) columnMap['instrumentName'] = colNumber;
+        else if (headerName.includes('型号')) columnMap['model'] = colNumber;
+        else if (headerName.includes('量程') || headerName.includes('规格')) columnMap['measurementRange'] = colNumber;
+        else if (headerName.includes('精确度') || headerName.includes('精度')) columnMap['accuracy'] = colNumber;
+        else if (headerName.includes('生产厂家') || headerName.includes('厂家')) columnMap['manufacturer'] = colNumber;
+        else if (headerName.includes('购入日期') || headerName.includes('采购日期')) columnMap['purchaseDate'] = colNumber;
+        else if (headerName.includes('使用部门') || headerName.includes('部门')) columnMap['department'] = colNumber;
+        else if (headerName.includes('管理人') || headerName.includes('负责人') || headerName.includes('责任人')) columnMap['responsiblePerson'] = colNumber;
+        else if (headerName.includes('校准周期') || headerName.includes('检定周期')) columnMap['calibrationCycle'] = colNumber;
+        else if (headerName.includes('校准单位') || headerName.includes('检定单位') || headerName.includes('校准机构')) columnMap['calibrationAgency'] = colNumber;
+        else if (headerName.includes('下次') && (headerName.includes('校准') || headerName.includes('检定'))) columnMap['nextCalibrationDate'] = colNumber;
+        else if (headerName.includes('校准日期') || headerName.includes('检定日期')) columnMap['calibrationDate'] = colNumber;
+        else if (headerName.includes('证书编号')) columnMap['certificateNumber'] = colNumber;
+        else if (headerName.includes('备注')) columnMap['remarks'] = colNumber;
+      }
+    });
+
+    console.log('所有列头:', allHeaders);
+    console.log('检测到的列映射:', columnMap);
+
+    const pool = await getConnection();
+
+    // 获取已存在的管理编号
+    let existingCodes = new Set();
+    try {
+      const existingResult = await pool.request().query(`
+        SELECT ManagementCode FROM Instruments WHERE IsActive = 1
+      `);
+      existingCodes = new Set(existingResult.recordset.map(r => r.ManagementCode).filter(Boolean));
+    } catch (dbErr) {
+      console.warn('获取已存在管理编号失败，将视为全部新增:', dbErr.message);
+    }
+
+    // 获取已存在的仪器编号（用于管理编号为空时的匹配）
+    let existingInstrumentCodes = new Set();
+    try {
+      const existingInstrResult = await pool.request().query(`
+        SELECT InstrumentCode FROM Instruments WHERE IsActive = 1 AND InstrumentCode IS NOT NULL AND InstrumentCode != ''
+      `);
+      existingInstrumentCodes = new Set(existingInstrResult.recordset.map(r => r.InstrumentCode).filter(Boolean));
+    } catch (dbErr) {
+      console.warn('获取已存在仪器编号失败:', dbErr.message);
+    }
+
+    // 获取部门列表
+    let departments = new Map();
+    try {
+      const deptResult = await pool.request().query(`
+        SELECT ID, Name FROM Department WHERE Status = 1
+      `);
+      departments = new Map(deptResult.recordset.map(d => [d.Name, d.ID]));
+    } catch (dbErr) {
+      console.warn('获取部门列表失败:', dbErr.message);
+    }
+
+    // 获取人员列表
+    let persons = new Map();
+    try {
+      const personResult = await pool.request().query(`
+        SELECT ID, Name FROM Person WHERE IsActive = 1
+      `);
+      persons = new Map(personResult.recordset.map(p => [p.Name, p.ID]));
+    } catch (dbErr) {
+      console.warn('获取人员列表失败:', dbErr.message);
+    }
+
+    const previewData = [];
+    const errors = [];
+    let rowIndex = 0;
+
+    // 验证必要列是否存在
+    // 验证必要列是否存在：管理编号和仪器编号至少有一个
+    if (!columnMap['managementCode'] && !columnMap['instrumentCode']) {
+      // 清理临时文件
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({
+        code: 400,
+        message: 'Excel文件缺少"管理编号"或"仪器编号"列，至少需要其中一列'
+      });
+    }
+    if (!columnMap['instrumentName']) {
+      // 清理临时文件
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({
+        code: 400,
+        message: 'Excel文件缺少"仪器名称/器具名称"列，请检查文件格式'
+      });
+    }
+
+    worksheet.eachRow((row, rowNumber) => {
+      // 跳过标题行和列头行
+      if (rowNumber <= actualHeaderRow) return;
+      
+      const rowData = {
+        rowNumber,
+        managementCode: columnMap['managementCode'] ? getCellValue(row.getCell(columnMap['managementCode'])) : '',
+        instrumentCode: columnMap['instrumentCode'] ? getCellValue(row.getCell(columnMap['instrumentCode'])) : '',
+        instrumentName: columnMap['instrumentName'] ? getCellValue(row.getCell(columnMap['instrumentName'])) : '',
+        model: columnMap['model'] ? getCellValue(row.getCell(columnMap['model'])) : '',
+        measurementRange: columnMap['measurementRange'] ? getCellValue(row.getCell(columnMap['measurementRange'])) : '',
+        accuracy: columnMap['accuracy'] ? getCellValue(row.getCell(columnMap['accuracy'])) : '',
+        manufacturer: columnMap['manufacturer'] ? getCellValue(row.getCell(columnMap['manufacturer'])) : '',
+        purchaseDate: columnMap['purchaseDate'] ? parseDateValue(row.getCell(columnMap['purchaseDate'])) : null,
+        department: columnMap['department'] ? getCellValue(row.getCell(columnMap['department'])) : '',
+        responsiblePerson: columnMap['responsiblePerson'] ? getCellValue(row.getCell(columnMap['responsiblePerson'])) : '',
+        calibrationCycle: columnMap['calibrationCycle'] ? getCellValue(row.getCell(columnMap['calibrationCycle'])) : '',
+        calibrationAgency: columnMap['calibrationAgency'] ? getCellValue(row.getCell(columnMap['calibrationAgency'])) : '',
+        calibrationDate: columnMap['calibrationDate'] ? parseDateValue(row.getCell(columnMap['calibrationDate'])) : null,
+        nextCalibrationDate: columnMap['nextCalibrationDate'] ? parseDateValue(row.getCell(columnMap['nextCalibrationDate'])) : null,
+        certificateNumber: columnMap['certificateNumber'] ? getCellValue(row.getCell(columnMap['certificateNumber'])) : '',
+        remarks: columnMap['remarks'] ? getCellValue(row.getCell(columnMap['remarks'])) : '',
+        status: 'pending',
+        errors: [],
+        warnings: []
+      };
+
+      // 跳过空行或说明行
+      if (!rowData.managementCode && !rowData.instrumentCode && !rowData.instrumentName) {
+        return;
+      }
+      if (rowData.managementCode && rowData.managementCode.includes('说明')) {
+        return;
+      }
+
+      // 数据验证：管理编号和仪器编号二者有其一即可
+      const hasIdentifier = rowData.managementCode || rowData.instrumentCode;
+      if (!hasIdentifier) {
+        rowData.errors.push('管理编号和仪器编号至少需要填写一项');
+      }
+      if (!rowData.instrumentName) {
+        rowData.errors.push('仪器名称为必填项');
+      }
+
+      // 检查是否已存在（管理编号和仪器编号都要检查）
+      const managementCodeExists = rowData.managementCode && existingCodes.has(rowData.managementCode);
+      const instrumentCodeExists = rowData.instrumentCode && existingInstrumentCodes.has(rowData.instrumentCode);
+      
+      if (managementCodeExists || instrumentCodeExists) {
+        rowData.status = 'update';
+        if (managementCodeExists && instrumentCodeExists) {
+          rowData.warnings.push('管理编号和仪器编号均已存在，将更新数据');
+        } else if (managementCodeExists) {
+          rowData.warnings.push('该管理编号已存在，将更新数据');
+        } else {
+          rowData.warnings.push('该仪器编号已存在，将更新数据');
+        }
+      } else {
+        rowData.status = 'new';
+      }
+
+      // 校准周期转换
+      rowData.calibrationCycleMonths = parseCalibrationCycle(rowData.calibrationCycle);
+
+      // 部门匹配
+      if (rowData.department) {
+        rowData.departmentId = departments.get(rowData.department);
+        if (!rowData.departmentId) {
+          rowData.warnings.push(`部门"${rowData.department}"不存在，将自动创建`);
+          rowData.newDepartment = true;
+        }
+      }
+
+      // 责任人匹配
+      if (rowData.responsiblePerson) {
+        rowData.responsiblePersonId = persons.get(rowData.responsiblePerson);
+        if (!rowData.responsiblePersonId) {
+          rowData.warnings.push(`人员"${rowData.responsiblePerson}"不存在，将自动创建`);
+          rowData.newPerson = true;
+        }
+      }
+
+      // 有错误则标记为error
+      if (rowData.errors.length > 0) {
+        rowData.status = 'error';
+      }
+
+      // 调试日志：打印校准信息
+      console.log(`预览行${rowData.rowNumber}: 管理编号=${rowData.managementCode}, 校准日期=${rowData.calibrationDate}, 校准机构="${rowData.calibrationAgency}"`);
+
+      previewData.push(rowData);
+      rowIndex++;
+    });
+
+    // 清理临时文件
+    fs.unlink(req.file.path, () => {});
+
+    // 统计
+    const stats = {
+      total: previewData.length,
+      newCount: previewData.filter(r => r.status === 'new').length,
+      updateCount: previewData.filter(r => r.status === 'update').length,
+      errorCount: previewData.filter(r => r.status === 'error').length
+    };
+
+    res.json({
+      code: 200,
+      data: {
+        preview: previewData,
+        stats
+      },
+      message: '预览数据解析成功'
+    });
+
+  } catch (error) {
+    console.error('预览导入数据失败:', error);
+    console.error('错误堆栈:', error.stack);
+    // 清理临时文件
+    if (req.file) {
+      fs.unlink(req.file.path, () => {});
+    }
+    res.status(500).json({
+      code: 500,
+      message: '预览导入数据失败',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
+  }
+});
+
+/**
+ * 执行批量导入
+ * POST /api/instruments/import/execute
+ */
+router.post('/import/execute', authenticateToken, async (req, res) => {
+  try {
+    console.log('=== 开始执行批量导入 ===');
+    const { data } = req.body;
+
+    if (!data || !Array.isArray(data) || data.length === 0) {
+      return res.status(400).json({
+        code: 400,
+        message: '没有要导入的数据'
+      });
+    }
+
+    console.log('导入数据条数:', data.length);
+
+    const pool = await getConnection();
+    const results = {
+      success: 0,
+      failed: 0,
+      updated: 0,
+      errors: []
+    };
+
+    // 获取现有部门和人员
+    const deptResult = await pool.request().query(`SELECT ID, Name FROM Department WHERE Status = 1`);
+    const departments = new Map(deptResult.recordset.map(d => [d.Name, d.ID]));
+
+    const personResult = await pool.request().query(`SELECT ID, Name FROM Person WHERE IsActive = 1`);
+    const persons = new Map(personResult.recordset.map(p => [p.Name, p.ID]));
+
+    // 辅助函数：安全解析日期
+    const safeParseDate = (value) => {
+      if (!value) return null;
+      if (value instanceof Date) return value;
+      const parsed = new Date(value);
+      return isNaN(parsed.getTime()) ? null : parsed;
+    };
+
+    for (const item of data) {
+      // 跳过有错误的行
+      if (item.status === 'error') {
+        results.failed++;
+        results.errors.push({
+          row: item.rowNumber,
+          managementCode: item.managementCode || '',
+          instrumentCode: item.instrumentCode || '',
+          identifier: item.managementCode || item.instrumentCode || '无标识',
+          error: item.errors.join('; ')
+        });
+        continue;
+      }
+
+      try {
+        // 处理部门：如果不存在则创建
+        let departmentId = null;
+        if (item.department) {
+          departmentId = departments.get(item.department);
+          if (!departmentId) {
+            const deptInsert = await pool.request()
+              .input('name', sql.NVarChar, item.department)
+              .query(`
+                INSERT INTO Department (Name, Status, CreatedAt) 
+                OUTPUT INSERTED.ID
+                VALUES (@name, 1, GETDATE())
+              `);
+            departmentId = deptInsert.recordset[0].ID;
+            departments.set(item.department, departmentId);
+          }
+        }
+
+        // 处理责任人：如果不存在则创建
+        let responsiblePersonId = null;
+        if (item.responsiblePerson) {
+          responsiblePersonId = persons.get(item.responsiblePerson);
+          if (!responsiblePersonId) {
+            const personInsert = await pool.request()
+              .input('name', sql.NVarChar, item.responsiblePerson)
+              .input('deptId', sql.Int, departmentId)
+              .query(`
+                INSERT INTO Person (Name, DepartmentID, IsActive) 
+                OUTPUT INSERTED.ID
+                VALUES (@name, @deptId, 1)
+              `);
+            responsiblePersonId = personInsert.recordset[0].ID;
+            persons.set(item.responsiblePerson, responsiblePersonId);
+          }
+        }
+
+        // 检查仪器是否已存在（同时检查管理编号和仪器编号）
+        let existCheck = { recordset: [] };
+        
+        // 先用管理编号检查
+        if (item.managementCode) {
+          existCheck = await pool.request()
+            .input('code', sql.NVarChar, item.managementCode)
+            .query(`SELECT ID FROM Instruments WHERE ManagementCode = @code AND IsActive = 1`);
+        }
+        
+        // 如果管理编号没找到，再用仪器编号检查
+        if (existCheck.recordset.length === 0 && item.instrumentCode) {
+          existCheck = await pool.request()
+            .input('code', sql.NVarChar, item.instrumentCode)
+            .query(`SELECT ID FROM Instruments WHERE InstrumentCode = @code AND IsActive = 1`);
+        }
+
+        let instrumentId;
+
+        if (existCheck.recordset.length > 0) {
+          // 更新现有仪器
+          instrumentId = existCheck.recordset[0].ID;
+          const purchaseDateValue = safeParseDate(item.purchaseDate);
+          
+          await pool.request()
+            .input('id', sql.Int, instrumentId)
+            .input('instrumentCode', sql.NVarChar, item.instrumentCode || null)
+            .input('instrumentName', sql.NVarChar, item.instrumentName)
+            .input('model', sql.NVarChar, item.model || null)
+            .input('measurementRange', sql.NVarChar, item.measurementRange || null)
+            .input('accuracy', sql.NVarChar, item.accuracy || null)
+            .input('manufacturer', sql.NVarChar, item.manufacturer || null)
+            .input('purchaseDate', sql.Date, purchaseDateValue)
+            .input('departmentId', sql.Int, departmentId)
+            .input('responsiblePerson', sql.Int, responsiblePersonId)
+            .input('calibrationCycle', sql.Int, item.calibrationCycleMonths || null)
+            .input('remarks', sql.NVarChar, item.remarks || null)
+            .input('updatedBy', sql.Int, req.user.id)
+            .query(`
+              UPDATE Instruments SET
+                InstrumentCode = @instrumentCode,
+                InstrumentName = @instrumentName,
+                Model = @model,
+                MeasurementRange = @measurementRange,
+                Accuracy = @accuracy,
+                Manufacturer = @manufacturer,
+                PurchaseDate = @purchaseDate,
+                DepartmentID = @departmentId,
+                ResponsiblePerson = @responsiblePerson,
+                CalibrationCycle = @calibrationCycle,
+                Remarks = @remarks,
+                UpdatedAt = GETDATE(),
+                UpdatedBy = @updatedBy
+              WHERE ID = @id
+            `);
+          results.updated++;
+        } else {
+          // 新增仪器
+          const purchaseDateValue = safeParseDate(item.purchaseDate);
+          
+          const insertResult = await pool.request()
+            .input('managementCode', sql.NVarChar, item.managementCode || null)
+            .input('instrumentCode', sql.NVarChar, item.instrumentCode || null)
+            .input('instrumentName', sql.NVarChar, item.instrumentName)
+            .input('model', sql.NVarChar, item.model || null)
+            .input('measurementRange', sql.NVarChar, item.measurementRange || null)
+            .input('accuracy', sql.NVarChar, item.accuracy || null)
+            .input('manufacturer', sql.NVarChar, item.manufacturer || null)
+            .input('purchaseDate', sql.Date, purchaseDateValue)
+            .input('departmentId', sql.Int, departmentId)
+            .input('responsiblePerson', sql.Int, responsiblePersonId)
+            .input('calibrationCycle', sql.Int, item.calibrationCycleMonths || null)
+            .input('remarks', sql.NVarChar, item.remarks || null)
+            .input('status', sql.NVarChar, 'normal')
+            .input('createdBy', sql.Int, req.user.id)
+            .query(`
+              INSERT INTO Instruments (
+                ManagementCode, InstrumentCode, InstrumentName, Model,
+                MeasurementRange, Accuracy, Manufacturer, PurchaseDate,
+                DepartmentID, ResponsiblePerson, CalibrationCycle, Remarks,
+                Status, IsActive, CreatedAt, CreatedBy
+              ) 
+              OUTPUT INSERTED.ID
+              VALUES (
+                @managementCode, @instrumentCode, @instrumentName, @model,
+                @measurementRange, @accuracy, @manufacturer, @purchaseDate,
+                @departmentId, @responsiblePerson, @calibrationCycle, @remarks,
+                @status, 1, GETDATE(), @createdBy
+              )
+            `);
+          instrumentId = insertResult.recordset[0].ID;
+          results.success++;
+        }
+
+        // 获取校准周期（月），默认12个月
+        const calibrationCycleMonths = item.calibrationCycleMonths || 12;
+        let calibrationDateValue = null;
+        let nextCalibrationDateValue = null;
+
+        // 如果有校准信息，创建校准记录
+        console.log(`检查校准信息: 管理编号=${item.managementCode}, 校准日期=${item.calibrationDate}, 校准机构=${item.calibrationAgency}`);
+        if (item.calibrationDate && item.calibrationAgency) {
+          console.log(`  -> 满足条件，创建校准记录`);
+          calibrationDateValue = safeParseDate(item.calibrationDate);
+          nextCalibrationDateValue = safeParseDate(item.nextCalibrationDate);
+          
+          // 如果下次校准日期为空，根据校准日期和校准周期自动计算
+          if (!nextCalibrationDateValue && calibrationDateValue) {
+            nextCalibrationDateValue = new Date(calibrationDateValue);
+            nextCalibrationDateValue.setMonth(nextCalibrationDateValue.getMonth() + calibrationCycleMonths);
+            console.log(`自动计算下次校准日期: ${calibrationDateValue.toISOString()} + ${calibrationCycleMonths}个月 = ${nextCalibrationDateValue.toISOString()}`);
+          }
+          
+          // 生成校准记录编号
+          const today = new Date();
+          const datePrefix = `${today.getFullYear()}${String(today.getMonth() + 1).padStart(2, '0')}${String(today.getDate()).padStart(2, '0')}`;
+          const countResult = await pool.request()
+            .input('prefix', sql.NVarChar, `CR${datePrefix}%`)
+            .query(`SELECT COUNT(*) as count FROM CalibrationResults WHERE ResultCode LIKE @prefix`);
+          const seq = (countResult.recordset[0].count || 0) + 1;
+          const resultCode = `CR${datePrefix}${String(seq).padStart(3, '0')}`;
+
+          await pool.request()
+            .input('resultCode', sql.NVarChar, resultCode)
+            .input('instrumentId', sql.Int, instrumentId)
+            .input('calibrationDate', sql.Date, calibrationDateValue)
+            .input('expiryDate', sql.Date, nextCalibrationDateValue)
+            .input('calibrationAgency', sql.NVarChar, item.calibrationAgency)
+            .input('certificateNumber', sql.NVarChar, item.certificateNumber || null)
+            .input('calibrationResult', sql.NVarChar, '合格')
+            .input('createdBy', sql.Int, req.user.id)
+            .query(`
+              INSERT INTO CalibrationResults (
+                ResultCode, InstrumentID, CalibrationDate, ExpiryDate,
+                CalibrationAgency, CertificateNumber, CalibrationResult,
+                CreatedAt, CreatedBy
+              ) VALUES (
+                @resultCode, @instrumentId, @calibrationDate, @expiryDate,
+                @calibrationAgency, @certificateNumber, @calibrationResult,
+                GETDATE(), @createdBy
+              )
+            `);
+        }
+
+        // 为所有仪器自动创建年度校准计划（无论是否有校准记录）
+        // 确定计划日期：优先使用下次校准日期，其次使用默认日期（下一年3月15日）
+        let planDate = nextCalibrationDateValue;
+        if (!planDate) {
+          // 没有下次校准日期，使用默认日期（下一年的3月15日）
+          const nextYear = new Date().getFullYear() + 1;
+          planDate = new Date(nextYear, 2, 15); // 月份从0开始，2表示3月
+          console.log(`仪器 ${item.managementCode || item.instrumentCode}: 无校准记录，使用默认计划日期 ${planDate.toISOString().split('T')[0]}`);
+        }
+        
+        const planYear = planDate.getFullYear();
+        
+        // 检查是否已存在同年度同仪器的计划
+        const existingPlan = await pool.request()
+          .input('planYear', sql.Int, planYear)
+          .input('instrumentId', sql.Int, instrumentId)
+          .query(`SELECT ID FROM AnnualCalibrationPlan WHERE PlanYear = @planYear AND InstrumentID = @instrumentId`);
+        
+        if (existingPlan.recordset.length === 0) {
+          await pool.request()
+            .input('planYear', sql.Int, planYear)
+            .input('instrumentId', sql.Int, instrumentId)
+            .input('plannedDate', sql.Date, planDate)
+            .input('lastCalibrationDate', sql.Date, calibrationDateValue)
+            .input('calibrationAgency', sql.NVarChar, item.calibrationAgency || null)
+            .input('calibrationCycle', sql.Int, calibrationCycleMonths)
+            .input('priority', sql.NVarChar, '中')
+            .input('status', sql.NVarChar, '待校准')
+            .input('createdBy', sql.Int, req.user.id)
+            .query(`
+              INSERT INTO AnnualCalibrationPlan (
+                PlanYear, InstrumentID, PlannedDate, LastCalibrationDate,
+                CalibrationAgency, CalibrationCycle, Priority, Status,
+                CreatedAt, CreatedBy
+              ) VALUES (
+                @planYear, @instrumentId, @plannedDate, @lastCalibrationDate,
+                @calibrationAgency, @calibrationCycle, @priority, @status,
+                GETDATE(), @createdBy
+              )
+            `);
+          
+          console.log(`创建年度计划: 仪器ID=${instrumentId}, 年度=${planYear}, 计划日期=${planDate.toISOString().split('T')[0]}, 上次校准=${calibrationDateValue ? calibrationDateValue.toISOString().split('T')[0] : '无'}`);
+        }
+
+      } catch (itemError) {
+        console.error(`导入第${item.rowNumber}行失败:`, itemError.message);
+        results.failed++;
+        results.errors.push({
+          row: item.rowNumber,
+          managementCode: item.managementCode || '',
+          instrumentCode: item.instrumentCode || '',
+          identifier: item.managementCode || item.instrumentCode || '无标识',
+          error: itemError.message
+        });
+      }
+    }
+
+    console.log('导入完成:', results);
+
+    res.json({
+      code: 200,
+      data: results,
+      message: `导入完成：新增${results.success}条，更新${results.updated}条，失败${results.failed}条`
+    });
+
+  } catch (error) {
+    console.error('执行批量导入失败:', error);
+    console.error('错误堆栈:', error.stack);
+    res.status(500).json({
+      code: 500,
+      message: '执行批量导入失败',
+      error: error.message
+    });
+  }
+});
+
+/**
+ * 获取单元格值的辅助函数
+ */
+function getCellValue(cell) {
+  if (!cell || cell.value === null || cell.value === undefined) {
+    return '';
+  }
+  
+  // 处理富文本
+  if (typeof cell.value === 'object' && cell.value.richText) {
+    return cell.value.richText.map(rt => rt.text).join('');
+  }
+  
+  // 处理公式
+  if (typeof cell.value === 'object' && cell.value.result !== undefined) {
+    return String(cell.value.result);
+  }
+  
+  return String(cell.value).trim();
+}
+
+/**
+ * 解析日期值的辅助函数
+ */
+function parseDateValue(cell) {
+  if (!cell || cell.value === null || cell.value === undefined) {
+    return null;
+  }
+
+  let value = cell.value;
+  
+  // 如果是Date对象，直接返回
+  if (value instanceof Date) {
+    return value;
+  }
+
+  // 转为字符串处理
+  const str = String(value).trim();
+  if (!str || str === 'NaN') {
+    return null;
+  }
+
+  // 处理数字格式的日期 (如 20250519)
+  if (/^\d{8}$/.test(str)) {
+    const year = str.substring(0, 4);
+    const month = str.substring(4, 6);
+    const day = str.substring(6, 8);
+    return new Date(`${year}-${month}-${day}`);
+  }
+
+  // 处理浮点数格式的日期 (如 20250519.0)
+  if (/^\d{8}\.\d+$/.test(str)) {
+    const intPart = str.split('.')[0];
+    const year = intPart.substring(0, 4);
+    const month = intPart.substring(4, 6);
+    const day = intPart.substring(6, 8);
+    return new Date(`${year}-${month}-${day}`);
+  }
+
+  // 处理标准日期格式
+  const parsed = new Date(str);
+  if (!isNaN(parsed.getTime())) {
+    return parsed;
+  }
+
+  return null;
+}
+
+/**
+ * 解析校准周期的辅助函数
+ */
+function parseCalibrationCycle(value) {
+  if (!value) return null;
+  
+  const str = String(value).trim();
+  
+  // "1年" -> 12
+  if (str.includes('年')) {
+    const num = parseInt(str);
+    return isNaN(num) ? 12 : num * 12;
+  }
+  
+  // "半年" -> 6
+  if (str === '半年') {
+    return 6;
+  }
+  
+  // "6个月" -> 6
+  if (str.includes('个月') || str.includes('月')) {
+    const num = parseInt(str);
+    return isNaN(num) ? null : num;
+  }
+  
+  // 纯数字
+  const num = parseInt(str);
+  return isNaN(num) ? null : num;
+}
 
 // =====================================================
 // 辅助功能

@@ -4035,10 +4035,12 @@ BEGIN
         [PlanYear] INT NOT NULL,                           -- 计划年度
         [InstrumentID] INT NOT NULL,                       -- 仪器ID
         [PlannedDate] DATE NOT NULL,                       -- 计划校准日期
+        [LastCalibrationDate] DATE,                        -- 上次校准日期
+        [CalibrationCycle] INT,                            -- 校准周期（月）
         [CalibrationAgency] NVARCHAR(100),                 -- 计划校准机构
         [EstimatedCost] DECIMAL(10,2),                     -- 预估费用
-        [Priority] NVARCHAR(20) DEFAULT 'normal',          -- 优先级：high/normal/low
-        [Status] NVARCHAR(20) DEFAULT 'planned',           -- 状态：planned/in_progress/completed/cancelled/overdue
+        [Priority] NVARCHAR(20) DEFAULT N'中',              -- 优先级：高/中/低
+        [Status] NVARCHAR(20) DEFAULT N'计划中',            -- 状态：计划中/待校准/已完成/已取消/逾期
         [ActualDate] DATE,                                 -- 实际校准日期
         [ActualCost] DECIMAL(10,2),                        -- 实际费用
         [CalibrationResultID] INT,                         -- 关联的校准结果ID

@@ -397,10 +397,16 @@ class ErpService {
      */
     async getProductionData(filters = {}) {
         try {
-            // 获取ERP生产数据
-            // 这里需要根据实际的ERP接口文档来实现
-            // 示例端点，实际使用时需要替换为真实的API端点
-            return await this.makeRequest('/api/production', 'GET', null, filters);
+            // 获取ERP生产情况统计表
+            // 根据迅越接口文档: /api/production/pNumSumInfo/getProductionDataAnaly
+            const params = {};
+            if (filters.StartDate) {
+                params.StartDate = filters.StartDate;
+            }
+            if (filters.EndDate) {
+                params.EndDate = filters.EndDate;
+            }
+            return await this.makeRequest('/api/production/pNumSumInfo/getProductionDataAnaly', 'GET', null, params);
         } catch (error) {
             // 获取生产数据失败
             throw error;
@@ -408,16 +414,24 @@ class ErpService {
     }
 
     /**
-     * 获取交付数据
+     * 获取生产情况统计表（别名方法）
+     * @param {Object} filters - 过滤条件
+     * @returns {Promise<Object>} 生产统计数据
+     */
+    async getProductionDataAnaly(filters = {}) {
+        return await this.getProductionData(filters);
+    }
+
+    /**
+     * 获取交付数据（成品出库明细）
      * @param {Object} filters - 过滤条件
      * @returns {Promise<Object>} 交付数据
      */
     async getDeliveryData(filters = {}) {
         try {
-            // 获取ERP交付数据
-            // 这里需要根据实际的ERP接口文档来实现
-            // 示例端点，实际使用时需要替换为真实的API端点
-            return await this.makeRequest('/api/delivery', 'GET', null, filters);
+            // 获取ERP成品出库明细
+            // 根据迅越接口文档: /api/stock/productOutSum/getList
+            return await this.getProductOutSumList(filters);
         } catch (error) {
             // 获取交付数据失败
             throw error;
@@ -713,6 +727,130 @@ class ErpService {
             // ERP连接测试失败，记录日志但不抛出异常
             console.log('ERP连接测试失败:', error.message);
             return false;
+        }
+    }
+
+    /**
+     * 查询物料列表
+     * 根据迅越接口文档: /api/stock/material/getList
+     * @param {Object} filters - 过滤条件
+     * @param {string} filters.StartDate - 开始时间 (yyyy-MM-dd HH:mm:ss)
+     * @param {string} filters.EndDate - 结束时间 (yyyy-MM-dd HH:mm:ss)
+     * @returns {Promise<Array>} 物料列表数据
+     */
+    async getMaterialList(filters = {}) {
+        try {
+            const params = {};
+            if (filters.StartDate) {
+                params.StartDate = filters.StartDate;
+            }
+            if (filters.EndDate) {
+                params.EndDate = filters.EndDate;
+            }
+            
+            const result = await this.makeRequest('/api/stock/material/getList', 'GET', null, params);
+            return result;
+        } catch (error) {
+            console.error('获取物料列表失败:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 查询工单列表
+     * 根据迅越接口文档: /api/production/pNumSumInfo/getList
+     * @param {Object} filters - 过滤条件
+     * @param {string} filters.StartDate - 开始日期 (yyyy-MM-dd HH:mm:ss)
+     * @param {string} filters.EndDate - 结束日期 (yyyy-MM-dd HH:mm:ss)
+     * @returns {Promise<Array>} 工单列表数据
+     */
+    async getWorkOrderList(filters = {}) {
+        try {
+            const params = {};
+            if (filters.StartDate) {
+                params.StartDate = filters.StartDate;
+            }
+            if (filters.EndDate) {
+                params.EndDate = filters.EndDate;
+            }
+            
+            const result = await this.makeRequest('/api/production/pNumSumInfo/getList', 'GET', null, params);
+            return result;
+        } catch (error) {
+            console.error('获取工单列表失败:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 查询工单明细
+     * 根据迅越接口文档: /api/production/pNumSumInfo/getByPNum
+     * @param {string} pNum - 工单号
+     * @returns {Promise<Object>} 工单明细数据
+     */
+    async getWorkOrderDetail(pNum) {
+        try {
+            if (!pNum) {
+                throw new Error('工单号不能为空');
+            }
+            
+            const result = await this.makeRequest('/api/production/pNumSumInfo/getByPNum', 'GET', null, { PNum: pNum });
+            return result;
+        } catch (error) {
+            console.error('获取工单明细失败:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 查询物料入库明细列表
+     * 根据迅越接口文档: /api/stock/bilOfInM/getList
+     * @param {Object} filters - 过滤条件
+     * @param {string} filters.StartDate - 开始时间 (yyyy-MM-dd HH:mm:ss)
+     * @param {string} filters.EndDate - 结束时间 (yyyy-MM-dd HH:mm:ss)
+     * @returns {Promise<Array>} 物料入库明细数据
+     */
+    async getMaterialInList(filters = {}) {
+        try {
+            const params = {};
+            if (filters.StartDate) {
+                params.StartDate = filters.StartDate;
+            }
+            if (filters.EndDate) {
+                params.EndDate = filters.EndDate;
+            }
+            
+            const result = await this.makeRequest('/api/stock/bilOfInM/getList', 'GET', null, params);
+            return result;
+        } catch (error) {
+            console.error('获取物料入库明细列表失败:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 查询外发单列表
+     * 根据迅越接口文档: /api/purchase/outPSumInfo/getList
+     * @param {Object} filters - 过滤条件
+     * @param {string} filters.StartDate - 开始时间 (yyyy-MM-dd HH:mm:ss)
+     * @param {string} filters.EndDate - 结束时间 (yyyy-MM-dd HH:mm:ss)
+     * @returns {Promise<Array>} 外发单数据
+     */
+    async getOutProcessList(filters = {}) {
+        try {
+            const params = {};
+            if (filters.StartDate) {
+                params.StartDate = filters.StartDate;
+            }
+            if (filters.EndDate) {
+                params.EndDate = filters.EndDate;
+            }
+            
+            const result = await this.makeRequest('/api/purchase/outPSumInfo/getList', 'GET', null, params);
+            return result;
+        } catch (error) {
+            console.error('获取外发单列表失败:', error.message);
+            throw error;
         }
     }
 }

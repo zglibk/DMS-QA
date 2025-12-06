@@ -13,7 +13,7 @@
 
     <!-- 标签页内容 -->
     <div class="content-section">
-      <el-tabs v-model="activeTab" type="card" class="instrument-tabs">
+      <el-tabs v-model="activeTab" type="card" class="instrument-tabs" @tab-change="handleTabClick">
         <!-- 仪器台账 -->
         <el-tab-pane label="仪器台账" name="instruments">
           <InstrumentList />
@@ -26,7 +26,7 @@
         
         <!-- 年度计划 -->
         <el-tab-pane label="年度计划" name="annual-plan">
-          <AnnualPlan />
+          <AnnualPlan ref="annualPlanRef" />
         </el-tab-pane>
       </el-tabs>
     </div>
@@ -60,6 +60,7 @@ const activeTab = ref('instruments')
 
 // 组件引用
 const calibrationResultsRef = ref(null)
+const annualPlanRef = ref(null)
 
 /**
  * 处理仪器删除后的数据刷新
@@ -74,6 +75,20 @@ const handleInstrumentDeleted = () => {
 
 // 向子组件提供刷新方法
 provide('onInstrumentDeleted', handleInstrumentDeleted)
+
+/**
+ * 处理标签页点击切换，刷新对应组件数据
+ */
+const handleTabClick = (tabName) => {
+  // 切换到年度计划时，刷新统计数据
+  if (tabName === 'annual-plan' && annualPlanRef.value && annualPlanRef.value.refreshData) {
+    annualPlanRef.value.refreshData()
+  }
+  // 切换到校准检定时，刷新数据
+  if (tabName === 'calibration' && calibrationResultsRef.value && calibrationResultsRef.value.refreshData) {
+    calibrationResultsRef.value.refreshData()
+  }
+}
 
 /**
  * 根据路由路径设置激活的标签页

@@ -632,7 +632,7 @@ async function generateExportFile(format, data, exportColumns, availableColumns)
   
   try {
     if (format === 'xlsx' || format === 'excel') {
-      console.log(`📊 [文件生成调试] 开始生成 Excel 文件...`);
+      console.log(`📊 [文件生成调试] 开始创建 Excel 文件...`);
       fileBuffer = await generateExcelFileBuffer(data, exportColumns, availableColumns);
       console.log(`✅ [文件生成调试] Excel 文件生成完成`);
     } else if (format === 'csv') {
@@ -686,6 +686,14 @@ async function generateExcelFileBuffer(data, exportColumns, availableColumns) {
     pattern: 'solid',
     fgColor: { argb: 'FFE0E0E0' }
   };
+  headerRow.eachCell(cell => {
+    cell.border = {
+      top: { style: 'thin', color: { argb: 'a0a0a0' } },
+      left: { style: 'thin', color: { argb: 'a0a0a0' } },
+      bottom: { style: 'thin', color: { argb: 'a0a0a0' } },
+      right: { style: 'thin', color: { argb: 'a0a0a0' } }
+    };
+  });
   console.log(`✅ [Excel调试] 表头样式设置完成`);
   
   console.log(`📝 [Excel调试] 开始添加数据行, 总行数: ${data.length}`);
@@ -693,7 +701,15 @@ async function generateExcelFileBuffer(data, exportColumns, availableColumns) {
   let processedRows = 0;
   data.forEach((row, index) => {
     const rowData = exportColumns.map(col => row[availableColumns[col]]);
-    worksheet.addRow(rowData);
+    const addedRow = worksheet.addRow(rowData);
+    addedRow.eachCell(cell => {
+      cell.border = {
+        top: { style: 'thin', color: { argb: 'a0a0a0' } },
+        left: { style: 'thin', color: { argb: 'a0a0a0' } },
+        bottom: { style: 'thin', color: { argb: 'a0a0a0' } },
+        right: { style: 'thin', color: { argb: 'a0a0a0' } }
+      };
+    });
     processedRows++;
     
     // 每处理1000行输出一次进度
