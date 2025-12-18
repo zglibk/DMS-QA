@@ -21,7 +21,7 @@
 
 const express = require('express');
 const { sql, getDynamicConfig } = require('../db');
-const { authenticateToken, checkPermission } = require('../middleware/auth');
+const { authenticateToken, checkPermission, isAdmin, checkUserPermission } = require('../middleware/auth');
 const router = express.Router();
 
 /**
@@ -110,6 +110,20 @@ router.get('/:userId', authenticateToken, checkPermission('user-permission:view'
 router.get('/:userId/complete', authenticateToken, async (req, res) => {
   try {
     const { userId } = req.params;
+    
+    // 安全检查：仅允许查看自己的权限，或者是管理员/拥有查看权限的用户
+    if (req.user.id != userId) {
+      const isAdminUser = isAdmin(req.user);
+      if (!isAdminUser) {
+        const hasViewPermission = await checkUserPermission(req.user.id, 'user-permission:view');
+        if (!hasViewPermission) {
+          return res.status(403).json({ 
+            success: false,
+            message: '无权查看其他用户的权限信息' 
+          });
+        }
+      }
+    }
     
     const pool = await sql.connect(await getDynamicConfig());
     

@@ -108,7 +108,7 @@
       <!-- 批量操作按钮区域 -->
       <div class="table-actions">
         <div class="actions-left">
-          <el-button type="primary" @click="showAddDialog" :icon="Plus">
+          <el-button type="primary" @click="showAddDialog" :icon="Plus" :disabled="!hasPermission('rework:add')">
             新增
           </el-button>
 
@@ -116,7 +116,7 @@
             type="warning" 
             @click="editSelectedRecord" 
             :icon="Edit"
-            :disabled="selectedRows.length !== 1"
+            :disabled="selectedRows.length !== 1 || !hasPermission('rework:edit')"
           >
             编辑
           </el-button>
@@ -124,7 +124,7 @@
             type="danger" 
             @click="deleteSelectedRecords" 
             :icon="Delete"
-            :disabled="selectedRows.length === 0"
+            :disabled="selectedRows.length === 0 || !hasPermission('rework:delete')"
           >
             删除
           </el-button>
@@ -133,7 +133,7 @@
           <span class="selection-info" v-if="selectedRows.length > 0">
             已选择 {{ selectedRows.length }} 项
           </span>
-          <el-button @click="exportData" :icon="Download" :loading="exportLoading">
+          <el-button @click="exportData" :icon="Download" :loading="exportLoading" :disabled="!hasPermission('rework:export')">
             导出数据
           </el-button>
           <el-button @click="refreshData" :icon="Refresh">
@@ -209,6 +209,7 @@
               :icon="Edit"
               class="action-btn edit-btn"
               title="编辑"
+              :disabled="!hasPermission('rework:edit')"
             />
             <el-button
               text
@@ -217,6 +218,7 @@
               :icon="Delete"
               class="action-btn delete-btn"
               title="删除"
+              :disabled="!hasPermission('rework:delete')"
             />
           </template>
         </el-table-column>
@@ -1151,6 +1153,7 @@
 
 <script setup name="ReworkManagement">
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus, Download, Refresh, Search, RefreshLeft, View, Edit, Delete,
@@ -1161,6 +1164,9 @@ import {
 } from '@element-plus/icons-vue'
 import axios from 'axios'
 import apiService from '@/services/apiService'
+
+const userStore = useUserStore()
+const hasPermission = (permission) => userStore.hasPermission(permission)
 
 // 响应式数据
 const loading = ref(false)

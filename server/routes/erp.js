@@ -630,8 +630,10 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     result.workOrderInfo = {
                         PNum: orderData.PNum,
                         OrderNum: orderData.OrderNum,
+                        CPO: orderData.CPO,              // CPO
                         Product: orderData.Product,
                         CustomerID: orderData.CustomerID,
+                        InDate: orderData.InDate,        // 开单日期
                         DeliveryDate: orderData.DeliveryDate,
                         Sales: orderData.Sales,
                         StatusDes: orderData.StatusDes
@@ -680,23 +682,63 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
             }
         }
         
+        // 先查询物料列表，用于获取型号和子物料类型信息
+        // 注意：物料基础信息可能创建于较早时间，需要使用更大的时间范围
+        let materialMap = new Map(); // 物料编码 -> 物料信息 的映射
+        try {
+            // 物料列表查询使用较大的时间范围，确保能获取到所有物料基础信息
+            const materialStartDate = '2010-01-01 00:00:00';
+            const materialEndDate = new Date().toISOString().replace('T', ' ').slice(0, 19);
+            
+            const materialData = await erpService.getMaterialList({
+                StartDate: materialStartDate,
+                EndDate: materialEndDate
+            });
+            
+            let materials = [];
+            if (Array.isArray(materialData)) {
+                materials = materialData;
+            } else if (materialData && materialData.data && Array.isArray(materialData.data)) {
+                materials = materialData.data;
+            }
+            
+            // 构建物料编码到物料信息的映射（使用标准化的key）
+            materials.forEach(item => {
+                if (item.MaterialID) {
+                    // 标准化物料编码：去除首尾空格，转为大写
+                    const normalizedId = item.MaterialID.trim().toUpperCase();
+                    materialMap.set(normalizedId, {
+                        model: item.Model,           // 型号
+                        materialSubType: item.MSubType, // 子物料类型
+                        materialType: item.MType,    // 物料类型
+                        brand: item.Band,            // 品牌
+                        spec: item.Scale             // 规格
+                    });
+                }
+            });
+            
+            console.log(`已加载 ${materialMap.size} 条物料基础信息用于联合查询`);
+        } catch (error) {
+            console.log('获取物料列表失败:', error.message);
+        }
+        
         // 查询物料入库明细（获取供应商信息）
+        let allMaterialInList = []; // 存储所有入库明细，后续根据物料信息过滤
         try {
             const materialInData = await erpService.getMaterialInList({
                 StartDate: startDate,
                 EndDate: endDate
             });
             
-            let materialInList = [];
             if (Array.isArray(materialInData)) {
-                materialInList = materialInData;
+                allMaterialInList = materialInData;
             } else if (materialInData && materialInData.data && Array.isArray(materialInData.data)) {
-                materialInList = materialInData.data;
+                allMaterialInList = materialInData.data;
             }
             
-            // 根据条件过滤
-            if (materialInList.length > 0) {
-                result.materialInList = materialInList.filter(item => {
+            // 先按查询条件过滤
+            if (allMaterialInList.length > 0) {
+                allMaterialInList = allMaterialInList.filter(item => {
                     let match = true;
                     
                     // 按物料编号过滤
@@ -710,72 +752,126 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     }
                     
                     return match;
-                }).map(item => ({
-                    inId: item.BInMID,              // 入库单号
-                    inDate: item.InDate,           // 入库日期
-                    dlyNum: item.DlyNum,           // 送货单号
-                    purId: item.PurID,             // 采购单号
-                    supply: item.Supply,           // 供应商（关键字段）
-                    materialId: item.MaterialID,   // 物料编码
-                    materialName: item.MName,      // 物料名称
-                    spec: item.Scale,              // 规格
-                    brand: item.Band,              // 品牌
-                    materialType: item.MType,      // 物料类型
-                    materialSubType: item.MSubType, // 子物料类型
-                    count: item.Acount || item.ACount,  // 入库数量
-                    deliveryDate: item.DeliveryDate,    // 计划交货期
-                    lastUpdateDate: item.LstUpdateDate  // 最后修改日期
-                }));
+                });
             }
+            
+            console.log(`物料入库明细初步过滤: ${allMaterialInList.length} 条`);
         } catch (error) {
             console.log('获取物料入库明细失败:', error.message);
         }
         
-        // 如果只按物料编号/名称查询，还需要查询基础物料信息
+        // 如果只按物料编号/名称查询，还需要查询基础物料信息添加到materialList
         if ((materialId || materialName) && !pNum) {
-            try {
-                const materialData = await erpService.getMaterialList({
-                    StartDate: startDate,
-                    EndDate: endDate
-                });
+            // 从已加载的materialMap中获取匹配的物料
+            const filteredMaterials = [];
+            materialMap.forEach((info, matId) => {
+                let match = true;
                 
-                let materials = [];
-                if (Array.isArray(materialData)) {
-                    materials = materialData;
-                } else if (materialData && materialData.data && Array.isArray(materialData.data)) {
-                    materials = materialData.data;
+                if (materialId) {
+                    match = match && matId.toLowerCase().includes(materialId.toLowerCase());
                 }
                 
-                // 过滤并添加基础物料信息
-                if (materials.length > 0) {
-                    const filteredMaterials = materials.filter(item => {
-                        let match = true;
-                        
-                        if (materialId && item.MaterialID) {
-                            match = match && item.MaterialID.toLowerCase().includes(materialId.toLowerCase());
-                        }
-                        
-                        if (materialName && item.MName) {
-                            match = match && item.MName.toLowerCase().includes(materialName.toLowerCase());
-                        }
-                        
-                        return match;
-                    }).map(item => ({
-                        type: item.MType || '物料',
-                        name: item.MName,
-                        brand: item.Band,
-                        spec: item.Scale,
-                        model: item.Model,
-                        unit: item.CalUnit,
-                        weight: item.DingLiang,
-                        subType: item.MSubType
-                    }));
-                    
-                    result.materialList = result.materialList.concat(filteredMaterials);
+                // 需要物料名称时，从入库明细中查找
+                if (materialName && allMaterialInList.length > 0) {
+                    const inItem = allMaterialInList.find(i => i.MaterialID && i.MaterialID.trim().toUpperCase() === matId);
+                    if (inItem) {
+                        match = match && inItem.MName && inItem.MName.toLowerCase().includes(materialName.toLowerCase());
+                    } else {
+                        match = false;
+                    }
                 }
-            } catch (error) {
-                console.log('获取物料列表失败:', error.message);
+                
+                if (match) {
+                    filteredMaterials.push({
+                        type: info.materialType || '物料',
+                        name: matId,  // 物料编码作为名称
+                        brand: info.brand,
+                        spec: info.spec,
+                        model: info.model,
+                        subType: info.materialSubType
+                    });
+                }
+            });
+            
+            if (filteredMaterials.length > 0 && result.materialList.length === 0) {
+                result.materialList = filteredMaterials;
             }
+        }
+        
+        // 根据物料信息列表精确过滤物料入库明细
+        // 只保留与物料信息中物料名称100%匹配的入库记录
+        if (result.materialList.length > 0 && allMaterialInList.length > 0) {
+            // 提取物料信息中的物料名称集合（标准化处理）
+            const materialNameSet = new Set();
+            result.materialList.forEach(m => {
+                if (m.name) {
+                    // 标准化物料名称：去除首尾空格
+                    materialNameSet.add(m.name.trim());
+                }
+            });
+            
+            console.log(`物料信息名称集合: ${materialNameSet.size} 个`);
+            
+            // 精确过滤入库明细：物料名称必须100%匹配，且排除送货单号为"盘点数据导入"的记录
+            result.materialInList = allMaterialInList.filter(item => {
+                if (!item.MName) return false;
+                // 排除送货单号为"盘点数据导入"的记录
+                if (item.DlyNum && item.DlyNum.trim() === '盘点数据导入') return false;
+                const itemName = item.MName.trim();
+                return materialNameSet.has(itemName);
+            }).map(item => {
+                // 从物料列表中获取型号和子物料类型
+                const normalizedId = item.MaterialID ? item.MaterialID.trim().toUpperCase() : '';
+                const materialInfo = materialMap.get(normalizedId) || {};
+                
+                return {
+                    inId: item.BInMID,              // 入库单号
+                    inDate: item.InDate,           // 入库日期
+                    dlyNum: item.DlyNum,           // 送货单号
+                    supply: item.Supply,           // 供应商（关键字段）
+                    materialId: item.MaterialID,   // 物料编码
+                    materialName: item.MName,      // 物料名称
+                    spec: item.Scale || materialInfo.spec,  // 规格
+                    model: materialInfo.model || '',        // 型号
+                    brand: item.Band || materialInfo.brand, // 品牌
+                    materialType: item.MType || materialInfo.materialType,      // 物料类型
+                    materialSubType: materialInfo.materialSubType || '',        // 子物料类型
+                    count: item.Acount || item.ACount,  // 入库数量
+                    deliveryDate: item.DeliveryDate,    // 计划交货期
+                    lastUpdateDate: item.LstUpdateDate  // 最后修改日期
+                };
+            });
+            
+            console.log(`物料入库明细精确匹配后: ${result.materialInList.length} 条`);
+        } else if (allMaterialInList.length > 0 && result.materialList.length === 0) {
+            // 如果没有物料信息列表，则显示所有入库明细（按查询条件过滤后的，排除盘点数据导入）
+            result.materialInList = allMaterialInList.filter(item => {
+                // 排除送货单号为"盘点数据导入"的记录
+                if (item.DlyNum && item.DlyNum.trim() === '盘点数据导入') return false;
+                return true;
+            }).map(item => {
+                const normalizedId = item.MaterialID ? item.MaterialID.trim().toUpperCase() : '';
+                const materialInfo = materialMap.get(normalizedId) || {};
+                
+                return {
+                    inId: item.BInMID,
+                    inDate: item.InDate,
+                    dlyNum: item.DlyNum,
+                    supply: item.Supply,
+                    materialId: item.MaterialID,
+                    materialName: item.MName,
+                    spec: item.Scale || materialInfo.spec,
+                    model: materialInfo.model || '',
+                    brand: item.Band || materialInfo.brand,
+                    materialType: item.MType || materialInfo.materialType,
+                    materialSubType: materialInfo.materialSubType || '',
+                    count: item.Acount || item.ACount,
+                    deliveryDate: item.DeliveryDate,
+                    lastUpdateDate: item.LstUpdateDate
+                };
+            });
+            
+            console.log(`物料入库明细(无物料信息时): ${result.materialInList.length} 条`);
         }
         
         res.json({

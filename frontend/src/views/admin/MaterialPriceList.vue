@@ -7,19 +7,19 @@
         <p class="page-description">管理材料价格信息，支持Excel批量导入</p>
       </div>
       <div class="header-actions">
-        <el-button type="primary" @click="showAddDialog = true">
+        <el-button type="primary" @click="showAddDialog = true" :disabled="!hasPermission('material:price:add')">
           <el-icon><Plus /></el-icon>
           新增价格
         </el-button>
-        <el-button type="success" @click="showImportDialog = true">
+        <el-button type="success" @click="showImportDialog = true" :disabled="!hasPermission('material:price:import')">
           <el-icon><Upload /></el-icon>
           导入Excel
         </el-button>
-        <el-button @click="openExportDialog">
+        <el-button @click="openExportDialog" :disabled="!hasPermission('material:price:export')">
           <el-icon><Download /></el-icon>
           导出数据
         </el-button>
-        <el-button type="info" @click="downloadTemplate">
+        <el-button type="info" @click="downloadTemplate" :disabled="!hasPermission('material:price:import')">
           <el-icon><Document /></el-icon>
           下载模板
         </el-button>
@@ -146,15 +146,15 @@
         </el-table-column>
         <el-table-column label="操作" width="280" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="editItem(row)">
+            <el-button type="primary" size="small" @click="editItem(row)" :disabled="!hasPermission('material:price:edit')">
               <el-icon><Edit /></el-icon>
               编辑
             </el-button>
-            <el-button type="info" size="small" @click="viewHistory(row)">
+            <el-button type="info" size="small" @click="viewHistory(row)" :disabled="!hasPermission('material:price:view')">
               <el-icon><Clock /></el-icon>
               历史
             </el-button>
-            <el-button type="danger" size="small" @click="deleteItem(row)">
+            <el-button type="danger" size="small" @click="deleteItem(row)" :disabled="!hasPermission('material:price:delete')">
               <el-icon><Delete /></el-icon>
               删除
             </el-button>
@@ -378,7 +378,7 @@
 
       <template #footer>
         <el-button @click="showHistoryDialog = false">关闭</el-button>
-        <el-button type="primary" @click="exportHistory">
+        <el-button type="primary" @click="exportHistory" :disabled="!hasPermission('material:price:export')">
           <el-icon><Download /></el-icon>
           导出历史
         </el-button>
@@ -481,8 +481,12 @@ import { Plus, Upload, Download, Search, RefreshLeft, Edit, Delete, UploadFilled
 import * as XLSX from 'xlsx-js-style'
 import { saveAs } from 'file-saver'
 import axios from 'axios'
+import { useUserStore } from '@/store/user'
 
 // 响应式数据
+const userStore = useUserStore()
+const hasPermission = (permission) => userStore.hasPermission(permission)
+
 const loading = ref(false)
 const submitting = ref(false)
 const importing = ref(false)

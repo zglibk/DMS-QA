@@ -70,17 +70,16 @@
         <div class="table-header">
           <div class="table-actions">
             <el-button 
-              v-if="hasCreatePermission" 
               type="primary" 
+              :disabled="!hasCreatePermission"
               @click="showCreateDialog"
             >
               <el-icon><Plus /></el-icon>
               新建日志
             </el-button>
             <el-button
-              v-if="hasDeletePermission"
               type="danger"
-              :disabled="selectedLogs.length === 0 || !canBatchDelete"
+              :disabled="selectedLogs.length === 0 || !canBatchDelete || !hasDeletePermission"
               @click="batchDeleteLogs"
             >
               <el-icon><Delete /></el-icon>
@@ -244,18 +243,18 @@
                     详情
                   </el-button>
                   <el-button 
-                    v-if="canEditLog(row)" 
                     type="warning" 
                     size="small" 
+                    :disabled="!canEditLog(row)"
                     @click="editLog(row)"
                   >
                     <el-icon><Edit /></el-icon>
                     编辑
                   </el-button>
                   <el-button 
-                    v-if="canDeleteLog(row)" 
                     type="danger" 
                     size="small" 
+                    :disabled="!canDeleteLog(row)"
                     @click="deleteLog(row)"
                   >
                     <el-icon><Delete /></el-icon>

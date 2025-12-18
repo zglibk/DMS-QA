@@ -310,6 +310,13 @@
             新增
           </el-button>
           <el-button 
+            type="success" 
+            @click="handleExport" 
+          >
+            <el-icon style="margin-right: 6px;"><Download /></el-icon>
+            导出
+          </el-button>
+          <el-button 
             type="danger" 
             @click="handleBatchDelete" 
             :disabled="selectedRows.length === 0"
@@ -2354,6 +2361,110 @@ const watchOrderQuantity = () => {
  */
 const handleSelectionChange = (selection) => {
   selectedRows.value = selection
+}
+
+/**
+ * 导出投诉记录
+ */
+const handleExport = async () => {
+  try {
+    const params = {
+      format: 'excel'
+    }
+    
+    // 如果有选中行，只导出选中行
+    if (selectedRows.value.length > 0) {
+      params.ids = selectedRows.value.map(row => row.id)
+    } else {
+      // 否则导出当前搜索条件下的所有数据
+      Object.assign(params, searchForm)
+      
+      // 处理日期范围
+      if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+        params.startDate = searchForm.dateRange[0]
+        params.endDate = searchForm.dateRange[1]
+      }
+      delete params.dateRange
+      
+      // 处理高级搜索的日期范围
+      if (searchForm.processingDeadlineRange && searchForm.processingDeadlineRange.length === 2) {
+        params.processingDeadlineStart = searchForm.processingDeadlineRange[0]
+        params.processingDeadlineEnd = searchForm.processingDeadlineRange[1]
+      }
+      delete params.processingDeadlineRange
+      
+      if (searchForm.replyDateRange && searchForm.replyDateRange.length === 2) {
+        params.replyDateStart = searchForm.replyDateRange[0]
+        params.replyDateEnd = searchForm.replyDateRange[1]
+      }
+      delete params.replyDateRange
+      
+      if (searchForm.feedbackDateRange && searchForm.feedbackDateRange.length === 2) {
+        params.feedbackDateStart = searchForm.feedbackDateRange[0]
+        params.feedbackDateEnd = searchForm.feedbackDateRange[1]
+      }
+      delete params.feedbackDateRange
+      
+      if (searchForm.verificationDateRange && searchForm.verificationDateRange.length === 2) {
+        params.verificationDateStart = searchForm.verificationDateRange[0]
+        params.verificationDateEnd = searchForm.verificationDateRange[1]
+      }
+      delete params.verificationDateRange
+      
+      // 处理数值范围
+      if (searchForm.defectQuantityRange && searchForm.defectQuantityRange.length === 2) {
+        if (searchForm.defectQuantityRange[0] !== null && searchForm.defectQuantityRange[0] !== undefined) {
+          params.defectQuantityMin = searchForm.defectQuantityRange[0]
+        }
+        if (searchForm.defectQuantityRange[1] !== null && searchForm.defectQuantityRange[1] !== undefined) {
+          params.defectQuantityMax = searchForm.defectQuantityRange[1]
+        }
+      }
+      delete params.defectQuantityRange
+      
+      if (searchForm.defectRateRange && searchForm.defectRateRange.length === 2) {
+        if (searchForm.defectRateRange[0] !== null && searchForm.defectRateRange[0] !== undefined) {
+          params.defectRateMin = searchForm.defectRateRange[0]
+        }
+        if (searchForm.defectRateRange[1] !== null && searchForm.defectRateRange[1] !== undefined) {
+          params.defectRateMax = searchForm.defectRateRange[1]
+        }
+      }
+      delete params.defectRateRange
+    }
+    
+    ElMessage.info('正在生成导出文件，请稍候...')
+    
+    const response = await apiService.post('/customer-complaints/export', params, {
+      responseType: 'blob'
+    })
+    
+    // 创建下载链接
+    const url = window.URL.createObjectURL(new Blob([response.data]))
+    const link = document.createElement('a')
+    link.href = url
+    
+    // 获取文件名
+    const contentDisposition = response.headers['content-disposition']
+    let filename = `customer-complaints-${new Date().toISOString().slice(0, 10)}.csv`
+    if (contentDisposition) {
+      const filenameMatch = contentDisposition.match(/filename="?([^"]+)"?/)
+      if (filenameMatch && filenameMatch.length === 2) {
+        filename = decodeURIComponent(filenameMatch[1])
+      }
+    }
+    
+    link.setAttribute('download', filename)
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('导出成功')
+  } catch (error) {
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败')
+  }
 }
 
 /**

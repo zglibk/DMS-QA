@@ -436,7 +436,7 @@
                   <el-button 
                     type="warning" 
                     size="small" 
-                    :disabled="!canEditProgress"
+                    :disabled="!canEditMilestone"
                     @click="editMilestone(milestone)"
                   >
                     <el-icon><Edit /></el-icon>

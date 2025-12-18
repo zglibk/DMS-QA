@@ -146,15 +146,15 @@
 
           <!-- 操作按钮 -->
           <div class="config-actions">
-            <el-button type="primary" @click="saveConfig" :loading="isSubmitting">
+            <el-button type="primary" @click="saveConfig" :loading="isSubmitting" :disabled="!hasPermission('sys:config:edit')">
               <el-icon><Check /></el-icon>
               保存配置
             </el-button>
-            <el-button @click="resetConfig">
+            <el-button @click="resetConfig" :disabled="!hasPermission('sys:config:edit')">
               <el-icon><RefreshLeft /></el-icon>
               重置为默认
             </el-button>
-            <el-button @click="loadConfig(true)">
+            <el-button @click="loadConfig(true)" :disabled="!hasPermission('sys:config:view')">
               <el-icon><Refresh /></el-icon>
               刷新配置
             </el-button>
@@ -167,10 +167,16 @@
 
 <script setup>
 import { ref, reactive, onMounted, nextTick } from 'vue'
+import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
 import { Picture, Upload, Check, RefreshLeft, Refresh } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import axios from 'axios'
+
+const userStore = useUserStore()
+const hasPermission = (permission) => {
+  return userStore.hasPermission(permission)
+}
 
 // 响应式数据
 const isLoading = ref(false)

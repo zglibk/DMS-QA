@@ -159,6 +159,7 @@
             type="primary"
             @click="saveConfig"
             :loading="isSubmitting"
+            :disabled="!hasPermission('sys:config:edit')"
           >
             {{ isSubmitting ? '保存中...' : '保存配置' }}
           </el-button>
@@ -167,15 +168,16 @@
             type="success"
             @click="saveAsDefault"
             :loading="isSubmitting"
+            :disabled="!hasPermission('sys:config:edit')"
           >
             {{ isSubmitting ? '设置中...' : '保存并设为默认' }}
           </el-button>
 
-          <el-button @click="loadConfig" :loading="isLoading">
+          <el-button @click="loadConfig" :loading="isLoading" :disabled="!hasPermission('sys:config:view')">
             {{ isLoading ? '刷新中...' : '刷新配置' }}
           </el-button>
 
-          <el-button @click="resetConfig">
+          <el-button @click="resetConfig" :disabled="!hasPermission('sys:config:edit')">
             重置为默认
           </el-button>
         </div>
@@ -186,10 +188,16 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
 import { Setting, Plus, Delete, ArrowDown, Tools, OfficeBuilding } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import draggable from 'vuedraggable'
+
+const userStore = useUserStore()
+const hasPermission = (permission) => {
+  return userStore.hasPermission(permission)
+}
 
 // 响应式数据
 const isSubmitting = ref(false)

@@ -23,7 +23,7 @@
                   type="primary"
                   @click="editMapping(index)"
                   :icon="Edit"
-                  :disabled="!isAdmin"
+                  :disabled="!hasPermission('sys:config:edit')"
                 >
                   编辑
                 </el-button>
@@ -31,7 +31,7 @@
                   type="danger"
                   @click="confirmRemoveMapping(index)"
                   :icon="Delete"
-                  :disabled="!isAdmin"
+                  :disabled="!hasPermission('sys:config:delete')"
                 >
                   删除
                 </el-button>
@@ -43,7 +43,7 @@
                 <el-input
                   v-model="mapping.name"
                   placeholder="输入规则名称"
-                  :disabled="!isAdmin || (mapping.isEditing === false)"
+                  :disabled="!hasPermission('sys:config:edit') || (mapping.isEditing === false)"
                 />
               </el-form-item>
 
@@ -51,7 +51,7 @@
                 <el-input
                   v-model="mapping.localPattern"
                   placeholder="如：C:\Users\*\AppData\Roaming\Microsoft\Excel\*"
-                  :disabled="!isAdmin || (mapping.isEditing === false)"
+                  :disabled="!hasPermission('sys:config:edit') || (mapping.isEditing === false)"
                 />
               </el-form-item>
 
@@ -59,7 +59,7 @@
                 <el-input
                   v-model="mapping.targetPattern"
                   placeholder="如：\\tj_server\工作\品质部\生产异常周报考核统计\*"
-                  :disabled="!isAdmin || (mapping.isEditing === false)"
+                  :disabled="!hasPermission('sys:config:edit') || (mapping.isEditing === false)"
                 />
               </el-form-item>
 
@@ -69,7 +69,7 @@
                   placeholder="规则描述"
                   type="textarea"
                   :rows="2"
-                  :disabled="!isAdmin || (mapping.isEditing === false)"
+                  :disabled="!hasPermission('sys:config:edit') || (mapping.isEditing === false)"
                 />
               </el-form-item>
 
@@ -98,7 +98,7 @@
           @click="addMapping"
           :icon="Plus"
           style="margin-top: 16px"
-          :disabled="!isAdmin"
+          :disabled="!hasPermission('sys:config:add')"
         >
           添加映射规则
         </el-button>
@@ -176,15 +176,16 @@
         type="primary" 
         @click="saveConfig" 
         :loading="isSubmitting"
+        :disabled="!hasPermission('sys:config:edit')"
       >
         {{ isSubmitting ? '保存中...' : '保存配置' }}
       </el-button>
       
-      <el-button @click="() => loadConfig(true)" :loading="isLoading">
+      <el-button @click="() => loadConfig(true)" :loading="isLoading" :disabled="!hasPermission('sys:config:view')">
         {{ isLoading ? '刷新中...' : '刷新配置' }}
       </el-button>
       
-      <el-button @click="resetConfig">
+      <el-button @click="resetConfig" :disabled="!hasPermission('sys:config:edit')">
         重置为默认
       </el-button>
     </div>
@@ -192,7 +193,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete, Edit } from '@element-plus/icons-vue'
 import { useUserStore } from '@/store/user'
@@ -206,7 +207,11 @@ const testPath = ref('')
 const testResult = ref('')
 
 // 权限验证
-const isAdmin = ref(false)
+const userStore = useUserStore()
+const hasPermission = (permission) => {
+  return userStore.hasPermission(permission)
+}
+// checkUserPermission 已移除，因为不再使用 isAdmin 而是细粒度权限
 
 // 路径映射规则
 const pathMappings = ref([
@@ -244,40 +249,10 @@ const conversionConfig = reactive({
   validatePaths: false
 })
 
-// 检查用户权限（静默检查，不显示提示）
-const checkUserPermission = async (showMessage = false) => {
-  // 从userStore获取用户信息
-  const userStore = useUserStore()
-
-  // 确保获取最新的用户信息
-  try {
-    await userStore.fetchProfile()
-  } catch (error) {
-    console.error('获取用户信息失败:', error)
-    if (showMessage) {
-      ElMessage.error('获取用户信息失败')
-    }
-    return false
-  }
-
-  const userInfo = userStore.user
-
-  // 检查用户名是否为admin（忽略大小写）
-  // 检查Username字段（注意大小写）
-  isAdmin.value = userInfo.Username && userInfo.Username.toLowerCase() === 'admin'
-
-  if (!isAdmin.value && showMessage) {
-    ElMessage.warning('只有管理员用户才能进行此操作')
-  }
-
-  return isAdmin.value
-}
-
-
-
 // 添加映射规则
 const addMapping = async () => {
-  if (!(await checkUserPermission(true))) {
+  if (!hasPermission('sys:config:add')) {
+    ElMessage.warning('您没有添加配置的权限')
     return
   }
 
@@ -295,7 +270,8 @@ const addMapping = async () => {
 
 // 编辑映射规则
 const editMapping = async (index) => {
-  if (!(await checkUserPermission(true))) {
+  if (!hasPermission('sys:config:edit')) {
+    ElMessage.warning('您没有编辑配置的权限')
     return
   }
 
@@ -312,7 +288,8 @@ const editMapping = async (index) => {
 
 // 保存映射规则
 const saveMapping = async (index) => {
-  if (!(await checkUserPermission(true))) {
+  if (!hasPermission('sys:config:edit')) {
+    ElMessage.warning('您没有编辑配置的权限')
     return
   }
 
@@ -362,7 +339,8 @@ const cancelEdit = (index) => {
 
 // 确认删除映射规则
 const confirmRemoveMapping = async (index) => {
-  if (!(await checkUserPermission(true))) {
+  if (!hasPermission('sys:config:delete')) {
+    ElMessage.warning('您没有删除配置的权限')
     return
   }
 
@@ -534,10 +512,11 @@ const resetConfig = () => {
   ElMessage.success('配置已重置为默认值')
 }
 
-// 组件挂载时加载配置和检查权限（静默）
+// 组件挂载时加载配置
 onMounted(async () => {
-  await checkUserPermission(false) // 静默检查权限，不显示提示
-  loadConfig()
+  if (hasPermission('sys:config:view')) {
+    loadConfig()
+  }
 })
 </script>
 

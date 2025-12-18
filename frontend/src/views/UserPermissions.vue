@@ -70,11 +70,11 @@
           </el-form-item>
           
           <el-form-item>
-            <el-button type="primary" @click="loadPermissions" :loading="loading">
+            <el-button type="primary" @click="loadPermissions" :loading="loading" v-if="hasPermission('user-permission:view')">
               <el-icon><Search /></el-icon>
               查询
             </el-button>
-            <el-button @click="resetSearch">
+            <el-button @click="resetSearch" v-if="hasPermission('user-permission:view')">
               <el-icon><Refresh /></el-icon>
               重置
             </el-button>

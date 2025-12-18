@@ -10,7 +10,7 @@
     <el-card class="toolbar-card" shadow="never">
       <div class="toolbar">
         <div class="action-section">
-          <el-button type="primary" @click="showAddDialog" :icon="Plus">
+          <el-button type="primary" @click="showAddDialog" :icon="Plus" :disabled="!hasPermission('sys:dept:add')">
             新增部门
           </el-button>
           <el-button @click="expandAll" :icon="Expand">
@@ -71,10 +71,10 @@
       <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
-            <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
+            <el-button size="small" @click="showEditDialog(row)" :icon="Edit" :disabled="!hasPermission('sys:dept:edit')">
               编辑
             </el-button>
-            <el-button size="small" type="success" @click="showAddDialog(row)" :icon="Plus">
+            <el-button size="small" type="success" @click="showAddDialog(row)" :icon="Plus" :disabled="!hasPermission('sys:dept:add')">
               新增子部门
             </el-button>
             <el-button 
@@ -82,7 +82,7 @@
               type="danger" 
               @click="deleteDepartment(row)"
               :icon="Delete"
-              :disabled="row.children && row.children.length > 0"
+              :disabled="(row.children && row.children.length > 0) || !hasPermission('sys:dept:delete')"
             >
               删除
             </el-button>
@@ -211,6 +211,12 @@ import {
   Document
 } from '@element-plus/icons-vue'
 import api from '@/services/api.js'
+import { useUserStore } from '@/store/user'
+
+const userStore = useUserStore()
+const hasPermission = (permission) => {
+  return userStore.hasPermission(permission)
+}
 
 // 响应式数据
 const loading = ref(false)

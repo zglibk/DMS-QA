@@ -51,7 +51,7 @@
           </el-button>
       </div>
         <div class="action-section">
-          <el-button type="primary" @click="showAddDialog" :icon="Plus">
+          <el-button type="primary" @click="showAddDialog" :icon="Plus" :disabled="!hasPermission('sys:position:add')">
             新增岗位
           </el-button>
           <el-button @click="refreshData" :icon="Refresh">
@@ -101,14 +101,21 @@
       <el-table-column label="操作" width="180" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
-            <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
+            <el-button 
+              link 
+              type="primary" 
+              @click="showEditDialog(row)" 
+              :icon="Edit"
+              :disabled="!hasPermission('sys:position:edit')"
+            >
               编辑
             </el-button>
             <el-button 
-              size="small" 
+              link 
               type="danger" 
-              @click="deletePosition(row)"
+              @click="deletePosition(row)" 
               :icon="Delete"
+              :disabled="!hasPermission('sys:position:delete')"
             >
               删除
             </el-button>
@@ -238,7 +245,13 @@ import {
   Refresh,
   Search
 } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/utils/api'
+import { useUserStore } from '@/store/user'
+
+const userStore = useUserStore()
+const hasPermission = (permission) => {
+  return userStore.hasPermission(permission)
+}
 
 // 响应式数据
 const loading = ref(false)
@@ -364,8 +377,8 @@ function formatDate(dateString) {
 // 获取部门列表
 const fetchDepartments = async () => {
   try {
-    const response = await axios.get('/departments')
-    departmentList.value = response.data.data || []
+    const response = await api.get('/departments')
+    departmentList.value = response.data || []
   } catch (error) {
     console.error('获取部门列表失败:', error)
   }
@@ -380,8 +393,8 @@ const fetchPositions = async () => {
       size: pagination.size,
       ...searchForm
     }
-    const response = await axios.get('/positions', { params })
-    const data = response.data.data || {}
+    const response = await api.get('/positions', { params })
+    const data = response.data || {}
     positionList.value = data.list || []
     pagination.total = data.total || 0
   } catch (error) {
@@ -473,7 +486,7 @@ const submitForm = async () => {
     const url = isEdit.value ? `/positions/${currentEditId.value}` : '/positions'
     const method = isEdit.value ? 'put' : 'post'
     
-    await axios[method](url, formData)
+    await api[method](url, formData)
     
     ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
@@ -501,7 +514,7 @@ const deletePosition = async (position) => {
       }
     )
     
-    await axios.delete(`/positions/${position.ID}`)
+    await api.delete(`/positions/${position.ID}`)
     ElMessage.success('删除成功')
     await fetchPositions()
   } catch (error) {

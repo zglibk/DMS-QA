@@ -60,7 +60,7 @@
         <div class="table-header">
           <div class="table-actions">
             <el-button 
-              v-if="hasCreatePermission" 
+              :disabled="!hasCreatePermission" 
               type="primary" 
               @click="showCreateDialog"
             >
@@ -68,7 +68,6 @@
               新建模板
             </el-button>
             <el-button
-              v-if="hasDeletePermission"
               type="danger"
               :disabled="selectedTemplates.length === 0 || !canBatchDelete"
               @click="batchDeleteTemplates"
@@ -172,7 +171,7 @@
                   使用
                 </el-button>
                 <el-button 
-                  v-if="canEditTemplate(row)" 
+                  :disabled="!canEditTemplate(row)" 
                   type="warning" 
                   size="small" 
                   @click="editTemplate(row)"
@@ -180,7 +179,7 @@
                   编辑
                 </el-button>
                 <el-button 
-                  v-if="canDeleteTemplate(row)" 
+                  :disabled="!canDeleteTemplate(row)" 
                   type="danger" 
                   size="small" 
                   @click="deleteTemplate(row)"
@@ -506,7 +505,7 @@
             使用此模板
           </el-button>
           <el-button 
-            v-if="canEditTemplate(selectedTemplate)" 
+            :disabled="!canEditTemplate(selectedTemplate)" 
             type="warning" 
             @click="editTemplate(selectedTemplate)"
           >

@@ -134,15 +134,16 @@
           type="primary" 
           @click="saveConfig" 
           :loading="isSubmitting"
+          :disabled="!hasPermission('sys:config:edit')"
         >
           {{ isSubmitting ? '保存中...' : '保存配置' }}
         </el-button>
         
-        <el-button @click="testStorage" :loading="isTesting">
+        <el-button @click="testStorage" :loading="isTesting" :disabled="!hasPermission('sys:config:edit')">
           {{ isTesting ? '测试中...' : '测试存储' }}
         </el-button>
         
-        <el-button @click="() => loadConfig(true)" :loading="isLoading">
+        <el-button @click="() => loadConfig(true)" :loading="isLoading" :disabled="!hasPermission('sys:config:view')">
           {{ isLoading ? '刷新中...' : '刷新配置' }}
         </el-button>
       </div>
@@ -152,8 +153,14 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
+import { useUserStore } from '@/store/user'
 import { ElMessage } from 'element-plus'
 import api from '@/utils/api'
+
+const userStore = useUserStore()
+const hasPermission = (permission) => {
+  return userStore.hasPermission(permission)
+}
 
 // 响应式数据
 const storageFormRef = ref()

@@ -1,531 +1,492 @@
 <template>
-  <div class="complaint-form-dialog">
-    <!-- 固定标题栏 -->
-    <div class="dialog-header">
-      <h2 class="dialog-title">{{ props.editData ? '编辑投诉' : '新增投诉' }}</h2>
-      <el-button
-        class="dialog-close-btn" :link="true"
-        @click="handleCancel"
-        :icon="Close"
-        size="large"
-      />
-    </div>
+  <el-dialog
+    v-model="dialogVisible"
+    :title="props.editData ? '编辑投诉' : '新增投诉'"
+    width="50%"
+    :close-on-click-modal="false"
+    destroy-on-close
+    class="complaint-dialog"
+    append-to-body
+  >
+    <el-form :model="form" :rules="rules" ref="formRef" label-width="90px" class="compact-form" label-position="right" size="default">
+      
+      <!-- 基本信息 -->
+      <div class="form-section">
+        <div class="section-title">
+          <span class="icon-wrapper"><el-icon><InfoFilled /></el-icon></span>
+          <span>基本信息</span>
+        </div>
+        <div class="section-body">
+          <el-row :gutter="12">
+            <el-col :span="6">
+              <el-form-item label="投诉日期" prop="Date">
+                <el-date-picker v-model="form.Date" type="date" style="width: 100%" placeholder="选择日期"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="客户编号" prop="Customer">
+                <el-input v-model="form.Customer" placeholder="输入客户编号"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="工单号" prop="OrderNo">
+                <el-input v-model="form.OrderNo" placeholder="输入工单号"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="发生车间" prop="Workshop">
+                <el-select v-model="form.Workshop" filterable placeholder="选择车间" style="width: 100%">
+                  <el-option v-for="item in options.workshops" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="生产数量" prop="ProductionQty">
+                <el-input-number v-model="form.ProductionQty" :min="0" style="width: 100%" controls-position="right"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="9">
+              <el-form-item label="产品名称" prop="ProductName">
+                <el-input v-model="form.ProductName" placeholder="输入产品名称"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="9">
+              <el-form-item label="规格型号">
+                <el-input v-model="form.Specification" placeholder="输入规格型号"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+      </div>
 
-    <!-- 表单内容区域 -->
-    <div class="dialog-content">
-      <el-form :model="form" :rules="rules" ref="formRef" label-width="120px" class="centered-form">
-      <el-card shadow="always" class="form-card">
-        <template #header>
-          <div class="form-card-header">基本信息</div>
-        </template>
-        <el-row :gutter="20">
-          <el-col :span="6">
-            <el-form-item label="投诉日期" prop="Date">
-              <el-date-picker v-model="form.Date" type="date" style="width: 160px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="客户编号" prop="Customer">
-              <el-input v-model="form.Customer" style="width: 140px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="工单号" prop="OrderNo">
-              <el-input v-model="form.OrderNo" style="width: 140px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
-            <el-form-item label="产品名称" prop="ProductName">
-              <el-input v-model="form.ProductName" style="width: 100%" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="规格型号">
-              <el-input v-model="form.Specification" style="width: 180px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="发生车间" prop="Workshop">
-              <el-select v-model="form.Workshop" filterable placeholder="请选择发生车间" style="width: 160px">
-                <el-option v-for="item in options.workshops" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="生产数量" prop="ProductionQty">
-              <el-input-number v-model="form.ProductionQty" :min="0" style="width: 120px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="不良数量">
-              <el-input-number v-model="form.DefectiveQty" :min="0" style="width: 120px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="不良率(%)">
-              <el-input-number v-model="form.DefectiveRate" :min="0" :max="100" :step="0.01" style="width: 120px" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-card>
-
-      <el-card shadow="always" class="form-card">
-        <template #header>
-          <div class="form-card-header">投诉类型</div>
-        </template>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="投诉类别" prop="ComplaintCategory">
-              <el-select
-                v-model="form.ComplaintCategory"
-                filterable
-                placeholder="请选择投诉类别"
-                @change="handleComplaintCategoryChange"
-                style="width: 160px"
-              >
-                <el-option v-for="item in options.complaintCategories" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="客诉类型">
-              <el-select
-                v-model="form.CustomerComplaintType"
-                filterable
-                placeholder="请选择客诉类型"
-                :disabled="form.ComplaintCategory !== '客诉'"
-                style="width: 160px"
-              >
-                <el-option v-for="item in options.customerComplaintTypes" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-card>
-
-      <el-card shadow="always" class="form-card">
-        <template #header>
-          <div class="form-card-header">不良信息</div>
-        </template>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="不良类别" prop="DefectiveCategory">
-              <el-select
-                v-model="form.DefectiveCategory"
-                filterable
-                placeholder="请选择不良类别"
-                @change="handleCategoryChange"
-                value-key="ID"
-                style="width: 160px"
-              >
-                <el-option
-                  v-for="item in options.defectiveCategories"
-                  :key="item.ID"
-                  :label="item.Name"
-                  :value="item"
-                />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="不良项" prop="DefectiveItem">
-              <el-select v-model="form.DefectiveItem" filterable placeholder="请选择不良项" style="width: 160px">
-                <el-option v-for="item in options.defectiveItems" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="不良描述" prop="DefectiveDescription">
-              <el-input v-model="form.DefectiveDescription" type="textarea" style="width: 600px" :rows="3" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="附件文件">
-              <div class="attachment-field">
-                <div class="attachment-input-section">
-                  <el-button @click="selectFile" :loading="fileUploading" type="primary">
-                    <el-icon><Plus /></el-icon>
-                    {{ fileUploading ? '上传中...' : '选择图片' }}
-                  </el-button>
-                </div>
-
-                <!-- 附件文件路径显示 -->
-                <div class="attachment-path-section" style="margin-top: 10px;">
-                  <el-input
-                    v-model="form.AttachmentFile"
-                    readonly
-                    placeholder="附件文件路径将在上传后显示"
-                    style="width: 100%"
-                  >
-                    <template #prepend>文件路径</template>
-                  </el-input>
-                </div>
-                <!-- 图片预览区域 -->
-                <div class="attachment-preview-section" style="margin-top: 15px;">
-                  <div class="preview-container">
-                    <!-- 图片预览 -->
-                    <div
-                      v-if="selectedFileInfo && selectedFileInfo.isImage"
-                      class="image-preview-box"
+      <!-- 不良详情 -->
+      <div class="form-section">
+        <div class="section-title">
+          <span class="icon-wrapper warning"><el-icon><WarningFilled /></el-icon></span>
+          <span>不良详情</span>
+        </div>
+        <div class="section-body">
+          <el-row :gutter="20">
+            <!-- 左侧表单区域 -->
+            <el-col :span="16">
+              <el-row :gutter="12">
+                <el-col :span="12">
+                  <el-form-item label="投诉类别" prop="ComplaintCategory">
+                    <el-select
+                      v-model="form.ComplaintCategory"
+                      filterable
+                      placeholder="选择类别"
+                      @change="handleComplaintCategoryChange"
+                      style="width: 100%"
                     >
-                      <ImagePreview
-                        :key="`complaint-preview-${selectedFileInfo.previewUrl || 'api'}-${props.editData?.ID || 'new'}-${Date.now()}`"
-                        :file-path="selectedFileInfo.previewUrl"
-                        :record-id="selectedFileInfo.previewUrl ? null : props.editData?.ID"
-                        width="146px"
-                        height="116px"
+                      <el-option v-for="item in options.complaintCategories" :key="item" :label="item" :value="item" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="客诉类型">
+                    <el-select
+                      v-model="form.CustomerComplaintType"
+                      filterable
+                      placeholder="选择类型"
+                      :disabled="form.ComplaintCategory !== '客诉'"
+                      style="width: 100%"
+                    >
+                      <el-option v-for="item in options.customerComplaintTypes" :key="item" :label="item" :value="item" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="不良类别" prop="DefectiveCategory">
+                    <el-select
+                      v-model="form.DefectiveCategory"
+                      filterable
+                      placeholder="选择类别"
+                      @change="handleCategoryChange"
+                      value-key="ID"
+                      style="width: 100%"
+                    >
+                      <el-option
+                        v-for="item in options.defectiveCategories"
+                        :key="item.ID"
+                        :label="item.Name"
+                        :value="item"
                       />
-                      <!-- 显示生成的文件名 -->
-                      <div class="file-name-display" style="margin-top: 8px; max-width: 146px;">
-                        <el-text size="small" type="info" style="word-break: break-all;">
-                          {{ selectedFileInfo.generatedFileName || selectedFileInfo.fileName }}
-                        </el-text>
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                  <el-form-item label="不良项" prop="DefectiveItem">
+                    <el-select v-model="form.DefectiveItem" filterable placeholder="选择不良项" style="width: 100%">
+                      <el-option v-for="item in options.defectiveItems" :key="item" :label="item" :value="item" />
+                    </el-select>
+                  </el-form-item>
+                </el-col>
+                <el-col :span="12">
+                   <el-form-item label="不良数量">
+                    <el-input-number v-model="form.DefectiveQty" :min="0" style="width: 100%" controls-position="right"/>
+                  </el-form-item>
+                </el-col>
+                
+                <el-col :span="12">
+                  <el-form-item label="不良率(%)">
+                    <el-input-number v-model="form.DefectiveRate" :min="0" :max="100" :step="0.01" style="width: 100%" controls-position="right"/>
+                  </el-form-item>
+                </el-col>
+
+                <el-col :span="24">
+                  <el-form-item label="不良描述" prop="DefectiveDescription">
+                    <el-input v-model="form.DefectiveDescription" placeholder="简要描述不良情况"/>
+                  </el-form-item>
+                </el-col>
+                
+                <el-col :span="24">
+                  <el-form-item label="不良原因">
+                    <el-input v-model="form.DefectiveReason" type="textarea" :rows="3" placeholder="详细分析不良原因"/>
+                  </el-form-item>
+                </el-col>
+              </el-row>
+            </el-col>
+            
+            <!-- 右侧图片上传区域 -->
+            <el-col :span="8">
+              <el-form-item label-width="0" class="upload-preview-container">
+                <div class="attachment-upload-area">
+                  <!-- 如果有图片则显示预览 -->
+                  <div v-if="selectedFileInfo" class="preview-box">
+                    <div v-if="selectedFileInfo.isImage" class="image-preview-wrapper" @mouseenter="showMask = true" @mouseleave="showMask = false">
+                      <el-image 
+                        ref="previewImage"
+                        :src="selectedFileInfo.previewUrl" 
+                        :preview-src-list="[selectedFileInfo.previewUrl]"
+                        fit="contain"
+                        class="preview-img"
+                        :preview-teleported="true"
+                        style="width: 100%; height: 100%;"
+                      />
+                      <div class="preview-mask" v-show="showMask">
+                        <span class="preview-action-btn" @click="handlePreviewClick">
+                          <el-icon><ZoomIn /></el-icon>
+                        </span>
+                        <span class="preview-action-btn" @click.stop="handleDeleteFile">
+                          <el-icon><Delete /></el-icon>
+                        </span>
                       </div>
                     </div>
-                    <!-- 非图片文件或错误状态 -->
-                    <div v-else-if="selectedFileInfo && !selectedFileInfo.isImage" class="file-preview-box">
+                    <div v-else class="file-preview">
                       <el-icon class="file-icon"><Document /></el-icon>
-                      <span class="file-name">{{ selectedFileInfo.fileName }}</span>
+                      <span class="file-name" :title="selectedFileInfo.generatedFileName || selectedFileInfo.fileName">
+                        {{ selectedFileInfo.generatedFileName || selectedFileInfo.fileName }}
+                      </span>
                     </div>
-                    <!-- 空状态 -->
-                    <div v-else class="empty-preview-box">
-                      <el-empty description="暂无附件" :image-size="60" />
+                    
+                    <div class="preview-actions">
+                      <span class="file-size" v-if="selectedFileInfo.fileSize">
+                        {{ formatFileSize(selectedFileInfo.fileSize) }}
+                      </span>
+                      <el-button v-if="!selectedFileInfo.isImage" type="danger" link size="small" @click="resetFormFile">
+                        移除
+                      </el-button>
                     </div>
                   </div>
+                  
+                  <!-- 没有图片时显示上传按钮 -->
+                  <div v-else class="upload-placeholder" @click="selectFile">
+                    <el-icon class="upload-icon"><Plus /></el-icon>
+                    <div class="upload-text">点击上传图片</div>
+                    <div class="upload-tip">支持 jpg/png 格式</div>
+                  </div>
+                  
+                  <!-- 隐藏的文件输入框 -->
+                  <el-input v-model="form.AttachmentFile" v-show="false" />
                 </div>
-              </div>
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="不良原因">
-              <el-input v-model="form.DefectiveReason" type="textarea" style="width: 600px" :rows="3" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-card>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+      </div>
 
-      <el-card shadow="always" class="form-card">
-        <template #header>
-          <div class="form-card-header">处置与补充</div>
-        </template>
-        <el-row :gutter="20">
-          <el-col :span="24">
-            <el-form-item label="处置措施" prop="Disposition">
-              <el-input v-model="form.Disposition" type="textarea" style="width: 600px" :rows="3" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="退货">
-              <el-switch v-model="form.ReturnGoods" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="是否补印">
-              <el-switch v-model="form.IsReprint" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="6">
-            <el-form-item label="补印数量">
-              <el-input-number v-model="form.ReprintQty" :min="0" style="width: 120px" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-card>
+      <!-- 处置与补充 -->
+      <div class="form-section">
+        <div class="section-title">
+          <span class="icon-wrapper success"><el-icon><Tools /></el-icon></span>
+          <span>处置与补充</span>
+        </div>
+        <div class="section-body">
+          <el-row :gutter="12">
+            <el-col :span="12">
+              <el-form-item label="处置措施" prop="Disposition">
+                <el-input v-model="form.Disposition" type="textarea" :rows="1" placeholder="输入处置措施"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="4">
+              <el-form-item label="是否退货" label-width="80px">
+                <el-switch v-model="form.ReturnGoods" active-text="是" inactive-text="否" inline-prompt/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="4">
+              <el-form-item label="是否补印" label-width="80px">
+                <el-switch v-model="form.IsReprint" active-text="是" inactive-text="否" inline-prompt/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="4" v-if="form.IsReprint">
+              <el-form-item label="补印数量" label-width="80px">
+                <el-input-number v-model="form.ReprintQty" :min="0" controls-position="right" style="width: 100%" size="small"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
+      </div>
 
       <!-- 材料和成本 -->
-      <el-card shadow="always" class="form-card">
-        <template #header>
-          <div class="form-card-header">材料和成本</div>
-        </template>
+      <div class="form-section">
+        <div class="section-title">
+          <span class="icon-wrapper primary"><el-icon><Money /></el-icon></span>
+          <span>材料和成本</span>
+        </div>
+        <div class="section-body no-padding">
+          <el-tabs v-model="activeMaterialTab" type="border-card" class="compact-tabs">
+            <!-- 纸张标签页 -->
+            <el-tab-pane label="纸张" name="paper">
+              <div class="tab-content">
+                <el-row :gutter="12">
+                  <el-col :span="6">
+                    <el-form-item label="纸张名称">
+                      <el-select
+                        v-model="form.Paper"
+                        filterable
+                        allow-create
+                        placeholder="选择或输入"
+                        style="width: 100%"
+                        @change="handleMaterialChange('Paper', $event)"
+                        :loading="materialLoading"
+                      >
+                        <el-option v-for="material in materialNames" :key="material" :label="material" :value="material"/>
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="纸张规格">
+                      <el-input v-model="form.PaperSpecification" placeholder="输入规格"/>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="纸张数量">
+                      <el-input-number v-model="form.PaperQty" :min="0" style="width: 100%" controls-position="right"/>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="纸张单价">
+                      <el-input-number v-model="form.PaperUnitPrice" :min="0" :step="0.01" style="width: 100%" controls-position="right"/>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+              </div>
+            </el-tab-pane>
 
-        <el-tabs v-model="activeMaterialTab" type="border-card" class="material-tabs">
-          <!-- 纸张标签页 -->
-          <el-tab-pane label="纸张" name="paper">
-            <el-row :gutter="20">
+            <!-- 材料A标签页 -->
+            <el-tab-pane label="材料A" name="materialA">
+              <div class="tab-content">
+                <el-row :gutter="12">
+                  <el-col :span="6">
+                    <el-form-item label="材料A名称">
+                      <el-select
+                        v-model="form.MaterialA"
+                        filterable
+                        allow-create
+                        placeholder="选择或输入"
+                        style="width: 100%"
+                        @change="handleMaterialChange('MaterialA', $event)"
+                        :loading="materialLoading"
+                      >
+                        <el-option v-for="material in materialNames" :key="material" :label="material" :value="material"/>
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="材料A规格">
+                      <el-input v-model="form.MaterialASpec" placeholder="输入规格"/>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="材料A数量">
+                      <el-input-number v-model="form.MaterialAQty" :min="0" style="width: 100%" controls-position="right"/>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="材料A单价">
+                      <el-input-number v-model="form.MaterialAUnitPrice" :min="0" :step="0.01" style="width: 100%" controls-position="right"/>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+              </div>
+            </el-tab-pane>
+
+            <!-- 材料B标签页 -->
+            <el-tab-pane label="材料B" name="materialB">
+              <div class="tab-content">
+                <el-row :gutter="12">
+                  <el-col :span="6">
+                    <el-form-item label="材料B名称">
+                      <el-select
+                        v-model="form.MaterialB"
+                        filterable
+                        allow-create
+                        placeholder="选择或输入"
+                        style="width: 100%"
+                        @change="handleMaterialChange('MaterialB', $event)"
+                        :loading="materialLoading"
+                      >
+                        <el-option v-for="material in materialNames" :key="material" :label="material" :value="material"/>
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="材料B规格">
+                      <el-input v-model="form.MaterialBSpec" placeholder="输入规格"/>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="材料B数量">
+                      <el-input-number v-model="form.MaterialBQty" :min="0" style="width: 100%" controls-position="right"/>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="材料B单价">
+                      <el-input-number v-model="form.MaterialBUnitPrice" :min="0" :step="0.01" style="width: 100%" controls-position="right"/>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+              </div>
+            </el-tab-pane>
+
+            <!-- 材料C标签页 -->
+            <el-tab-pane label="材料C" name="materialC">
+              <div class="tab-content">
+                <el-row :gutter="12">
+                  <el-col :span="6">
+                    <el-form-item label="材料C名称">
+                      <el-select
+                        v-model="form.MaterialC"
+                        filterable
+                        allow-create
+                        placeholder="选择或输入"
+                        style="width: 100%"
+                        @change="handleMaterialChange('MaterialC', $event)"
+                        :loading="materialLoading"
+                      >
+                        <el-option v-for="material in materialNames" :key="material" :label="material" :value="material"/>
+                      </el-select>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="材料C规格">
+                      <el-input v-model="form.MaterialCSpec" placeholder="输入规格"/>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="材料C数量">
+                      <el-input-number v-model="form.MaterialCQty" :min="0" style="width: 100%" controls-position="right"/>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="材料C单价">
+                      <el-input-number v-model="form.MaterialCUnitPrice" :min="0" :step="0.01" style="width: 100%" controls-position="right"/>
+                    </el-form-item>
+                  </el-col>
+                </el-row>
+              </div>
+            </el-tab-pane>
+          </el-tabs>
+          
+          <div class="cost-summary">
+            <el-row :gutter="12">
               <el-col :span="12">
-                <el-form-item label="纸张名称">
-                  <el-select
-                    v-model="form.Paper"
-                    filterable
-                    allow-create
-                    placeholder="请选择或输入纸张名称"
-                    style="width: 100%"
-                    @change="handleMaterialChange('Paper', $event)"
-                    :loading="materialLoading"
-                  >
-                    <el-option
-                      v-for="material in materialNames"
-                      :key="material"
-                      :label="material"
-                      :value="material"
-                    />
-                  </el-select>
+                <el-form-item label="人工成本">
+                  <el-input-number v-model="form.LaborCost" :min="0" :step="0.01" style="width: 100%" controls-position="right"/>
                 </el-form-item>
               </el-col>
               <el-col :span="12">
-                <el-form-item label="纸张规格">
-                  <el-input v-model="form.PaperSpecification" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <el-form-item label="纸张数量">
-                  <el-input-number v-model="form.PaperQty" :min="0" style="width: 200px" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <el-form-item label="纸张单价">
-                  <el-input-number
-                    v-model="form.PaperUnitPrice"
-                    :min="0"
-                    :step="0.01"
-                    style="width: 200px"
-                    placeholder="自动获取或手动输入"
-                  />
+                <el-form-item label="总成本" class="total-cost-item">
+                  <el-input-number v-model="form.TotalCost" :min="0" :step="0.01" style="width: 100%" controls-position="right"/>
                 </el-form-item>
               </el-col>
             </el-row>
-          </el-tab-pane>
-
-          <!-- 材料A标签页 -->
-          <el-tab-pane label="材料A" name="materialA">
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="材料A名称">
-                  <el-select
-                    v-model="form.MaterialA"
-                    filterable
-                    allow-create
-                    placeholder="请选择或输入材料A名称"
-                    style="width: 100%"
-                    @change="handleMaterialChange('MaterialA', $event)"
-                    :loading="materialLoading"
-                  >
-                    <el-option
-                      v-for="material in materialNames"
-                      :key="material"
-                      :label="material"
-                      :value="material"
-                    />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="材料A规格">
-                  <el-input v-model="form.MaterialASpec" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <el-form-item label="材料A数量">
-                  <el-input-number v-model="form.MaterialAQty" :min="0" style="width: 200px" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <el-form-item label="材料A单价">
-                  <el-input-number
-                    v-model="form.MaterialAUnitPrice"
-                    :min="0"
-                    :step="0.01"
-                    style="width: 200px"
-                    placeholder="自动获取或手动输入"
-                  />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-tab-pane>
-
-          <!-- 材料B标签页 -->
-          <el-tab-pane label="材料B" name="materialB">
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="材料B名称">
-                  <el-select
-                    v-model="form.MaterialB"
-                    filterable
-                    allow-create
-                    placeholder="请选择或输入材料B名称"
-                    style="width: 100%"
-                    @change="handleMaterialChange('MaterialB', $event)"
-                    :loading="materialLoading"
-                  >
-                    <el-option
-                      v-for="material in materialNames"
-                      :key="material"
-                      :label="material"
-                      :value="material"
-                    />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="材料B规格">
-                  <el-input v-model="form.MaterialBSpec" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <el-form-item label="材料B数量">
-                  <el-input-number v-model="form.MaterialBQty" :min="0" style="width: 200px" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <el-form-item label="材料B单价">
-                  <el-input-number
-                    v-model="form.MaterialBUnitPrice"
-                    :min="0"
-                    :step="0.01"
-                    style="width: 200px"
-                    placeholder="自动获取或手动输入"
-                  />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-tab-pane>
-
-          <!-- 材料C标签页 -->
-          <el-tab-pane label="材料C" name="materialC">
-            <el-row :gutter="20">
-              <el-col :span="12">
-                <el-form-item label="材料C名称">
-                  <el-select
-                    v-model="form.MaterialC"
-                    filterable
-                    allow-create
-                    placeholder="请选择或输入材料C名称"
-                    style="width: 100%"
-                    @change="handleMaterialChange('MaterialC', $event)"
-                    :loading="materialLoading"
-                  >
-                    <el-option
-                      v-for="material in materialNames"
-                      :key="material"
-                      :label="material"
-                      :value="material"
-                    />
-                  </el-select>
-                </el-form-item>
-              </el-col>
-              <el-col :span="12">
-                <el-form-item label="材料C规格">
-                  <el-input v-model="form.MaterialCSpec" style="width: 100%" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <el-form-item label="材料C数量">
-                  <el-input-number v-model="form.MaterialCQty" :min="0" style="width: 200px" />
-                </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <el-form-item label="材料C单价">
-                  <el-input-number
-                    v-model="form.MaterialCUnitPrice"
-                    :min="0"
-                    :step="0.01"
-                    style="width: 200px"
-                    placeholder="自动获取或手动输入"
-                  />
-                </el-form-item>
-              </el-col>
-            </el-row>
-          </el-tab-pane>
-        </el-tabs>
-      </el-card>
-
-      <!-- 质量成本损失 -->
-      <el-card shadow="always" class="form-card">
-        <template #header>
-          <div class="form-card-header">质量成本损失</div>
-        </template>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="人工成本">
-              <el-input-number v-model="form.LaborCost" :min="0" :step="0.01" style="width: 240px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="总成本">
-              <el-input-number v-model="form.TotalCost" :min="0" :step="0.01" style="width: 240px" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-card>
+          </div>
+        </div>
+      </div>
 
       <!-- 责任与考核 -->
-      <el-card shadow="always" class="form-card">
-        <template #header>
-          <div class="form-card-header">责任与考核</div>
-        </template>
-        <el-row :gutter="20">
-          <el-col :span="8">
-            <el-form-item label="主责部门" prop="MainDept">
-              <el-select v-model="form.MainDept" filterable placeholder="请选择主责部门" style="width: 160px">
-                <el-option v-for="item in options.departments" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="主责人" prop="MainPerson">
-              <el-select v-model="form.MainPerson" filterable placeholder="请选择主责人" style="width: 140px">
-                <el-option v-for="item in options.persons" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="主责考核金额">
-              <el-input-number v-model="form.MainPersonAssessment" :min="0" :step="0.01" style="width: 120px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="次责人">
-              <el-select v-model="form.SecondPerson" filterable placeholder="请选择次责人" style="width: 140px">
-                <el-option v-for="item in options.persons" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="次责考核金额">
-              <el-input-number v-model="form.SecondPersonAssessment" :min="0" :step="0.01" style="width: 120px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="责任主管">
-              <el-select v-model="form.Manager" filterable placeholder="请选择责任主管" style="width: 140px">
-                <el-option v-for="item in options.persons" :key="item" :label="item" :value="item" />
-              </el-select>
-            </el-form-item>
-          </el-col>
-          <el-col :span="8">
-            <el-form-item label="主管考核金额">
-              <el-input-number v-model="form.ManagerAssessment" :min="0" :step="0.01" style="width: 120px" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="24">
-            <el-form-item label="考核说明">
-              <el-input v-model="form.AssessmentDescription" type="textarea" style="width: 600px" :rows="3" />
-            </el-form-item>
-          </el-col>
-        </el-row>
-      </el-card>
-
-      <!-- 底部按钮 -->
-      <div class="form-actions">
-        <el-button @click="handleCancel">
-          <el-icon style="margin-right: 6px;"><Close /></el-icon>
-          取消
-        </el-button>
-        <el-button @click="resetForm">
-          <el-icon style="margin-right: 6px;"><RefreshLeft /></el-icon>
-          重置
-        </el-button>
-        <el-button type="primary" @click="submitForm" :loading="loading">
-          <el-icon style="margin-right: 6px;"><Check /></el-icon>
-          提交
-        </el-button>
+      <div class="form-section">
+        <div class="section-title">
+          <span class="icon-wrapper danger"><el-icon><UserFilled /></el-icon></span>
+          <span>责任与考核</span>
+        </div>
+        <div class="section-body">
+          <el-row :gutter="12">
+            <el-col :span="6">
+              <el-form-item label="主责部门" prop="MainDept">
+                <el-select v-model="form.MainDept" filterable placeholder="选择部门" style="width: 100%">
+                  <el-option v-for="item in options.departments" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="主责人" prop="MainPerson">
+                <el-select v-model="form.MainPerson" filterable placeholder="选择人员" style="width: 100%">
+                  <el-option v-for="item in options.persons" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="主责考核">
+                <el-input-number v-model="form.MainPersonAssessment" :min="0" :step="0.01" style="width: 100%" controls-position="right"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="次责人">
+                <el-select v-model="form.SecondPerson" filterable placeholder="选择人员" style="width: 100%">
+                  <el-option v-for="item in options.persons" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="次责考核">
+                <el-input-number v-model="form.SecondPersonAssessment" :min="0" :step="0.01" style="width: 100%" controls-position="right"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="责任主管">
+                <el-select v-model="form.Manager" filterable placeholder="选择人员" style="width: 100%">
+                  <el-option v-for="item in options.persons" :key="item" :label="item" :value="item" />
+                </el-select>
+              </el-form-item>
+            </el-col>
+            <el-col :span="6">
+              <el-form-item label="主管考核">
+                <el-input-number v-model="form.ManagerAssessment" :min="0" :step="0.01" style="width: 100%" controls-position="right"/>
+              </el-form-item>
+            </el-col>
+            <el-col :span="24">
+              <el-form-item label="考核说明">
+                <el-input v-model="form.AssessmentDescription" placeholder="输入考核说明"/>
+              </el-form-item>
+            </el-col>
+          </el-row>
+        </div>
       </div>
     </el-form>
-    </div> <!-- 关闭 dialog-content -->
-
-
-
-
+    
+    <template #footer>
+      <div class="dialog-footer">
+        <el-button @click="handleCancel" size="large">取消</el-button>
+        <el-button @click="resetForm" size="large">重置</el-button>
+        <el-button type="primary" @click="submitForm" :loading="loading" size="large">
+          <el-icon style="margin-right: 6px;"><Check /></el-icon>
+          提交保存
+        </el-button>
+      </div>
+    </template>
 
     <!-- 图片预览遮罩和弹窗 -->
     <div v-if="showPreview" class="img-preview-mask" @click.self="showPreview = false">
@@ -534,7 +495,7 @@
         <img :src="previewImgUrl" class="img-preview-large" @click.stop @dblclick="showPreview = false" />
       </div>
     </div>
-  </div>
+  </el-dialog>
 </template>
 
 <script setup>
@@ -548,15 +509,19 @@
  * 4. 文件上传和附件管理
  */
 
-import { ref, reactive, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, reactive, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import axios from 'axios'
-import { CircleClose, Close, RefreshLeft, Check, Document, Plus } from '@element-plus/icons-vue'
+import { CircleClose, Close, RefreshLeft, Check, Document, Plus, InfoFilled, WarningFilled, Tools, Money, UserFilled, ZoomIn, Delete } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 import ImagePreview from './ImagePreview.vue'
 import imagePreviewService from '@/services/imagePreviewService.js'
 
 // 定义props
 const props = defineProps({
+  modelValue: {
+    type: Boolean,
+    default: false
+  },
   editData: {
     type: Object,
     default: null
@@ -564,7 +529,12 @@ const props = defineProps({
 })
 
 // 定义事件
-const emit = defineEmits(['success', 'cancel'])
+const emit = defineEmits(['success', 'cancel', 'update:modelValue'])
+
+const dialogVisible = computed({
+  get: () => props.modelValue,
+  set: (val) => emit('update:modelValue', val)
+})
 
 const formRef = ref()
 const activeMaterialTab = ref('paper') // 默认显示纸张标签页
@@ -1100,6 +1070,24 @@ const resetForm = () => {
 }
 
 /**
+ * 移除当前选择的文件
+ */
+const resetFormFile = () => {
+  // 清理选中文件的预览URL
+  if (selectedFileInfo.value?.previewUrl && selectedFileInfo.value.previewUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(selectedFileInfo.value.previewUrl)
+  }
+  
+  // 重置文件相关变量
+  selectedFileInfo.value = null
+  form.value.AttachmentFile = ''
+}
+
+const handleDeleteFile = () => {
+  resetFormFile();
+}
+
+/**
  * 处理取消操作
  */
 const handleCancel = () => {
@@ -1108,6 +1096,9 @@ const handleCancel = () => {
 
   // 发送取消事件
   emit('cancel')
+  
+  // 关闭弹窗
+  dialogVisible.value = false
 }
 
 // 附件选择与图片预览相关变量
@@ -1130,64 +1121,69 @@ const getApiBaseUrl = () => {
 
 // 判断文件路径类型并生成正确的预览URL
 const getFilePreviewUrl = (filePath, recordId = null) => {
+  console.log('========================================')
+  console.log('[getFilePreviewUrl] 开始处理')
+  console.log('[getFilePreviewUrl] 输入路径:', filePath)
+  console.log('[getFilePreviewUrl] 记录ID:', recordId)
+  
   if (!filePath || filePath === '' || filePath === null || filePath === undefined) {
-    console.log('ComplaintFormDialog getFilePreviewUrl: 路径为空，返回null')
+    console.log('[getFilePreviewUrl] 路径为空，返回null')
     return null
   }
-
-  console.log('=== ComplaintFormDialog getFilePreviewUrl 调试信息 ===')
-  console.log('输入路径:', filePath)
-  console.log('记录ID:', recordId)
-  console.log('路径类型:', typeof filePath)
 
   try {
     // 确保filePath是字符串
     const pathStr = String(filePath).trim()
     if (!pathStr) {
-      console.log('路径转换为字符串后为空')
+      console.log('[getFilePreviewUrl] 路径转换为字符串后为空')
       return null
     }
 
     // 如果是blob URL，直接返回
     if (pathStr.startsWith('blob:')) {
-      console.log('检测到blob URL，直接返回')
+      console.log('[getFilePreviewUrl] 检测到blob URL，直接返回')
       return pathStr
     }
 
     // 如果是HTTP URL，直接返回
     if (pathStr.startsWith('http://') || pathStr.startsWith('https://')) {
-      console.log('检测到HTTP URL，直接返回')
+      console.log('[getFilePreviewUrl] 检测到HTTP URL，直接返回')
       return pathStr
     }
 
-    // 判断是否为新上传的文件（包含file_时间戳格式或uploads/路径）
+    // 判断路径特征
     const hasFilePrefix = pathStr.includes('file_') && /file_\d+_/.test(pathStr)
     const isUploadsPath = pathStr.startsWith('uploads/') || pathStr.startsWith('./uploads/') || pathStr.startsWith('/uploads/')
+    const isYearlyPath = /^\d{4}年/.test(pathStr) || pathStr.includes('年异常汇总') || pathStr.includes('不良图片')
 
-    console.log('路径分析:', {
+    console.log('[getFilePreviewUrl] 路径特征分析:', {
       hasFilePrefix,
       isUploadsPath,
-      pathLength: pathStr.length
+      isYearlyPath,
+      pathStr: pathStr.substring(0, 50) + '...'
     })
 
-    if (hasFilePrefix || isUploadsPath) {
-      // 新上传的文件，使用静态文件服务
+    // 如果是服务器文件路径，生成静态文件URL
+    if (hasFilePrefix || isUploadsPath || isYearlyPath) {
       const backendUrl = getApiBaseUrl()
       const pathParts = pathStr.split(/[\/\\]/).filter(part => part.trim() !== '')
       const encodedPath = pathParts.map(part => encodeURIComponent(part)).join('/')
       const finalUrl = `${backendUrl}/files/attachments/${encodedPath}`
-      console.log('生成服务器URL:', finalUrl)
-      console.log('================================================')
+      console.log('[getFilePreviewUrl] 生成静态文件URL:', finalUrl)
       return finalUrl
-    } else {
-      // 现有的数据库记录文件，需要通过API访问
-      // 这些文件可能是网络共享路径或相对路径，需要后端处理
-      console.log('检测到现有数据库文件，返回null让ImagePreview组件通过API处理')
-      console.log('================================================')
-      return null // 返回null，让ImagePreview组件通过recordId和API获取
     }
+    
+    // 如果有recordId，通过API获取
+    if (recordId) {
+      const apiUrl = `/api/complaint/file/${recordId}`
+      console.log('[getFilePreviewUrl] 使用API URL:', apiUrl)
+      return apiUrl
+    }
+
+    console.log('[getFilePreviewUrl] 无法处理的路径，返回null')
+    return null
   } catch (error) {
-    console.error('ComplaintFormDialog getFilePreviewUrl 处理错误:', error)
+    console.error('[getFilePreviewUrl] 处理错误:', error)
     return null
   }
 }
@@ -1449,12 +1445,17 @@ const isImage = (path) => {
   return path.match(/\.(jpg|jpeg|png|gif|bmp|webp)$/i);
 }
 
-const showPreview = ref(false)
-const previewImgUrl = ref('')
+const showMask = ref(false)
+const previewImage = ref()
 
-function handlePreviewImg(url) {
-  previewImgUrl.value = url
-  showPreview.value = true
+const handlePreviewClick = () => {
+  if (previewImage.value) {
+    // 触发 el-image 的预览功能
+    const imgEl = previewImage.value.$el.querySelector('img')
+    if (imgEl) {
+      imgEl.click()
+    }
+  }
 }
 
 // 不良率自动计算
@@ -1516,21 +1517,52 @@ const initializeEditData = () => {
       const filePath = props.editData.AttachmentFile
       const fileName = filePath.split(/[\/\\]/).pop() || filePath
 
+      console.log('========================================')
+      console.log('[initializeEditData] 处理附件文件')
+      console.log('[initializeEditData] filePath:', filePath)
+      console.log('[initializeEditData] fileName:', fileName)
+      console.log('[initializeEditData] recordId:', props.editData?.ID)
+
       // 判断文件类型并创建文件信息
       const isImage = isImageFile(fileName)
+      console.log('[initializeEditData] isImage:', isImage)
+      
+      // 获取预览URL
+      let previewUrl = null
+      if (isImage) {
+        previewUrl = getFilePreviewUrl(filePath, props.editData?.ID)
+        console.log('[initializeEditData] 获取到的previewUrl:', previewUrl)
+      }
 
       selectedFileInfo.value = {
         fileName: fileName,
         fileSize: 0, // 现有文件大小未知
         fileType: isImage ? 'image/*' : 'application/octet-stream',
         isImage: isImage,
-        previewUrl: isImage ? getFilePreviewUrl(filePath, props.editData?.ID) : null,
+        previewUrl: previewUrl,
         relativePath: filePath,
         serverPath: null,
         filename: fileName,
         file: null,
         uploaded: true,
         isExisting: true // 标记为现有文件
+      }
+      
+      console.log('[initializeEditData] selectedFileInfo:', JSON.stringify(selectedFileInfo.value, null, 2))
+      
+      // 如果是图片且previewUrl为null，尝试通过imagePreviewService异步获取
+      if (isImage && !previewUrl && props.editData?.ID) {
+        console.log('[initializeEditData] previewUrl为空，尝试通过imagePreviewService获取')
+        imagePreviewService.getImageUrlByRecordId(props.editData.ID)
+          .then(url => {
+            console.log('[initializeEditData] imagePreviewService返回URL:', url)
+            if (selectedFileInfo.value && selectedFileInfo.value.isExisting) {
+              selectedFileInfo.value.previewUrl = url
+            }
+          })
+          .catch(error => {
+            console.error('[initializeEditData] imagePreviewService获取失败:', error)
+          })
       }
     }
   }
@@ -1588,169 +1620,298 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-.complaint-form-dialog {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
+.compact-form {
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.compact-form :deep(.el-form-item) {
+  margin-bottom: 12px;
+}
+
+/* 表单分节样式 */
+.form-section {
+  margin-bottom: 16px;
+  background: #fff;
+  border-radius: 8px;
+  border: 1px solid #ebeef5;
   overflow: hidden;
 }
 
-/* 固定标题栏样式 */
-.dialog-header {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  z-index: 1000;
-  background: linear-gradient(135deg, #409eff 0%, #66b1ff 100%);
-  color: white;
-  padding: 12px 30px;
-  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.3);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  position: relative;
-}
-
-.dialog-title {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 600;
+.section-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-}
-
-.dialog-title::before {
-  content: '📝';
-  font-size: 18px;
-}
-
-.dialog-close-btn {
-  position: absolute;
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  color: white !important;
-  font-size: 20px;
-  padding: 8px;
-  border-radius: 50%;
-  transition: all 0.3s ease;
-  background: transparent;
-  border: none;
-  min-width: 40px;
-  height: 40px;
-}
-
-.dialog-close-btn:hover {
-  background: rgba(255, 255, 255, 0.2) !important;
-  color: white !important;
-  transform: translateY(-50%) scale(1.1);
-}
-
-/* 内容区域样式 */
-.dialog-content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 10px;
+  padding: 8px 12px;
   background: #f8f9fa;
-  margin-top: 50px; /* 为固定标题栏留出空间 */
-  padding-bottom: 100px; /* 为底部按钮留出空间 */
-}
-
-.centered-form {
-  max-width: 100%;
-  margin: 0 auto;
-  background: transparent;
-}
-
-.form-card {
-  margin-bottom: 20px;
-  border-radius: 12px !important;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-  padding: 2rem 1.5rem 1rem 1.5rem;
-  background: #fff;
-  border: 1px solid rgba(64, 158, 255, 0.1);
-  transition: all 0.3s ease;
-  position: relative;
-}
-
-.form-card:hover {
-  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
-}
-
-.form-card-header {
-  font-size: 16px;
+  border-bottom: 1px solid #ebeef5;
   font-weight: 600;
   color: #303133;
+  font-size: 14px;
+}
+
+.icon-wrapper {
   display: flex;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  background: #ecf5ff;
+  color: #409eff;
+  margin-right: 8px;
+}
+
+.icon-wrapper.warning {
+  background: #fdf6ec;
+  color: #e6a23c;
+}
+
+.icon-wrapper.success {
+  background: #f0f9eb;
+  color: #67c23a;
+}
+
+.icon-wrapper.primary {
+  background: #ecf5ff;
+  color: #409eff;
+}
+
+.icon-wrapper.danger {
+  background: #fef0f0;
+  color: #f56c6c;
+}
+
+.section-body {
+  padding: 12px;
+}
+
+/* 附件文件样式现代版 */
+.attachment-field-modern {
+  width: 100%;
+}
+
+.attachment-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.upload-btn {
+  flex-shrink: 0;
+}
+
+.file-path-input {
+  flex-grow: 1;
+}
+
+.attachment-preview-modern {
+  margin-top: 10px;
+}
+
+.preview-card {
+  display: flex;
+  align-items: center;
+  padding: 8px;
+  border: 1px solid #dcdfe6;
+  border-radius: 6px;
+  background: #f8f9fa;
+  gap: 12px;
+}
+
+.preview-image-wrapper {
+  width: 60px;
+  height: 60px;
+  border-radius: 4px;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+  border: 1px solid #ebeef5;
+}
+
+.preview-thumb {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.preview-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.preview-image-wrapper:hover .preview-overlay {
+  opacity: 1;
+}
+
+.preview-file-wrapper {
+  width: 60px;
+  height: 60px;
+  border-radius: 4px;
+  background: #ecf5ff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #409eff;
+  font-size: 24px;
+  flex-shrink: 0;
+  border: 1px solid #d9ecff;
+}
+
+.file-info {
+  flex-grow: 1;
+  overflow: hidden;
+}
+
+/* 附件上传区域样式 */
+.upload-preview-container {
+  margin-bottom: 0 !important;
+}
+
+.attachment-upload-area {
+  width: 100%;
+  height: 220px; /* 固定高度与左侧表单区域对齐 */
+  border: 1px dashed #dcdfe6;
+  border-radius: 6px;
+  box-sizing: border-box;
+  background-color: #fcfcfc;
+  transition: border-color 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
   position: relative;
 }
 
-.form-card-header::before {
-  content: '';
-  position: absolute;
-  left: -1.5rem;
-  top: 50%;
-  transform: translateY(-50%);
-  width: 4px;
-  height: 20px;
-  background: #409eff;
-  border-radius: 2px;
+.attachment-upload-area:hover {
+  border-color: #409eff;
 }
 
-.form-actions {
+.upload-placeholder {
   display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  color: #909399;
+}
+
+.upload-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.upload-text {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.upload-tip {
+  font-size: 12px;
+  color: #c0c4cc;
+}
+
+/* 预览框样式 */
+.preview-box {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.image-preview-wrapper {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
   justify-content: center;
   gap: 16px;
-  padding: 24px 0;
+  color: #fff;
+  font-size: 20px;
+  cursor: default;
+  z-index: 1;
+  transition: opacity 0.3s;
+}
+
+.preview-action-btn {
+  cursor: pointer;
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.preview-action-btn:hover {
+  transform: scale(1.2);
+}
+
+.file-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.file-icon {
+  font-size: 48px;
+  color: #909399;
+  margin-bottom: 10px;
+}
+
+.preview-actions {
+  height: 36px;
+  background-color: #fff;
   border-top: 1px solid #ebeef5;
-  margin-top: 20px;
-  background: #fff;
-  border-radius: 0;
-  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.05);
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
 }
 
-.form-actions .el-button {
-  min-width: 120px;
-  height: 40px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 0.3s ease;
-}
-
-.form-actions .el-button--primary {
-  background: #409eff;
-  border: none;
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.3);
-}
-
-.form-actions .el-button--primary:hover {
-  background: #66b1ff;
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(64, 158, 255, 0.4);
-}
-
-.form-actions .el-button:not(.el-button--primary) {
-  background: #f5f7fa;
-  border: 1px solid #dcdfe6;
+.file-name {
+  font-size: 12px;
   color: #606266;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
-.form-actions .el-button:not(.el-button--primary):hover {
-  background: #ecf5ff;
-  border-color: #409eff;
-  color: #409eff;
-  transform: translateY(-1px);
+.file-size {
+  font-size: 12px;
+  color: #909399;
 }
 
 /* 图片预览样式 */
@@ -1800,269 +1961,54 @@ onUnmounted(() => {
 }
 
 /* 表单控件美化 */
-.complaint-form-dialog :deep(.el-input__wrapper) {
-  border-radius: 6px;
-  transition: all 0.3s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
+.complaint-dialog :deep(.el-input__wrapper) {
+  border-radius: 4px;
 }
 
-.complaint-form-dialog :deep(.el-input__wrapper):hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.complaint-form-dialog :deep(.el-input__wrapper.is-focus) {
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
-}
-
-.complaint-form-dialog :deep(.el-select) {
+.complaint-dialog :deep(.el-select) {
   width: 100%;
 }
 
-.complaint-form-dialog :deep(.el-select .el-input__wrapper) {
-  border-radius: 6px;
-  transition: all 0.3s ease;
-}
-
-.complaint-form-dialog :deep(.el-textarea__inner) {
-  border-radius: 6px;
-  transition: all 0.3s ease;
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
-}
-
-.complaint-form-dialog :deep(.el-textarea__inner):hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.complaint-form-dialog :deep(.el-textarea__inner):focus {
-  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.2);
-}
-
-.complaint-form-dialog :deep(.el-input-number) {
+.complaint-dialog :deep(.el-input-number) {
   width: 100%;
 }
 
-.complaint-form-dialog :deep(.el-input-number .el-input__wrapper) {
-  border-radius: 6px;
+/* 紧凑型标签页样式 */
+.compact-tabs {
+  margin-top: 8px;
+  border: none !important;
+  box-shadow: none !important;
 }
 
-.complaint-form-dialog :deep(.el-date-editor) {
-  width: 100%;
-}
-
-.complaint-form-dialog :deep(.el-date-editor .el-input__wrapper) {
-  border-radius: 6px;
-}
-
-/* 开关控件美化 */
-.complaint-form-dialog :deep(.el-switch) {
-  --el-switch-on-color: #409eff;
-  --el-switch-off-color: #dcdfe6;
-}
-
-/* 表单标签美化 */
-.complaint-form-dialog :deep(.el-form-item__label) {
-  font-weight: 600;
-  color: #303133;
-}
-
-/* 必填项标记美化 */
-.complaint-form-dialog :deep(.el-form-item.is-required .el-form-item__label::before) {
-  color: #f56c6c;
-  font-weight: bold;
-}
-
-/* 材料标签页样式 */
-.material-tabs {
-  margin-top: 10px;
-}
-
-.material-tabs :deep(.el-tabs__header) {
-  margin-bottom: 15px;
+.compact-tabs :deep(.el-tabs__header) {
+  margin-bottom: 10px;
   background: #f8f9fa;
-  border-radius: 8px;
-  padding: 8px;
+  border-bottom: 1px solid #ebeef5;
+  border-radius: 6px 6px 0 0;
 }
 
-.material-tabs :deep(.el-tabs__nav-wrap) {
-  background: transparent;
+.compact-tabs :deep(.el-tabs__content) {
+  padding: 12px 0;
 }
 
-.material-tabs :deep(.el-tabs__item) {
-  border-radius: 6px;
-  margin-right: 8px;
-  transition: all 0.3s ease;
-  font-weight: 600;
+.compact-tabs :deep(.el-tabs__item) {
+  height: 36px;
+  line-height: 36px;
+  font-size: 13px;
 }
 
-.material-tabs :deep(.el-tabs__item:hover) {
-  background: #ecf5ff;
-  color: #409eff;
+.compact-tabs :deep(.el-tab-pane) {
+  min-height: auto;
 }
 
-/* 附件预览样式 */
-.attachment-field {
-  width: 100%;
+.cost-summary {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed #ebeef5;
 }
 
-.attachment-input-section {
-  display: flex;
-  align-items: center;
-}
-
-.attachment-preview-section {
-  width: 100%;
-}
-
-.preview-container {
-  width: 150px;
-  height: 120px;
-  border: 2px dashed #dcdfe6;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fafafa;
-  transition: all 0.3s ease;
-}
-
-.preview-container:hover {
-  border-color: #409eff;
-  background: #f0f9ff;
-}
-
-.image-preview-box {
-  width: 100%;
-  height: 100%;
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.file-preview-box {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #909399;
-  gap: 8px;
-}
-
-.file-icon {
-  font-size: 32px;
-  color: #409eff;
-}
-
-.file-name {
-  font-size: 12px;
-  text-align: center;
-  word-break: break-all;
-  max-width: 120px;
-}
-
-.empty-preview-box {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* 文件上传预览对话框样式 */
-.file-upload-preview-dialog {
-  border-radius: 12px;
-}
-
-.file-preview-content {
-  padding: 20px 0;
-}
-
-.file-info-section,
-.image-preview-section,
-.non-image-section,
-.confirm-section {
-  margin-bottom: 20px;
-}
-
-.file-info-section h4,
-.image-preview-section h4,
-.non-image-section h4 {
-  margin: 0 0 12px 0;
-  color: #303133;
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.file-details {
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 16px;
-  border: 1px solid #e9ecef;
-}
-
-.detail-item {
-  display: flex;
-  margin-bottom: 8px;
-}
-
-.detail-item:last-child {
-  margin-bottom: 0;
-}
-
-.detail-item .label {
-  font-weight: 600;
-  color: #606266;
-  min-width: 80px;
-}
-
-.detail-item .value {
-  color: #303133;
-  word-break: break-all;
-}
-
-.preview-image-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 20px;
-  border: 1px solid #e9ecef;
-}
-
-.preview-image {
-  max-width: 100%;
-  max-height: 200px;
-  object-fit: contain;
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.file-icon-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  background: #f8f9fa;
-  border-radius: 8px;
-  padding: 40px 20px;
-  border: 1px solid #e9ecef;
-}
-
-.large-file-icon {
-  font-size: 48px;
-  color: #409eff;
-  margin-bottom: 12px;
-}
-
-.file-icon-container p {
-  margin: 0;
-  color: #606266;
-  font-size: 14px;
-  text-align: center;
-  word-break: break-all;
-}
-
-.confirm-section {
-  margin-top: 20px;
+.no-padding {
+  padding: 0 !important;
 }
 
 .dialog-footer {
@@ -2070,23 +2016,38 @@ onUnmounted(() => {
   justify-content: flex-end;
   gap: 12px;
 }
+</style>
 
-
-
-.material-tabs :deep(.el-tabs__item.is-active) {
-  background: #409eff;
-  color: white;
-  border-color: #409eff;
-}
-
-.material-tabs :deep(.el-tabs__content) {
-  padding: 20px;
-  background: #fafbfc;
+<style>
+/* 全局弹窗样式调整 - 不使用scoped以确保覆盖Element Plus默认样式 */
+.complaint-dialog {
+  display: flex;
+  flex-direction: column;
+  margin: 5vh auto !important; /* 上下留出空间，同时居中 */
+  max-height: 85vh; /* 严格限制最大高度为视口高度的85%，确保不超出 */
+  overflow: hidden; /* 防止溢出 */
   border-radius: 8px;
-  border: 1px solid #ebeef5;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.material-tabs :deep(.el-tab-pane) {
-  min-height: 120px;
+.complaint-dialog .el-dialog__header {
+  margin-right: 0;
+  border-bottom: 1px solid #ebeef5;
+  padding: 15px 20px;
+  flex-shrink: 0; /* 标题栏不收缩 */
+}
+
+.complaint-dialog .el-dialog__body {
+  padding: 10px 20px;
+  flex: 1; /* 占据剩余空间 */
+  overflow-y: auto; /* 内容过多时显示滚动条 */
+  min-height: 0; /* 配合flex布局实现内部滚动 */
+}
+
+.complaint-dialog .el-dialog__footer {
+  border-top: 1px solid #ebeef5;
+  padding: 15px 20px;
+  flex-shrink: 0; /* 底部按钮不收缩 */
+  background: #fff;
 }
 </style>

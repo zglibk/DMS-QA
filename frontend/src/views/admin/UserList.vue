@@ -40,10 +40,23 @@
         <!-- 左侧：新增用户 + 刷新 -->
         <el-col :span="4">
           <div class="left-actions">
-            <el-button type="primary" :icon="Plus" @click="showAddUser=true" class="primary-btn">
+            <el-button 
+              type="primary" 
+              :icon="Plus" 
+              @click="showAddUser=true" 
+              class="primary-btn"
+              :disabled="!userStore.hasPermission('sys:user:add')"
+            >
               新增用户
             </el-button>
-            <el-button :icon="Refresh" @click="refreshData" circle style="width: 100px;" type="warning" plain>
+            <el-button 
+              :icon="Refresh" 
+              @click="refreshData" 
+              circle 
+              style="width: 100px;" 
+              type="warning" 
+              plain
+            >
               刷新
             </el-button>
           </div>
@@ -261,7 +274,7 @@
             <div class="status-control">
               <el-switch
                 v-model="scope.row.Status"
-                :disabled="scope.row.Role === 'admin' || (scope.row.RoleNames && scope.row.RoleNames.includes('admin'))"
+                :disabled="scope.row.Role === 'admin' || (scope.row.RoleNames && scope.row.RoleNames.includes('admin')) || !userStore.hasPermission('sys:user:edit')"
                 :active-value="1"
                 :inactive-value="0"
                 active-color="#67c23a"
@@ -319,10 +332,10 @@
           <template #default="scope">
             <div class="action-buttons">
               <el-tooltip content="编辑用户" placement="top">
-                <el-button type="primary" :icon="Edit" size="small" circle @click="editUser(scope.row)" />
+                <el-button type="primary" :icon="Edit" size="small" circle @click="editUser(scope.row)" :disabled="!userStore.hasPermission('sys:user:edit')" />
               </el-tooltip>
               <el-tooltip content="权限设置" placement="top">
-                <el-button type="warning" :icon="Setting" size="small" circle @click="setPermission(scope.row)" />
+                <el-button type="warning" :icon="Setting" size="small" circle @click="setPermission(scope.row)" :disabled="!userStore.hasPermission('sys:user:role')" />
               </el-tooltip>
               <el-tooltip content="查看详情" placement="top">
                 <el-button type="info" :icon="View" size="small" circle @click="viewUser(scope.row)" />
@@ -334,7 +347,7 @@
                   size="small" 
                   circle 
                   @click="deleteUser(scope.row)"
-                  :disabled="scope.row.Role === 'admin' || (scope.row.RoleNames && scope.row.RoleNames.includes('admin'))"
+                  :disabled="(scope.row.Role === 'admin' || (scope.row.RoleNames && scope.row.RoleNames.includes('admin'))) || !userStore.hasPermission('sys:user:delete')"
                 />
               </el-tooltip>
             </div>
@@ -371,9 +384,9 @@
           <span>已选择 {{ selectedUsers.length }} 个用户</span>
         </div>
         <div class="batch-buttons">
-          <el-button type="warning" :icon="Lock" @click="batchDisable">批量禁用</el-button>
-          <el-button type="success" :icon="Unlock" @click="batchEnable">批量启用</el-button>
-          <el-button type="danger" :icon="Delete" @click="batchDelete">批量删除</el-button>
+          <el-button type="warning" :icon="Lock" @click="batchDisable" :disabled="!userStore.hasPermission('sys:user:edit')">批量禁用</el-button>
+          <el-button type="success" :icon="Unlock" @click="batchEnable" :disabled="!userStore.hasPermission('sys:user:edit')">批量启用</el-button>
+          <el-button type="danger" :icon="Delete" @click="batchDelete" :disabled="!userStore.hasPermission('sys:user:delete')">批量删除</el-button>
         </div>
       </div>
     </el-card>
@@ -394,7 +407,7 @@
           <el-icon class="dialog-icon" style="font-size: 24px;"><UserFilled /></el-icon>
           <span class="dialog-title">{{ isEdit ? '编辑用户信息' : '新增用户' }}</span>
           <div v-if="isEdit" class="header-actions">
-            <el-button type="warning" @click="openResetPasswordDialog">
+            <el-button type="warning" @click="openResetPasswordDialog" :disabled="!userStore.hasPermission('sys:user:reset-pwd')">
               <el-icon><Key /></el-icon>
               重置密码
             </el-button>

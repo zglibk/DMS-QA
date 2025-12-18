@@ -855,7 +855,7 @@
     <!-- 编辑记录对话框 -->
     <el-dialog
       v-model="showEditDialog"
-      width="60%"
+      width="50%"
       :close-on-click-modal="false"
       :modal="true"
       :append-to-body="true"
@@ -863,7 +863,6 @@
       destroy-on-close
       class="edit-dialog"
       center
-      top="5vh"
       @close="cleanupEditResources"
     >
       <template #header>
@@ -927,7 +926,10 @@
                             v-else-if="field.type === 'number' || field.type === 'decimal'"
                             v-model="editFormData[field.key]"
                             :precision="field.type === 'decimal' ? 2 : 0"
+                            :step="field.type === 'decimal' ? 0.01 : 1"
                             :min="0"
+                            :max="field.key === 'DefectiveRate' ? 100 : undefined"
+                            controls-position="right"
                             style="width: 100%"
                           />
                           <!-- 材料名称下拉框 -->
@@ -962,199 +964,479 @@
                   </el-tab-pane>
                 </el-tabs>
                 <!-- 普通布局 -->
-                <el-row v-else :gutter="16">
-                  <el-col
-                    v-for="field in section.fields"
-                    :key="field.key"
-                    :span="getFieldSpan(field)"
-                  >
-                    <el-form-item
-                      :label="field.label"
-                      :prop="field.key"
-                      :label-width="getFieldLabelWidth(field)"
-                    >
-                      <!-- 日期字段 -->
-                      <el-date-picker
-                        v-if="field.type === 'date'"
-                        v-model="editFormData[field.key]"
-                        type="date"
-                        style="width: 100%"
-                        format="YYYY-MM-DD"
-                        value-format="YYYY-MM-DD"
-                      />
-                      <!-- 数字字段 -->
-                      <el-input-number
-                        v-else-if="field.type === 'number' || field.type === 'decimal'"
-                        v-model="editFormData[field.key]"
-                        :precision="field.type === 'decimal' ? 2 : 0"
-                        :min="0"
-                        style="width: 100%"
-                      />
-                      <!-- 布尔值字段 -->
-                      <el-switch
-                        v-else-if="field.key === 'ReturnGoods' || field.key === 'IsReprint'"
-                        v-model="editFormData[field.key]"
-                      />
-                      <!-- 发生车间下拉框 -->
-                      <el-select
-                        v-else-if="field.key === 'Workshop'"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        placeholder="请选择发生车间"
-                        style="width: 100%"
-                      >
-                        <el-option v-for="item in editOptions.workshops" :key="item" :label="item" :value="item" />
-                      </el-select>
-                      <!-- 投诉类别下拉框 -->
-                      <el-select
-                        v-else-if="field.key === 'ComplaintCategory'"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        placeholder="请选择投诉类别"
-                        style="width: 100%"
-                      >
-                        <el-option v-for="item in editOptions.complaintCategories" :key="item" :label="item" :value="item" />
-                      </el-select>
-                      <!-- 客诉类型下拉框 -->
-                      <el-select
-                        v-else-if="field.key === 'CustomerComplaintType'"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        placeholder="请选择客诉类型"
-                        :disabled="editFormData.ComplaintCategory !== '客诉'"                        
-                        style="width: 100%"
-                      >
-                        <el-option v-for="item in editOptions.customerComplaintTypes" :key="item" :label="item" :value="item" />
-                      </el-select>
-                      <!-- 不良类别下拉框 -->
-                      <el-select
-                        v-else-if="field.key === 'DefectiveCategory'"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        placeholder="请选择不良类别"
-                        @change="handleEditCategoryChange"
-                        value-key="ID"                        
-                        style="width: 100%"
-                      >
-                        <el-option
-                          v-for="item in editOptions.defectiveCategories"
-                          :key="item.ID"
-                          :label="item.Name"
-                          :value="item"
-                        />
-                      </el-select>
-                      <!-- 不良项下拉框 -->
-                      <el-select
-                        v-else-if="field.key === 'DefectiveItem'"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        placeholder="请选择不良项"                        
-                        style="width: 100%"
-                      >
-                        <el-option v-for="item in editOptions.defectiveItems" :key="item" :label="item" :value="item" />
-                      </el-select>
-                      <!-- 主责部门下拉框 -->
-                      <el-select
-                        v-else-if="field.key === 'MainDept'"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        placeholder="请选择主责部门"                       
-                        style="width: 100%"
-                      >
-                        <el-option v-for="item in editOptions.departments" :key="item" :label="item" :value="item" />
-                      </el-select>
-                      <!-- 主责人下拉框 -->
-                      <el-select
-                        v-else-if="field.key === 'MainPerson'"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        placeholder="请选择主责人"                        
-                        style="width: 100%"
-                      >
-                        <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
-                      </el-select>
-                      <!-- 次责人下拉框 -->
-                      <el-select
-                        v-else-if="field.key === 'SecondPerson'"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        placeholder="请选择次责人"                        
-                        style="width: 100%"
-                      >
-                        <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
-                      </el-select>
-                      <!-- 责任主管下拉框 -->
-                      <el-select
-                        v-else-if="field.key === 'Manager'"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        placeholder="请选择责任主管"
-                        style="width: 100%"
-                      >
-                        <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
-                      </el-select>
-                      <!-- 材料名称下拉框 -->
-                      <el-select
-                        v-else-if="['Paper', 'MaterialA', 'MaterialB', 'MaterialC'].includes(field.key)"
-                        v-model="editFormData[field.key]"
-                        filterable
-                        allow-create
-                        :placeholder="`请选择或输入${field.label}`"
-                        style="width: 100%"
-                        @change="handleEditMaterialChange(field.key, $event)"
-                        :loading="editMaterialLoading"
-                      >
-                        <el-option
-                          v-for="material in editMaterialNames"
-                          :key="material"
-                          :label="material"
-                          :value="material"
-                        />
-                      </el-select>
-                      <!-- 附件文件字段 - 特殊处理 -->
-                      <div v-else-if="field.key === 'AttachmentFile'" class="attachment-field">
-                        <div class="attachment-input-section">
-                          <el-button @click="selectFile" :loading="editFileUploading" type="primary">
-                            <el-icon><Plus /></el-icon>
-                            {{ editFileUploading ? '上传中...' : '选择图片' }}
-                          </el-button>
-                        </div>
-
-                        <!-- 附件文件路径显示 -->
-                        <div class="attachment-path-section" style="margin-top: 10px;">
-                          <el-input
-                            v-model="editFormData[field.key]"
-                            readonly
-                            placeholder="附件文件路径将在上传后显示"
-                            class="attachment-path-input"
+                <div v-else>
+                  <!-- 特殊处理不良详情卡片布局：左右分栏 -->
+                  <el-row v-if="section.title === '不良详情'" :gutter="20">
+                    <!-- 左侧表单区域 -->
+                    <el-col :span="16">
+                      <el-row :gutter="16">
+                        <el-col
+                          v-for="field in section.fields.filter(f => f.key !== 'AttachmentFile')"
+                          :key="field.key"
+                          :span="getFieldSpan(field)"
+                        >
+                          <el-form-item
+                            :label="field.label"
+                            :prop="field.key"
+                            :label-width="getFieldLabelWidth(field)"
                           >
-                            <template #prepend>文件路径</template>
-                          </el-input>
+                            <!-- 日期字段 -->
+                            <el-date-picker
+                              v-if="field.type === 'date'"
+                              v-model="editFormData[field.key]"
+                              type="date"
+                              style="width: 100%"
+                              format="YYYY-MM-DD"
+                              value-format="YYYY-MM-DD"
+                            />
+                            <!-- 数字字段 -->
+                            <el-input-number
+                              v-else-if="field.type === 'number' || field.type === 'decimal'"
+                              v-model="editFormData[field.key]"
+                              :precision="field.type === 'decimal' ? 2 : 0"
+                              :step="field.type === 'decimal' ? 0.01 : 1"
+                              :min="0"
+                              :max="field.key === 'DefectiveRate' ? 100 : undefined"
+                              controls-position="right"
+                              style="width: 100%"
+                            />
+                            <!-- 布尔值字段 -->
+                            <el-switch
+                              v-else-if="field.key === 'ReturnGoods' || field.key === 'IsReprint'"
+                              v-model="editFormData[field.key]"
+                            />
+                            <!-- 发生车间下拉框 -->
+                            <el-select
+                              v-else-if="field.key === 'Workshop'"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              placeholder="请选择发生车间"
+                              style="width: 100%"
+                            >
+                              <el-option v-for="item in editOptions.workshops" :key="item" :label="item" :value="item" />
+                            </el-select>
+                            <!-- 投诉类别下拉框 -->
+                            <el-select
+                              v-else-if="field.key === 'ComplaintCategory'"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              placeholder="请选择投诉类别"
+                              style="width: 100%"
+                            >
+                              <el-option v-for="item in editOptions.complaintCategories" :key="item" :label="item" :value="item" />
+                            </el-select>
+                            <!-- 客诉类型下拉框 -->
+                            <el-select
+                              v-else-if="field.key === 'CustomerComplaintType'"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              placeholder="请选择客诉类型"
+                              :disabled="editFormData.ComplaintCategory !== '客诉'"                        
+                              style="width: 100%"
+                            >
+                              <el-option v-for="item in editOptions.customerComplaintTypes" :key="item" :label="item" :value="item" />
+                            </el-select>
+                            <!-- 不良类别下拉框 -->
+                            <el-select
+                              v-else-if="field.key === 'DefectiveCategory'"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              placeholder="请选择不良类别"
+                              @change="handleEditCategoryChange"
+                              value-key="ID"                        
+                              style="width: 100%"
+                            >
+                              <el-option
+                                v-for="item in editOptions.defectiveCategories"
+                                :key="item.ID"
+                                :label="item.Name"
+                                :value="item"
+                              />
+                            </el-select>
+                            <!-- 不良项下拉框 -->
+                            <el-select
+                              v-else-if="field.key === 'DefectiveItem'"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              placeholder="请选择不良项"                        
+                              style="width: 100%"
+                            >
+                              <el-option v-for="item in editOptions.defectiveItems" :key="item" :label="item" :value="item" />
+                            </el-select>
+                            <!-- 主责部门下拉框 -->
+                            <el-select
+                              v-else-if="field.key === 'MainDept'"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              placeholder="请选择主责部门"                       
+                              style="width: 100%"
+                            >
+                              <el-option v-for="item in editOptions.departments" :key="item" :label="item" :value="item" />
+                            </el-select>
+                            <!-- 主责人下拉框 -->
+                            <el-select
+                              v-else-if="field.key === 'MainPerson'"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              placeholder="请选择主责人"                        
+                              style="width: 100%"
+                            >
+                              <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
+                            </el-select>
+                            <!-- 次责人下拉框 -->
+                            <el-select
+                              v-else-if="field.key === 'SecondPerson'"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              placeholder="请选择次责人"                        
+                              style="width: 100%"
+                            >
+                              <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
+                            </el-select>
+                            <!-- 责任主管下拉框 -->
+                            <el-select
+                              v-else-if="field.key === 'Manager'"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              placeholder="请选择责任主管"
+                              style="width: 100%"
+                            >
+                              <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
+                            </el-select>
+                            <!-- 材料名称下拉框 -->
+                            <el-select
+                              v-else-if="['Paper', 'MaterialA', 'MaterialB', 'MaterialC'].includes(field.key)"
+                              v-model="editFormData[field.key]"
+                              filterable
+                              allow-create
+                              :placeholder="`请选择或输入${field.label}`"
+                              style="width: 100%"
+                              @change="handleEditMaterialChange(field.key, $event)"
+                              :loading="editMaterialLoading"
+                            >
+                              <el-option
+                                v-for="material in editMaterialNames"
+                                :key="material"
+                                :label="material"
+                                :value="material"
+                              />
+                            </el-select>
+                            <!-- 文本字段 -->
+                            <el-input
+                              v-else
+                              v-model="editFormData[field.key]"
+                              :type="isFullWidthField(field) ? 'textarea' : 'text'"
+                              :rows="isFullWidthField(field) ? 2 : undefined"
+                            />
+                          </el-form-item>
+                        </el-col>
+                      </el-row>
+                    </el-col>
+                    
+                    <!-- 右侧附件区域 -->
+                    <el-col :span="8">
+                      <el-form-item label-width="0" class="upload-preview-container" style="margin-bottom: 0;">
+                        <div v-for="field in section.fields.filter(f => f.key === 'AttachmentFile')" :key="field.key" style="width: 100%">
+                          <div class="attachment-upload-area">
+                            <!-- 如果有图片则显示预览 -->
+                            <div v-if="editSelectedFileInfo" class="preview-box">
+                              <!-- 图片加载失败时显示错误提示 -->
+                              <div v-if="editSelectedFileInfo.loadError" class="file-load-error">
+                                <el-icon class="error-icon" :size="40"><WarningFilled /></el-icon>
+                                <div class="error-text">{{ editSelectedFileInfo.errorMessage || '文件加载失败' }}</div>
+                                <el-button type="primary" size="small" @click="selectFile" style="margin-top: 8px;">
+                                  重新上传
+                                </el-button>
+                              </div>
+                              <!-- 图片正常显示 -->
+                              <div v-else-if="editSelectedFileInfo.isImage && editSelectedFileInfo.previewUrl" class="image-preview-wrapper" @mouseenter="editShowMask = true" @mouseleave="editShowMask = false">
+                                <el-image 
+                                  ref="editPreviewImage"
+                                  :src="editSelectedFileInfo.previewUrl" 
+                                  :preview-src-list="[editSelectedFileInfo.previewUrl]"
+                                  fit="contain"
+                                  class="preview-img"
+                                  :preview-teleported="true"
+                                  style="width: 100%; height: 100%;"
+                                />
+                                <div class="preview-mask" v-show="editShowMask">
+                                  <span class="preview-action-btn" @click="handleEditPreviewClick">
+                                    <el-icon><ZoomIn /></el-icon>
+                                  </span>
+                                  <span class="preview-action-btn" @click.stop="handleEditDeleteFile">
+                                    <el-icon><Delete /></el-icon>
+                                  </span>
+                                </div>
+                              </div>
+                              <!-- 图片正在加载 -->
+                              <div v-else-if="editSelectedFileInfo.isImage && !editSelectedFileInfo.previewUrl" class="image-loading">
+                                <el-icon class="is-loading" :size="30"><Loading /></el-icon>
+                                <div class="loading-text">加载中...</div>
+                              </div>
+                              <!-- 非图片文件 -->
+                              <div v-else class="file-preview">
+                                <el-icon class="file-icon"><Document /></el-icon>
+                                <span class="file-name" :title="editSelectedFileInfo.generatedFileName || editSelectedFileInfo.fileName">
+                                  {{ editSelectedFileInfo.generatedFileName || editSelectedFileInfo.fileName }}
+                                </span>
+                              </div>
+                              
+                              <div class="preview-actions">
+                                <span class="file-size" v-if="editSelectedFileInfo.fileSize">
+                                  {{ formatFileSize(editSelectedFileInfo.fileSize) }}
+                                </span>
+                                <el-button v-if="!editSelectedFileInfo.isImage" type="danger" link size="small" @click="handleEditDeleteFile">
+                                  移除
+                                </el-button>
+                              </div>
+                            </div>
+                            
+                            <!-- 没有图片时显示上传按钮 -->
+                            <div v-else class="upload-placeholder" @click="selectFile">
+                              <el-icon class="upload-icon"><Plus /></el-icon>
+                              <div class="upload-text">点击上传图片</div>
+                              <div class="upload-tip">支持 jpg/png 格式</div>
+                            </div>
+                            
+                            <!-- 隐藏的文件输入框 -->
+                            <el-input v-model="editFormData[field.key]" v-show="false" />
+                          </div>
                         </div>
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
 
-                        <!-- 图片预览区域 -->
-                        <div class="image-preview-area" style="margin-top: 10px;">
-                          <ImagePreview
-                            v-if="shouldShowImagePreview(editSelectedFileInfo, editFormData[field.key])"
-                            :key="`edit-dialog-${editDialogInstanceId}-${editFormData.ID}-${field.key}-${editSelectedFileInfo?.fileName || 'existing'}`"
-                            :file-path="editSelectedFileInfo?.previewUrl || editFormData[field.key]"
-                            :record-id="editSelectedFileInfo?.previewUrl ? null : editFormData.ID"
-                            width="200px"
-                            height="150px"
+                  <!-- 其他卡片保持原有流式布局 -->
+                  <el-row v-else :gutter="16">
+                    <el-col
+                      v-for="field in section.fields"
+                      :key="field.key"
+                      :span="getFieldSpan(field)"
+                    >
+                      <el-form-item
+                        :label="field.label"
+                        :prop="field.key"
+                        :label-width="getFieldLabelWidth(field)"
+                      >
+                        <!-- 日期字段 -->
+                        <el-date-picker
+                          v-if="field.type === 'date'"
+                          v-model="editFormData[field.key]"
+                          type="date"
+                          style="width: 100%"
+                          format="YYYY-MM-DD"
+                          value-format="YYYY-MM-DD"
+                        />
+                        <!-- 数字字段 -->
+                        <el-input-number
+                          v-else-if="field.type === 'number' || field.type === 'decimal'"
+                          v-model="editFormData[field.key]"
+                          :precision="field.type === 'decimal' ? 2 : 0"
+                          :step="field.type === 'decimal' ? 0.01 : 1"
+                          :min="0"
+                          :max="field.key === 'DefectiveRate' ? 100 : undefined"
+                          controls-position="right"
+                          style="width: 100%"
+                        />
+                        <!-- 布尔值字段 -->
+                        <el-switch
+                          v-else-if="field.key === 'ReturnGoods' || field.key === 'IsReprint'"
+                          v-model="editFormData[field.key]"
+                        />
+                        <!-- 发生车间下拉框 -->
+                        <el-select
+                          v-else-if="field.key === 'Workshop'"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          placeholder="请选择发生车间"
+                          style="width: 100%"
+                        >
+                          <el-option v-for="item in editOptions.workshops" :key="item" :label="item" :value="item" />
+                        </el-select>
+                        <!-- 投诉类别下拉框 -->
+                        <el-select
+                          v-else-if="field.key === 'ComplaintCategory'"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          placeholder="请选择投诉类别"
+                          style="width: 100%"
+                        >
+                          <el-option v-for="item in editOptions.complaintCategories" :key="item" :label="item" :value="item" />
+                        </el-select>
+                        <!-- 客诉类型下拉框 -->
+                        <el-select
+                          v-else-if="field.key === 'CustomerComplaintType'"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          placeholder="请选择客诉类型"
+                          :disabled="editFormData.ComplaintCategory !== '客诉'"                        
+                          style="width: 100%"
+                        >
+                          <el-option v-for="item in editOptions.customerComplaintTypes" :key="item" :label="item" :value="item" />
+                        </el-select>
+                        <!-- 不良类别下拉框 -->
+                        <el-select
+                          v-else-if="field.key === 'DefectiveCategory'"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          placeholder="请选择不良类别"
+                          @change="handleEditCategoryChange"
+                          value-key="ID"                        
+                          style="width: 100%"
+                        >
+                          <el-option
+                            v-for="item in editOptions.defectiveCategories"
+                            :key="item.ID"
+                            :label="item.Name"
+                            :value="item"
                           />
-                          <el-empty v-else description="暂无图片" :image-size="80" />
+                        </el-select>
+                        <!-- 不良项下拉框 -->
+                        <el-select
+                          v-else-if="field.key === 'DefectiveItem'"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          placeholder="请选择不良项"                        
+                          style="width: 100%"
+                        >
+                          <el-option v-for="item in editOptions.defectiveItems" :key="item" :label="item" :value="item" />
+                        </el-select>
+                        <!-- 主责部门下拉框 -->
+                        <el-select
+                          v-else-if="field.key === 'MainDept'"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          placeholder="请选择主责部门"                       
+                          style="width: 100%"
+                        >
+                          <el-option v-for="item in editOptions.departments" :key="item" :label="item" :value="item" />
+                        </el-select>
+                        <!-- 主责人下拉框 -->
+                        <el-select
+                          v-else-if="field.key === 'MainPerson'"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          placeholder="请选择主责人"                        
+                          style="width: 100%"
+                        >
+                          <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
+                        </el-select>
+                        <!-- 次责人下拉框 -->
+                        <el-select
+                          v-else-if="field.key === 'SecondPerson'"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          placeholder="请选择次责人"                        
+                          style="width: 100%"
+                        >
+                          <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
+                        </el-select>
+                        <!-- 责任主管下拉框 -->
+                        <el-select
+                          v-else-if="field.key === 'Manager'"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          placeholder="请选择责任主管"
+                          style="width: 100%"
+                        >
+                          <el-option v-for="item in editOptions.persons" :key="item" :label="item" :value="item" />
+                        </el-select>
+                        <!-- 材料名称下拉框 -->
+                        <el-select
+                          v-else-if="['Paper', 'MaterialA', 'MaterialB', 'MaterialC'].includes(field.key)"
+                          v-model="editFormData[field.key]"
+                          filterable
+                          allow-create
+                          :placeholder="`请选择或输入${field.label}`"
+                          style="width: 100%"
+                          @change="handleEditMaterialChange(field.key, $event)"
+                          :loading="editMaterialLoading"
+                        >
+                          <el-option
+                            v-for="material in editMaterialNames"
+                            :key="material"
+                            :label="material"
+                            :value="material"
+                          />
+                        </el-select>
+                        <!-- 附件文件字段 - 特殊处理 -->
+                        <div v-else-if="field.key === 'AttachmentFile'" class="upload-preview-container">
+                          <div class="attachment-upload-area">
+                            <!-- 如果有图片则显示预览 -->
+                            <div v-if="editSelectedFileInfo" class="preview-box">
+                              <!-- 图片加载失败时显示错误提示 -->
+                              <div v-if="editSelectedFileInfo.loadError" class="file-load-error">
+                                <el-icon class="error-icon" :size="40"><WarningFilled /></el-icon>
+                                <div class="error-text">{{ editSelectedFileInfo.errorMessage || '文件加载失败' }}</div>
+                                <el-button type="primary" size="small" @click="selectFile" style="margin-top: 8px;">
+                                  重新上传
+                                </el-button>
+                              </div>
+                              <!-- 图片正常显示 -->
+                              <div v-else-if="editSelectedFileInfo.isImage && editSelectedFileInfo.previewUrl" class="image-preview-wrapper" @mouseenter="editShowMask = true" @mouseleave="editShowMask = false">
+                                <el-image 
+                                  ref="editPreviewImage"
+                                  :src="editSelectedFileInfo.previewUrl" 
+                                  :preview-src-list="[editSelectedFileInfo.previewUrl]"
+                                  fit="contain"
+                                  class="preview-img"
+                                  :preview-teleported="true"
+                                  style="width: 100%; height: 100%;"
+                                />
+                                <div class="preview-mask" v-show="editShowMask">
+                                  <span class="preview-action-btn" @click="handleEditPreviewClick">
+                                    <el-icon><ZoomIn /></el-icon>
+                                  </span>
+                                  <span class="preview-action-btn" @click.stop="handleEditDeleteFile">
+                                    <el-icon><Delete /></el-icon>
+                                  </span>
+                                </div>
+                              </div>
+                              <!-- 图片正在加载 -->
+                              <div v-else-if="editSelectedFileInfo.isImage && !editSelectedFileInfo.previewUrl" class="image-loading">
+                                <el-icon class="is-loading" :size="30"><Loading /></el-icon>
+                                <div class="loading-text">加载中...</div>
+                              </div>
+                              <!-- 非图片文件 -->
+                              <div v-else class="file-preview">
+                                <el-icon class="file-icon"><Document /></el-icon>
+                                <span class="file-name" :title="editSelectedFileInfo.generatedFileName || editSelectedFileInfo.fileName">
+                                  {{ editSelectedFileInfo.generatedFileName || editSelectedFileInfo.fileName }}
+                                </span>
+                              </div>
+                              
+                              <div class="preview-actions">
+                                <span class="file-size" v-if="editSelectedFileInfo.fileSize">
+                                  {{ formatFileSize(editSelectedFileInfo.fileSize) }}
+                                </span>
+                                <el-button v-if="!editSelectedFileInfo.isImage" type="danger" link size="small" @click="handleEditDeleteFile">
+                                  移除
+                                </el-button>
+                              </div>
+                            </div>
+                            
+                            <!-- 没有图片时显示上传按钮 -->
+                            <div v-else class="upload-placeholder" @click="selectFile">
+                              <el-icon class="upload-icon"><Plus /></el-icon>
+                              <div class="upload-text">点击上传图片</div>
+                              <div class="upload-tip">支持 jpg/png 格式</div>
+                            </div>
+                            
+                            <!-- 隐藏的文件输入框 -->
+                            <el-input v-model="editFormData[field.key]" v-show="false" />
+                          </div>
                         </div>
-                      </div>
-                      <!-- 文本字段 -->
-                      <el-input
-                        v-else
-                        v-model="editFormData[field.key]"
-                        :type="isFullWidthField(field) ? 'textarea' : 'text'"
-                        :rows="isFullWidthField(field) ? 2 : undefined"
-                      />
-                    </el-form-item>
-                  </el-col>
-                </el-row>
+                        <!-- 文本字段 -->
+                        <el-input
+                          v-else
+                          v-model="editFormData[field.key]"
+                          :type="isFullWidthField(field) ? 'textarea' : 'text'"
+                          :rows="isFullWidthField(field) ? 2 : undefined"
+                        />
+                      </el-form-item>
+                    </el-col>
+                  </el-row>
+                </div>
               </div>
             </el-card>
           </div>
@@ -1259,26 +1541,11 @@
     </el-dialog>
 
     <!-- 新增投诉对话框 -->
-    <el-dialog
+    <ComplaintFormDialog 
       v-model="showComplaintDialog"
-      width="70%"
-      :close-on-click-modal="false"
-      :close-on-press-escape="false"
-      class="complaint-dialog"
-      :destroy-on-close="true"
-      :append-to-body="true"
-      :lock-scroll="false"
-      :modal="true"
-      center
-      top="3vh">
-      <template #header>
-        <div class="dialog-header-with-icon">
-          <el-icon class="dialog-icon"><DocumentCopy /></el-icon>
-          <span class="dialog-title">新增投诉记录</span>
-        </div>
-      </template>
-      <ComplaintFormDialog @success="handleComplaintSuccess" @cancel="showComplaintDialog = false" />
-    </el-dialog>
+      @success="handleComplaintSuccess" 
+      @cancel="showComplaintDialog = false" 
+    />
     
     <!-- 回到顶部按钮 -->
     <el-backtop :right="40" :bottom="40" :visibility-height="200" />
@@ -1287,7 +1554,7 @@
 
 <script setup>
 import { ref, onMounted, computed, watch, nextTick, reactive } from 'vue'
-import { Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning, DocumentCopy, Box, CircleClose, ChatLineRound, Coordinate, Avatar, Setting, Picture, Upload, Money, ArrowDown, User } from '@element-plus/icons-vue'
+import { Document, Search, Plus, View, RefreshLeft, InfoFilled, WarningFilled, UserFilled, Paperclip, Loading, QuestionFilled, Tools, OfficeBuilding, Download, Close, Edit, Delete, Check, Calendar, DataAnalysis, CircleCheck, Warning, DocumentCopy, Box, CircleClose, ChatLineRound, Coordinate, Avatar, Setting, Picture, Upload, Money, ArrowDown, User, ZoomIn } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import api from '@/services/api'
 import { ElPagination, ElMessage, ElMessageBox } from 'element-plus'
@@ -1353,6 +1620,8 @@ const editDialogInstanceId = ref(0) // 对话框实例标识，用于强制重�
 // 编辑对话框文件处理相关变量
 const editSelectedFileInfo = ref(null)
 const editFileUploading = ref(false)
+const editShowMask = ref(false)
+const editPreviewImage = ref()
 
 // 编辑表单下拉选项数据
 const editOptions = reactive({
@@ -2166,7 +2435,6 @@ const handleAdvancedQuery = () => {
 // 处理投诉表单成功提交
 const handleComplaintSuccess = () => {
   showComplaintDialog.value = false
-  ElMessage.success('投诉记录添加成功')
   // 刷新表格数据和统计数据
   fetchTableData()
   fetchStats()
@@ -2739,17 +3007,46 @@ const editRecord = async (row) => {
         const extension = fileName.toLowerCase().substring(fileName.lastIndexOf('.'))
         const isImage = imageExtensions.includes(extension)
 
+        console.log('[HomeContent] 编辑初始化 - 附件路径:', filePath)
+        console.log('[HomeContent] 编辑初始化 - 文件名:', fileName)
+        console.log('[HomeContent] 编辑初始化 - 是否图片:', isImage)
+        console.log('[HomeContent] 编辑初始化 - 记录ID:', data.ID)
+
         editSelectedFileInfo.value = {
           fileName: fileName,
           fileSize: 0, // 现有文件大小未知
           fileType: isImage ? 'image/*' : 'application/octet-stream',
           isImage: isImage,
-          previewUrl: null, // 现有文件使用API预览
+          previewUrl: null, // 先设为null，后面异步加载
           relativePath: filePath,
           serverPath: null,
           file: null,
           uploaded: true,
           isExisting: true // 标记为现有文件
+        }
+
+        // 如果是图片，通过API异步加载预览URL
+        if (isImage && data.ID) {
+          console.log('[HomeContent] 开始异步加载图片预览，记录ID:', data.ID)
+          import('@/services/imagePreviewService.js').then(module => {
+            const imagePreviewService = module.default
+            imagePreviewService.getImageUrlByRecordId(data.ID)
+              .then(url => {
+                console.log('[HomeContent] 图片预览URL加载成功:', url)
+                if (editSelectedFileInfo.value && editSelectedFileInfo.value.isExisting) {
+                  editSelectedFileInfo.value.previewUrl = url
+                }
+              })
+              .catch(error => {
+                console.error('[HomeContent] 图片预览URL加载失败:', error)
+                // 文件不存在时，显示占位提示而不是报错
+                if (editSelectedFileInfo.value && editSelectedFileInfo.value.isExisting) {
+                  editSelectedFileInfo.value.previewUrl = null
+                  editSelectedFileInfo.value.loadError = true
+                  editSelectedFileInfo.value.errorMessage = '文件不存在，可能需要重新上传'
+                }
+              })
+          })
         }
       } else {
         editSelectedFileInfo.value = null
@@ -3388,6 +3685,63 @@ const cleanupEditResources = () => {
   editFileUploading.value = false
 }
 
+// 编辑对话框：处理预览点击
+const handleEditPreviewClick = () => {
+  // 获取实际的组件实例（可能是数组或单个组件）
+  let imageComponent = editPreviewImage.value
+  
+  // 如果是数组，取第一个元素
+  if (Array.isArray(imageComponent) || (imageComponent && imageComponent[0])) {
+    imageComponent = imageComponent[0]
+  }
+  
+  if (imageComponent) {
+    try {
+      // 方式1：直接调用 el-image 的 clickHandler 方法
+      if (typeof imageComponent.clickHandler === 'function') {
+        imageComponent.clickHandler()
+        return
+      }
+      
+      // 方式2：通过 $el 获取 img 元素并点击
+      if (imageComponent.$el) {
+        const imgEl = imageComponent.$el.querySelector('img')
+        if (imgEl) {
+          imgEl.click()
+          return
+        }
+      }
+    } catch (error) {
+      console.error('[handleEditPreviewClick] 预览失败:', error)
+    }
+  }
+  
+  // 备用方案：手动创建预览
+  if (editSelectedFileInfo.value?.previewUrl) {
+    const previewUrl = editSelectedFileInfo.value.previewUrl
+    const overlay = document.createElement('div')
+    overlay.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.9);z-index:9999;display:flex;align-items:center;justify-content:center;cursor:zoom-out;'
+    const img = document.createElement('img')
+    img.src = previewUrl
+    img.style.cssText = 'max-width:90%;max-height:90%;object-fit:contain;'
+    overlay.appendChild(img)
+    overlay.onclick = () => document.body.removeChild(overlay)
+    document.body.appendChild(overlay)
+  }
+}
+
+// 编辑对话框：删除文件
+const handleEditDeleteFile = () => {
+  // 清理选中文件的预览URL
+  if (editSelectedFileInfo.value?.previewUrl && editSelectedFileInfo.value.previewUrl.startsWith('blob:')) {
+    URL.revokeObjectURL(editSelectedFileInfo.value.previewUrl)
+  }
+
+  // 重置文件相关状态
+  editSelectedFileInfo.value = null
+  editFormData.value.AttachmentFile = ''
+}
+
 // 注意：图片预览功能已移至ImagePreview组件中处理
 
 // 处理文件拖拽
@@ -3496,6 +3850,15 @@ const deleteRecord = async (row) => {
       ElMessage.error('删除记录失败')
     }
   }
+}
+
+// 格式化文件大小
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 
 // 格式化日期
@@ -3652,13 +4015,13 @@ const organizeEditFields = () => {
       title: '基本信息',
       icon: 'InfoFilled',
       iconClass: '',
-      fields: ['Date', 'Customer', 'OrderNo', 'ProductName', 'Specification', 'Workshop', 'ProductionQty', 'DefectiveQty', 'DefectiveRate']
+      fields: ['Date', 'Customer', 'OrderNo', 'ProductName', 'Specification', 'Workshop', 'ProductionQty']
     },
     complaint: {
-      title: '不良信息',
+      title: '不良详情',
       icon: 'WarningFilled',
       iconClass: 'warning',
-      fields: ['ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'DefectiveDescription', 'DefectiveReason', 'AttachmentFile']
+      fields: ['ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem', 'DefectiveQty', 'DefectiveRate', 'DefectiveDescription', 'DefectiveReason', 'AttachmentFile']
     },
     disposition: {
       title: '处置与补充',
@@ -3704,13 +4067,7 @@ const organizeEditFields = () => {
       title: '责任与考核',
       icon: 'UserFilled',
       iconClass: 'danger',
-      fields: ['MainDept', 'MainPerson', 'MainPersonAssessment', 'Manager', 'SecondPerson', 'SecondPersonAssessment', 'ManagerAssessment']
-    },
-    assessment: {
-      title: '考核信息',
-      icon: 'QuestionFilled',
-      iconClass: 'warning',
-      fields: ['AssessmentDescription']
+      fields: ['MainDept', 'MainPerson', 'MainPersonAssessment', 'Manager', 'SecondPerson', 'SecondPersonAssessment', 'ManagerAssessment', 'AssessmentDescription']
     }
   }
 
@@ -3815,7 +4172,11 @@ const getFieldProps = (field) => {
   return props
 }
 
-// 获取字段占用的列宽 - 优化布局规则
+/**
+ * 获取字段占用的列宽 - 优化布局规则
+ * @param {Object} field - 字段对象
+ * @returns {number} 列宽span值(1-24)
+ */
 const getFieldSpan = (field) => {
   // 全宽字段占满整行
   if (isFullWidthField(field)) {
@@ -3826,9 +4187,9 @@ const getFieldSpan = (field) => {
   const fieldKey = field.key
   const labelLength = field.label.length
 
-  // 基本信息模块 - 紧凑布局
+  // 基本信息模块 - 紧凑布局 (4列)
   if (['Date', 'Customer', 'OrderNo', 'Workshop'].includes(fieldKey)) {
-    return 12  // 2列布局
+    return 6  // 4列布局，与新增投诉保持一致
   }
 
   // 产品信息 - 产品名称占50%，规格占50%
@@ -3839,8 +4200,18 @@ const getFieldSpan = (field) => {
     return 12  // 50%宽度
   }
 
-  // 数量相关字段 - 3列布局
-  if (['ProductionQty', 'DefectiveQty', 'DefectiveRate', 'ReprintQty'].includes(fieldKey)) {
+  // 生产数量 - 独立占位或与其他对齐
+  if (fieldKey === 'ProductionQty') {
+    return 6   // 4列布局
+  }
+
+  // 不良数量和不良率 - 2列布局
+  if (['DefectiveQty', 'DefectiveRate'].includes(fieldKey)) {
+    return 12  // 2列布局
+  }
+
+  // 补印数量
+  if (fieldKey === 'ReprintQty') {
     return 8  // 3列布局
   }
 
@@ -3883,6 +4254,11 @@ const getFieldSpan = (field) => {
   // 下拉选择类字段 - 2列布局
   if (['ComplaintCategory', 'CustomerComplaintType', 'DefectiveCategory', 'DefectiveItem'].includes(fieldKey)) {
     return 12  // 2列布局
+  }
+
+  // 附件文件
+  if (fieldKey === 'AttachmentFile') {
+    return 24
   }
 
   // 根据标签长度的默认规则
@@ -5640,6 +6016,43 @@ body::-webkit-scrollbar-thumb:hover {
   overflow: hidden;
 }
 
+/* 全局编辑对话框样式调整 - 解决高度溢出问题 */
+.edit-dialog {
+  display: flex;
+  flex-direction: column;
+  margin: 5vh auto !important;
+  max-height: 85vh; /* 严格限制最大高度 */
+  overflow: hidden; /* 防止溢出 */
+  border-radius: 12px;
+  box-shadow: 0 12px 32px 4px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.edit-dialog .el-dialog__header {
+  flex-shrink: 0;
+  padding: 20px 24px 16px 24px;
+  border-bottom: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-radius: 12px 12px 0 0;
+}
+
+.edit-dialog .el-dialog__body {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #fafbfc;
+}
+
+.edit-dialog .el-dialog__footer {
+  flex-shrink: 0;
+  padding: 16px 24px 20px 24px;
+  border-top: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-radius: 0 0 12px 12px;
+}
+
 .file-icon {
   color: #0ea5e9;
   font-size: 20px;
@@ -5896,44 +6309,192 @@ body::-webkit-scrollbar-thumb:hover {
   border-right: 1px solid #409eff;
 }
 
+/* 附件上传区域样式 - 保持与ComplaintFormDialog一致 */
+.upload-preview-container {
+  margin-bottom: 0 !important;
+  width: 100%;
+}
+
+.attachment-upload-area {
+  width: 100%;
+  height: 220px; /* 固定高度与左侧表单区域对齐 */
+  border: 1px dashed #dcdfe6;
+  border-radius: 6px;
+  box-sizing: border-box;
+  background-color: #fcfcfc;
+  transition: border-color 0.3s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  position: relative;
+}
+
+.attachment-upload-area:hover {
+  border-color: #409eff;
+}
+
+/* 文件加载错误样式 */
+.file-load-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #f56c6c;
+  text-align: center;
+  padding: 16px;
+}
+
+.file-load-error .error-icon {
+  color: #f56c6c;
+  margin-bottom: 8px;
+}
+
+.file-load-error .error-text {
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+
+/* 图片加载中样式 */
+.image-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  color: #409eff;
+}
+
+.image-loading .loading-text {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  width: 100%;
+  height: 100%;
+  color: #909399;
+}
+
+.upload-icon {
+  font-size: 28px;
+  margin-bottom: 8px;
+}
+
+.upload-text {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.upload-tip {
+  font-size: 12px;
+  color: #c0c4cc;
+}
+
+/* 预览框样式 */
+.preview-box {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.image-preview-wrapper {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.preview-mask {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: #fff;
+  font-size: 20px;
+  cursor: default;
+  z-index: 1;
+  transition: opacity 0.3s;
+}
+
+.preview-action-btn {
+  cursor: pointer;
+  transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.preview-action-btn:hover {
+  transform: scale(1.2);
+}
+
+.file-preview {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.file-icon {
+  font-size: 48px;
+  color: #909399;
+  margin-bottom: 10px;
+}
+
+.preview-actions {
+  height: 36px;
+  background-color: #fff;
+  border-top: 1px solid #ebeef5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 10px;
+}
+
+.file-name {
+  font-size: 12px;
+  color: #606266;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #909399;
+}
+
 /* 编辑对话框样式 */
 .edit-dialog {
   --el-dialog-margin-top: 5vh;
-}
-
-.edit-dialog :deep(.el-dialog) {
-  margin: 5vh auto;
-  height: 90vh;
-  max-height: 90vh;
-  display: flex;
-  flex-direction: column;
-  border-radius: 12px;
-  box-shadow: 0 12px 32px 4px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.08);
-}
-
-.edit-dialog :deep(.el-dialog__header) {
-  flex-shrink: 0;
-  padding: 20px 24px 16px 24px;
-  border-bottom: 1px solid #e4e7ed;
-  background: #ffffff;
-  border-radius: 12px 12px 0 0;
-}
-
-.edit-dialog :deep(.el-dialog__body) {
-  flex: 1;
-  padding: 0;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  background: #fafbfc;
-}
-
-.edit-dialog :deep(.el-dialog__footer) {
-  padding: 16px 24px 20px 24px;
-  border-top: 1px solid #e4e7ed;
-  background: #ffffff;
-  border-radius: 0 0 12px 12px;
 }
 
 /* 编辑对话框头部样式 */
@@ -5992,8 +6553,6 @@ body::-webkit-scrollbar-thumb:hover {
   overflow-x: hidden;
   padding: 24px;
   background: #fafbfc;
-  height: 100%;
-  max-height: calc(90vh - 180px);
 }
 
 .edit-form :deep(.el-form-item) {
@@ -7449,5 +8008,82 @@ body.el-popup-parent--hidden {
 .danger-btn:disabled {
   color: #ee8585 !important;
   opacity: 0.4 !important;
+}
+</style>
+<style>
+/* 全局样式修正 - 必须放在�?scoped 标签�?*/
+.el-dialog.edit-dialog {
+  display: flex;
+  flex-direction: column;
+  margin: 5vh auto !important;
+  max-height: 85vh !important;
+  overflow: hidden !important;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px 4px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.el-dialog.edit-dialog .el-dialog__header {
+  flex-shrink: 0;
+  padding: 20px 24px 16px 24px;
+  border-bottom: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-radius: 12px 12px 0 0;
+}
+
+.el-dialog.edit-dialog .el-dialog__body {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #fafbfc;
+}
+
+.el-dialog.edit-dialog .el-dialog__footer {
+  flex-shrink: 0;
+  padding: 16px 24px 20px 24px;
+  border-top: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-radius: 0 0 12px 12px;
+}
+</style>
+
+<style>
+/* 全局样式修正 - 必须放在�?scoped 标签�?*/
+.el-dialog.edit-dialog {
+  display: flex;
+  flex-direction: column;
+  margin: 5vh auto !important;
+  max-height: 85vh !important;
+  overflow: hidden !important;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px 4px rgba(0, 0, 0, 0.04), 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+
+.el-dialog.edit-dialog .el-dialog__header {
+  flex-shrink: 0;
+  padding: 20px 24px 16px 24px;
+  border-bottom: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-radius: 12px 12px 0 0;
+}
+
+.el-dialog.edit-dialog .el-dialog__body {
+  flex: 1;
+  padding: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  background: #fafbfc;
+}
+
+.el-dialog.edit-dialog .el-dialog__footer {
+  flex-shrink: 0;
+  padding: 16px 24px 20px 24px;
+  border-top: 1px solid #e4e7ed;
+  background: #ffffff;
+  border-radius: 0 0 12px 12px;
 }
 </style>

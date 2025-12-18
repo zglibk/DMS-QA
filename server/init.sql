@@ -461,15 +461,65 @@ CREATE TABLE [dbo].[CustomerComplaintType] (
 -- 不良类别表
 CREATE TABLE [dbo].[DefectiveCategory] (
     [ID] INT IDENTITY(1,1) PRIMARY KEY,
-    [Name] NVARCHAR(50) NOT NULL UNIQUE
+    [Name] NVARCHAR(50) NOT NULL UNIQUE,              -- 类别名称
+    [Description] NVARCHAR(200),                      -- 描述
+    [SortOrder] INT DEFAULT 0,                        -- 排序
+    [IsActive] BIT DEFAULT 1,                         -- 是否启用
+    [CreatedAt] DATETIME DEFAULT GETDATE(),           -- 创建时间
+    [UpdatedAt] DATETIME DEFAULT GETDATE()            -- 更新时间
 );
 
 -- 不良项表
 CREATE TABLE [dbo].[DefectiveItem] (
     [ID] INT IDENTITY(1,1) PRIMARY KEY,
-    [Name] NVARCHAR(100) NOT NULL UNIQUE,
-    [CategoryID] INT FOREIGN KEY REFERENCES DefectiveCategory(ID)
+    [Name] NVARCHAR(100) NOT NULL UNIQUE,             -- 不良项名称
+    [CategoryID] INT FOREIGN KEY REFERENCES DefectiveCategory(ID), -- 保留用于向后兼容
+    [Description] NVARCHAR(500),                      -- 描述
+    [SortOrder] INT DEFAULT 0,                        -- 排序
+    [IsActive] BIT DEFAULT 1,                         -- 是否启用
+    [CreatedAt] DATETIME DEFAULT GETDATE(),           -- 创建时间
+    [UpdatedAt] DATETIME DEFAULT GETDATE()            -- 更新时间
 );
+
+-- 不良项与类别多对多关联表
+CREATE TABLE [dbo].[DefectiveItemCategory] (
+    [ID] INT IDENTITY(1,1) PRIMARY KEY,
+    [ItemID] INT NOT NULL,                            -- 不良项ID
+    [CategoryID] INT NOT NULL,                        -- 类别ID
+    [CreatedAt] DATETIME DEFAULT GETDATE(),           -- 创建时间
+    
+    CONSTRAINT FK_DefectiveItemCategory_Item 
+        FOREIGN KEY (ItemID) REFERENCES [dbo].[DefectiveItem](ID) ON DELETE CASCADE,
+    CONSTRAINT FK_DefectiveItemCategory_Category 
+        FOREIGN KEY (CategoryID) REFERENCES [dbo].[DefectiveCategory](ID) ON DELETE CASCADE,
+    CONSTRAINT UK_DefectiveItemCategory_ItemCategory 
+        UNIQUE (ItemID, CategoryID)
+);
+
+-- 不良项与类别关联视图
+CREATE VIEW [dbo].[V_DefectiveItemWithCategories] AS
+SELECT 
+    di.ID,
+    di.Name,
+    di.Description,
+    di.SortOrder,
+    di.IsActive,
+    di.CreatedAt,
+    di.UpdatedAt,
+    STUFF((
+        SELECT ',' + dc.Name
+        FROM DefectiveItemCategory dic
+        INNER JOIN DefectiveCategory dc ON dic.CategoryID = dc.ID
+        WHERE dic.ItemID = di.ID
+        ORDER BY dc.SortOrder, dc.ID
+        FOR XML PATH('')
+    ), 1, 1, '') AS CategoryNames,
+    (
+        SELECT STRING_AGG(CAST(dic.CategoryID AS VARCHAR), ',')
+        FROM DefectiveItemCategory dic
+        WHERE dic.ItemID = di.ID
+    ) AS CategoryIDs
+FROM DefectiveItem di;
 
 -- "记住我"功能的令牌表
 CREATE TABLE [dbo].[UserTokens] (
@@ -648,7 +698,18 @@ INSERT INTO [dbo].[Menus] ([ParentID], [MenuCode], [MenuName], [MenuType], [Icon
 INSERT INTO [dbo].[Menus] ([ParentID], [MenuCode], [MenuName], [MenuType], [Icon], [Path], [Component], [Permission], [SortOrder], [Visible], [Status]) VALUES
 (@qualityMenuId, 'complaint-management', N'投诉管理', 'menu', 'Warning', '/quality/complaint', 'quality/complaint/index', 'quality:complaint:view', 10, 1, 1),
 (@qualityMenuId, 'rework-management', N'返工管理', 'menu', 'Refresh', '/quality/rework', 'quality/rework/index', 'quality:rework:view', 20, 1, 1),
-(@qualityMenuId, 'person-management', N'人员管理', 'menu', 'Avatar', '/quality/person', 'quality/person/index', 'quality:person:view', 30, 1, 1);
+(@qualityMenuId, 'person-management', N'人员管理', 'menu', 'Avatar', '/quality/person', 'quality/person/index', 'quality:person:view', 30, 1, 1),
+(@qualityMenuId, 'defective-management', N'不良类别管理', 'menu', 'List', '/admin/quality/defective-management', 'admin/DefectiveManagement', 'quality:defective:view', 40, 1, 1);
+
+-- 不良类别管理按钮权限
+DECLARE @defectiveMenuId INT = (SELECT ID FROM [dbo].[Menus] WHERE MenuCode = 'defective-management');
+INSERT INTO [dbo].[Menus] ([ParentID], [MenuCode], [MenuName], [MenuType], [Icon], [Path], [Component], [Permission], [SortOrder], [Visible], [Status]) VALUES
+(@defectiveMenuId, 'defective-category-add', N'新增类别', 'button', NULL, NULL, NULL, 'quality:defective:category:add', 1, 1, 1),
+(@defectiveMenuId, 'defective-category-edit', N'编辑类别', 'button', NULL, NULL, NULL, 'quality:defective:category:edit', 2, 1, 1),
+(@defectiveMenuId, 'defective-category-delete', N'删除类别', 'button', NULL, NULL, NULL, 'quality:defective:category:delete', 3, 1, 1),
+(@defectiveMenuId, 'defective-item-add', N'新增不良项', 'button', NULL, NULL, NULL, 'quality:defective:item:add', 4, 1, 1),
+(@defectiveMenuId, 'defective-item-edit', N'编辑不良项', 'button', NULL, NULL, NULL, 'quality:defective:item:edit', 5, 1, 1),
+(@defectiveMenuId, 'defective-item-delete', N'删除不良项', 'button', NULL, NULL, NULL, 'quality:defective:item:delete', 6, 1, 1);
 
 -- 生产管理子菜单
 INSERT INTO [dbo].[Menus] ([ParentID], [MenuCode], [MenuName], [MenuType], [Icon], [Path], [Component], [Permission], [SortOrder], [Visible], [Status]) VALUES
@@ -697,7 +758,15 @@ INSERT INTO [dbo].[ComplaintCategory] (Name) VALUES (N'客户投诉'), (N'内部
 INSERT INTO [dbo].[CustomerComplaintType] (Name) VALUES (N'产品质量'), (N'交货期'), (N'服务态度');
 
 -- 不良类别 (与之前插入不良项的脚本对应)
-INSERT INTO [dbo].[DefectiveCategory] (Name) VALUES (N'印刷类'), (N'裁切类'), (N'包装类'), (N'未分类');
+INSERT INTO [dbo].[DefectiveCategory] (Name, Description, SortOrder, IsActive) VALUES 
+(N'印刷类', N'印刷相关的不良问题', 1, 1), 
+(N'裁切类', N'裁切相关的不良问题', 2, 1), 
+(N'包装类', N'包装相关的不良问题', 3, 1), 
+(N'未分类', N'暂未分类的不良问题', 99, 1);
+
+-- 创建DefectiveItemCategory索引
+CREATE NONCLUSTERED INDEX [IX_DefectiveItemCategory_ItemID] ON [dbo].[DefectiveItemCategory] ([ItemID]);
+CREATE NONCLUSTERED INDEX [IX_DefectiveItemCategory_CategoryID] ON [dbo].[DefectiveItemCategory] ([CategoryID]);
 
 -- 创建权限管理系统相关索引
 CREATE NONCLUSTERED INDEX [IX_Departments_ParentID] ON [dbo].[Department] ([ParentID]);

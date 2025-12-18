@@ -939,6 +939,16 @@ router.post('/user-status', authenticateToken, async (req, res) => {
 // POST /api/auth/add-user
 // 参数: Username, Password, Role, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark
 router.post('/add-user', authenticateToken, async (req, res) => {
+  try {
+    const { checkUserPermission } = require('../middleware/auth');
+    const hasPermission = await checkUserPermission(req.user.id, 'sys:user:add');
+    if (!hasPermission) {
+      return res.status(403).json({ success: false, message: '权限不足，无法添加用户' });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: '权限检查失败' });
+  }
+
   const { Username, Password, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
   
   // 检查必填字段并返回具体缺失字段信息
@@ -1013,6 +1023,16 @@ router.post('/add-user', authenticateToken, async (req, res) => {
 // PUT /api/auth/update-user
 // 更新用户信息（管理员功能）
 router.put('/update-user', authenticateToken, async (req, res) => {
+  try {
+    const { checkUserPermission } = require('../middleware/auth');
+    const hasPermission = await checkUserPermission(req.user.id, 'sys:user:edit');
+    if (!hasPermission) {
+      return res.status(403).json({ success: false, message: '权限不足，无法编辑用户' });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: '权限检查失败' });
+  }
+
   const { Username, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark } = req.body;
   
   // 检查必填字段并返回具体缺失字段信息
@@ -1257,6 +1277,17 @@ router.post('/refresh-permissions', authenticateToken, async (req, res) => {
 // 参数: userID, username, newPassword, notifyMethod
 // 管理员重置指定用户的密码
 router.post('/reset-user-password', authenticateToken, async (req, res) => {
+  try {
+    const { checkUserPermission } = require('../middleware/auth');
+    // 使用 sys:user:reset-pwd 权限
+    const hasPermission = await checkUserPermission(req.user.id, 'sys:user:reset-pwd');
+    if (!hasPermission) {
+      return res.status(403).json({ success: false, message: '权限不足，无法重置密码' });
+    }
+  } catch (error) {
+    return res.status(500).json({ success: false, message: '权限检查失败' });
+  }
+
   const { userId, username, newPassword, notifyMethod } = req.body;
   
   // 参数验证
@@ -1333,6 +1364,30 @@ router.post('/user/:userId/assign-roles', authenticateToken, async (req, res) =>
   
   try {
     let pool = await sql.connect(await getDynamicConfig());
+    
+    // 权限检查：只有管理员或拥有 sys:user:role 权限的用户可以分配角色
+    const checkPermResult = await pool.request()
+      .input('UserId', sql.Int, req.user.id)
+      .input('Permission', sql.NVarChar, 'sys:user:role')
+      .query(`
+        -- 检查是否为管理员
+        SELECT COUNT(*) as count FROM UserRoles ur
+        INNER JOIN Roles r ON ur.RoleID = r.ID
+        WHERE ur.UserID = @UserId AND (r.RoleCode = 'admin' OR r.RoleName = '系统管理员') AND r.Status = 1
+        
+        UNION ALL
+        
+        -- 检查是否有分配角色权限
+        SELECT COUNT(*) as count FROM V_UserCompletePermissions
+        WHERE UserID = @UserId AND Permission = @Permission AND HasPermission = 1
+      `);
+      
+    // 检查结果集中是否有大于0的记录
+    const hasPermission = checkPermResult.recordset && checkPermResult.recordset.some(row => row.count > 0);
+    
+    if (!hasPermission) {
+      return res.status(403).json({ success: false, message: '权限不足，无法分配角色' });
+    }
     
     // 验证用户是否存在
     const userResult = await pool.request()
@@ -1597,6 +1652,105 @@ router.post('/refresh-token', authenticateToken, async (req, res) => {
       message: 'Token刷新失败',
       error: error.message
     });
+  }
+});
+
+// ===================== 删除用户接口 =====================
+// DELETE /api/auth/user/:userId
+// 删除指定用户（管理员或拥有 sys:user:delete 权限）
+router.delete('/user/:userId', authenticateToken, async (req, res) => {
+  const { userId } = req.params;
+  
+  try {
+    const { checkUserPermission } = require('../middleware/auth');
+    
+    // 权限检查
+    const hasPermission = await checkUserPermission(req.user.id, 'sys:user:delete');
+    if (!hasPermission) {
+      return res.status(403).json({ success: false, message: '权限不足，无法删除用户' });
+    }
+    
+    let pool = await sql.connect(await getDynamicConfig());
+    
+    // 检查用户是否存在及角色
+    const userResult = await pool.request()
+      .input('UserId', sql.Int, userId)
+      .query(`
+        SELECT u.ID, u.Username, u.RealName,
+        CASE WHEN EXISTS(
+          SELECT 1 FROM [UserRoles] ur 
+          INNER JOIN [Roles] r ON ur.RoleID = r.ID 
+          WHERE ur.UserID = u.ID AND (r.RoleCode = 'admin' OR r.RoleName = '系统管理员')
+        ) THEN 1 ELSE 0 END AS IsAdmin
+        FROM [User] u WHERE u.ID = @UserId
+      `);
+    
+    const user = userResult.recordset[0];
+    if (!user) {
+      return res.status(404).json({ success: false, message: '用户不存在' });
+    }
+    
+    // 禁止删除管理员
+    if (user.IsAdmin === 1 || user.Username === 'admin') {
+      return res.status(403).json({ success: false, message: '无法删除管理员账户' });
+    }
+    
+    // 开启事务删除用户相关数据
+    const transaction = new sql.Transaction(pool);
+    await transaction.begin();
+    
+    try {
+      // 1. 删除用户角色关联
+      await transaction.request()
+        .input('UserId', sql.Int, userId)
+        .query('DELETE FROM [UserRoles] WHERE UserID = @UserId');
+
+      // 2. 删除用户独立权限配置
+      await transaction.request()
+        .input('UserId', sql.Int, userId)
+        .query('DELETE FROM [UserPermissions] WHERE UserID = @UserId');
+
+      // 3. 删除用户权限历史记录
+      await transaction.request()
+        .input('UserId', sql.Int, userId)
+        .query('DELETE FROM [UserPermissionHistory] WHERE UserID = @UserId');
+        
+      // 4. 删除用户登录日志
+      // 检查是否有外键约束导致无法删除
+      // 尝试删除用户登录日志
+      await transaction.request()
+        .input('UserId', sql.Int, userId)
+        .query('DELETE FROM [UserLoginLogs] WHERE UserID = @UserId');
+        
+      // 5. 删除用户
+      await transaction.request()
+        .input('UserId', sql.Int, userId)
+        .query('DELETE FROM [User] WHERE ID = @UserId');
+      
+      await transaction.commit();
+      
+      // 记录操作日志
+      await pool.request()
+        .input('UserId', sql.Int, req.user.id)
+        .input('Action', sql.NVarChar, 'DELETE_USER')
+        .input('Details', sql.NVarChar, `删除用户: ${user.Username} (${user.RealName})`)
+        .input('IPAddress', sql.NVarChar, req.ip || 'unknown')
+        .query('INSERT INTO [SystemLogs] (UserID, Action, Details, IPAddress, CreatedAt) VALUES (@UserId, @Action, @Details, @IPAddress, GETDATE())');
+      
+      res.json({ success: true, message: '用户删除成功' });
+      
+    } catch (err) {
+      await transaction.rollback();
+      throw err;
+    }
+    
+  } catch (err) {
+    console.error('删除用户失败:', err);
+    // 处理外键约束错误
+    if (err.number === 547) {
+      return res.status(400).json({ success: false, message: '该用户有关联数据（如业务记录），无法直接删除，请先禁用账户' });
+    }
+    res.status(500).json({ success: false, message: '删除失败: ' + err.message });
   }
 });
 

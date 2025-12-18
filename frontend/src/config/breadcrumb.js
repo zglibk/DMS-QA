@@ -282,6 +282,12 @@ export const breadcrumbConfig = {
     icon: 'mdi:upload'
   },
 
+  // 不良类别管理
+  '/admin/quality/defective-management': {
+    title: '不良类别管理',
+    icon: 'mdi:alert-decagram'
+  },
+
   // 质量报告
   '/admin/quality/reports': {
     title: '质量报告',
@@ -582,6 +588,16 @@ export const breadcrumbConfig = {
   '/admin/version-updates': {
     title: '版本更新',
     icon: 'Upgrade'
+  },
+
+  // 检验报告
+  '/admin/shipment-report': {
+    title: '出货检验报告',
+    icon: 'DocumentChecked'
+  },
+  '/admin/shipment-report/template-mapping': {
+    title: '模板映射编辑',
+    icon: 'Setting'
   }
 }
 
@@ -721,7 +737,11 @@ function generateDefaultTitle(segment) {
     'detail': '详情',
     'create': '创建',
     'edit': '编辑',
-    'view': '查看'
+    'view': '查看',
+    // 检验报告相关
+    'shipment-report': '出货检验报告',
+    'inspection-report': '检验报告',
+    'template-mapping': '模板映射'
   }
   
   return titleMap[segment] || segment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())

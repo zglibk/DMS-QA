@@ -115,7 +115,27 @@ class ImagePreviewService {
       // 根据不同的错误状态提供更具体的错误信息
       let errorMessage = '图片加载失败'
       if (error.response?.status === 404) {
-        errorMessage = '记录不存在或该记录无附件文件'
+        // 尝试获取后端返回的详细调试信息
+        try {
+          // 如果响应是blob，需要转换为text再解析
+          let debugInfo = null
+          if (error.response?.data instanceof Blob) {
+            const text = await error.response.data.text()
+            const json = JSON.parse(text)
+            debugInfo = json.debug
+          } else {
+            debugInfo = error.response?.data?.debug
+          }
+          
+          if (debugInfo) {
+            console.error('[imagePreviewService] 404错误详情:', debugInfo)
+            errorMessage = `文件不存在 - DB路径: ${debugInfo.dbPath}, 搜索路径: ${debugInfo.searchedPath || debugInfo.fullPath}`
+          } else {
+            errorMessage = '记录不存在或该记录无附件文件'
+          }
+        } catch (e) {
+          errorMessage = '记录不存在或该记录无附件文件'
+        }
       } else if (error.response?.status === 500) {
         errorMessage = '服务器内部错误，请稍后重试'
       } else if (error.message.includes('Network Error')) {

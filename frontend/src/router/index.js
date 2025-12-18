@@ -54,9 +54,6 @@ const routes = [
   // 出版异常页面
   { path: '/publishing-exceptions', component: () => import('../views/PublishingExceptions.vue') },
 
-  // 出货报告页面
-  { path: '/shipment-report', component: () => import('../views/ShipmentReport.vue') },
-
   // 版本更新日志页面
   { path: '/version-updates', component: () => import('../views/VersionUpdates.vue') },
 
@@ -68,6 +65,20 @@ const routes = [
 
   // 二维码扫描页面
   { path: '/qr-scan', component: () => import('../views/QrScanPage.vue') },
+
+  // 出货报告页面（根级路由）
+  {
+    path: '/shipment-report',
+    name: 'ShipmentReportRoot',
+    component: () => import('../views/ShipmentReport.vue'),
+    meta: { title: '出货报告', requiresAuth: true }
+  },
+  {
+    path: '/shipment-report/template-mapping/:id',
+    name: 'TemplateMappingEditorRoot',
+    component: () => import('../views/TemplateMappingEditor.vue'),
+    meta: { title: '模板映射编辑', requiresAuth: true }
+  },
 
   // 个人资料页面（懒加载）
   {
@@ -152,6 +163,12 @@ const routes = [
         path: 'quality/data-management',
         component: () => import('../views/admin/DataManagement.vue'), // 质量异常数据导入页面
         meta: { requiresAuth: true }
+      },
+      {
+        path: 'quality/defective-management',
+        name: 'DefectiveManagement',
+        component: () => import('../views/admin/DefectiveManagement.vue'), // 不良类别管理页面
+        meta: { title: '不良类别管理', requiresAuth: true }
       },
       {
         path: 'quality/targets',
@@ -365,11 +382,6 @@ const routes = [
         component: () => import('../views/admin/instruments/InstrumentManagement.vue'), // 年度计划页面
         meta: { title: '年度计划', requiresAuth: true }
       },
-      {
-        path: 'instruments/import',
-        component: () => import('../views/admin/instruments/InstrumentImport.vue'), // 批量导入页面
-        meta: { title: '批量导入', requiresAuth: true }
-      },
 
       // 二次开发模块
       {
@@ -468,7 +480,19 @@ const routes = [
         meta: { requiresAuth: true }
       },
 
-
+      // 出货报告模块
+      {
+        path: 'shipment-report',
+        name: 'ShipmentReport',
+        component: () => import('../views/ShipmentReport.vue'),
+        meta: { title: '出货报告', requiresAuth: true }
+      },
+      {
+        path: 'shipment-report/template-mapping/:id',
+        name: 'TemplateMappingEditor',
+        component: () => import('../views/TemplateMappingEditor.vue'),
+        meta: { title: '模板映射编辑', requiresAuth: true }
+      },
     ]
   }
 ]

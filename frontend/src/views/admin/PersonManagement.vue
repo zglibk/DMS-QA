@@ -13,7 +13,7 @@
     <el-card class="operation-card" shadow="never">
       <div class="operation-bar">
         <div class="left-actions">
-          <el-button type="primary" @click="showAddDialog = true" :icon="Plus">
+          <el-button type="primary" @click="showAddDialog = true" :icon="Plus" :disabled="!hasPermission('sys:person:add')">
             新增人员
           </el-button>
           <el-switch
@@ -67,6 +67,7 @@
               size="small"
               @click="editPerson(row)"
               :icon="Edit"
+              :disabled="!hasPermission('sys:person:edit')"
             >
               编辑
             </el-button>
@@ -75,6 +76,7 @@
               size="small"
               @click="togglePersonStatus(row)"
               :icon="Switch"
+              :disabled="!hasPermission('sys:person:edit')"
             >
               {{ row.IsActive ? '设为离职' : '设为在职' }}
             </el-button>
@@ -83,6 +85,7 @@
               size="small"
               @click="deletePerson(row)"
               :icon="Delete"
+              :disabled="!hasPermission('sys:person:delete')"
             >
               删除
             </el-button>
@@ -159,6 +162,10 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { User, Plus, Search, Refresh, Edit, Switch, Delete } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { useUserStore } from '@/store/user'
+
+const userStore = useUserStore()
+const hasPermission = (permission) => userStore.hasPermission(permission)
 
 // 响应式数据
 const loading = ref(false)

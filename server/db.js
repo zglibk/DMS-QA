@@ -258,6 +258,17 @@ async function executeQuery(queryFn) {
 
       return await queryFn(pool);
     } catch (error) {
+      // 检查是否为逻辑错误（如约束冲突），此类错误不应重试
+      // 例如：DELETE 语句与 REFERENCE 约束冲突
+      if (error.message.includes('REFERENCE 约束') || 
+          error.message.includes('conflicted with the REFERENCE constraint') ||
+          error.message.includes('无法删除') ||
+          error.message.includes('不存在') ||
+          error.message.includes('已存在') ||
+          error.message.includes('不能为空')) {
+        throw error;
+      }
+
       retryCount++;
       console.error(`数据库查询失败 (尝试 ${retryCount}/${maxRetries + 1}):`, error.message);
 

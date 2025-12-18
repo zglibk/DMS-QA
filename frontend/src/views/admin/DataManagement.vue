@@ -24,7 +24,7 @@
                 <template #header>
                   <div class="upload-header">
                     <h3>上传Excel文件</h3>
-                    <el-button type="primary" size="small" @click="downloadTemplate">
+                    <el-button type="primary" size="small" @click="downloadTemplate" :disabled="!hasPermission('sys:data:import')">
                       <el-icon><Download /></el-icon>
                       下载模板
                     </el-button>
@@ -106,6 +106,7 @@
                         @click="previewSelectedSheet(sheetName)"
                         :loading="previewLoading"
                         style="margin-right: 10px; margin-bottom: 10px;"
+                        :disabled="!hasPermission('sys:data:import')"
                       >
                         {{ sheetName }}
                       </el-button>
@@ -113,12 +114,13 @@
                   </div>
 
                   <div class="step-actions">
-                    <el-button @click="clearFile">重新选择</el-button>
+                    <el-button @click="clearFile" :disabled="!hasPermission('sys:data:import')">重新选择</el-button>
                     <el-button
                       v-if="!hasMultipleSheets"
                       type="primary"
                       @click="previewFile"
                       :loading="previewLoading"
+                      :disabled="!hasPermission('sys:data:import')"
                     >
                       预览文件
                     </el-button>
@@ -171,6 +173,7 @@
                             v-if="Object.keys(columnMapping).length > 0"
                             size="small"
                             @click="clearAllMappings"
+                            :disabled="!hasPermission('sys:data:import')"
                           >
                             清空映射
                           </el-button>
@@ -179,7 +182,7 @@
                             type="primary"
                             size="small"
                             @click="smartAutoMap"
-                            :disabled="selectedFields.length === 0"
+                            :disabled="selectedFields.length === 0 || !hasPermission('sys:data:import')"
                             style="margin-left: 8px;"
                           >
                             智能映射
@@ -331,10 +334,10 @@
                 
                 <div class="step-actions">
                   <el-button @click="currentStep = 1">上一步</el-button>
-                  <el-button type="warning" @click="() => validateData()" :disabled="validationLoading || importLoading">
+                  <el-button type="warning" @click="() => validateData()" :disabled="validationLoading || importLoading || !hasPermission('sys:data:import')">
                     数据校验
                   </el-button>
-                  <el-button type="primary" @click="executeImport" :disabled="validationLoading || importLoading">
+                  <el-button type="primary" @click="executeImport" :disabled="validationLoading || importLoading || !hasPermission('sys:data:import')">
                     直接导入
                   </el-button>
                 </div>
@@ -359,7 +362,7 @@
                   >
                     <template #extra>
                       <div class="success-actions">
-                        <el-button type="primary" @click="resetImportProcess">
+                        <el-button type="primary" @click="resetImportProcess" :disabled="!hasPermission('sys:data:import')">
                           <el-icon><Refresh /></el-icon>
                           重新导入
                         </el-button>
@@ -430,7 +433,7 @@
                         列表
                       </el-button>
                     </el-button-group>
-                    <el-button type="primary" @click="refreshTableList" :loading="tableListLoading">
+                    <el-button type="primary" @click="refreshTableList" :loading="tableListLoading" :disabled="!hasPermission('sys:data:init')">
                       <el-icon><Refresh /></el-icon>
                       刷新列表
                     </el-button>
@@ -698,7 +701,7 @@
                         type="danger"
                         size="large"
                         @click="showInitializeDialog"
-                        :disabled="['User', 'DbConfig'].includes(selectedTable.tableName)"
+                        :disabled="['User', 'DbConfig'].includes(selectedTable.tableName) || !hasPermission('sys:data:init')"
                         :loading="initializeLoading"
                       >
                         <el-icon><Delete /></el-icon>
@@ -750,7 +753,7 @@
                               <el-icon><Setting /></el-icon>
                               数据库信息
                             </h3>
-                            <el-button type="primary" @click="fetchDatabaseInfo" :loading="databaseInfoLoading">
+                            <el-button type="primary" @click="fetchDatabaseInfo" :loading="databaseInfoLoading" :disabled="!hasPermission('sys:data:backup')">
                               <el-icon><Refresh /></el-icon>
                               刷新信息
                             </el-button>
@@ -778,6 +781,7 @@
                             @click="saveBackupPath"
                             :loading="backupPathSaving"
                             style="margin-left: 8px;"
+                            :disabled="!hasPermission('sys:data:backup')"
                           >
                             <el-icon><Setting /></el-icon>
                             保存配置
@@ -835,6 +839,7 @@
                                 type="primary"
                                 @click="saveDefaultBackupPath"
                                 :loading="defaultPathSaving"
+                                :disabled="!hasPermission('sys:data:backup')"
                               >
                                 保存路径
                               </el-button>
@@ -872,6 +877,7 @@
                                 type="primary"
                                 @click="saveAlternativeBackupPath"
                                 :loading="alternativePathSaving"
+                                :disabled="!hasPermission('sys:data:backup')"
                               >
                                 保存路径
                               </el-button>
@@ -913,12 +919,12 @@
                           type="primary"
                           @click="createDatabaseBackup"
                           :loading="backupLoading"
-                          :disabled="!backupForm.backupName"
+                          :disabled="!backupForm.backupName || !hasPermission('sys:data:backup')"
                         >
                           <el-icon><Download /></el-icon>
                           创建备份
                         </el-button>
-                        <el-button @click="resetBackupForm" :disabled="backupLoading" style="margin-left: 8px;">
+                        <el-button @click="resetBackupForm" :disabled="backupLoading || !hasPermission('sys:data:backup')" style="margin-left: 8px;">
                           重置
                         </el-button>
                       </el-form-item>
@@ -938,7 +944,7 @@
                           <el-icon><Clock /></el-icon>
                           备份历史
                         </h3>
-                        <el-button type="primary" @click="fetchBackupList" :loading="backupListLoading">
+                        <el-button type="primary" @click="fetchBackupList" :loading="backupListLoading" :disabled="!hasPermission('sys:data:backup')">
                           <el-icon><Refresh /></el-icon>
                           刷新列表
                         </el-button>
@@ -986,11 +992,11 @@
                           <template #default="{ row }">
                             <div class="backup-actions">
                               <el-button-group>
-                                <el-button type="info" @click="showBackupDetails(row)">
+                                <el-button type="info" @click="showBackupDetails(row)" :disabled="!hasPermission('sys:data:backup')">
                                   <el-icon><InfoFilled /></el-icon>
                                   详情
                                 </el-button>
-                                <el-button type="primary" @click="copyBackupPath(row.BackupPath)">
+                                <el-button type="primary" @click="copyBackupPath(row.BackupPath)" :disabled="!hasPermission('sys:data:backup')">
                                   <el-icon><Document /></el-icon>
                                   复制
                                 </el-button>
@@ -1002,19 +1008,19 @@
                                 </el-button>
                                 <template #dropdown>
                                   <el-dropdown-menu>
-                                    <el-dropdown-item @click="updateBackupPath(row)">
+                                    <el-dropdown-item @click="updateBackupPath(row)" :disabled="!hasPermission('sys:data:backup')">
                                       <el-icon><Edit /></el-icon>
                                       更新路径
                                     </el-dropdown-item>
-                                    <el-dropdown-item @click="verifyBackupFile(row)">
+                                    <el-dropdown-item @click="verifyBackupFile(row)" :disabled="!hasPermission('sys:data:backup')">
                                       <el-icon><Check /></el-icon>
                                       验证文件
                                     </el-dropdown-item>
-                                    <el-dropdown-item @click="downloadBackup(row)" v-if="row.BackupPath.startsWith('\\\\')">
+                                    <el-dropdown-item @click="downloadBackup(row)" v-if="row.BackupPath.startsWith('\\\\')" :disabled="!hasPermission('sys:data:backup')">
                                       <el-icon><Download /></el-icon>
                                       下载备份
                                     </el-dropdown-item>
-                                    <el-dropdown-item divided @click="deleteBackupRecord(row)" style="color: #f56c6c;">
+                                    <el-dropdown-item divided @click="deleteBackupRecord(row)" style="color: #f56c6c;" :disabled="!hasPermission('sys:data:backup')">
                                       <el-icon><Delete /></el-icon>
                                       删除记录
                                     </el-dropdown-item>
@@ -1046,7 +1052,7 @@
                               <el-icon><Clock /></el-icon>
                               自动备份配置
                             </h3>
-                            <el-button type="primary" @click="fetchAutoBackupConfig" :loading="autoBackupConfigLoading">
+                            <el-button type="primary" @click="fetchAutoBackupConfig" :loading="autoBackupConfigLoading" :disabled="!hasPermission('sys:data:backup')">
                               <el-icon><Refresh /></el-icon>
                               刷新配置
                             </el-button>
@@ -1163,11 +1169,12 @@
                               type="primary"
                               @click="saveAutoBackupConfig"
                               :loading="autoBackupConfigSaving"
+                              :disabled="!hasPermission('sys:data:backup')"
                             >
                               <el-icon><Setting /></el-icon>
                               保存配置
                             </el-button>
-                            <el-button @click="resetAutoBackupConfig" :disabled="autoBackupConfigSaving">
+                            <el-button @click="resetAutoBackupConfig" :disabled="autoBackupConfigSaving || !hasPermission('sys:data:backup')">
                               重置
                             </el-button>
                           </el-form-item>
@@ -1184,7 +1191,7 @@
                               <el-icon><InfoFilled /></el-icon>
                               自动备份状态
                             </h3>
-                            <el-button type="primary" @click="fetchAutoBackupStatus" :loading="autoBackupStatusLoading">
+                            <el-button type="primary" @click="fetchAutoBackupStatus" :loading="autoBackupStatusLoading" :disabled="!hasPermission('sys:data:backup')">
                               <el-icon><Refresh /></el-icon>
                               刷新状态
                             </el-button>
@@ -1219,7 +1226,7 @@
                               type="warning"
                               @click="triggerManualBackup"
                               :loading="manualBackupTriggering"
-                              :disabled="!autoBackupConfig.enabled"
+                              :disabled="!autoBackupConfig.enabled || !hasPermission('sys:data:backup')"
                             >
                               <el-icon><Download /></el-icon>
                               立即执行备份
@@ -1336,6 +1343,7 @@
                   link
                   @click="copyToClipboard(selectedBackup.BackupPath)"
                   class="copy-btn"
+                  :disabled="!hasPermission('sys:data:backup')"
                 >
                   <el-icon><CopyDocument /></el-icon>
                   复制
@@ -1471,12 +1479,14 @@
                   type="primary"
                   @click="selectAllConversions"
                   :loading="conversionLoading"
+                  :disabled="!hasPermission('sys:data:import')"
                 >
                   全选
                 </el-button>
                 <el-button
                   size="small"
                   @click="clearAllConversions"
+                  :disabled="!hasPermission('sys:data:import')"
                 >
                   清空
                 </el-button>
@@ -1584,7 +1594,7 @@
               v-if="selectedConversions.length > 0"
               type="warning"
               @click="applyConversions"
-              :disabled="selectedConversions.length === 0"
+              :disabled="selectedConversions.length === 0 || !hasPermission('sys:data:import')"
             >
               应用转换 ({{ selectedConversions.length }}个)
             </el-button>
@@ -1592,7 +1602,7 @@
               v-if="validationResult.summary?.canImport"
               type="primary"
               @click="showValidationDialog = false; executeImport()"
-              :disabled="!validationResult.summary?.canImport"
+              :disabled="!validationResult.summary?.canImport || !hasPermission('sys:data:import')"
             >
               确认导入
               <span v-if="selectedConversions.length > 0">
@@ -1844,7 +1854,10 @@ import { ref, computed, onMounted, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled, Download, Warning, InfoFilled, Refresh, Document, Collection, Setting, Delete, SuccessFilled, FolderAdd, ArrowDown, Edit, Check, Folder, EditPen, CopyDocument, Clock } from '@element-plus/icons-vue'
 import axios from 'axios'
+import { useUserStore } from '@/store/user'
 
+const userStore = useUserStore()
+const hasPermission = (permission) => userStore.hasPermission(permission)
 
 // 响应式数据
 const activeTab = ref('import')

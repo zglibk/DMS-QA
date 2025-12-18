@@ -38,7 +38,7 @@
               </el-select>
             </div>
             <div class="quick-actions">
-              <el-button type="primary" @click="createNewPlan" class="action-btn">
+              <el-button type="primary" :disabled="!hasCreatePlanPermission" @click="createNewPlan" class="action-btn">
                 <el-icon><Plus /></el-icon>
                 新建计划
               </el-button>
@@ -272,7 +272,7 @@
               </div>
               <div v-else-if="displayedTodos.length === 0" class="empty-state">
                 <el-empty description="暂无待办事项">
-                  <el-button type="primary" @click="createNewPlan">创建新计划</el-button>
+                  <el-button type="primary" :disabled="!hasCreatePlanPermission" @click="createNewPlan">创建新计划</el-button>
                 </el-empty>
               </div>
               <ul v-else v-infinite-scroll="loadMoreTodos" :infinite-scroll-disabled="todoLoading || !hasMoreTodos" class="todo-list">
@@ -344,7 +344,7 @@
               </div>
               <div v-else-if="recentLogs.length === 0" class="empty-state">
                 <el-empty description="暂无工作记录">
-                  <el-button type="primary" @click="addWorkLog">添加工作记录</el-button>
+                  <el-button type="primary" :disabled="!hasCreateLogPermission" @click="addWorkLog">添加工作记录</el-button>
                 </el-empty>
               </div>
               <div v-else v-infinite-scroll="loadMoreLogs" :infinite-scroll-disabled="timelineLoading || !hasMoreLogs">
@@ -418,6 +418,10 @@ const router = useRouter()
 
 // 用户状态管理
 const userStore = useUserStore()
+
+// 权限检查
+const hasCreatePlanPermission = computed(() => userStore.hasActionPermission('work-plan:plan:create'))
+const hasCreateLogPermission = computed(() => userStore.hasActionPermission('work-plan:log:create'))
 
 // 响应式数据
 const dashboardData = ref({})

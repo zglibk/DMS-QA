@@ -1890,16 +1890,228 @@ router.delete('/:id', async (req, res) => {
  */
 router.post('/export', async (req, res) => {
   try {
-    const { ids, format = 'excel' } = req.body;
-    
-    if (!ids || !Array.isArray(ids) || ids.length === 0) {
-      return res.status(400).json({ success: false, message: '请提供要导出的记录ID列表' });
-    }
+    const { 
+      ids, 
+      format = 'excel',
+      // 搜索参数
+      search = '', 
+      status = '', 
+      customerCode = '',
+      workOrderNo = '',
+      productName = '',
+      startDate = '',
+      endDate = '',
+      // 高级搜索参数
+      specification = '',
+      complaintMethod = '',
+      responsibleDepartment = '',
+      responsiblePerson = '',
+      feedbackPerson = '',
+      processor = '',
+      createdBy = '',
+      defectQuantityMin = '',
+      defectQuantityMax = '',
+      defectRateMin = '',
+      defectRateMax = '',
+      processingDeadlineStart = '',
+      processingDeadlineEnd = '',
+      replyDateStart = '',
+      replyDateEnd = '',
+      feedbackDateStart = '',
+      feedbackDateEnd = '',
+      verificationDateStart = '',
+      verificationDateEnd = ''
+    } = req.body;
     
     const pool = await getConnection();
+    const request = pool.request();
     
-    // 构建查询SQL语句
-    const placeholders = ids.map((_, index) => `@id${index}`).join(',');
+    let whereClause = '';
+    
+    // 如果提供了ids，优先使用ids过滤
+    if (ids && Array.isArray(ids) && ids.length > 0) {
+      const placeholders = ids.map((_, index) => `@id${index}`).join(',');
+      whereClause = `WHERE ID IN (${placeholders})`;
+      ids.forEach((id, index) => {
+        request.input(`id${index}`, require('mssql').Int, parseInt(id));
+      });
+    } else {
+      // 否则使用搜索条件过滤
+      let whereConditions = [];
+      let paramIndex = 1;
+      
+      if (search) {
+        whereConditions.push(`(
+          CustomerCode LIKE @param${paramIndex} OR 
+          WorkOrderNo LIKE @param${paramIndex + 1} OR 
+          ProductName LIKE @param${paramIndex + 2} OR 
+          ProblemDescription LIKE @param${paramIndex + 3}
+        )`);
+        request.input(`param${paramIndex}`, sql.NVarChar, `%${search}%`);
+        request.input(`param${paramIndex + 1}`, sql.NVarChar, `%${search}%`);
+        request.input(`param${paramIndex + 2}`, sql.NVarChar, `%${search}%`);
+        request.input(`param${paramIndex + 3}`, sql.NVarChar, `%${search}%`);
+        paramIndex += 4;
+      }
+      
+      if (status) {
+        whereConditions.push(`Status = @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, status);
+        paramIndex++;
+      }
+      
+      if (customerCode) {
+        whereConditions.push(`CustomerCode = @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, customerCode);
+        paramIndex++;
+      }
+      
+      if (startDate) {
+        whereConditions.push(`Date >= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, startDate);
+        paramIndex++;
+      }
+      
+      if (endDate) {
+        whereConditions.push(`Date <= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, endDate);
+        paramIndex++;
+      }
+      
+      // 高级搜索条件
+      if (workOrderNo) {
+        whereConditions.push(`WorkOrderNo LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, `%${workOrderNo}%`);
+        paramIndex++;
+      }
+      
+      if (productName) {
+        whereConditions.push(`ProductName LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, `%${productName}%`);
+        paramIndex++;
+      }
+      
+      if (specification) {
+        whereConditions.push(`Specification LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, `%${specification}%`);
+        paramIndex++;
+      }
+      
+      if (complaintMethod) {
+        whereConditions.push(`ComplaintMethod = @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, complaintMethod);
+        paramIndex++;
+      }
+      
+      if (responsibleDepartment) {
+        whereConditions.push(`ResponsibleDepartment LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, `%${responsibleDepartment}%`);
+        paramIndex++;
+      }
+      
+      if (responsiblePerson) {
+        whereConditions.push(`ResponsiblePerson LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, `%${responsiblePerson}%`);
+        paramIndex++;
+      }
+      
+      if (feedbackPerson) {
+        whereConditions.push(`FeedbackPerson LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, `%${feedbackPerson}%`);
+        paramIndex++;
+      }
+      
+      if (processor) {
+        whereConditions.push(`Processor LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, `%${processor}%`);
+        paramIndex++;
+      }
+      
+      if (createdBy) {
+        whereConditions.push(`CreatedBy LIKE @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.NVarChar, `%${createdBy}%`);
+        paramIndex++;
+      }
+      
+      // 数值范围条件
+      if (defectQuantityMin) {
+        whereConditions.push(`DefectQuantity >= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Int, parseInt(defectQuantityMin));
+        paramIndex++;
+      }
+      
+      if (defectQuantityMax) {
+        whereConditions.push(`DefectQuantity <= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Int, parseInt(defectQuantityMax));
+        paramIndex++;
+      }
+      
+      if (defectRateMin) {
+        whereConditions.push(`DefectRate >= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Decimal, parseFloat(defectRateMin));
+        paramIndex++;
+      }
+      
+      if (defectRateMax) {
+        whereConditions.push(`DefectRate <= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Decimal, parseFloat(defectRateMax));
+        paramIndex++;
+      }
+      
+      // 日期范围条件
+      if (processingDeadlineStart) {
+        whereConditions.push(`ProcessingDeadline >= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, processingDeadlineStart);
+        paramIndex++;
+      }
+      
+      if (processingDeadlineEnd) {
+        whereConditions.push(`ProcessingDeadline <= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, processingDeadlineEnd);
+        paramIndex++;
+      }
+      
+      if (replyDateStart) {
+        whereConditions.push(`ReplyDate >= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, replyDateStart);
+        paramIndex++;
+      }
+      
+      if (replyDateEnd) {
+        whereConditions.push(`ReplyDate <= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, replyDateEnd);
+        paramIndex++;
+      }
+      
+      if (feedbackDateStart) {
+        whereConditions.push(`FeedbackDate >= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, feedbackDateStart);
+        paramIndex++;
+      }
+      
+      if (feedbackDateEnd) {
+        whereConditions.push(`FeedbackDate <= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, feedbackDateEnd);
+        paramIndex++;
+      }
+      
+      if (verificationDateStart) {
+        whereConditions.push(`VerificationDate >= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, verificationDateStart);
+        paramIndex++;
+      }
+      
+      if (verificationDateEnd) {
+        whereConditions.push(`VerificationDate <= @param${paramIndex}`);
+        request.input(`param${paramIndex}`, sql.Date, verificationDateEnd);
+        paramIndex++;
+      }
+      
+      if (whereConditions.length > 0) {
+        whereClause = `WHERE ${whereConditions.join(' AND ')}`;
+      }
+    }
+
     const query = `
       SELECT 
         ID, Date, CustomerCode, WorkOrderNo, ProductName, Specification,
@@ -1908,14 +2120,9 @@ router.post('/export', async (req, res) => {
         ResponsiblePerson, ReplyDate, FeedbackPerson, FeedbackDate,
         Processor, VerificationDate, CreatedBy, CreatedAt, UpdatedAt
       FROM CustomerComplaints 
-      WHERE ID IN (${placeholders})
+      ${whereClause}
       ORDER BY CreatedAt DESC
     `;
-    
-    const request = pool.request();
-     ids.forEach((id, index) => {
-       request.input(`id${index}`, require('mssql').Int, parseInt(id));
-     });
     
     const result = await request.query(query);
     
@@ -1935,7 +2142,7 @@ router.post('/export', async (req, res) => {
          const values = [
            row.ID, row.Date, row.CustomerCode, row.WorkOrderNo,
            row.ProductName, row.Specification, row.OrderQuantity,
-           `"${row.ProblemDescription || ''}"`, row.DefectQuantity,
+           `"${(row.ProblemDescription || '').replace(/"/g, '""')}"`, row.DefectQuantity,
            row.DefectRate, row.ComplaintMethod, row.ProcessingDeadline,
            row.Status, row.ResponsibleDepartment, row.ResponsiblePerson,
            row.ReplyDate, row.FeedbackPerson, row.FeedbackDate,

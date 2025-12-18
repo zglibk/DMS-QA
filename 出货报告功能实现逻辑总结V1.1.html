@@ -1,0 +1,1739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>出货报告帮助文档</title>
+  <style>
+    :root {
+      --sidebar-width: 280px;
+      --header-height: 64px;
+      --primary-color: #3b82f6;
+      --sidebar-bg: rgba(30, 41, 59, 0.95);
+      --sidebar-hover: rgba(51, 65, 85, 0.8);
+      --text-main: #1e293b;
+      --text-secondary: #64748b;
+      --border-color: rgba(226, 232, 240, 0.8);
+      --card-bg: rgba(255, 255, 255, 0.9);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    html {
+      overflow: hidden;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: var(--text-main);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      background-color: #f8fafc;
+      position: relative;
+    }
+
+    /* =========================================
+       动态背景效果
+       ========================================= */
+    .bg-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: -1;
+      overflow: hidden;
+      background: radial-gradient(circle at 50% 50%, #f8fafc 0%, #e2e8f0 100%);
+    }
+
+    /* 点阵网格背景 */
+    .bg-dots {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-image: radial-gradient(#cbd5e1 1.5px, transparent 1.5px);
+      background-size: 30px 30px;
+      opacity: 0.6;
+    }
+
+    /* 浮动几何图形 */
+    .shape {
+      position: absolute;
+      opacity: 0.15;
+      animation: float 20s infinite ease-in-out;
+    }
+
+    .shape-circle {
+      width: 300px;
+      height: 300px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #60a5fa, #3b82f6);
+      top: 10%;
+      left: 10%;
+      animation-delay: 0s;
+    }
+
+    .shape-triangle {
+      width: 0;
+      height: 0;
+      border-left: 150px solid transparent;
+      border-right: 150px solid transparent;
+      border-bottom: 260px solid #818cf8;
+      top: 60%;
+      left: 70%;
+      animation-delay: -5s;
+    }
+
+    .shape-rect {
+      width: 200px;
+      height: 200px;
+      background: linear-gradient(135deg, #34d399, #10b981);
+      transform: rotate(45deg);
+      top: 30%;
+      left: 80%;
+      border-radius: 30px;
+      animation-delay: -10s;
+    }
+
+    .shape-hex {
+      width: 240px;
+      height: 140px;
+      background: #f472b6;
+      position: absolute;
+      top: 70%;
+      left: 20%;
+      animation-delay: -15s;
+    }
+    .shape-hex:before, .shape-hex:after {
+      content: "";
+      position: absolute;
+      width: 0;
+      border-left: 120px solid transparent;
+      border-right: 120px solid transparent;
+    }
+    .shape-hex:before {
+      bottom: 100%;
+      border-bottom: 70px solid #f472b6;
+    }
+    .shape-hex:after {
+      top: 100%;
+      border-top: 70px solid #f472b6;
+    }
+
+    @keyframes float {
+      0% { transform: translate(0, 0) rotate(0deg) scale(1); }
+      33% { transform: translate(30px, -50px) rotate(10deg) scale(1.1); }
+      66% { transform: translate(-20px, 20px) rotate(-5deg) scale(0.95); }
+      100% { transform: translate(0, 0) rotate(0deg) scale(1); }
+    }
+
+    /* =========================================
+       布局
+       ========================================= */
+
+    /* 左侧边栏 */
+    .sidebar {
+      width: var(--sidebar-width);
+      background-color: var(--sidebar-bg);
+      backdrop-filter: blur(10px);
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      flex-shrink: 0;
+      box-shadow: 4px 0 15px rgba(0,0,0,0.1);
+      z-index: 20;
+      border-right: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .sidebar-header {
+      height: var(--header-height);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      font-size: 18px;
+      font-weight: 700;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+      background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), transparent);
+    }
+    
+    .sidebar-header .logo-icon {
+      margin-right: 12px;
+      font-size: 24px;
+      filter: drop-shadow(0 2px 4px rgba(0,0,0,0.2));
+    }
+
+    .sidebar-menu {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px 0;
+    }
+
+    .menu-group-title {
+      padding: 16px 24px 8px;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #94a3b8;
+      font-weight: 600;
+    }
+
+    .menu-item {
+      padding: 12px 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+      color: #cbd5e1;
+      font-size: 14px;
+      margin-bottom: 2px;
+    }
+
+    .menu-item:hover {
+      background-color: rgba(255,255,255,0.05);
+      color: #fff;
+      padding-left: 28px;
+    }
+
+    .menu-item.active {
+      background: linear-gradient(90deg, rgba(59, 130, 246, 0.2), transparent);
+      color: #60a5fa;
+      border-left-color: #60a5fa;
+      font-weight: 500;
+    }
+
+    .menu-item .icon {
+      margin-right: 12px;
+      width: 20px;
+      text-align: center;
+      font-size: 16px;
+    }
+
+    /* 右侧内容区 */
+    .main-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      position: relative;
+      z-index: 10;
+    }
+
+    /* 顶部导航栏 */
+    .top-header {
+      height: var(--header-height);
+      background-color: rgba(255, 255, 255, 0.8);
+      backdrop-filter: blur(10px);
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      flex-shrink: 0;
+    }
+
+    .breadcrumb {
+      font-size: 14px;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+    }
+    
+    .breadcrumb-item:not(:last-child)::after {
+      content: '/';
+      margin: 0 10px;
+      color: #cbd5e1;
+    }
+    
+    .breadcrumb-item.active {
+      color: var(--primary-color);
+      font-weight: 600;
+      background: rgba(59, 130, 246, 0.1);
+      padding: 4px 10px;
+      border-radius: 6px;
+    }
+
+    /* 内容区 */
+    .content-scroll-area {
+      flex: 1;
+      overflow-y: auto;
+      overflow-x: hidden;
+      padding: 40px 40px 0 40px; 
+      scroll-behavior: smooth;
+    }
+
+    .content-wrapper {
+      max-width: 1600px;
+      margin: 0 auto;
+      padding-bottom: 40px; /* 适度留白 */
+    }
+
+    /* 内容区块 */
+    .content-section {
+      display: none;
+      animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .content-section.active {
+      display: block;
+    }
+
+    @keyframes slideUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* 卡片样式 */
+    .card {
+      background: var(--card-bg);
+      border-radius: 16px;
+      box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.08);
+      padding: 40px;
+      margin-bottom: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      backdrop-filter: blur(5px);
+    }
+
+    h2 {
+      font-size: 26px;
+      margin-bottom: 30px;
+      color: #1e293b;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      border-bottom: 2px solid #f1f5f9;
+      padding-bottom: 20px;
+    }
+    
+    h2 .icon {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      box-shadow: 0 4px 10px rgba(59, 130, 246, 0.3);
+    }
+
+    h3 {
+      font-size: 18px;
+      margin: 32px 0 16px;
+      color: #334155;
+      font-weight: 700;
+      padding-left: 12px;
+      border-left: 4px solid var(--primary-color);
+    }
+    
+    h4 {
+      font-size: 16px;
+      margin: 20px 0 10px;
+      color: #475569;
+    }
+
+    p {
+      line-height: 1.7;
+      margin-bottom: 16px;
+      color: #475569;
+    }
+
+    /* 列表样式 */
+    ul, ol {
+      margin-left: 24px;
+      margin-bottom: 20px;
+      color: #475569;
+    }
+    
+    li {
+      margin-bottom: 8px;
+      line-height: 1.6;
+    }
+
+    /* 表格样式 */
+    .table-container {
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      margin: 20px 0;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.02);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+    }
+
+    th, td {
+      padding: 16px 20px;
+      text-align: left;
+      border-bottom: 1px solid #e2e8f0;
+    }
+
+    th {
+      background-color: #f8fafc;
+      font-weight: 600;
+      color: #475569;
+      font-size: 14px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    tr:hover td {
+      background-color: #f8fafc;
+    }
+
+    /* 代码块样式 */
+    .code-block {
+      background-color: #1e293b;
+      color: #e2e8f0;
+      padding: 24px;
+      border-radius: 12px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 14px;
+      line-height: 1.6;
+      overflow-x: auto;
+      margin: 20px 0;
+      white-space: pre;
+      box-shadow: inset 0 2px 4px rgba(0,0,0,0.3);
+      border: 1px solid #334155;
+    }
+
+    .keyword { color: #c678dd; }
+    .function { color: #61afef; }
+    .string { color: #98c379; }
+    .number { color: #d19a66; }
+    .comment { color: #7f848e; font-style: italic; }
+    .property { color: #e06c75; }
+    
+    code {
+      background-color: rgba(59, 130, 246, 0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+      color: #2563eb;
+      font-size: 0.9em;
+      font-weight: 500;
+    }
+    
+    .code-block code {
+      background: none;
+      color: inherit;
+      padding: 0;
+    }
+
+    /* 提示框 */
+    .tip-box {
+      padding: 20px;
+      border-radius: 12px;
+      margin: 24px 0;
+      display: flex;
+      gap: 16px;
+      border: 1px solid transparent;
+      align-items: flex-start;
+    }
+    
+    .tip-box.info {
+      background-color: rgba(239, 246, 255, 0.8);
+      border-color: rgba(191, 219, 254, 0.5);
+      color: #1e40af;
+    }
+    
+    .tip-box.warning {
+      background-color: rgba(255, 251, 235, 0.8);
+      border-color: rgba(253, 230, 138, 0.5);
+      color: #92400e;
+    }
+    
+    .tip-box.success {
+      background-color: rgba(240, 253, 244, 0.8);
+      border-color: rgba(187, 247, 208, 0.5);
+      color: #166534;
+    }
+    
+    .tip-icon {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    /* 演示区域样式 */
+    .demo-section {
+      background: white;
+      padding: 24px;
+      border-radius: 12px;
+      margin-bottom: 24px;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.02);
+    }
+    
+    .demo-input {
+      display: flex;
+      gap: 12px;
+      margin: 16px 0;
+      flex-wrap: wrap;
+    }
+    
+    input[type="text"], select {
+      padding: 12px 16px;
+      border: 1px solid #cbd5e1;
+      border-radius: 8px;
+      outline: none;
+      font-size: 14px;
+      transition: all 0.2s;
+      min-width: 200px;
+    }
+    
+    input[type="text"]:focus, select:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+    }
+    
+    .demo-btn {
+      padding: 12px 24px;
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+      box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+    }
+    
+    .demo-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 10px -1px rgba(59, 130, 246, 0.4);
+    }
+    
+    .demo-btn:active {
+      transform: translateY(0);
+    }
+    
+    .demo-btn.green {
+      background: linear-gradient(135deg, #10b981, #059669);
+      box-shadow: 0 4px 6px -1px rgba(16, 185, 129, 0.3);
+    }
+    
+    .demo-result {
+      margin-top: 20px;
+      padding: 20px;
+      background: #f8fafc;
+      border-radius: 8px;
+      border: 1px dashed #cbd5e1;
+      min-height: 60px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    /* 滚动条美化 */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    
+    ::-webkit-scrollbar-track {
+      background: transparent;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+      background: rgba(203, 213, 225, 0.4);
+      border-radius: 4px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(148, 163, 184, 0.7);
+    }
+
+    /* 文件树样式 */
+    .file-tree {
+      font-family: monospace;
+      font-size: 14px;
+      line-height: 1.8;
+      color: #475569;
+    }
+    .file-tree .folder { color: #eab308; margin-right: 8px; }
+    .file-tree .file { color: #3b82f6; margin-right: 8px; }
+    .file-tree .comment { color: #94a3b8; margin-left: 12px; }
+
+    /* 步骤节点样式 */
+    .step-number {
+      position: absolute;
+      left: -46px;
+      top: 0;
+      width: 32px;
+      height: 32px;
+      background: linear-gradient(135deg, #64748b, #475569);
+      color: white;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
+      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.2);
+      border: 2px solid white;
+      z-index: 1;
+    }
+    
+    .step-number.blue {
+      background: linear-gradient(135deg, #3b82f6, #2563eb);
+      box-shadow: 0 4px 6px -1px rgba(59, 130, 246, 0.3);
+    }
+
+  /* Feature Grid */
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin-top: 1.5rem;
+        }
+        .feature-item {
+            background: rgba(255, 255, 255, 0.5);
+            padding: 1.5rem;
+            border-radius: 12px;
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        .feature-item:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.8);
+        }
+        .feature-icon {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+        }
+
+        /* Guide Steps */
+        .guide-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+        }
+        .guide-step {
+            display: flex;
+            gap: 1.5rem;
+            align-items: flex-start;
+            background: rgba(255, 255, 255, 0.4);
+            padding: 1.5rem;
+            border-radius: 12px;
+        }
+        .step-badge {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 1.2rem;
+            flex-shrink: 0;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .step-content h3 {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            color: #2d3748;
+        }
+        .tip-box {
+            background: rgba(255, 243, 205, 0.6);
+            border-left: 4px solid #ffc107;
+            padding: 0.8rem;
+            margin-top: 0.8rem;
+            border-radius: 4px;
+            font-size: 0.9rem;
+            color: #856404;
+        }
+    </style>
+</head>
+<body>
+
+  <!-- 动态背景 -->
+  <div class="bg-container">
+    <div class="bg-dots"></div>
+    <div class="shape shape-circle"></div>
+    <div class="shape shape-triangle"></div>
+    <div class="shape shape-rect"></div>
+    <div class="shape shape-hex"></div>
+  </div>
+
+  <!-- 左侧边栏 -->
+  <aside class="sidebar">
+    <div class="sidebar-header">
+      <span class="logo-icon">�</span>
+      <span>出货报告帮助文档</span>
+    </div>
+    <div class="sidebar-menu">
+      <div class="menu-group-title">概览与架构</div>
+      <div class="menu-item" data-section="intro">
+        <span class="icon">📑</span>
+        <span class="text">功能概述</span>
+      </div>
+      <div class="menu-item" data-section="user-guide">
+        <span class="icon">🔰</span>
+        <span class="text">新手操作指南</span>
+      </div>
+      <div class="menu-item" data-section="template-guide">
+        <span class="icon">📝</span>
+        <span class="text">模板配置指南</span>
+      </div>
+      <div class="menu-item" data-section="architecture">
+        <span class="icon">🏗️</span>
+        <span class="text">系统架构</span>
+      </div>
+      
+      <div class="menu-group-title">核心逻辑</div>
+      <div class="menu-item" data-section="core-process">
+        <span class="icon">🔄</span>
+        <span class="text">核心流程详解</span>
+      </div>
+      <div class="menu-item" data-section="customer-handler">
+        <span class="icon">🎯</span>
+        <span class="text">客户处理器</span>
+      </div>
+      
+      <div class="menu-group-title">配置与模板</div>
+      <div class="menu-item" data-section="template">
+        <span class="icon">📄</span>
+        <span class="text">模板系统</span>
+      </div>
+      <div class="menu-item" data-section="mapping">
+        <span class="icon">🔗</span>
+        <span class="text">映射编辑器</span>
+      </div>
+      <div class="menu-item" data-section="column-width">
+        <span class="icon">📏</span>
+        <span class="text">列宽处理 (重点)</span>
+      </div>
+      
+      <div class="menu-group-title">演示与总结</div>
+      <div class="menu-item" data-section="demo">
+        <span class="icon">🎮</span>
+        <span class="text">交互演示</span>
+      </div>
+      <div class="menu-item" data-section="summary">
+        <span class="icon">🚀</span>
+        <span class="text">快速上手总结</span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- 右侧主内容区 -->
+  <main class="main-content">
+    <!-- 顶部栏 -->
+    <header class="top-header">
+      <div class="breadcrumb">
+        <span class="breadcrumb-item">首页</span>
+        <span class="breadcrumb-item">开发文档</span>
+        <span class="breadcrumb-item active" id="breadcrumb-current">功能概述</span>
+      </div>
+    </header>
+
+    <!-- 滚动内容区 -->
+    <div class="content-scroll-area">
+      <div class="content-wrapper">
+        
+        <!-- 1. 功能概述 -->
+        <section class="content-section active" id="section-intro">
+          <div class="card">
+            <h2><span class="icon">📑</span> 功能概述</h2>
+            
+            <div class="glass-card">
+                <h2>系统价值</h2>
+                <p>出货报告自动生成，为解决手工填写报告费时、易出错导致客诉的痛点。通过将MES/ERP系统中的业务数据（如工单号、物料信息、包装数量等）与预定义的 Excel 模板进行自动填写，实现一键生成标准化的出货检验报告。</p>
+                <div class="feature-grid">
+                    <div class="feature-item">
+                        <div class="feature-icon">⚡</div>
+                        <h3>高效自动化</h3>
+                        <p>告别手工填写，秒级生成包含数百条数据的复杂报告。</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🎯</div>
+                        <h3>精准映射</h3>
+                        <p>支持单值字段（如发票号）与列表字段（如装箱明细）的混合映射。</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">🛠️</div>
+                        <h3>可视化配置</h3>
+                        <p>提供所见即所得的模板配置界面，无需懂代码即可调整字段对应关系。</p>
+                    </div>
+                    <div class="feature-item">
+                        <div class="feature-icon">📐</div>
+                        <h3>智能样式控制</h3>
+                        <p>内置列宽自动修正算法，支持前端微调，确保打印输出完美适配。</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="tip-box info" style="margin-top: 2rem;">
+              <span class="tip-icon">💡</span>
+              <div class="tip-content">
+                <strong>文档定位</strong><br>
+                本文档是面向开发人员、系统维护及报告制作人员的<strong>综合指南</strong>。不仅介绍如何操作，更重点解释了<strong>底层设计原理</strong>和<strong>核心代码逻辑</strong>，帮助所有人快速理解系统是如何运作的。
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 1.5 新手操作指南 (针对出货检验人员) -->
+        <section class="content-section" id="section-user-guide">
+          <div class="card">
+            <h2><span class="icon">🔰</span> 新手操作指南</h2>
+            
+            <div class="tip-box success">
+              <span class="tip-icon">👨‍🔧</span>
+              <div class="tip-content">
+                <strong>适用对象：出货检验员</strong><br>
+                本章节专为首次使用系统的检验人员设计。请跟随以下步骤，轻松生成一份完美的出货报告。
+              </div>
+            </div>
+
+            <div class="glass-card" style="margin-top: 1.5rem;">
+                <h2>新手三步走</h2>
+                <div class="guide-steps">
+                    <div class="guide-step">
+                        <div class="step-badge">1</div>
+                        <div class="step-content">
+                            <h3>筛选数据源</h3>
+                            <p>进入“出货报告”页面。在顶部搜索栏输入 <strong>工单号</strong> 或选择 <strong>工单日期范围</strong>，点击“查询”按钮，锁定需要生成报告的产品信息。</p>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <div class="step-badge">2</div>
+                        <div class="step-content">
+                            <h3>选择模板</h3>
+                            <p>在列表上方勾选 <strong>“使用模板”</strong> 复选框。从下拉菜单中选择该客户对应的 Excel 模板（例如：`出货检验报告-A08 模板-250617-03.xlsx`）。</p>
+                            <div class="tip-box">💡 提示：如果不确定使用哪个模板，请咨询系统管理员或查看“客户模板对照表”。</div>
+                        </div>
+                    </div>
+                    <div class="guide-step">
+                        <div class="step-badge">3</div>
+                        <div class="step-content">
+                            <h3>生成与核对</h3>
+                            <p>勾选列表中的出货单据，点击 <strong>“导出出货报告”</strong>。系统将自动下载 Excel 文件。打开文件检查以下几点：</p>
+                            <ul>
+                                <li>表头信息（Invoice No, Date）是否正确填充。</li>
+                                <li>产品列表数据是否完整，无错行。</li>
+                                <li>表格列宽是否正常，无内容被遮挡。</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card" style="margin-top: 2rem;">
+                <h2>常见问题自救 (FAQ)</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th width="30%">现象</th>
+                                <th width="40%">可能原因</th>
+                                <th width="30%">处理方案</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td><span style="color: #ef4444; font-weight: bold;">导出失败</span></td>
+                                <td>未勾选“使用模板”或未选择具体模板ID</td>
+                                <td>请确保勾选“使用模板”并选择正确的模板文件。</td>
+                            </tr>
+                            <tr>
+                                <td><span style="color: #f59e0b; font-weight: bold;">列宽异常</span></td>
+                                <td>Excel 默认渲染差异或配置未生效</td>
+                                <td>请联系管理员在“模板配置”页面调整该列的宽度数值。</td>
+                            </tr>
+                            <tr>
+                                <td><span style="color: #f59e0b; font-weight: bold;">数据错位</span></td>
+                                <td>模板映射配置中的“列表起始行”设置错误</td>
+                                <td>需进入“映射配置”检查列表字段的起始行坐标。</td>
+                            </tr>
+                            <tr>
+                                <td><span style="color: #f59e0b; font-weight: bold;">实测尺寸为空</span></td>
+                                <td>产品名称中不包含标准的规格描述</td>
+                                <td>检查产品名称（如 "贴纸 80*50mm"），确保包含 "*" 号和单位。</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 1.6 模板配置指南 (新增) -->
+        <section class="content-section" id="section-template-guide">
+          <div class="card">
+            <h2><span class="icon">📝</span> 模板配置指南</h2>
+            
+            <div class="tip-box info">
+              <span class="tip-icon">ℹ️</span>
+              <div class="tip-content">
+                <strong>适用对象：系统管理员 / 质量主管</strong><br>
+                当接入新客户或客户变更报告格式时，需要进行此配置。配置完成后，报告打印人员即可直接使用。
+              </div>
+            </div>
+
+            <div style="margin: 40px 0; border-left: 4px solid #cbd5e1; padding-left: 30px;">
+              
+              <!-- 步骤 1: 上传模板 -->
+              <div style="position: relative; margin-bottom: 50px;">
+                <div class="step-number">1</div>
+                <h4 style="margin-top: 0; color: #1e293b;">上传 Excel 模板</h4>
+                <p>进入“模板管理”页面，点击右上角的“上传模板”按钮。选择提前设置好格式的原始 Excel 报告模板文件（.xlsx）。</p>
+                <div class="demo-section" style="background: white; padding: 20px; border: 1px dashed #cbd5e1; border-radius: 8px;">
+                  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                    <span style="font-weight: bold;">模板列表</span>
+                    <button class="demo-btn" style="padding: 8px 16px; font-size: 13px;">☁️ 上传模板</button>
+                  </div>
+                  <table style="font-size: 13px;">
+                    <tr style="background: #f8fafc;"><th>模板名称</th><th>客户ID</th><th>操作</th></tr>
+                    <tr>
+                      <td>出货检验报告-A08 模板-250617-03.xlsx</td>
+                      <td>A08</td>
+                      <td>
+                        <span style="color: #3b82f6; margin-right: 10px;">✏️ 编辑</span>
+                        <span style="color: #ef4444;">🗑️ 删除</span>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 步骤 2: 进入映射 -->
+              <div style="position: relative; margin-bottom: 50px;">
+                <div class="step-number">2</div>
+                <h4 style="margin-top: 0; color: #1e293b;">进入映射编辑器</h4>
+                <p>在模板列表中，找到刚上传的模板，点击操作栏的 <strong>“🔗 映射”</strong> 按钮。系统会自动解析 Excel 的列结构。</p>
+              </div>
+
+              <!-- 步骤 3: 配置映射 -->
+              <div style="position: relative; margin-bottom: 50px;">
+                <div class="step-number">3</div>
+                <h4 style="margin-top: 0; color: #1e293b;">配置字段映射</h4>
+                <p>这是最关键的一步。编辑器界面分为左侧“预览区”和右侧“配置区”。以下是右侧配置区的详细说明：</p>
+                
+                <div class="demo-section" style="background: white; padding: 0; border: 1px solid #e2e8f0; overflow: hidden;">
+                  <!-- 模拟 Tab 导航 -->
+                  <div style="display: flex; background: #f8fafc; border-bottom: 1px solid #e2e8f0;">
+                    <div class="mock-tab active" onclick="switchTab(0)" style="padding: 12px 20px; font-weight: bold; color: #3b82f6; border-bottom: 2px solid #3b82f6; cursor: pointer; transition: all 0.2s;">1. 基本配置</div>
+                    <div class="mock-tab" onclick="switchTab(1)" style="padding: 12px 20px; color: #64748b; cursor: pointer; transition: all 0.2s;">2. 顶部字段</div>
+                    <div class="mock-tab" onclick="switchTab(2)" style="padding: 12px 20px; color: #64748b; cursor: pointer; transition: all 0.2s;">3. 表格列映射</div>
+                    <div class="mock-tab" onclick="switchTab(3)" style="padding: 12px 20px; color: #64748b; cursor: pointer; transition: all 0.2s;">4. 列宽配置</div>
+                  </div>
+
+                  <!-- 内容区 -->
+                  <div style="padding: 20px;">
+                    
+                    <!-- 1. 基本配置 -->
+                    <div id="tab-content-0" class="tab-content-item">
+                      <h5 style="margin-top: 0; color: #334155;">⚙️ 基本配置 (Basic Config)</h5>
+                      <p style="font-size: 13px; color: #64748b;">定义表格在 Excel 中的整体位置结构。</p>
+                      <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; font-size: 13px;">
+                        <div style="background: #f8fafc; padding: 10px; border-radius: 6px;">
+                          <div style="font-weight: bold; margin-bottom: 5px;">工作表 (Sheet Index)</div>
+                          <div style="color: #475569;">默认为 0（第一个 Sheet）。如果模板包含多个 Sheet，需指定目标 Sheet 的索引。</div>
+                        </div>
+                        <div style="background: #f8fafc; padding: 10px; border-radius: 6px;">
+                          <div style="font-weight: bold; margin-bottom: 5px;">表头行 (Header Row)</div>
+                          <div style="color: #475569;">Excel 中表头所在的行号（例如第 7 行）。用于定位列标题。</div>
+                        </div>
+                        <div style="background: #f8fafc; padding: 10px; border-radius: 6px;">
+                          <div style="font-weight: bold; margin-bottom: 5px;">数据起始行 (Start Row)</div>
+                          <div style="color: #475569;">产品数据开始填充的第一行（例如第 10 行）。系统将从这一行开始向下追加数据。</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <!-- 2. 顶部字段 -->
+                    <div id="tab-content-1" class="tab-content-item" style="display: none;">
+                      <h5 style="margin-top: 0; color: #334155;">🧱 顶部字段 (Top Fields)</h5>
+                      <p style="font-size: 13px; color: #64748b;">用于填充表格上方的固定信息（如工单号、日期、检验员）。</p>
+                      
+                      <!-- 交互流程图 -->
+                      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; margin-bottom: 20px;">
+                        <div style="font-weight: bold; font-size: 13px; margin-bottom: 15px; color: #3b82f6; display: flex; align-items: center;">
+                          <span style="margin-right: 6px;">🖱️</span> 极速绑定功能（推荐）
+                        </div>
+                        <div style="display: flex; align-items: center; justify-content: space-between; font-size: 12px; gap: 10px;">
+                          
+                          <!-- Step 1 -->
+                          <div style="text-align: center; flex: 1;">
+                            <div style="border: 1px solid #bfdbfe; background: white; padding: 6px 12px; border-radius: 4px; display: inline-block; color: #3b82f6; margin-bottom: 8px; box-shadow: 0 2px 4px rgba(59, 130, 246, 0.1);">🎯 绑定</div>
+                            <div style="color: #64748b;">1. 点击绑定按钮</div>
+                          </div>
+                    
+                          <div style="color: #cbd5e1; font-size: 16px;">➜</div>
+                    
+                          <!-- Step 2 -->
+                          <div style="text-align: center; flex: 1;">
+                            <div style="border: 1px dashed #f59e0b; background: #fffbeb; padding: 6px 12px; border-radius: 4px; display: inline-block; color: #d97706; margin-bottom: 8px;">请点击单元格...</div>
+                            <div style="color: #64748b;">2. 进入拾取模式</div>
+                          </div>
+                    
+                          <div style="color: #cbd5e1; font-size: 16px;">➜</div>
+                    
+                          <!-- Step 3 -->
+                          <div style="text-align: center; flex: 1;">
+                            <div style="border: 1px solid #cbd5e1; background: #e2e8f0; width: 60px; height: 30px; display: inline-flex; align-items: center; justify-content: center; margin-bottom: 8px; border-radius: 2px; position: relative;">
+                              <div style="width: 100%; height: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #cbd5e1;">
+                                <div style="background: white;"></div>
+                                <div style="background: #dbeafe; border: 1px solid #3b82f6;"></div>
+                                <div style="background: white;"></div>
+                                <div style="background: white;"></div>
+                              </div>
+                              <div style="position: absolute; right: -5px; bottom: -5px; font-size: 16px;">👆</div>
+                            </div>
+                            <div style="color: #64748b;">3. 点击预览表格</div>
+                          </div>
+                    
+                          <div style="color: #cbd5e1; font-size: 16px;">➜</div>
+                    
+                          <!-- Step 4 -->
+                          <div style="text-align: center; flex: 1;">
+                            <div style="border: 1px solid #cbd5e1; background: white; padding: 6px 12px; border-radius: 4px; display: inline-block; font-family: monospace; font-weight: bold; color: #1e293b; margin-bottom: 8px;">N26</div>
+                            <div style="color: #64748b;">4. 坐标自动填入</div>
+                          </div>
+                    
+                        </div>
+                      </div>
+
+                      <ul style="font-size: 13px; color: #475569; margin-bottom: 15px;">
+                        <li><strong>字段名 (Name)</strong>: 必须与代码中的 Key 一致（如 <code>OrderNum</code>, <code>InspectDate</code>）。</li>
+                        <li><strong>单元格 (Cell)</strong>: 目标单元格坐标（如 <code>N26</code>）。<strong>无需手动输入</strong>，使用上方的“绑定”功能即可从左侧预览区自动获取。</li>
+                      </ul>
+                    </div>
+
+                    <!-- 3. 表格列映射 -->
+                    <div id="tab-content-2" class="tab-content-item" style="display: none;">
+                      <h5 style="margin-top: 0; color: #334155;">📊 表格列映射 (Column Mapping)</h5>
+                      <p style="font-size: 13px; color: #64748b;">核心部分，决定了产品列表的每一列数据填入哪一列。</p>
+                      <div class="table-container" style="margin: 10px 0; font-size: 12px;">
+                        <table>
+                          <tr style="background: #f1f5f9;"><th>配置项</th><th>说明</th><th>示例</th></tr>
+                          <tr>
+                            <td><strong>表头 (Header)</strong></td>
+                            <td>仅作助记，方便系统管理员识别该列用途。</td>
+                            <td>"实测尺寸"</td>
+                          </tr>
+                          <tr>
+                            <td><strong>字段名 (Name)</strong></td>
+                            <td><span style="color: #ef4444;">关键！</span>必须匹配数据源中的 Key。</td>
+                            <td><code>MeasuredSize</code></td>
+                          </tr>
+                          <tr>
+                            <td><strong>列号 (Col)</strong></td>
+                            <td>目标列的索引（1=A, 2=B...）。</td>
+                            <td>20 (T列)</td>
+                          </tr>
+                        </table>
+                      </div>
+                    </div>
+
+                    <!-- 4. 列宽配置 -->
+                    <div id="tab-content-3" class="tab-content-item" style="display: none;">
+                      <h5 style="margin-top: 0; color: #334155;">📏 列宽配置 (Column Widths)</h5>
+                      <p style="font-size: 13px; color: #64748b;">用于修正导出时的列宽。由于 ExcelJS 库在导出Excel时字体渲染差异，通常需要重新指定列宽以获得最佳打印效果。</p>
+                      <div class="tip-box info" style="margin: 10px 0; padding: 10px;">
+                        <span class="tip-icon" style="font-size: 16px;">💡</span>
+                        <div class="tip-content" style="font-size: 13px;">
+                          <strong>优先级说明：</strong> 系统优先使用此处的<strong>列宽配置</strong>。如果此处未配置（为空），则尝试使用代码中针对该客户的<strong>硬编码配置</strong>。
+                        </div>
+                      </div>
+                      <p style="font-size: 13px; color: #475569;">
+                        <strong>配置方法：</strong> 在输入框中粘贴列宽数值数组（如 <code>4.4, 6.9, 6.9, 5.5</code>）。建议直接从 Excel 模板中查看并记录每一列的宽度值。
+                      </p>
+                    </div>
+
+                  </div>
+                </div>
+              </div>
+
+              <!-- 步骤 4: 保存 -->
+              <div style="position: relative;">
+                <div class="step-number">4</div>
+                <h4 style="margin-top: 0; color: #1e293b;">保存并测试</h4>
+                <p>点击“保存配置”。然后回到出货报告页面，选择一个工单进行测试生成。检查数据是否准确填入，列宽是否正常。</p>
+              </div>
+
+            </div>
+          </div>
+        </section>
+
+        <!-- 2. 系统架构 -->
+        <section class="content-section" id="section-architecture">
+          <div class="card">
+            <h2><span class="icon">🏗️</span> 系统架构</h2>
+            
+            <h3>三层架构设计</h3>
+            <div class="table-container">
+              <table>
+                <tr>
+                  <th>层级</th>
+                  <th>技术栈</th>
+                  <th>核心职责</th>
+                </tr>
+                <tr>
+                  <td><strong>前端 (Frontend)</strong></td>
+                  <td>Vue 3 + Element Plus + ExcelJS</td>
+                  <td>用户交互、模板管理、映射配置、Excel生成与导出（核心逻辑）</td>
+                </tr>
+                <tr>
+                  <td><strong>后端 (Backend)</strong></td>
+                  <td>Node.js (Express) + SQL Server</td>
+                  <td>ERP数据查询接口、模板文件存储与解析、映射配置持久化</td>
+                </tr>
+                <tr>
+                  <td><strong>数据库 (Database)</strong></td>
+                  <td>SQL Server</td>
+                  <td>存储业务数据（工单、产品）、模板元数据</td>
+                </tr>
+              </table>
+            </div>
+
+            <h3>核心文件结构</h3>
+            <div class="code-block file-tree">
+📁 frontend/src/views/
+├── 📄 <span class="file">ShipmentReport.vue</span>         <span class="comment">// 核心页面：查询、处理逻辑、导出实现</span>
+└── 📄 <span class="file">TemplateMappingEditor.vue</span>  <span class="comment">// 映射编辑器：配置字段与Excel单元格对应关系</span>
+
+📁 server/routes/
+├── 📄 <span class="file">erp.js</span>                     <span class="comment">// ERP接口：查询工单、物料信息</span>
+└── 📄 <span class="file">reportTemplates.js</span>         <span class="comment">// 模板接口：上传、下载、解析、映射保存</span>
+            </div>
+          </div>
+        </section>
+
+        <!-- 3. 核心流程详解 -->
+        <section class="content-section" id="section-core-process">
+          <div class="card">
+            <h2><span class="icon">🔄</span> 核心流程详解</h2>
+            
+            <div class="glass-card">
+                <h3>3.1 跨系统数据流转 (ERP -> QMS QA ->Report)</h3>
+                <p>DMS-QA质量管理系统本身并不直接存储工单数据，而是充当<strong>中间桥梁</strong>角色。通过 MES/ERP 系统开放的数据接口，实时获取数据，经过处理后注入到 Excel 出货报告模板中。</p>
+                
+                <div class="guide-steps" style="margin-top: 20px;">
+                    <!-- Step 1: Request -->
+                    <div class="guide-step">
+                        <div class="step-badge" style="background: #3b82f6;">1</div>
+                        <div class="step-content">
+                            <h4>前端发起请求</h4>
+                            <p>用户输入工单号（如 <code>GD25120182</code>）并点击查询。</p>
+                            <div class="code-block" style="margin-top: 10px; font-size: 12px;">
+// Frontend: ShipmentReport.vue
+const params = { pNum: 'GD25120182' }
+await api.get('/erp/shipment-report', { params })
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Step 2: Backend Query -->
+                    <div class="guide-step">
+                        <div class="step-badge" style="background: #8b5cf6;">2</div>
+                        <div class="step-content">
+                            <h4>后端数据聚合 (Node.js)</h4>
+                            <p>服务器接收请求后，连接 SQL Server 数据库，执行多表联查（工单表、产品表、物料表），将分散的数据聚合成标准格式。</p>
+                            <div class="code-block" style="margin-top: 10px; font-size: 12px;">
+// Backend: erp.js
+const result = {
+  workOrderInfo: { PNum: '...', CustomerID: 'A08' }, // 基础信息
+  productInfo: [{ productId: '...', product: '...' }], // 产品列表
+  materialList: [...] // 原材料信息
+}
+res.json({ code: 0, data: result })
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="glass-card" style="margin-top: 30px;">
+                <h3>3.2 模板渲染引擎 (Template Rendering Engine)</h3>
+                <p>这是系统的“心脏”。当用户点击“生成报告”时，<code>exportFromTemplate</code> 函数会启动以下流水线：</p>
+                
+                <div class="feature-grid" style="grid-template-columns: 1fr;">
+                    
+                    <!-- Phase 1: Resource Loading -->
+                    <div class="feature-item" style="text-align: left; display: flex; gap: 20px; align-items: flex-start;">
+                        <div class="feature-icon" style="font-size: 2rem;">📥</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0;">第一阶段：资源加载</h4>
+                            <p style="margin: 0; font-size: 14px; color: #64748b;">
+                                1. <strong>下载模板</strong>：前端调用 <code>GET /templates/:id/download</code> 获取 Excel 文件的二进制流 (ArrayBuffer)。<br>
+                                2. <strong>获取映射</strong>：同时调用 <code>GET /templates/:id/mapping</code> 获取字段坐标配置。<br>
+                                3. <strong>装载工作簿</strong>：使用 <code>ExcelJS.load(buffer)</code> 将二进制流解析为可操作的 Workbook 对象。
+                            </p>
+                        </div>
+                    </div>
+
+                    <!-- Phase 2: Context Building -->
+                    <div class="feature-item" style="text-align: left; display: flex; gap: 20px; align-items: flex-start;">
+                        <div class="feature-icon" style="font-size: 2rem;">🧠</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0;">第二阶段：构建数据上下文 (Context)</h4>
+                            <p style="margin: 0; font-size: 14px; color: #64748b;">
+                                调用 <code>buildTemplateContext()</code> 函数，将 ERP 数据转换为扁平化的键值对。在此过程中，<strong>客户处理器 (Customer Handler)</strong> 介入：
+                            </p>
+                            <ul style="margin: 5px 0 0 0; padding-left: 20px; font-size: 13px; color: #475569;">
+                                <li><strong>规格提取</strong>：自动从产品名称中解析出 "80*50mm"。</li>
+                                <li><strong>数据模拟</strong>：根据公差标准（GB/T1804-c）生成逼真的实测尺寸数据。</li>
+                                <li><strong>自动判定</strong>：自动填充 "合格"、"OK" 等固定结论。</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Phase 3: Mapping & Filling -->
+                    <div class="feature-item" style="text-align: left; display: flex; gap: 20px; align-items: flex-start;">
+                        <div class="feature-icon" style="font-size: 2rem;">✍️</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0;">第三阶段：智能映射填充</h4>
+                            <p style="margin: 0; font-size: 14px; color: #64748b;">
+                                遍历映射配置，将上下文数据写入 Excel 单元格。
+                            </p>
+                            <div class="code-block" style="margin-top: 10px; font-size: 12px; background: rgba(0,0,0,0.05);">
+// 伪代码演示
+// 1. 填充单值字段
+worksheet.getCell('N26').value = ctx.Inspector // 填入检验员
+
+// 2. 填充列表数据
+tableData.forEach((row, index) => {
+  const r = startRow + index
+  worksheet.getCell(r, 2).value = row.CProductID // B列填料号
+  worksheet.getCell(r, 20).value = row.MeasuredSize // T列填实测值
+})
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Phase 4: Finalize -->
+                    <div class="feature-item" style="text-align: left; display: flex; gap: 20px; align-items: flex-start;">
+                        <div class="feature-icon" style="font-size: 2rem;">🎁</div>
+                        <div>
+                            <h4 style="margin: 0 0 5px 0;">第四阶段：样式修正与导出</h4>
+                            <p style="margin: 0; font-size: 14px; color: #64748b;">
+                                1. <strong>列宽补偿</strong>：应用 <code>Width = (Config * 1.43) + 0.63</code> 公式，强制修正列宽，防止打印截断。<br>
+                                2. <strong>二进制生成</strong>：<code>workbook.xlsx.writeBuffer()</code> 生成最终文件。<br>
+                                3. <strong>触发下载</strong>：使用 <code>FileSaver.saveAs</code> 弹出浏览器下载框。
+                            </p>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+          </div>
+        </section>
+
+        <!-- 4. 客户处理器 -->
+        <section class="content-section" id="section-customer-handler">
+          <div class="card">
+            <h2><span class="icon">🎯</span> 客户处理器架构</h2>
+            
+            <div class="tip-box info">
+              <span class="tip-icon">💡</span>
+              <div class="tip-content">
+                <strong>设计思想</strong><br>
+                因不同客户的出货报告自动生成的逻辑差异。本功能模块采用"策略模式"，在 <code>CUSTOMER_HANDLERS</code> 常量中为每个客户配置独立的处理逻辑，实现高扩展性。
+              </div>
+            </div>
+            
+            <h3>配置结构</h3>
+            <div class="code-block">
+<span class="keyword">const</span> CUSTOMER_HANDLERS = {
+  <span class="string">'A08'</span>: {
+    <span class="comment">// 1. 规格提取函数</span>
+    <span class="property">extractSpec</span>: <span class="function">extractSpecFromProductName</span>,
+    
+    <span class="comment">// 2. 实测尺寸生成函数</span>
+    <span class="property">generateMeasuredSize</span>: <span class="function">generateMeasuredSize_GBT1804c</span>,
+    
+    <span class="comment">// 3. 自定义字段 (自动填写检测项)</span>
+    <span class="property">customFields</span>: () => ({
+      <span class="property">外观</span>: <span class="string">'OK'</span>,
+      <span class="property">颜色</span>: <span class="string">'OK'</span>,
+      <span class="property">结果判定</span>: <span class="string">'合格'</span>
+    }),
+    
+    <span class="comment">// 4. 列宽硬编码配置 (核心修复点)</span>
+    <span class="property">columnWidths</span>: [<span class="number">4.4</span>, <span class="number">6.9</span>, <span class="number">6.9</span>, <span class="number">5.5</span>, ...]
+  }
+}
+            </div>
+            
+            <h3>GB/T1804-c 公差标准表</h3>
+            <p>系统内置该标准，用于生成符合国标公差范围的产品规格模拟实则数据。</p>
+            <div class="table-container">
+              <table>
+                <tr>
+                  <th>尺寸范围 (mm)</th>
+                  <th>允许偏差 (±mm)</th>
+                </tr>
+                <tr><td>0.5 ~ 3</td><td>±0.2</td></tr>
+                <tr><td>3 ~ 6</td><td>±0.3</td></tr>
+                <tr><td>6 ~ 30</td><td>±0.5</td></tr>
+                <tr><td>30 ~ 120</td><td>±0.8</td></tr>
+                <tr><td>120 ~ 400</td><td>±1.2</td></tr>
+                <tr><td>400 ~ 1000</td><td>±2.0</td></tr>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <!-- 5. 模板系统 -->
+        <section class="content-section" id="section-template">
+          <div class="card">
+            <h2><span class="icon">📄</span> 模板系统</h2>
+            
+            <h3>后端API接口</h3>
+            <div class="table-container">
+              <table>
+                <tr>
+                  <th>方法</th>
+                  <th>接口路径</th>
+                  <th>功能说明</th>
+                </tr>
+                <tr>
+                  <td>GET</td>
+                  <td>/api/shipment-report/templates</td>
+                  <td>获取模板列表</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td>/api/shipment-report/templates</td>
+                  <td>上传新模板 (支持 .xlsx)</td>
+                </tr>
+                <tr>
+                  <td>POST</td>
+                  <td>/api/shipment-report/templates/:id/parse</td>
+                  <td>解析模板 (使用 ExcelJS 获取 Sheet 结构)</td>
+                </tr>
+                <tr>
+                  <td>GET</td>
+                  <td>/api/shipment-report/templates/:id/mapping</td>
+                  <td>获取已保存的映射配置</td>
+                </tr>
+              </table>
+            </div>
+            
+            <h3>模板解析结构</h3>
+            <div class="code-block">
+{
+  <span class="property">previewHtml</span>: <span class="string">'&lt;table&gt;...&lt;/table&gt;'</span>, <span class="comment">// 用于前端预览的 HTML</span>
+  <span class="property">mapping</span>: {
+    <span class="property">fields</span>: [],       <span class="comment">// 顶部固定字段映射</span>
+    <span class="property">table</span>: {
+      <span class="property">sheetIndex</span>: <span class="number">0</span>,
+      <span class="property">headerRow</span>: <span class="number">7</span>,   <span class="comment">// 表头所在行</span>
+      <span class="property">startRow</span>: <span class="number">10</span>,   <span class="comment">// 数据填充起始行</span>
+      <span class="property">columns</span>: [...]  <span class="comment">// 列映射配置</span>
+    }
+  }
+}
+            </div>
+          </div>
+        </section>
+
+        <!-- 6. 映射编辑器 -->
+        <section class="content-section" id="section-mapping">
+          <div class="card">
+            <h2><span class="icon">🔗</span> 映射编辑器</h2>
+            
+            <p>映射编辑器 (<code>TemplateMappingEditor.vue</code>) 允许系统管理员通过可视化界面配置数据字段与 Excel 单元格的对应关系。</p>
+            
+            <h3>映射类型</h3>
+            <div class="table-container">
+              <table>
+                <tr>
+                  <th>类型</th>
+                  <th>说明</th>
+                  <th>示例</th>
+                </tr>
+                <tr>
+                  <td><strong>顶部字段 (fields)</strong></td>
+                  <td>单值映射，通常用于表头信息</td>
+                  <td><code>检验人员</code> → <code>N26</code></td>
+                </tr>
+                <tr>
+                  <td><strong>表格列 (columns)</strong></td>
+                  <td>列表数据映射，用于填充产品明细</td>
+                  <td><code>客户料号</code> → <code>B列</code></td>
+                </tr>
+              </table>
+            </div>
+            
+            <div class="tip-box warning">
+              <span class="tip-icon">⚠️</span>
+              <div class="tip-content">
+                <strong>重要提示</strong><br>
+                映射中的 <code>name</code> 字段必须与 <code>buildTemplateContext()</code> 返回的数据对象中的 Key 严格一致，否则无法填充数据。
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 7. 列宽处理 -->
+        <section class="content-section" id="section-column-width">
+          <div class="card">
+            <h2><span class="icon">📏</span> 列宽处理 (重点)</h2>
+            
+            <div class="tip-box warning">
+              <span class="tip-icon">🔥</span>
+              <div class="tip-content">
+                <strong>核心问题修复</strong><br>
+                ExcelJS 在写入文件时，会因为默认字体（Calibri）与模板字体（宋体等）的差异，导致计算出的列宽严重塌陷（变窄）。如果不处理，生成的报告将无法打印（内容被截断）。
+              </div>
+            </div>
+            
+            <h3>最终解决方案</h3>
+            <p>经过多次调试，放弃后端映射列宽和原始列宽方案，直接采用 <strong>"硬编码 + 补偿系数"</strong> 策略。</p>
+            
+            <h4>1. 补偿系数</h4>
+            <div class="code-block">
+<span class="comment">// 经验参数</span>
+<span class="keyword">const</span> WIDTH_COMPENSATION = <span class="number">0.63</span>   <span class="comment">// 基础补偿值</span>
+<span class="keyword">const</span> GLOBAL_SCALE = <span class="number">1.43</span>         <span class="comment">// 全局放大系数</span>
+
+<span class="comment">// 最终列宽计算</span>
+<span class="keyword">const</span> finalWidth = (原始列宽 * GLOBAL_SCALE) + WIDTH_COMPENSATION
+
+<span class="comment">// 示例：模板中 A 列宽 4.4</span>
+<span class="comment">// finalWidth = (4.4 * 1.43) + 0.63 = 6.922</span>
+            </div>
+            
+            <h4>2. 强制生效配置</h4>
+            <p>必须显式设置 <code>customWidth</code> 属性，否则 Excel 打开时可能会忽略我们设置的宽度并重新计算。</p>
+            <div class="code-block">
+col.<span class="property">width</span> = finalWidth
+col.<span class="property">customWidth</span> = <span class="keyword">true</span> <span class="comment">// 关键！</span>
+            </div>
+            
+            <h4>3. 唯一数据源</h4>
+            <p>目前列宽配置有两种来源，优先级如下：</p>
+            <ol>
+              <li><strong>映射配置 (高优先)</strong>：在模板映射编辑器面板中，手动配置列宽数组。达到不修改代码的情况下调整列宽。</li>
+              <li><strong>列宽硬编码 (低优先)</strong>：<code>CUSTOMER_HANDLERS</code> 中的 <code>columnWidths</code> 数组。作为默认方案。</li>
+            </ol>
+          </div>
+        </section>
+
+        <!-- 8. 交互演示 -->
+        <section class="content-section" id="section-demo">
+          <div class="card">
+            <h2><span class="icon">🎮</span> 交互演示</h2>
+            
+            <div class="demo-section">
+              <h4>📐 实测尺寸生成演示 (GB/T1804-c)</h4>
+              <p>输入规格尺寸，自动根据公差标准生成随机的实测数据：</p>
+              <div class="demo-input">
+                <input type="text" id="specInput" placeholder="输入规格" value="80*282mm">
+                <button class="demo-btn" onclick="generateMeasuredSize()">生成实测尺寸</button>
+                <button class="demo-btn green" onclick="generateMultiple()">生成5个</button>
+              </div>
+              <div class="demo-result" id="measureResult">
+                <p style="color: #94a3b8;">点击按钮生成实测尺寸...</p>
+              </div>
+            </div>
+            
+            <div class="demo-section">
+              <h4>🔍 规格提取演示</h4>
+              <p>模拟从 ERP 产品名称中自动提取规格字符串：</p>
+              <div class="demo-input">
+                <input type="text" id="productInput" placeholder="输入产品名称" value="贴纸80*282mm" style="width: 280px;">
+                <button class="demo-btn" onclick="extractSpec()">提取规格</button>
+              </div>
+              <div class="demo-result" id="extractResult">
+                <p style="color: #94a3b8;">点击按钮提取规格...</p>
+              </div>
+            </div>
+            
+            <div class="demo-section">
+              <h4>📊 客户处理器查询</h4>
+              <p>查看系统中已配置的客户处理器及其参数：</p>
+              <div class="demo-input">
+                <select id="customerSelect">
+                  <option value="A08">A08 客户 (标准)</option>
+                  <option value="A84">A84 客户 (同A08)</option>
+                  <option value="B01">B01 客户 (未配置)</option>
+                </select>
+                <button class="demo-btn" onclick="queryHandler()">查询配置</button>
+              </div>
+              <div class="demo-result" id="handlerResult">
+                <p style="color: #94a3b8;">选择客户并点击查询...</p>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- 9. 快速上手总结 -->
+        <section class="content-section" id="section-summary">
+          <div class="card">
+            <h2><span class="icon">🚀</span> 快速上手总结</h2>
+            
+            <h3>添加新客户的步骤</h3>
+            <ol style="margin-left: 20px; line-height: 1.8;">
+              <li><strong>模板上传</strong>：在系统界面"模板管理"中上传该客户的 Excel 模板文件。</li>
+              <li><strong>映射配置</strong>：打开"映射编辑器"，配置字段与单元格的对应关系。在此处也可直接配置<strong>列宽</strong>（推荐）。</li>
+              <li><strong>高级配置 (可选)</strong>：如果需要特殊的规格提取规则，或自定义字段逻辑才需要在代码中配置 <code>CUSTOMER_HANDLERS</code>。</li>
+            </ol>
+            
+            <h3>常见问题排查</h3>
+            <div class="table-container">
+              <table>
+                <tr>
+                  <th>现象</th>
+                  <th>可能原因</th>
+                  <th>解决方案</th>
+                </tr>
+                <tr>
+                  <td><strong>列宽变窄/塌陷</strong></td>
+                  <td>未配置列宽补偿</td>
+                  <td>在映射编辑器的"列宽配置"中填入模板原始列宽数组（推荐），或联系开发者在代码中添加硬编码配置。</td>
+                </tr>
+                <tr>
+                  <td><strong>数据未填充</strong></td>
+                  <td>映射字段名错误</td>
+                  <td>检查映射编辑器中的 <code>name</code> 是否在代码白名单中。</td>
+                </tr>
+                <tr>
+                  <td><strong>实测尺寸为空</strong></td>
+                  <td>规格提取失败</td>
+                  <td>检查产品名称格式，或调整 <code>extractSpec</code> 正则逻辑。</td>
+                </tr>
+              </table>
+            </div>
+            
+            <h3>开发调试指南</h3>
+            <p>作为开发人员，当报告生成出现问题时，可以按以下步骤进行排查：</p>
+            <div class="code-block" style="background: #0f172a;">
+# 1. 开启控制台调试
+在 Chrome DevTools Console 中，观察以 "ShipmentReport" 开头的日志。
+
+# 2. 检查数据上下文
+在 exportFromTemplate 函数中打印 ctx 对象：
+console.log('构建的上下文:', ctx)
+
+# 3. 检查列宽设置
+查看控制台是否输出 "列 X 设置宽度: ..."，确认硬编码配置是否生效。
+
+# 4. 验证映射关系
+进入映射编辑器，检查字段的 name 属性是否与 ctx 中的 key 完全一致（区分大小写）。
+            </div>
+
+            <div class="tip-box success">
+              <span class="tip-icon">🎉</span>
+              <div class="tip-content">
+                <strong>总结</strong><br>
+                本功能通过"模板化 + 策略模式 + 硬编码列宽补偿"的组合，完美解决复杂多变的客户报告需求。维护时请重点关注 <code>CUSTOMER_HANDLERS</code> 配置。
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+  </main>
+
+  <script>
+    // 菜单切换逻辑
+    const menuItems = document.querySelectorAll('.menu-item');
+    const sections = document.querySelectorAll('.content-section');
+    const breadcrumbCurrent = document.getElementById('breadcrumb-current');
+    
+    menuItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const sectionId = item.dataset.section;
+        
+        // 更新菜单状态
+        menuItems.forEach(m => m.classList.remove('active'));
+        item.classList.add('active');
+        
+        // 切换内容区
+        sections.forEach(s => s.classList.remove('active'));
+        const targetSection = document.getElementById('section-' + sectionId);
+        if (targetSection) {
+          targetSection.classList.add('active');
+        }
+        
+        // 更新面包屑
+        const text = item.querySelector('.text').textContent;
+        breadcrumbCurrent.textContent = text;
+        
+        // 滚动到顶部
+        document.querySelector('.content-scroll-area').scrollTop = 0;
+      });
+    });
+
+    // ---------------------------------------------------------
+    // Tab 切换逻辑 (模板配置指南)
+    // ---------------------------------------------------------
+    function switchTab(index) {
+      // 1. 更新 Tab 样式
+      const tabs = document.querySelectorAll('.mock-tab');
+      tabs.forEach((tab, i) => {
+        if (i === index) {
+          tab.classList.add('active');
+          tab.style.fontWeight = 'bold';
+          tab.style.color = '#3b82f6';
+          tab.style.borderBottom = '2px solid #3b82f6';
+        } else {
+          tab.classList.remove('active');
+          tab.style.fontWeight = 'normal';
+          tab.style.color = '#64748b';
+          tab.style.borderBottom = 'none';
+        }
+      });
+
+      // 2. 切换内容显示
+      const contents = document.querySelectorAll('.tab-content-item');
+      contents.forEach((content, i) => {
+        if (i === index) {
+          content.style.display = 'block';
+          // 添加简单的淡入动画
+          content.style.opacity = '0';
+          setTimeout(() => content.style.opacity = '1', 10);
+          content.style.transition = 'opacity 0.3s ease';
+        } else {
+          content.style.display = 'none';
+        }
+      });
+    }
+
+    // ---------------------------------------------------------
+    // 以下为业务逻辑演示代码
+    // ---------------------------------------------------------
+
+    // GB/T1804-c 公差表
+    function getGBT1804cTolerance(nominal) {
+      if (nominal <= 3) return 0.2
+      if (nominal <= 6) return 0.3
+      if (nominal <= 30) return 0.5
+      if (nominal <= 120) return 0.8
+      if (nominal <= 400) return 1.2
+      if (nominal <= 1000) return 2.0
+      return 4.0
+    }
+    
+    // 生成实测尺寸
+    function generateMeasuredSize_GBT1804c(spec) {
+      if (!spec) return ''
+      const match = spec.match(/([\d.]+)\s*\*\s*([\d.]+)/)
+      if (!match) return ''
+      
+      const width = parseFloat(match[1])
+      const height = parseFloat(match[2])
+      if (isNaN(width) || isNaN(height)) return ''
+      
+      const widthTol = getGBT1804cTolerance(width)
+      const heightTol = getGBT1804cTolerance(height)
+      
+      const widthOffset = (Math.random() * 2 - 1) * widthTol
+      const heightOffset = (Math.random() * 2 - 1) * heightTol
+      
+      return `${(width + widthOffset).toFixed(1)}*${(height + heightOffset).toFixed(1)}`
+    }
+    
+    // 规格提取
+    function extractSpecFromProductName(productName) {
+      if (!productName) return ''
+      const starPos = productName.indexOf('*')
+      const mmPos = productName.toLowerCase().indexOf('mm')
+      if (starPos === -1 || mmPos === -1 || mmPos <= starPos) return ''
+      
+      let startPos = starPos
+      while (startPos > 0 && /[\d.]/.test(productName[startPos - 1])) startPos--
+      return productName.substring(startPos, mmPos + 2)
+    }
+    
+    // 客户处理器配置 (模拟)
+    const CUSTOMER_HANDLERS = {
+      'A08': {
+        extractSpec: 'extractSpecFromProductName',
+        generateMeasuredSize: 'generateMeasuredSize_GBT1804c',
+        customFields: { 外观: 'OK', 颜色: 'OK', 图文: 'OK', 结果判定: '合格' },
+        columnWidths: [4.4, 6.9, 6.9, 5.5, 7.7, 8.9, 5.5, 8.6, 4.4, 3.8]
+      },
+      'A84': {
+        extractSpec: 'extractSpecFromProductName',
+        generateMeasuredSize: 'generateMeasuredSize_GBT1804c',
+        customFields: { 外观: 'OK', 结果判定: '合格' },
+        columnWidths: [4.4, 6.9, 6.9, 5.5, 7.7]
+      }
+    }
+    
+    // 演示函数：生成实测尺寸
+    function generateMeasuredSize() {
+      const spec = document.getElementById('specInput').value
+      const result = generateMeasuredSize_GBT1804c(spec)
+      
+      if (result) {
+        const match = spec.match(/([\d.]+)\s*\*\s*([\d.]+)/)
+        const width = parseFloat(match[1])
+        const height = parseFloat(match[2])
+        document.getElementById('measureResult').innerHTML = `
+          <p><strong>输入规格：</strong>${spec}</p>
+          <p><strong>宽度公差：</strong>±${getGBT1804cTolerance(width)}mm</p>
+          <p><strong>高度公差：</strong>±${getGBT1804cTolerance(height)}mm</p>
+          <p><strong>生成的实测尺寸：</strong><span style="color: #10b981; font-size: 18px; font-weight: bold;">${result}</span></p>
+        `
+      } else {
+        document.getElementById('measureResult').innerHTML = '<p style="color: #ef4444;">无法解析规格，请检查格式</p>'
+      }
+    }
+    
+    // 演示函数：批量生成
+    function generateMultiple() {
+      const spec = document.getElementById('specInput').value
+      let html = `<p><strong>输入规格：</strong>${spec}</p><p><strong>生成5个随机实测尺寸：</strong></p><ol>`
+      for (let i = 0; i < 5; i++) {
+        html += `<li style="color: #10b981; font-weight: 500;">${generateMeasuredSize_GBT1804c(spec)}</li>`
+      }
+      html += '</ol>'
+      document.getElementById('measureResult').innerHTML = html
+    }
+    
+    // 演示函数：提取规格
+    function extractSpec() {
+      const productName = document.getElementById('productInput').value
+      const result = extractSpecFromProductName(productName)
+      document.getElementById('extractResult').innerHTML = result
+        ? `<p><strong>产品名称：</strong>${productName}</p><p><strong>提取的规格：</strong><span style="color: #3b82f6; font-size: 18px; font-weight: bold;">${result}</span></p>`
+        : '<p style="color: #ef4444;">未能提取规格</p>'
+    }
+    
+    // 演示函数：查询处理器
+    function queryHandler() {
+      const customerId = document.getElementById('customerSelect').value
+      const handler = CUSTOMER_HANDLERS[customerId]
+      
+      if (handler) {
+        let html = `<p><strong>客户编码：</strong>${customerId}</p><p><strong>自定义字段：</strong></p><ul>`
+        for (const [key, value] of Object.entries(handler.customFields)) {
+          html += `<li>${key}: <span style="color: #10b981;">${value}</span></li>`
+        }
+        html += `</ul><p><strong>列宽配置：</strong>${handler.columnWidths.length}列 (硬编码)</p>`
+        document.getElementById('handlerResult').innerHTML = html
+      } else {
+        document.getElementById('handlerResult').innerHTML = `
+          <p style="color: #f59e0b;"><strong>客户 ${customerId} 未配置处理器</strong></p>
+          <p>该客户将使用默认行为，不自动提取规格和生成实测尺寸，且列宽可能不准确。</p>
+        `
+      }
+    }
+  </script>
+</body>
+</html>

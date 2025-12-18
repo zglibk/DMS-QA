@@ -38,7 +38,12 @@
           </el-button>
         </div>
         <div class="action-section">
-          <el-button type="primary" @click="showAddDialog" :icon="Plus">
+          <el-button 
+            type="primary" 
+            @click="showAddDialog" 
+            :icon="Plus"
+            :disabled="!userStore.hasPermission('sys:role:add')"
+          >
             新增角色
           </el-button>
           <el-button @click="refreshData" :icon="Refresh">
@@ -90,13 +95,30 @@
       <el-table-column label="操作" width="270" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
-            <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
+            <el-button 
+              size="small" 
+              @click="showEditDialog(row)" 
+              :icon="Edit"
+              :disabled="!userStore.hasPermission('sys:role:edit')"
+            >
               编辑
             </el-button>
-            <el-button size="small" type="success" @click="showPermissionDialog(row)" :icon="Setting">
+            <el-button 
+              size="small" 
+              type="success" 
+              @click="showPermissionDialog(row)" 
+              :icon="Setting"
+              :disabled="!userStore.hasPermission('sys:role:perm')"
+            >
               权限
             </el-button>
-            <el-button size="small" type="warning" @click="showDepartmentDialog(row)" :icon="OfficeBuilding">
+            <el-button 
+              size="small" 
+              type="warning" 
+              @click="showDepartmentDialog(row)" 
+              :icon="OfficeBuilding"
+              :disabled="!userStore.hasPermission('sys:role:dept')"
+            >
               部门
             </el-button>
             <el-button 
@@ -104,6 +126,7 @@
               type="danger" 
               @click="deleteRole(row)"
               :icon="Delete"
+              :disabled="!userStore.hasPermission('sys:role:delete')"
             >
               删除
             </el-button>
@@ -295,6 +318,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus,
@@ -308,7 +332,9 @@ import {
   UserFilled,
   Setting
 } from '@element-plus/icons-vue'
-import axios from 'axios'
+import api from '@/utils/api'
+
+const userStore = useUserStore()
 
 // 响应式数据
 const loading = ref(false)
@@ -421,8 +447,8 @@ const fetchRoles = async () => {
       size: pagination.size,
       ...searchForm
     }
-    const response = await axios.get('/roles', { params })
-    const data = response.data.data || {}
+    const response = await api.get('/roles', { params })
+    const data = response.data || {}
     roleList.value = data.list || []
     pagination.total = data.total || 0
   } catch (error) {
@@ -437,8 +463,8 @@ const fetchRoles = async () => {
 const fetchMenus = async () => {
   try {
     // 使用tree接口获取所有菜单数据，不受分页限制
-    const response = await axios.get('/menus/tree')
-    const treeData = response.data.data || []
+    const response = await api.get('/menus/tree')
+    const treeData = response.data || []
     
     // 将树形结构转换为扁平数组，用于权限分配
     const flattenMenus = (menus) => {
@@ -461,8 +487,8 @@ const fetchMenus = async () => {
 // 获取部门列表
 const fetchDepartments = async () => {
   try {
-    const response = await axios.get('/departments')
-    departmentList.value = response.data.data || []
+    const response = await api.get('/departments')
+    departmentList.value = response.data || []
   } catch (error) {
     console.error('获取部门列表失败:', error)
   }
@@ -525,8 +551,16 @@ const showPermissionDialog = async (role) => {
     await fetchMenus()
     
     // 然后获取角色的权限数据
-    const response = await axios.get(`/roles/${role.ID}/menus`)
-    selectedMenuIds.value = response.data.data || []
+    const response = await api.get(`/roles/${role.ID}/menus`)
+    const allMenuIds = response.data || []
+    
+    // 过滤出叶子节点，避免el-tree自动选中父节点导致所有子节点被选中
+    // 如果选中了父节点ID，el-tree会默认选中所有子节点，这可能与实际权限不符（半选状态）
+    selectedMenuIds.value = allMenuIds.filter(id => {
+      const menu = menuList.value.find(m => m.ID === id)
+      // 只保留叶子节点（没有子节点的节点）
+      return menu && (!menu.children || menu.children.length === 0)
+    })
     
     // 打开对话框
     permissionDialogVisible.value = true
@@ -538,7 +572,6 @@ const showPermissionDialog = async (role) => {
       menuTreeRef.value.setCheckedKeys([])
       // 设置新的选中状态
       menuTreeRef.value.setCheckedKeys(selectedMenuIds.value)
-      console.log('手动设置树组件选中状态:', selectedMenuIds.value)
     }
   } catch (error) {
     console.error('获取角色权限失败:', error)
@@ -551,8 +584,8 @@ const showPermissionDialog = async (role) => {
 const showDepartmentDialog = async (role) => {
   currentRole.value = role
   try {
-    const response = await axios.get(`/roles/${role.ID}/departments`)
-    selectedDepartmentIds.value = response.data.data || []
+    const response = await api.get(`/roles/${role.ID}/departments`)
+    selectedDepartmentIds.value = response.data || []
   } catch (error) {
     console.error('获取角色部门失败:', error)
     selectedDepartmentIds.value = []
@@ -585,7 +618,7 @@ const submitForm = async () => {
     const url = isEdit.value ? `/roles/${currentEditId.value}` : '/roles'
     const method = isEdit.value ? 'put' : 'post'
     
-    await axios[method](url, formData)
+    await api[method](url, formData)
     
     ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
     dialogVisible.value = false
@@ -610,15 +643,13 @@ const savePermissions = async () => {
   
   try {
     permissionSubmitting.value = true
-    // 获取完全选中的节点和半选中的节点
+    // 获取选中的节点（包括半选节点，即父节点）
     const checkedKeys = menuTreeRef.value.getCheckedKeys()
     const halfCheckedKeys = menuTreeRef.value.getHalfCheckedKeys()
-    
-    // 合并完全选中和半选中的节点ID
-    const allSelectedKeys = [...checkedKeys, ...halfCheckedKeys]
-    
-    await axios.post(`/roles/${currentRole.value.ID}/menus`, {
-      menuIds: allSelectedKeys
+    const allCheckedIds = [...checkedKeys, ...halfCheckedKeys]
+
+    await api.post(`/roles/${currentRole.value.ID}/menus`, {
+      menuIds: allCheckedIds
     })
     
     ElMessage.success('权限保存成功')
@@ -639,15 +670,15 @@ const refreshRolePermissions = async () => {
     refreshingPermissions.value = true
     
     // 获取该角色下的所有用户
-    const usersResponse = await axios.get(`/roles/${currentRole.value.ID}/users`)
-    console.log('API响应:', usersResponse)
+    const usersResponse = await api.get(`/roles/${currentRole.value.ID}/users`)
+    console.log('获取角色用户列表响应:', usersResponse)
     
-    if (!usersResponse || !usersResponse.data) {
+    if (!usersResponse || !usersResponse.success) {
       ElMessage.error('获取用户列表失败：API响应异常')
       return
     }
     
-    const users = usersResponse.data.data?.users || []
+    const users = usersResponse.data?.users || []
     
     if (users.length === 0) {
       ElMessage.info('该角色下没有用户需要刷新权限')
@@ -660,13 +691,17 @@ const refreshRolePermissions = async () => {
     
     for (const user of users) {
       try {
-        await axios.post('/auth/refresh-permissions', {
+        await api.post('/auth/refresh-permissions', {
           userId: user.ID
         })
         successCount++
       } catch (error) {
         console.error(`刷新用户 ${user.Username} 权限失败:`, error)
         failCount++
+        if (error.response?.status === 403) {
+           // 避免弹出太多消息，只在控制台记录详细
+           console.warn(`无权刷新用户 ${user.Username} 的权限`)
+        }
       }
     }
     
@@ -692,7 +727,7 @@ const saveDepartments = async () => {
     departmentSubmitting.value = true
     const checkedKeys = departmentTreeRef.value.getCheckedKeys()
     
-    await axios.post(`/roles/${currentRole.value.ID}/departments`, {
+    await api.post(`/roles/${currentRole.value.ID}/departments`, {
       departmentIds: checkedKeys
     })
     
@@ -721,7 +756,7 @@ const deleteRole = async (role) => {
       }
     )
     
-    await axios.delete(`/roles/${role.ID}`)
+    await api.delete(`/roles/${role.ID}`)
     ElMessage.success('删除成功')
     await fetchRoles()
   } catch (error) {

@@ -51,7 +51,7 @@
             搜索
           </el-button>
           <el-button @click="resetSearch">重置</el-button>
-          <el-button type="success" @click="handleAdd">
+          <el-button type="success" @click="handleAdd" :disabled="!hasAddPermission">
             <el-icon><Plus /></el-icon>
             新增供应商
           </el-button>
@@ -107,13 +107,13 @@
         </el-table-column>
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">
+            <el-button type="primary" size="small" @click="handleEdit(row)" :disabled="!hasEditPermission">
               编辑
             </el-button>
-            <el-button type="info" size="small" @click="handleViewMaterials(row)">
+            <el-button type="info" size="small" @click="handleViewMaterials(row)" :disabled="!hasViewMaterialsPermission">
               材料清单
             </el-button>
-            <el-button type="warning" size="small" @click="handleQualityCheck(row)">
+            <el-button type="warning" size="small" @click="handleQualityCheck(row)" :disabled="!hasQualityCheckPermission">
               质检记录
             </el-button>
           </template>
@@ -243,9 +243,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
+import { useUserStore } from '@/store/user'
+
+const userStore = useUserStore()
+
+// 权限控制
+const hasAddPermission = computed(() => userStore.hasActionPermission('supplier:material:add'))
+const hasEditPermission = computed(() => userStore.hasActionPermission('supplier:material:edit'))
+const hasViewMaterialsPermission = computed(() => userStore.hasActionPermission('supplier:material:view_materials'))
+const hasQualityCheckPermission = computed(() => userStore.hasActionPermission('supplier:material:quality_check'))
 
 /**
  * 响应式数据定义

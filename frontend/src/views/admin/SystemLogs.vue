@@ -80,15 +80,15 @@
           </el-form-item>
           
           <el-form-item>
-            <el-button @click="handleReset">
+            <el-button @click="handleReset" :disabled="!hasPermission('sys:log:view')">
               <el-icon><Refresh /></el-icon>
               <span class="button-text">重置</span>
             </el-button>
-            <el-button type="primary" @click="handleSearch" :loading="loading">
+            <el-button type="primary" @click="handleSearch" :loading="loading" :disabled="!hasPermission('sys:log:view')">
               <el-icon><Search /></el-icon>
               <span class="button-text">搜索</span>
             </el-button>
-            <el-button type="success" @click="goToAnalytics">
+            <el-button type="success" @click="goToAnalytics" :disabled="!hasPermission('sys:log:view')">
               <el-icon><TrendCharts /></el-icon>
               <span class="button-text">统计分析</span>
             </el-button>
@@ -158,9 +158,9 @@
 
     <!-- 操作按钮区域 -->
     <div class="action-section">
-      <el-button type="success" @click="showExportDialog" :loading="exportLoading"><el-icon style="margin-right: 3px;"><Download /></el-icon>导出日志</el-button>
-      <el-button type="danger" @click="showCleanupDialog"><el-icon style="margin-right: 3px;"><Delete /></el-icon>清理日志</el-button>
-      <el-button type="primary" plain @click="handleRefresh" :loading="loading"><el-icon style="margin-right: 3px;"><Refresh /></el-icon>刷新</el-button>
+      <el-button type="success" @click="showExportDialog" :loading="exportLoading" :disabled="!hasPermission('sys:log:export')"><el-icon style="margin-right: 3px;"><Download /></el-icon>导出日志</el-button>
+      <el-button type="danger" @click="showCleanupDialog" :disabled="!hasPermission('sys:log:delete')"><el-icon style="margin-right: 3px;"><Delete /></el-icon>清理日志</el-button>
+      <el-button type="primary" plain @click="handleRefresh" :loading="loading" :disabled="!hasPermission('sys:log:view')"><el-icon style="margin-right: 3px;"><Refresh /></el-icon>刷新</el-button>
     </div>
 
     <!-- 日志列表 -->
@@ -234,7 +234,7 @@
         
         <el-table-column label="操作" min-width="120" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click.stop="viewLogDetail(row)">
+            <el-button type="primary" size="small" @click.stop="viewLogDetail(row)" :disabled="!hasPermission('sys:log:view')">
               <el-icon><View /></el-icon>
               <span class="button-text">详情</span>
             </el-button>
@@ -518,6 +518,7 @@ import { ref, reactive, onMounted, computed, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Refresh, Download, Delete, View, TrendCharts, Check, Close, Star, Document, Warning, InfoFilled, User, Loading } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '@/store/user'
 import api from '@/utils/api'
 
 export default {
@@ -541,6 +542,10 @@ export default {
   setup() {
     // 路由
     const router = useRouter()
+    const userStore = useUserStore()
+    const hasPermission = (permission) => {
+      return userStore.hasPermission(permission)
+    }
     
     // 响应式数据
     const loading = ref(false)
@@ -1308,7 +1313,11 @@ export default {
       clearAllColumns,
       selectDefaultColumns,
       hasActiveFilters,
-      goToAnalytics
+      goToAnalytics,
+
+      // 权限
+      userStore,
+      hasPermission
     }
   }
 }

@@ -1,7 +1,8 @@
 <template>
   <AppLayout>
-    <div class="rework-analysis">
-      <!-- 时间筛选汇总信息 -->
+    <ContentWrapper>
+      <div class="rework-analysis">
+        <!-- 时间筛选汇总信息 -->
       <el-card class="yearly-summary" shadow="never">
         <template #header>
           <div class="card-header">
@@ -485,6 +486,7 @@
         </el-tabs>
       </el-card>
   </div>
+  </ContentWrapper>
     <!-- 详情弹窗 -->
     <el-dialog v-model="detailVisible" title="返工记录详情" width="800px">
       <div class="detail-content" v-if="currentRecord">
@@ -551,6 +553,7 @@ import {
 import * as echarts from 'echarts'
 import api from '@/services/api.js'
 import AppLayout from '../components/common/AppLayout.vue'
+import ContentWrapper from '../components/common/ContentWrapper.vue'
 
 // 响应式数据
 const loading = ref(false)
@@ -1605,10 +1608,6 @@ const updateGanttChart = () => {
 </script>
 
 <style scoped>
-.rework-analysis {
-  width: 80%;
-}
-
 /* 年度统计卡片整体样式 */
 .yearly-summary {
   margin-bottom: 24px;

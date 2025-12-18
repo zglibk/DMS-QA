@@ -44,9 +44,9 @@
           <div class="tab-content">
             <div class="tab-header">
               <el-button 
-                v-if="canEditPlan" 
                 type="primary" 
                 size="small"
+                :disabled="!canEditPlan"
                 @click="editPlan"
               >
                 <el-icon><Edit /></el-icon>
@@ -86,9 +86,9 @@
           <div class="tab-content">
             <div class="tab-header">
               <el-button 
-                v-if="canAddMilestone" 
                 type="primary" 
                 size="small"
+                :disabled="!canAddMilestone"
                 @click="showAddMilestoneDialog"
               >
                 <el-icon><Plus /></el-icon>
@@ -161,9 +161,9 @@
           <div class="tab-content">
             <div class="tab-header">
               <el-button 
-                v-if="canEditProgress" 
                 type="primary" 
                 size="small"
+                :disabled="!canEditProgress"
                 @click="showUpdateProgressDialog"
               >
                 <el-icon><Edit /></el-icon>

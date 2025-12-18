@@ -104,7 +104,7 @@ router.get('/', async (req, res) => {
 
 // ===================== 获取不良项（级联） =====================
 // GET /api/complaint/defective-items/:categoryId
-// 返回: 指定类别下的不良项
+// 返回: 指定类别下的不良项（支持多对多关联，同时兼容旧的单一关联）
 router.get('/defective-items/:categoryId', async (req, res) => {
   try {
     const { categoryId } = req.params;
@@ -112,20 +112,62 @@ router.get('/defective-items/:categoryId', async (req, res) => {
 
     let pool = await sql.connect(await getDynamicConfig());
 
-    // 先查询所有不良项以便调试
-    const allItemsResult = await pool.request()
-      .query('SELECT ID, Name, CategoryID FROM DefectiveItem');
-    console.log('所有不良项:', allItemsResult.recordset);
+    // 检查多对多关联表是否存在
+    const tableCheck = await pool.request().query(`
+      SELECT COUNT(*) as count 
+      FROM INFORMATION_SCHEMA.TABLES 
+      WHERE TABLE_NAME = 'DefectiveItemCategory'
+    `);
+    const hasRelationTable = tableCheck.recordset[0].count > 0;
+    console.log('多对多关联表是否存在:', hasRelationTable);
 
-    // 查询指定类别的不良项
-    const result = await pool.request()
-      .input('CategoryID', sql.Int, categoryId)
-      .query('SELECT Name FROM DefectiveItem WHERE CategoryID = @CategoryID');
+    let items = [];
 
-    console.log('匹配的不良项:', result.recordset);
-    const items = result.recordset.map(r => r.Name);
-    console.log('返回的不良项数组:', items);
+    if (hasRelationTable) {
+      // 优先从多对多关联表查询
+      const relationResult = await pool.request()
+        .input('CategoryID', sql.Int, categoryId)
+        .query(`
+          SELECT DISTINCT di.Name, di.SortOrder
+          FROM DefectiveItem di
+          INNER JOIN DefectiveItemCategory dic ON di.ID = dic.ItemID
+          WHERE dic.CategoryID = @CategoryID
+            AND (di.IsActive = 1 OR di.IsActive IS NULL)
+          ORDER BY di.SortOrder ASC, di.Name ASC
+        `);
+      console.log('多对多关联查询结果:', relationResult.recordset);
+      
+      if (relationResult.recordset.length > 0) {
+        items = relationResult.recordset.map(r => r.Name);
+      } else {
+        // 如果多对多关联表没有数据，尝试从旧的CategoryID字段查询
+        console.log('多对多关联表无数据，尝试旧的单一关联查询');
+        const legacyResult = await pool.request()
+          .input('CategoryID', sql.Int, categoryId)
+          .query(`
+            SELECT Name FROM DefectiveItem 
+            WHERE CategoryID = @CategoryID
+              AND (IsActive = 1 OR IsActive IS NULL)
+            ORDER BY SortOrder ASC, Name ASC
+          `);
+        console.log('旧单一关联查询结果:', legacyResult.recordset);
+        items = legacyResult.recordset.map(r => r.Name);
+      }
+    } else {
+      // 只能使用旧的单一关联查询
+      const result = await pool.request()
+        .input('CategoryID', sql.Int, categoryId)
+        .query(`
+          SELECT Name FROM DefectiveItem 
+          WHERE CategoryID = @CategoryID
+            AND (IsActive = 1 OR IsActive IS NULL)
+          ORDER BY SortOrder ASC, Name ASC
+        `);
+      console.log('旧单一关联查询结果:', result.recordset);
+      items = result.recordset.map(r => r.Name);
+    }
 
+    console.log('最终返回的不良项数组:', items);
     res.json(items);
   } catch (err) {
     console.error('获取不良项失败:', err);
@@ -1178,7 +1220,7 @@ router.get('/options', async (req, res) => {
     // 获取不良类别选项 - 从DefectiveCategory表获取（包含ID）
     console.log('正在获取不良类别选项...');
     const defectiveCategoryResult = await pool.request()
-      .query('SELECT ID, Name FROM DefectiveCategory ORDER BY Name');
+      .query(`SELECT ID, Name FROM DefectiveCategory WHERE IsActive = 1 OR IsActive IS NULL ORDER BY SortOrder ASC, Name ASC`);
     console.log('不良类别选项结果:', defectiveCategoryResult.recordset);
 
     // 获取部门选项 - 从Department表获取
@@ -1863,8 +1905,10 @@ router.get('/attachment-path/:id', async (req, res) => {
 router.get('/file/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    console.log(`\n========== 获取附件文件 ID: ${id} ==========`);
 
     if (!id || isNaN(id)) {
+      console.log(`无效的记录ID: ${id}`);
       return res.status(400).json({ success: false, message: '无效的记录ID' });
     }
 
@@ -1875,20 +1919,33 @@ router.get('/file/:id', async (req, res) => {
       .query('SELECT AttachmentFile FROM ComplaintRegister WHERE ID = @ID');
 
     if (result.recordset.length === 0) {
-      return res.status(404).json({ success: false, message: '记录不存在' });
+      console.log(`记录ID ${id} 不存在`);
+      return res.status(404).json({ success: false, message: `记录ID ${id} 不存在` });
     }
 
     const attachmentFile = result.recordset[0].AttachmentFile;
+    console.log(`数据库中的附件路径: ${attachmentFile}`);
 
     if (!attachmentFile) {
-      return res.status(404).json({ success: false, message: '无附件文件' });
+      console.log(`记录ID ${id} 无附件文件`);
+      return res.status(404).json({ success: false, message: `记录ID ${id} 无附件文件` });
     }
 
     // 将相对路径转换为服务器文件路径
     const serverPath = await convertRelativePathToServerPath(attachmentFile);
+    console.log(`路径转换结果:`, serverPath);
 
     if (!serverPath.isAccessible) {
-      return res.status(404).json({ success: false, message: '文件不存在或无法访问' });
+      console.log(`文件不可访问: ${serverPath.fullPath}`);
+      return res.status(404).json({ 
+        success: false, 
+        message: `文件不可访问`,
+        debug: {
+          dbPath: attachmentFile,
+          searchedPath: serverPath.fullPath,
+          isAccessible: serverPath.isAccessible
+        }
+      });
     }
 
     const fs = require('fs');
@@ -1896,13 +1953,22 @@ router.get('/file/:id', async (req, res) => {
 
     // 检查文件是否存在
     if (!fs.existsSync(serverPath.fullPath)) {
-      return res.status(404).json({ success: false, message: '文件不存在' });
+      console.log(`文件不存在: ${serverPath.fullPath}`);
+      return res.status(404).json({ 
+        success: false, 
+        message: `文件不存在`,
+        debug: {
+          dbPath: attachmentFile,
+          fullPath: serverPath.fullPath
+        }
+      });
     }
 
     // 获取文件信息
     const stat = fs.statSync(serverPath.fullPath);
     const fileName = path.basename(serverPath.fullPath);
     const ext = path.extname(fileName).toLowerCase();
+    console.log(`文件信息: ${fileName}, 大小: ${stat.size} bytes`);
 
     // 设置响应头
     res.setHeader('Content-Length', stat.size);
@@ -1925,6 +1991,7 @@ router.get('/file/:id', async (req, res) => {
 
     const contentType = mimeTypes[ext] || 'application/octet-stream';
     res.setHeader('Content-Type', contentType);
+    console.log(`发送文件: ${serverPath.fullPath}, Content-Type: ${contentType}`);
 
     // 创建文件流并发送
     const fileStream = fs.createReadStream(serverPath.fullPath);
@@ -1998,28 +2065,71 @@ async function convertRelativePathToServerPath(relativePath) {
 
   // 如果直接路径不存在，尝试路径映射
   if (!isAccessible) {
-    // 尝试将"不良图片&资料"路径映射到实际的月份目录
+    // 尝试将"不良图片&资料"路径映射到实际的目录
     if (relativePath.includes('不良图片&资料')) {
-      // 提取文件名
+      // 提取文件名和客户目录
       const fileName = path.basename(relativePath);
+      // 解析路径结构：2025年异常汇总\不良图片&资料\客户\文件名.jpg
+      const pathParts = relativePath.split(/[\/\\]/).filter(p => p);
+      const customerDir = pathParts.length >= 4 ? pathParts[pathParts.length - 2] : null;
+      
       console.log(`提取文件名: ${fileName}`);
+      console.log(`提取客户目录: ${customerDir}`);
 
-      // 在所有月份目录中查找文件
-      const yearDir = path.join(baseServerPath, '2025年异常汇总');
+      // 在 不良图片&资料 目录中查找
+      const yearDir = path.join(baseServerPath, '2025年异常汇总', '不良图片&资料');
+      console.log(`查找目录: ${yearDir}`);
+      
       if (fs.existsSync(yearDir)) {
-        const monthDirs = fs.readdirSync(yearDir).filter(dir => {
-          const fullPath = path.join(yearDir, dir);
-          return fs.statSync(fullPath).isDirectory();
-        });
-
-        for (const monthDir of monthDirs) {
-          const searchPath = path.join(yearDir, monthDir, fileName);
-          console.log(`搜索路径: ${searchPath}`);
-          if (fs.existsSync(searchPath)) {
-            fullPath = searchPath;
+        // 如果有客户目录，优先在客户目录中查找
+        if (customerDir) {
+          const customerPath = path.join(yearDir, customerDir, fileName);
+          console.log(`尝试客户目录路径: ${customerPath}`);
+          if (fs.existsSync(customerPath)) {
+            fullPath = customerPath;
             isAccessible = true;
-            console.log(`找到文件: ${fullPath}`);
-            break;
+            console.log(`在客户目录中找到文件: ${fullPath}`);
+          }
+        }
+        
+        // 如果客户目录中找不到，遍历所有子目录查找
+        if (!isAccessible) {
+          const subDirs = fs.readdirSync(yearDir).filter(dir => {
+            const dirPath = path.join(yearDir, dir);
+            return fs.statSync(dirPath).isDirectory();
+          });
+
+          for (const subDir of subDirs) {
+            const searchPath = path.join(yearDir, subDir, fileName);
+            console.log(`搜索路径: ${searchPath}`);
+            if (fs.existsSync(searchPath)) {
+              fullPath = searchPath;
+              isAccessible = true;
+              console.log(`找到文件: ${fullPath}`);
+              break;
+            }
+          }
+        }
+      }
+      
+      // 如果还没找到，尝试在月份目录中查找（旧的逻辑兼容）
+      if (!isAccessible) {
+        const yearDirAlt = path.join(baseServerPath, '2025年异常汇总');
+        if (fs.existsSync(yearDirAlt)) {
+          const monthDirs = fs.readdirSync(yearDirAlt).filter(dir => {
+            const dirPath = path.join(yearDirAlt, dir);
+            return fs.statSync(dirPath).isDirectory() && !dir.includes('不良图片');
+          });
+
+          for (const monthDir of monthDirs) {
+            const searchPath = path.join(yearDirAlt, monthDir, fileName);
+            console.log(`搜索月份目录: ${searchPath}`);
+            if (fs.existsSync(searchPath)) {
+              fullPath = searchPath;
+              isAccessible = true;
+              console.log(`在月份目录找到文件: ${fullPath}`);
+              break;
+            }
           }
         }
       }
@@ -2032,9 +2142,9 @@ async function convertRelativePathToServerPath(relativePath) {
   if (isAccessible && fullPath) {
     // 提取相对于uploads目录的路径
     const uploadsDir = path.join(__dirname, '..', 'uploads');
-    const relativePath = path.relative(uploadsDir, fullPath);
+    const relPath = path.relative(uploadsDir, fullPath);
     // 转换为URL路径格式，并进行URL编码
-    const urlPath = relativePath.split(path.sep).map(part => encodeURIComponent(part)).join('/');
+    const urlPath = relPath.split(path.sep).map(part => encodeURIComponent(part)).join('/');
     displayPath = `/files/${urlPath}`;
     console.log(`生成HTTP访问路径: ${displayPath}`);
   } else {

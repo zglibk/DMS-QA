@@ -15,6 +15,7 @@
             size="small"
             @click="createNewConfig"
             :icon="Plus"
+            :disabled="!hasPermission('sys:config:add')"
           >
             新建配置
           </el-button>
@@ -70,6 +71,7 @@
                 size="small"
                 @click="deleteConfig"
                 :icon="Delete"
+                :disabled="!hasPermission('sys:config:delete')"
               >
                 删除配置
               </el-button>
@@ -120,12 +122,12 @@
           type="primary" 
           @click="saveConfig" 
           :loading="isSubmitting" 
-          :disabled="isSubmitting"
+          :disabled="isSubmitting || (selectedConfigId ? !hasPermission('sys:config:edit') : !hasPermission('sys:config:add'))"
         >
           {{ isSubmitting ? (selectedConfigId ? '更新中...' : '保存中...') : (selectedConfigId ? '更新配置' : '新增配置') }}
         </el-button>
         
-        <el-button @click="testConnection" :loading="isTesting">
+        <el-button @click="testConnection" :loading="isTesting" :disabled="!hasPermission('sys:config:edit')">
           {{ isTesting ? '测试中...' : '测试连接' }}
         </el-button>
         
@@ -133,7 +135,7 @@
           v-if="selectedConfigId" 
           type="danger" 
           @click="deleteConfig"
-          :disabled="isSubmitting"
+          :disabled="isSubmitting || !hasPermission('sys:config:delete')"
         >
           删除配置
         </el-button>
@@ -149,6 +151,12 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Delete } from '@element-plus/icons-vue'
 import api from '@/utils/api'
+import { useUserStore } from '@/store/user'
+
+const userStore = useUserStore()
+const hasPermission = (permission) => {
+  return userStore.hasPermission(permission)
+}
 
 // 响应式数据
 const dbFormRef = ref()

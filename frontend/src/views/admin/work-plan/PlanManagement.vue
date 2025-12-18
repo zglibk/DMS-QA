@@ -11,8 +11,8 @@
       </div>
       <div class="header-right">
         <el-button 
-          v-if="hasCreatePermission" 
           type="primary" 
+          :disabled="!hasCreatePermission"
           @click="showCreateDialog"
         >
           <el-icon><Plus /></el-icon>
@@ -81,9 +81,8 @@
           <div class="table-title">计划列表</div>
           <div class="table-actions">
             <el-button
-              v-if="hasDeletePermission"
               type="danger"
-              :disabled="selectedPlans.length === 0 || !canBatchDelete"
+              :disabled="selectedPlans.length === 0 || !canBatchDelete || !hasDeletePermission"
               @click="batchDeletePlans"
             >
               <el-icon><Delete /></el-icon>
@@ -161,17 +160,17 @@
                 查看
               </el-button>
               <el-button 
-                v-if="canEditPlan(row)" 
                 type="warning" 
                 size="small" 
+                :disabled="!canEditPlan(row)"
                 @click="editPlan(row)"
               >
                 编辑
               </el-button>
               <el-button 
-                v-if="canDeletePlan(row)" 
                 type="danger" 
                 size="small" 
+                :disabled="!canDeletePlan(row)"
                 @click="deletePlan(row)"
               >
                 删除

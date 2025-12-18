@@ -41,7 +41,7 @@
           </div>
           <!-- 快捷操作按钮 -->
            <div class="quick-actions">
-             <div class="action-button" @click="handleSyncData">
+             <div :class="['action-button', { disabled: !canSync }]" @click="handleSyncData">
                <div class="action-icon-container">
                  <el-icon class="action-icon" size="50">
                    <svg viewBox="0 0 1024 1024" xmlns="http://www.w3.org/2000/svg">
@@ -61,7 +61,7 @@
           <div class="card-header">
             <span>ERP 对接参数</span>
             <div class="header-actions">
-              <el-button v-if="canAdd" type="primary" @click="handleAddConfig">
+              <el-button type="primary" @click="handleAddConfig" :disabled="!canAdd">
                 <el-icon><Plus /></el-icon>
                 <span style="margin-left: 4px;">新增配置</span>
               </el-button>
@@ -101,11 +101,11 @@
           <el-table-column label="操作" width="150" fixed="right" align="center" header-align="center">
             <template #default="{ row }">
               <div class="action-buttons">
-                <el-button v-if="canEdit" type="primary" size="small" @click="handleEditConfig(row)">
+                <el-button type="primary" size="small" @click="handleEditConfig(row)" :disabled="!canEdit">
                   <el-icon><Edit /></el-icon>
                   <span style="margin-left: 4px;">编辑</span>
                 </el-button>
-                <el-button v-if="canDelete" type="danger" size="small" @click="handleDeleteConfig(row)">
+                <el-button type="danger" size="small" @click="handleDeleteConfig(row)" :disabled="!canDelete">
                   <el-icon><Delete /></el-icon>
                   <span style="margin-left: 4px;">删除</span>
                 </el-button>
@@ -136,7 +136,7 @@
           <div class="card-header">
             <span>ERP同步日志</span>
             <div class="header-actions">
-              <el-button v-if="canSync" type="primary" @click="handleManualSync" :loading="syncLoading">
+              <el-button type="primary" @click="handleManualSync" :loading="syncLoading" :disabled="!canSync">
                 <el-icon><Refresh /></el-icon>
                 <span style="margin-left: 4px;">手动同步</span>
               </el-button>
@@ -144,7 +144,7 @@
                 <el-icon><Refresh /></el-icon>
                 <span style="margin-left: 4px;">刷新日志</span>
               </el-button>
-              <el-button v-if="canClearLogs" type="warning" @click="handleClearLogs">
+              <el-button type="warning" @click="handleClearLogs" :disabled="!canClearLogs">
                 <el-icon><Delete /></el-icon>
                 <span style="margin-left: 4px;">清理日志</span>
               </el-button>
@@ -237,6 +237,7 @@
                 type="warning" 
                 size="small" 
                 @click="handleRetrySync(row)"
+                :disabled="!canSync"
               >
                 <el-icon><Refresh /></el-icon>
                 <span style="margin-left: 4px;">重试</span>
@@ -795,6 +796,10 @@ export default {
      * 打开同步数据子页面
      */
     const handleSyncData = () => {
+      if (!permissions.canSync) {
+        ElMessage.warning('您没有同步数据的权限')
+        return
+      }
       showSyncForm.value = true
     }
     
@@ -1042,6 +1047,20 @@ export default {
   line-height: 1.2;
   transition: font-weight 0.3s ease;
   margin: 0;
+}
+
+.action-button.disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.action-button.disabled:hover .action-icon-container {
+  transform: none;
+  box-shadow: none;
+}
+
+.action-button.disabled:hover .action-title {
+  color: inherit;
 }
 
 /* 表格样式 */

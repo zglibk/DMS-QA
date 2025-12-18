@@ -224,7 +224,7 @@
             type="primary" 
             @click="handleSubmit" 
             :loading="loading"
-            :disabled="syncMode === 'batch' && syncRange.length === 0"
+            :disabled="(syncMode === 'batch' && syncRange.length === 0) || !hasPermission('sys:sync:edit')"
           >
             {{ getSubmitButtonText() }}
           </el-button>
@@ -247,8 +247,14 @@
  */
 
 import { ref, reactive, watch } from 'vue'
+import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import api from '@/api'
+
+const userStore = useUserStore()
+const hasPermission = (permission) => {
+  return userStore.hasPermission(permission)
+}
 
 // Props定义
 const props = defineProps({

@@ -41,7 +41,7 @@
             搜索
           </el-button>
           <el-button @click="resetSearch">重置</el-button>
-          <el-button type="success" @click="handleAdd">
+          <el-button type="success" @click="handleAdd" :disabled="!hasAddPermission">
             <el-icon><Plus /></el-icon>
             新增供应商
           </el-button>
@@ -80,13 +80,13 @@
         <el-table-column prop="createTime" label="创建时间" width="180" />
         <el-table-column label="操作" width="200" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">
+            <el-button type="primary" size="small" @click="handleEdit(row)" :disabled="!hasEditPermission">
               编辑
             </el-button>
-            <el-button type="info" size="small" @click="handleView(row)">
+            <el-button type="info" size="small" @click="handleView(row)" :disabled="!hasViewPermission">
               查看
             </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">
+            <el-button type="danger" size="small" @click="handleDelete(row)" :disabled="!hasDeletePermission">
               删除
             </el-button>
           </template>
@@ -187,9 +187,18 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Search, Plus } from '@element-plus/icons-vue'
+import { useUserStore } from '@/store/user'
+
+const userStore = useUserStore()
+
+// 权限控制
+const hasAddPermission = computed(() => userStore.hasActionPermission('supplier:basic:add'))
+const hasEditPermission = computed(() => userStore.hasActionPermission('supplier:basic:edit'))
+const hasDeletePermission = computed(() => userStore.hasActionPermission('supplier:basic:delete'))
+const hasViewPermission = computed(() => userStore.hasActionPermission('supplier:basic:view'))
 
 /**
  * 响应式数据定义

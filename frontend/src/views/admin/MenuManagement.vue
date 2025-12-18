@@ -12,7 +12,7 @@
         <!-- 左侧：操作按钮 -->
         <el-col :xs="24" :sm="24" :md="12" :lg="12" :xl="12" class="action-section">
           <div class="action-buttons">
-            <el-button type="primary" @click="showAddDialog" :icon="Plus">
+            <el-button type="primary" @click="showAddDialog" :icon="Plus" :disabled="!userStore.hasPermission('sys:menu:add')">
               新增菜单
             </el-button>
             <el-button @click="expandAll" :icon="Expand">
@@ -21,7 +21,7 @@
             <el-button @click="collapseAll" :icon="Fold">
               收起全部
             </el-button>
-            <el-button @click="refreshData" :icon="Refresh">
+            <el-button @click="refreshData" :icon="Refresh" :disabled="!userStore.hasPermission('sys:menu:view')">
               刷新
             </el-button>
           </div>
@@ -76,15 +76,15 @@
                  </el-select>
                </el-col>
                <el-col :xs="12" :sm="4" :md="4" :lg="4" :xl="4">
-                 <el-button type="primary" @click="handleSearch" :icon="Search" size="default" style="width: 100%">
-                   搜索
-                 </el-button>
-               </el-col>
-               <el-col :xs="12" :sm="4" :md="4" :lg="4" :xl="4">
-                 <el-button @click="handleReset" :icon="Refresh" size="default" style="width: 100%">
-                   重置
-                 </el-button>
-               </el-col>
+                  <el-button type="primary" @click="handleSearch" :icon="Search" size="default" style="width: 100%" :disabled="!userStore.hasPermission('sys:menu:view')">
+                    搜索
+                  </el-button>
+                </el-col>
+                <el-col :xs="12" :sm="4" :md="4" :lg="4" :xl="4">
+                  <el-button @click="handleReset" :icon="Refresh" size="default" style="width: 100%" :disabled="!userStore.hasPermission('sys:menu:view')">
+                    重置
+                  </el-button>
+                </el-col>
              </el-row>
            </div>
          </el-col>
@@ -143,10 +143,10 @@
       <el-table-column label="操作" width="260" fixed="right">
         <template #default="{ row }">
           <div class="action-buttons">
-            <el-button size="small" @click="showEditDialog(row)" :icon="Edit">
+            <el-button size="small" @click="showEditDialog(row)" :icon="Edit" :disabled="!userStore.hasPermission('sys:menu:edit')">
               编辑
             </el-button>
-            <el-button size="small" type="success" @click="showAddDialog(row)" :icon="Plus">
+            <el-button size="small" type="success" @click="showAddDialog(row)" :icon="Plus" :disabled="!userStore.hasPermission('sys:menu:add')">
               新增子菜单
             </el-button>
             <el-button 
@@ -154,7 +154,7 @@
               type="danger" 
               @click="deleteMenu(row)"
               :icon="Delete"
-              :disabled="row.children && row.children.length > 0"
+              :disabled="row.children && row.children.length > 0 || !userStore.hasPermission('sys:menu:delete')"
             >
               删除
             </el-button>
@@ -298,6 +298,7 @@
 
 <script setup>
 import { ref, reactive, onMounted, computed, nextTick } from 'vue'
+import { useUserStore } from '@/store/user'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   Plus,
@@ -310,6 +311,8 @@ import {
   Search
 } from '@element-plus/icons-vue'
 import api from '@/utils/api'
+
+const userStore = useUserStore()
 
 // 响应式数据
 const loading = ref(false)

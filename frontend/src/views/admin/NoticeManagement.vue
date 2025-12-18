@@ -12,14 +12,14 @@
         <el-button 
           type="primary" 
           @click="openCreateDialog"
-          :disabled="!permissions.canAdd"
+          :disabled="!hasPermission('notice:add')"
         >
           <el-icon><Plus /></el-icon>
           发布通知
         </el-button>
         <el-button 
           @click="markAllAsRead" 
-          :disabled="unreadCount === 0 || !permissions.canMarkAllRead" 
+          :disabled="unreadCount === 0 || !hasPermission('notice:mark-all-read')" 
           type="warning" 
           plain
         >
@@ -188,7 +188,7 @@
               size="small" 
               @click="editNotice(row)"
               :icon="Edit"
-              :disabled="!permissions.canEdit"
+              :disabled="!hasPermission('notice:edit')"
             >
               编辑
             </el-button>
@@ -197,7 +197,7 @@
               size="small" 
               @click="deleteNotice(row)"
               :icon="Delete"
-              :disabled="!permissions.canDelete"
+              :disabled="!hasPermission('notice:delete')"
             >
               删除
             </el-button>
@@ -207,7 +207,7 @@
               size="small" 
               @click="markAsRead(row.ID)"
               :icon="Check"
-              :disabled="!permissions.canMarkRead"
+              :disabled="!hasPermission('notice:mark-read')"
             >
               已读
             </el-button>
@@ -442,52 +442,8 @@ import { defaultConfig, plugins, toolbar, fontFormats, fontSizeFormats, blockFor
 
 // 用户权限管理
 const userStore = useUserStore()
-
-// 权限检查
-const permissions = reactive({
-  canAdd: false,
-  canEdit: false,
-  canDelete: false,
-  canMarkRead: false,
-  canMarkAllRead: false
-})
-
-
-
-/**
- * 检查用户权限
- */
-const checkPermissions = async () => {
-  try {
-    // 检查是否为管理员角色
-    const isAdmin = userStore.isAdmin
-    
-    if (isAdmin) {
-      // 管理员拥有所有权限
-      permissions.canAdd = true
-      permissions.canEdit = true
-      permissions.canDelete = true
-      permissions.canMarkRead = true
-      permissions.canMarkAllRead = true
-    } else {
-      // 使用异步权限检查方法，权限标识与数据库Permission字段保持一致
-      permissions.canAdd = await userStore.hasActionPermissionAsync('notice:add')
-      permissions.canEdit = await userStore.hasActionPermissionAsync('notice:edit')
-      permissions.canDelete = await userStore.hasActionPermissionAsync('notice:delete')
-      permissions.canMarkRead = await userStore.hasActionPermissionAsync('notice:mark-read')
-      permissions.canMarkAllRead = await userStore.hasActionPermissionAsync('notice:mark-all-read')
-    }
-    
-    console.log('权限检查结果:', permissions)
-  } catch (error) {
-    console.error('权限检查失败:', error)
-    // 权限检查失败时，默认无权限
-    permissions.canAdd = false
-    permissions.canEdit = false
-    permissions.canDelete = false
-    permissions.canMarkRead = false
-    permissions.canMarkAllRead = false
-  }
+const hasPermission = (permission) => {
+  return userStore.hasPermission(permission)
 }
 
 // 响应式数据
@@ -2038,7 +1994,6 @@ watch(showEditDialog, (newVal) => {
 
 // 组件挂载时获取数据
 onMounted(async () => {
-  await checkPermissions()
   await getNoticeList()
   await getUnreadCount()
 })

@@ -24,7 +24,7 @@
           <el-icon><Refresh /></el-icon>
           刷新数据
         </el-button>
-        <el-button @click="exportReport">
+        <el-button @click="exportReport" :disabled="!hasExportPermission">
           <el-icon><Download /></el-icon>
           导出报告
         </el-button>
@@ -162,7 +162,7 @@
             <template #header>
               <div class="table-header">
                 <span class="table-title">人员绩效统计</span>
-                <el-button size="small" @click="exportUserStats">
+                <el-button size="small" @click="exportUserStats" :disabled="!hasExportPermission">
                   <el-icon><Download /></el-icon>
                   导出
                 </el-button>
@@ -215,7 +215,7 @@
             <template #header>
               <div class="table-header">
                 <span class="table-title">工作类型统计</span>
-                <el-button size="small" @click="exportTypeStats">
+                <el-button size="small" @click="exportTypeStats" :disabled="!hasExportPermission">
                   <el-icon><Download /></el-icon>
                   导出
                 </el-button>
@@ -273,7 +273,7 @@
                 value-format="YYYY-MM"
                 @change="generateMonthlyReport"
               />
-              <el-button type="primary" @click="generateMonthlyReport">
+              <el-button type="primary" @click="generateMonthlyReport" :disabled="!hasExportPermission">
                 <el-icon><Document /></el-icon>
                 生成报告
               </el-button>
@@ -340,8 +340,9 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted, nextTick } from 'vue'
+import { ref, reactive, onMounted, nextTick, computed } from 'vue'
 import { ElMessage } from 'element-plus'
+import { useUserStore } from '@/store/user'
 import {
   DataAnalysis,
   Refresh,
@@ -354,6 +355,10 @@ import {
 } from '@element-plus/icons-vue'
 import * as echarts from 'echarts'
 import api from '@/services/api'
+
+// 用户状态管理
+const userStore = useUserStore()
+const hasExportPermission = computed(() => userStore.hasActionPermission('work-plan:statistics:export'))
 
 // 响应式数据
 const loading = ref(false)

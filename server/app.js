@@ -71,6 +71,8 @@ const versionUpdatesRouter = require('./routes/versionUpdates'); // 版本更新
 const assessmentRouter = require('./routes/assessment');         // 质量考核管理路由
 const instrumentsRouter = require('./routes/instruments');       // 仪器管理路由
 const qrScanRouter = require('./routes/qrScan');              // 二维码扫描管理路由
+const reportTemplatesRouter = require('./routes/reportTemplates'); // 出货报告模板管理路由
+const defectiveRouter = require('./routes/defective');             // 不良类别管理路由
 const erpSyncService = require('./services/erpSyncService');
 const { startFileServer } = require('./file-server');
 const { logCleanupService } = require('./services/logCleanupService');
@@ -298,6 +300,8 @@ app.use('/api/monthly-batch-stats', monthlyBatchStatsRouter);
 app.use('/api/version-updates', versionUpdatesRouter);
 app.use('/api/assessment', assessmentRouter);
 app.use('/api/qr-scan', qrScanRouter);
+app.use('/api/shipment-report/templates', reportTemplatesRouter); // 出货报告模板管理
+app.use('/api/defective', defectiveRouter);                       // 不良类别管理
 app.use('/api/log-export', require('./routes/logExport'));
 
 // 错误日志记录中间件（必须在所有路由之后）
@@ -339,6 +343,7 @@ app.use('/files/customer-complaint', staticCorsMiddleware, express.static(path.j
 app.use('/files/supplier-complaint', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/supplier-complaint')));
 app.use('/files/notice-images', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/notice-images')));
 app.use('/files/rework-attachments', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/rework-attachments')));
+app.use('/files/report-templates', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/report-templates'))); // 模板文件
 app.use('/uploads/complaints', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/complaints')));
 
 // 添加共享文件访问路由
