@@ -1616,6 +1616,7 @@ const editFormRef = ref(null)
 const editSections = ref([])
 const activeTab = ref({})
 const editDialogInstanceId = ref(0) // 对话框实例标识，用于强制重新创建组件
+const isEditInitializing = ref(false) // 初始化标志，防止在加载数据时触发自动计算
 
 // 编辑对话框文件处理相关变量
 const editSelectedFileInfo = ref(null)
@@ -2942,11 +2943,18 @@ const editRecord = async (row) => {
     const response = await api.get(`/complaint/detail/${row.ID}`)
 
     if (response.data.success) {
-      const data = response.data.data
+      isEditInitializing.value = true
+      try {
+        const data = response.data.data
+        console.log('========================================')
+        console.log('[HomeContent] 编辑记录 - 后端原始数据:', JSON.parse(JSON.stringify(data)))
+        console.log('[HomeContent] MainPersonAssessment:', data.MainPersonAssessment)
+        console.log('[HomeContent] SecondPersonAssessment:', data.SecondPersonAssessment)
+        console.log('========================================')
 
-      // 初始化编辑表单数据
-      const formData = {
-        ID: data.ID,
+        // 初始化编辑表单数据
+        const formData = {
+          ID: data.ID,
         Date: data.Date ? data.Date.split('T')[0] : '',
         Customer: data.Customer || '',
         OrderNo: data.OrderNo || '',
@@ -2987,11 +2995,11 @@ const editRecord = async (row) => {
         TotalCost: data.TotalCost || 0,
         MainDept: data.MainDept || '',
         MainPerson: data.MainPerson || '',
-        MainPersonAssessment: data.MainPersonAssessment || 0,
+        MainPersonAssessment: data.MainPersonAssessment,
         SecondPerson: data.SecondPerson || '',
-        SecondPersonAssessment: data.SecondPersonAssessment || 0,
+        SecondPersonAssessment: data.SecondPersonAssessment,
         Manager: data.Manager || '',
-        ManagerAssessment: data.ManagerAssessment || 0,
+        ManagerAssessment: data.ManagerAssessment,
         AssessmentDescription: data.AssessmentDescription || ''
       }
 
@@ -3089,6 +3097,14 @@ const editRecord = async (row) => {
       await nextTick()
       // 深拷贝保存原始数据，确保所有数据处理完成后再备份
       originalFormData.value = JSON.parse(JSON.stringify(editFormData.value))
+    } catch (err) {
+      console.error('编辑初始化过程出错:', err)
+    } finally {
+      // 确保在数据赋值完成后恢复标志
+      nextTick(() => {
+        isEditInitializing.value = false
+      })
+    }
     } else {
       ElMessage.error(response.data.message || '获取记录详情失败')
     }
@@ -4281,6 +4297,7 @@ watch(pageCount, (val) => {
 
 // 监听编辑表单纸张数量和车间变化，自动计算人工成本
 watch(() => editFormData.value ? [editFormData.value.PaperQty, editFormData.value.Workshop] : [], (values) => {
+  if (isEditInitializing.value) return;
   if (editFormData.value) {
     calculateEditLaborCost();
   }
@@ -4302,6 +4319,7 @@ watch(() => editFormData.value ? [
   editFormData.value.MaterialCUnitPrice,
   editFormData.value.LaborCost
 ] : [], (values) => {
+  if (isEditInitializing.value) return;
   if (editFormData.value) {
     calculateEditTotalCost();
   }
@@ -4309,6 +4327,7 @@ watch(() => editFormData.value ? [
 
 // 监听编辑表单总成本变化，自动计算主责人考核
 watch(() => editFormData.value ? editFormData.value.TotalCost : 0, (totalCost) => {
+  if (isEditInitializing.value) return;
   if (editFormData.value) {
     calculateEditMainPersonAssessment();
   }
@@ -8011,7 +8030,7 @@ body.el-popup-parent--hidden {
 }
 </style>
 <style>
-/* 全局样式修正 - 必须放在�?scoped 标签�?*/
+/* 全局样式修正 - 必须放在�?scoped 标签�?*/
 .el-dialog.edit-dialog {
   display: flex;
   flex-direction: column;
@@ -8050,7 +8069,7 @@ body.el-popup-parent--hidden {
 </style>
 
 <style>
-/* 全局样式修正 - 必须放在�?scoped 标签�?*/
+/* 全局样式修正 - 必须放在�?scoped 标签�?*/
 .el-dialog.edit-dialog {
   display: flex;
   flex-direction: column;

@@ -1458,11 +1458,15 @@ const handlePreviewClick = () => {
   }
 }
 
+// 初始化标志，防止在加载数据时触发自动计算
+const isInitializing = ref(false)
+
 // 不良率自动计算
 watch([
   () => form.value.ProductionQty,
   () => form.value.DefectiveQty
 ], ([prod, defect]) => {
+  if (isInitializing.value) return;
   if (prod && prod !== 0) {
     form.value.DefectiveRate = Number(((defect || 0) / prod * 100).toFixed(2));
   } else {
@@ -1475,6 +1479,7 @@ watch([
   () => form.value.PaperQty,
   () => form.value.Workshop
 ], () => {
+  if (isInitializing.value) return;
   calculateLaborCost();
 })
 
@@ -1494,23 +1499,33 @@ watch([
   () => form.value.MaterialCUnitPrice,
   () => form.value.LaborCost
 ], () => {
+  if (isInitializing.value) return;
   calculateTotalCost();
 })
 
 // 主责人考核自动计算
 watch(() => form.value.TotalCost, () => {
+  if (isInitializing.value) return;
   calculateMainPersonAssessment();
 })
 
 // 处理编辑数据的初始化
 const initializeEditData = () => {
   if (props.editData) {
-    // 复制编辑数据到表单
-    Object.keys(form.value).forEach(key => {
-      if (props.editData[key] !== undefined) {
-        form.value[key] = props.editData[key]
-      }
-    })
+    isInitializing.value = true;
+    try {
+      // 复制编辑数据到表单
+      Object.keys(form.value).forEach(key => {
+        if (props.editData[key] !== undefined) {
+          form.value[key] = props.editData[key]
+        }
+      })
+    } finally {
+      // 确保在数据赋值完成后恢复标志
+      nextTick(() => {
+        isInitializing.value = false;
+      })
+    }
 
     // 处理现有附件文件
     if (props.editData.AttachmentFile) {
@@ -1601,11 +1616,6 @@ onMounted(async () => {
     fetchOptions(),
     fetchMaterialNames()
   ]);
-
-  // 初始化计算
-  calculateLaborCost();
-  calculateTotalCost();
-  calculateMainPersonAssessment();
 
   // 初始化编辑数据
   initializeEditData();
