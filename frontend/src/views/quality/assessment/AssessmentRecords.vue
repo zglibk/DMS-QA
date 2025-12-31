@@ -2,7 +2,24 @@
   <div class="assessment-records">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2>考核记录管理</h2>
+      <div class="header-content">
+        <h2>考核记录管理</h2>
+        <el-popover
+          placement="bottom-start"
+          title="使用说明"
+          :width="350"
+          trigger="hover"
+        >
+          <template #reference>
+            <el-icon class="help-icon"><QuestionFilled /></el-icon>
+          </template>
+          <div class="help-content">
+            <p>1. 本模块数据来源于投诉、返工和异常记录。</p>
+            <p>2. 数据<strong>非实时同步</strong>，需点击“+生成考核记录”按钮获取最新数据。</p>
+            <p>3. 如果统计数据为0或列表为空，请尝试执行生成操作。</p>
+          </div>
+        </el-popover>
+      </div>
       <p class="page-description">质量考核记录查看、编辑和改善期跟踪管理</p>
     </div>
 
@@ -559,7 +576,7 @@ import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import {
   Search, Refresh, Plus, Clock, Loading, Check, Money,
   User, OfficeBuilding, Edit, View, DataAnalysis, Download,
-  Setting, Document, Postcard, Rank
+  Setting, Document, Postcard, Rank, QuestionFilled
 } from '@element-plus/icons-vue'
 import * as assessmentApi from '@/services/assessmentApi'
 import AssessmentRecordDialog from '@/components/AssessmentRecordDialog.vue'
@@ -2279,6 +2296,36 @@ const getSourceLabel = (sourceType) => {
   background: linear-gradient(135deg, #3a8ee6 0%, #337ecc 100%);
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.4);
   transform: translateY(-1px);
+}
+
+.empty-tip {
+  color: #909399;
+  font-size: 14px;
+  margin-top: 8px;
+}
+
+.help-icon {
+  color: #ee7d31;
+  font-size: 18px;
+  cursor: pointer;
+  margin-left: 8px;
+  transition: color 0.3s;
+}
+
+.help-icon:hover {
+  color: #ff4040;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+}
+
+.help-content p {
+  margin: 0;
+  line-height: 1.8;
+  font-size: 13px;
+  color: #606266;
 }
 
 :deep(.export-confirm-dialog .el-button--default) {

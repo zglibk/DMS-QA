@@ -1,0 +1,1 @@
+SELECT ID, ItemName, MaterialCategory, InspectionStandard, AcceptanceCriteria FROM InspectionItems WHERE Status = 1 ORDER BY MaterialCategory, SortOrder;

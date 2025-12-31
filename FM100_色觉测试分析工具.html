@@ -1,0 +1,904 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FM100 色觉测试结果分析工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Microsoft YaHei", sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        
+        h1 {
+            text-align: center;
+            color: white;
+            margin-bottom: 30px;
+            font-size: 2rem;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        @media (max-width: 900px) {
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .card {
+            background: white;
+            border-radius: 16px;
+            padding: 24px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.15);
+        }
+        
+        .card-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #333;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #667eea;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .card-title::before {
+            content: "";
+            width: 4px;
+            height: 20px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        .section-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #666;
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+        
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+        
+        label {
+            font-size: 0.85rem;
+            color: #555;
+            margin-bottom: 4px;
+            font-weight: 500;
+        }
+        
+        input, select {
+            padding: 10px 12px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            background: #fafafa;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #667eea;
+            background: white;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        
+        input::placeholder {
+            color: #aaa;
+        }
+        
+        .btn {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin-top: 10px;
+        }
+        
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn:active {
+            transform: translateY(0);
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            margin-top: 8px;
+        }
+        
+        .btn-secondary:hover {
+            box-shadow: 0 5px 20px rgba(108, 117, 125, 0.4);
+        }
+        
+        /* 报告样式 */
+        .report {
+            display: none;
+        }
+        
+        .report.show {
+            display: block;
+        }
+        
+        .report-header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+        
+        .report-header h2 {
+            color: #333;
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+        
+        .report-header .subtitle {
+            color: #666;
+            font-size: 0.9rem;
+        }
+        
+        .score-circle {
+            width: 140px;
+            height: 140px;
+            border-radius: 50%;
+            margin: 20px auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            box-shadow: 0 8px 30px rgba(0,0,0,0.2);
+        }
+        
+        .score-circle .score {
+            font-size: 3rem;
+            font-weight: 700;
+            line-height: 1;
+        }
+        
+        .score-circle .label {
+            font-size: 0.85rem;
+            margin-top: 4px;
+            opacity: 0.9;
+        }
+        
+        .grade-superior { background: linear-gradient(135deg, #11998e, #38ef7d); }
+        .grade-good { background: linear-gradient(135deg, #56ab2f, #a8e063); }
+        .grade-attention { background: linear-gradient(135deg, #f7971e, #ffd200); }
+        .grade-fail { background: linear-gradient(135deg, #cb2d3e, #ef473a); }
+        
+        .info-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 16px 0;
+        }
+        
+        .info-table th, .info-table td {
+            padding: 10px 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        
+        .info-table th {
+            color: #666;
+            font-weight: 500;
+            width: 40%;
+            font-size: 0.9rem;
+        }
+        
+        .info-table td {
+            color: #333;
+            font-weight: 600;
+        }
+        
+        .analysis-box {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+        
+        .analysis-box h4 {
+            color: #333;
+            font-size: 1rem;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .analysis-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px dashed #ddd;
+        }
+        
+        .analysis-item:last-child {
+            border-bottom: none;
+        }
+        
+        .analysis-item .label {
+            color: #666;
+        }
+        
+        .analysis-item .value {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+        
+        .badge-success { background: #d4edda; color: #155724; }
+        .badge-warning { background: #fff3cd; color: #856404; }
+        .badge-danger { background: #f8d7da; color: #721c24; }
+        .badge-info { background: #d1ecf1; color: #0c5460; }
+        
+        .conclusion-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 12px;
+            padding: 20px;
+            color: white;
+            margin-top: 20px;
+        }
+        
+        .conclusion-box h4 {
+            font-size: 1rem;
+            margin-bottom: 12px;
+            opacity: 0.9;
+        }
+        
+        .conclusion-box .main-text {
+            font-size: 1.1rem;
+            font-weight: 600;
+            line-height: 1.6;
+        }
+        
+        .job-match {
+            margin-top: 16px;
+        }
+        
+        .job-match-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+        
+        .job-match-item:last-child {
+            border-bottom: none;
+        }
+        
+        .job-match-item .job-name {
+            font-size: 0.9rem;
+        }
+        
+        .job-match-item .match-status {
+            font-size: 0.85rem;
+            padding: 4px 12px;
+            border-radius: 20px;
+            background: rgba(255,255,255,0.2);
+        }
+        
+        .job-match-item .match-status.excellent {
+            background: rgba(17, 153, 142, 0.8);
+        }
+        
+        .job-match-item .match-status.good {
+            background: rgba(86, 171, 47, 0.8);
+        }
+        
+        .job-match-item .match-status.caution {
+            background: rgba(247, 151, 30, 0.8);
+        }
+        
+        .job-match-item .match-status.fail {
+            background: rgba(203, 45, 62, 0.8);
+        }
+        
+        .vingrys-detail {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 10px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+        
+        .vingrys-detail h4 {
+            color: #333;
+            margin-bottom: 12px;
+        }
+        
+        .vingrys-interpretation {
+            background: #fffbeb;
+            border-left: 4px solid #f59e0b;
+            padding: 12px;
+            margin-top: 12px;
+            border-radius: 0 8px 8px 0;
+        }
+        
+        .vingrys-interpretation.normal {
+            background: #ecfdf5;
+            border-left-color: #10b981;
+        }
+        
+        .vingrys-interpretation.warning {
+            background: #fef2f2;
+            border-left-color: #ef4444;
+        }
+        
+        .vingrys-interpretation p {
+            font-size: 0.9rem;
+            color: #555;
+            line-height: 1.6;
+        }
+        
+        .print-btn {
+            background: #28a745;
+            margin-top: 8px;
+        }
+        
+        .print-btn:hover {
+            box-shadow: 0 5px 20px rgba(40, 167, 69, 0.4);
+        }
+        
+        @media print {
+            body {
+                background: white;
+                padding: 0;
+            }
+            
+            .card {
+                box-shadow: none;
+                border: 1px solid #ddd;
+            }
+            
+            .input-card, .btn {
+                display: none !important;
+            }
+            
+            .main-content {
+                grid-template-columns: 1fr;
+            }
+            
+            .report-card {
+                page-break-inside: avoid;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎨 FM100 色觉测试结果分析工具</h1>
+        
+        <div class="main-content">
+            <!-- 输入表单 -->
+            <div class="card input-card">
+                <div class="card-title">测试数据输入</div>
+                
+                <div class="section">
+                    <div class="section-title">一、受测对象</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>姓名</label>
+                            <input type="text" id="name" placeholder="请输入姓名">
+                        </div>
+                        <div class="form-group">
+                            <label>测试日期</label>
+                            <input type="date" id="testDate">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">二、测试结果</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>测试持续时间（分钟）</label>
+                            <input type="number" id="duration" placeholder="如：11" step="0.1">
+                        </div>
+                        <div class="form-group">
+                            <label>错误总分 (TES)</label>
+                            <input type="number" id="tes" placeholder="如：4" step="1">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>错误总分平方根 (√TES)</label>
+                            <input type="number" id="sqrtTes" placeholder="如：2" step="0.0001">
+                        </div>
+                        <div class="form-group">
+                            <label>分类</label>
+                            <select id="category">
+                                <option value="">请选择</option>
+                                <option value="优秀色彩分辨力">优秀色彩分辨力</option>
+                                <option value="一般色彩分辨力">一般色彩分辨力</option>
+                                <option value="低色彩分辨力">低色彩分辨力</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">三、百分位数</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>未选定 (%)</label>
+                            <input type="number" id="pctUnselected" placeholder="如：90" min="0" max="100">
+                        </div>
+                        <div class="form-group">
+                            <label>在工厂 (%)</label>
+                            <input type="number" id="pctFactory" placeholder="如：90" min="0" max="100">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>经验丰富 (%)</label>
+                            <input type="number" id="pctExperienced" placeholder="如：70" min="0" max="100">
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="section">
+                    <div class="section-title">四、Vingrys 分析</div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>角度 (Angle)</label>
+                            <input type="number" id="angle" placeholder="如：59.9535" step="0.0001">
+                        </div>
+                        <div class="form-group">
+                            <label>C 指数</label>
+                            <input type="number" id="cIndex" placeholder="如：1.00961" step="0.00001">
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>S 指数</label>
+                            <input type="number" id="sIndex" placeholder="如：1.22754" step="0.00001">
+                        </div>
+                        <div class="form-group">
+                            <label>Suggested Diagnosis</label>
+                            <select id="diagnosis">
+                                <option value="">请选择</option>
+                                <option value="Normal">Normal</option>
+                                <option value="Superior Discrimination">Superior Discrimination</option>
+                                <option value="Protan Deficiency">Protan Deficiency</option>
+                                <option value="Deutan Deficiency">Deutan Deficiency</option>
+                                <option value="Tritan Deficiency">Tritan Deficiency</option>
+                                <option value="Ambiguous Deficiency">Ambiguous Deficiency</option>
+                                <option value="Low Discrimination">Low Discrimination</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                
+                <button class="btn" onclick="generateReport()">📊 生成分析报告</button>
+                <button class="btn btn-secondary" onclick="loadExample()">📝 载入示例数据</button>
+            </div>
+            
+            <!-- 报告输出 -->
+            <div class="card report-card">
+                <div class="card-title">分析报告</div>
+                
+                <div id="placeholder" style="text-align: center; padding: 60px 20px; color: #999;">
+                    <div style="font-size: 4rem; margin-bottom: 20px;">📋</div>
+                    <p>请在左侧输入测试数据后点击"生成分析报告"</p>
+                </div>
+                
+                <div id="report" class="report">
+                    <div class="report-header">
+                        <h2>FM100 色觉测试分析报告</h2>
+                        <div class="subtitle">
+                            <span id="reportName"></span> | <span id="reportDate"></span>
+                        </div>
+                    </div>
+                    
+                    <div id="scoreCircle" class="score-circle">
+                        <div class="score" id="scoreValue"></div>
+                        <div class="label">√TES</div>
+                    </div>
+                    
+                    <div style="text-align: center; margin-bottom: 20px;">
+                        <span id="gradeText" class="badge" style="font-size: 1rem; padding: 8px 20px;"></span>
+                    </div>
+                    
+                    <div class="analysis-box">
+                        <h4>📊 核心指标</h4>
+                        <div class="analysis-item">
+                            <span class="label">错误总分 (TES)</span>
+                            <span class="value" id="reportTes"></span>
+                        </div>
+                        <div class="analysis-item">
+                            <span class="label">测试时长</span>
+                            <span class="value" id="reportDuration"></span>
+                        </div>
+                        <div class="analysis-item">
+                            <span class="label">软件分类</span>
+                            <span class="value" id="reportCategory"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="analysis-box">
+                        <h4>📈 百分位数排名</h4>
+                        <div class="analysis-item">
+                            <span class="label">一般人群</span>
+                            <span class="value" id="reportPctUnselected"></span>
+                        </div>
+                        <div class="analysis-item">
+                            <span class="label">工厂人群</span>
+                            <span class="value" id="reportPctFactory"></span>
+                        </div>
+                        <div class="analysis-item">
+                            <span class="label">经验丰富者</span>
+                            <span class="value" id="reportPctExperienced"></span>
+                        </div>
+                    </div>
+                    
+                    <div class="vingrys-detail">
+                        <h4>🔬 Vingrys 分析详情</h4>
+                        <table class="info-table">
+                            <tr>
+                                <th>角度 (Angle)</th>
+                                <td id="reportAngle"></td>
+                            </tr>
+                            <tr>
+                                <th>C 指数 (混乱指数)</th>
+                                <td id="reportCIndex"></td>
+                            </tr>
+                            <tr>
+                                <th>S 指数 (选择性指数)</th>
+                                <td id="reportSIndex"></td>
+                            </tr>
+                            <tr>
+                                <th>软件诊断建议</th>
+                                <td id="reportDiagnosis"></td>
+                            </tr>
+                        </table>
+                        <div id="vingrysInterpretation" class="vingrys-interpretation">
+                            <p id="vingrysText"></p>
+                        </div>
+                    </div>
+                    
+                    <div class="conclusion-box">
+                        <h4>🎯 岗位匹配建议</h4>
+                        <div class="job-match" id="jobMatch"></div>
+                    </div>
+                    
+                    <div class="analysis-box" style="margin-top: 20px;">
+                        <h4>📝 综合评价</h4>
+                        <p id="summaryText" style="line-height: 1.8; color: #444;"></p>
+                    </div>
+                    
+                    <button class="btn print-btn" onclick="window.print()">🖨️ 打印报告</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        // 载入示例数据（李志浩的测试结果）
+        function loadExample() {
+            document.getElementById('name').value = '李志浩';
+            document.getElementById('testDate').value = '2025-12-18';
+            document.getElementById('duration').value = '11';
+            document.getElementById('tes').value = '4';
+            document.getElementById('sqrtTes').value = '2';
+            document.getElementById('category').value = '优秀色彩分辨力';
+            document.getElementById('pctUnselected').value = '90';
+            document.getElementById('pctFactory').value = '90';
+            document.getElementById('pctExperienced').value = '70';
+            document.getElementById('angle').value = '59.9535';
+            document.getElementById('cIndex').value = '1.00961';
+            document.getElementById('sIndex').value = '1.22754';
+            document.getElementById('diagnosis').value = 'Ambiguous Deficiency';
+        }
+        
+        // 判断能力等级
+        function getGrade(sqrtTes) {
+            if (sqrtTes <= 4.0) return { grade: '优异', class: 'grade-superior', badge: 'badge-success' };
+            if (sqrtTes <= 6.0) return { grade: '良好', class: 'grade-good', badge: 'badge-success' };
+            if (sqrtTes <= 8.0) return { grade: '需关注', class: 'grade-attention', badge: 'badge-warning' };
+            return { grade: '不达标', class: 'grade-fail', badge: 'badge-danger' };
+        }
+        
+        // 判断色觉缺陷类型
+        function getDeficiencyType(angle) {
+            if (angle >= -12 && angle <= 18) return 'Protan（红色盲/弱）';
+            if (angle >= -2 && angle <= 28) return 'Deutan（绿色盲/弱）';
+            if (angle >= 56 && angle <= 61) return 'Tritan（蓝色盲/弱）';
+            if (angle >= 176 || angle <= -176) return 'Protan（红色盲/弱）';
+            return '非典型';
+        }
+        
+        // 判断Vingrys是否提示异常
+        function hasVingrysAbnormality(sIndex, cIndex, angle) {
+            if (sIndex <= 1.5) return false;
+            if (cIndex <= 1.5) return false;
+            
+            // 检查角度是否在典型缺陷区间
+            const isProtan = (angle >= -12 && angle <= 18) || (angle >= 168 || angle <= -168);
+            const isDeutan = (angle >= -2 && angle <= 28);
+            const isTritan = (angle >= 56 && angle <= 61);
+            
+            return isProtan || isDeutan || isTritan;
+        }
+        
+        // 生成岗位匹配HTML
+        function generateJobMatch(sqrtTes, hasAbnormality) {
+            const jobs = [
+                { name: 'A类：关键岗位（调墨员、终检员等）', key: 'A' },
+                { name: 'B类：重要岗位（印刷机长、巡检等）', key: 'B' },
+                { name: 'C类：一般色彩岗（印刷助手等）', key: 'C' },
+                { name: 'D类：非色彩岗（行政后勤等）', key: 'D' }
+            ];
+            
+            let html = '';
+            jobs.forEach(job => {
+                let status, statusClass;
+                
+                if (sqrtTes <= 4.0) {
+                    status = job.key === 'A' ? '✅ 优先录用' : '✅ 完全胜任';
+                    statusClass = 'excellent';
+                } else if (sqrtTes <= 6.0) {
+                    if (job.key === 'A') {
+                        status = '⚠️ 需实操考核';
+                        statusClass = 'caution';
+                    } else if (job.key === 'B') {
+                        status = '✅ 建议录用';
+                        statusClass = 'good';
+                    } else {
+                        status = '✅ 完全胜任';
+                        statusClass = 'excellent';
+                    }
+                } else if (sqrtTes <= 8.0) {
+                    if (job.key === 'A') {
+                        status = '❌ 不匹配';
+                        statusClass = 'fail';
+                    } else if (job.key === 'B') {
+                        status = hasAbnormality ? '❌ 不匹配' : '⚠️ 需实操考核';
+                        statusClass = hasAbnormality ? 'fail' : 'caution';
+                    } else if (job.key === 'C') {
+                        status = '⚠️ 需复核';
+                        statusClass = 'caution';
+                    } else {
+                        status = '✅ 完全胜任';
+                        statusClass = 'excellent';
+                    }
+                } else {
+                    if (job.key === 'D') {
+                        status = '✅ 完全胜任';
+                        statusClass = 'excellent';
+                    } else {
+                        status = '❌ 不匹配';
+                        statusClass = 'fail';
+                    }
+                }
+                
+                html += `
+                    <div class="job-match-item">
+                        <span class="job-name">${job.name}</span>
+                        <span class="match-status ${statusClass}">${status}</span>
+                    </div>
+                `;
+            });
+            
+            return html;
+        }
+        
+        // 生成Vingrys解读
+        function generateVingrysInterpretation(sIndex, cIndex, angle, diagnosis) {
+            let text = '';
+            let className = 'normal';
+            
+            const deficiencyType = getDeficiencyType(angle);
+            
+            if (sIndex <= 1.5) {
+                text = `<strong>S 指数 = ${sIndex.toFixed(4)}</strong>（< 1.5），表明错误在色相环上随机分布，没有明显的方向性。`;
+                
+                if (cIndex <= 1.0) {
+                    text += `<br><br><strong>C 指数 = ${cIndex.toFixed(4)}</strong>（≈ 1.0），整体错误程度与正常人群平均水平相当或更优。`;
+                } else if (cIndex <= 1.5) {
+                    text += `<br><br><strong>C 指数 = ${cIndex.toFixed(4)}</strong>（略高于1.0），整体错误程度轻微偏高，但仍在正常范围内。`;
+                } else {
+                    text += `<br><br><strong>C 指数 = ${cIndex.toFixed(4)}</strong>（> 1.5），整体错误程度较高，但由于 S 指数较低，可能是注意力或测试环境因素导致。`;
+                    className = '';
+                }
+                
+                text += `<br><br><strong>角度 = ${angle.toFixed(4)}°</strong>，由于 S 指数 < 1.5，角度值不具有诊断意义。`;
+                
+                if (diagnosis === 'Ambiguous Deficiency') {
+                    text += `<br><br>⚠️ 软件提示"Ambiguous Deficiency"，但根据各项指标分析，这可能只是正常的随机误差，<strong>不代表存在色觉缺陷</strong>。`;
+                }
+            } else {
+                className = 'warning';
+                text = `<strong>S 指数 = ${sIndex.toFixed(4)}</strong>（> 1.5），表明错误具有明显的方向性，集中在特定色相区域。`;
+                text += `<br><br><strong>C 指数 = ${cIndex.toFixed(4)}</strong>`;
+                
+                if (cIndex > 1.5) {
+                    text += `（> 1.5），整体错误程度较高。`;
+                } else {
+                    text += `，整体错误程度在可接受范围内。`;
+                }
+                
+                text += `<br><br><strong>角度 = ${angle.toFixed(4)}°</strong>，指向 ${deficiencyType} 方向。`;
+                
+                if (sIndex > 1.5 && cIndex > 1.5) {
+                    text += `<br><br>⚠️ <strong>综合判断：Vingrys 分析提示可能存在 ${deficiencyType} 倾向，建议进行实操考核或医疗复核。</strong>`;
+                }
+            }
+            
+            return { text, className };
+        }
+        
+        // 生成综合评价
+        function generateSummary(name, sqrtTes, gradeInfo, sIndex, cIndex, pctFactory, hasAbnormality) {
+            let summary = `${name} 的 FM100 色觉测试结果显示，错误总分平方根（√TES）为 ${sqrtTes}，`;
+            
+            if (sqrtTes <= 4.0) {
+                summary += `属于<strong>优异</strong>水平。`;
+                summary += `在工厂人群中的百分位排名达到 ${pctFactory}%，表明其色彩辨别能力超过了绝大多数人。`;
+                
+                if (sIndex <= 1.5 && cIndex <= 1.2) {
+                    summary += `<br><br>Vingrys 分析各项指标正常，没有发现任何色觉缺陷倾向。`;
+                }
+                
+                summary += `<br><br><strong>结论：</strong>${name} 具备极为优秀的色彩辨别能力，完全胜任包括调墨员、色彩管理、终检员等在内的所有色彩关键岗位，建议优先录用。`;
+                
+            } else if (sqrtTes <= 6.0) {
+                summary += `属于<strong>良好</strong>水平。`;
+                summary += `在工厂人群中的百分位排名为 ${pctFactory}%，具备正常的色彩辨别能力。`;
+                
+                if (!hasAbnormality) {
+                    summary += `<br><br><strong>结论：</strong>${name} 可胜任 B 类及以下岗位。如需从事 A 类关键岗位，建议结合实操考核进行综合评估。`;
+                } else {
+                    summary += `<br><br>但 Vingrys 分析提示可能存在轻微色觉问题，`;
+                    summary += `<br><br><strong>结论：</strong>建议安排实操考核或医疗复核后再做最终决策。`;
+                }
+                
+            } else if (sqrtTes <= 8.0) {
+                summary += `属于<strong>需关注</strong>水平，辨色能力低于平均。`;
+                
+                if (hasAbnormality) {
+                    summary += `同时 Vingrys 分析提示存在色觉异常倾向。`;
+                    summary += `<br><br><strong>结论：</strong>不建议安排至 A 类或 B 类岗位。如需安排至 C 类岗位，应进行复核并提供辅助工具（如标准色卡）。`;
+                } else {
+                    summary += `但 Vingrys 分析未发现明确的色觉缺陷模式。`;
+                    summary += `<br><br><strong>结论：</strong>不建议安排至 A 类岗位。B 类岗位需经实操考核，C 类岗位需复核评估。`;
+                }
+                
+            } else {
+                summary += `属于<strong>不达标</strong>水平，存在较高概率的色觉缺陷。`;
+                summary += `<br><br><strong>结论：</strong>不建议安排至任何涉及色彩判断的岗位（A/B/C 类）。可安排至 D 类非色彩相关岗位。`;
+            }
+            
+            return summary;
+        }
+        
+        // 生成报告
+        function generateReport() {
+            // 获取输入值
+            const name = document.getElementById('name').value || '未填写';
+            const testDate = document.getElementById('testDate').value || '未填写';
+            const duration = parseFloat(document.getElementById('duration').value) || 0;
+            const tes = parseInt(document.getElementById('tes').value) || 0;
+            const sqrtTes = parseFloat(document.getElementById('sqrtTes').value) || 0;
+            const category = document.getElementById('category').value || '未选择';
+            const pctUnselected = parseInt(document.getElementById('pctUnselected').value) || 0;
+            const pctFactory = parseInt(document.getElementById('pctFactory').value) || 0;
+            const pctExperienced = parseInt(document.getElementById('pctExperienced').value) || 0;
+            const angle = parseFloat(document.getElementById('angle').value) || 0;
+            const cIndex = parseFloat(document.getElementById('cIndex').value) || 0;
+            const sIndex = parseFloat(document.getElementById('sIndex').value) || 0;
+            const diagnosis = document.getElementById('diagnosis').value || '未选择';
+            
+            // 验证必填项
+            if (!document.getElementById('name').value || !document.getElementById('sqrtTes').value) {
+                alert('请至少填写姓名和错误总分平方根（√TES）');
+                return;
+            }
+            
+            // 获取等级信息
+            const gradeInfo = getGrade(sqrtTes);
+            
+            // 判断是否有Vingrys异常
+            const hasAbnormality = hasVingrysAbnormality(sIndex, cIndex, angle);
+            
+            // 更新报告内容
+            document.getElementById('reportName').textContent = name;
+            document.getElementById('reportDate').textContent = testDate;
+            
+            const scoreCircle = document.getElementById('scoreCircle');
+            scoreCircle.className = `score-circle ${gradeInfo.class}`;
+            document.getElementById('scoreValue').textContent = sqrtTes.toFixed(2);
+            
+            const gradeText = document.getElementById('gradeText');
+            gradeText.textContent = gradeInfo.grade;
+            gradeText.className = `badge ${gradeInfo.badge}`;
+            
+            document.getElementById('reportTes').textContent = tes;
+            document.getElementById('reportDuration').textContent = `${duration} 分钟`;
+            document.getElementById('reportCategory').textContent = category;
+            
+            document.getElementById('reportPctUnselected').textContent = `超过 ${pctUnselected}% 的人`;
+            document.getElementById('reportPctFactory').textContent = `超过 ${pctFactory}% 的人`;
+            document.getElementById('reportPctExperienced').textContent = `超过 ${pctExperienced}% 的人`;
+            
+            document.getElementById('reportAngle').textContent = `${angle.toFixed(4)}°`;
+            document.getElementById('reportCIndex').textContent = cIndex.toFixed(5);
+            document.getElementById('reportSIndex').textContent = sIndex.toFixed(5);
+            document.getElementById('reportDiagnosis').textContent = diagnosis;
+            
+            // Vingrys 解读
+            const vingrysResult = generateVingrysInterpretation(sIndex, cIndex, angle, diagnosis);
+            document.getElementById('vingrysText').innerHTML = vingrysResult.text;
+            document.getElementById('vingrysInterpretation').className = `vingrys-interpretation ${vingrysResult.className}`;
+            
+            // 岗位匹配
+            document.getElementById('jobMatch').innerHTML = generateJobMatch(sqrtTes, hasAbnormality);
+            
+            // 综合评价
+            document.getElementById('summaryText').innerHTML = generateSummary(name, sqrtTes, gradeInfo, sIndex, cIndex, pctFactory, hasAbnormality);
+            
+            // 显示报告
+            document.getElementById('placeholder').style.display = 'none';
+            document.getElementById('report').classList.add('show');
+        }
+        
+        // 设置今天的日期为默认值
+        document.getElementById('testDate').valueAsDate = new Date();
+    </script>
+</body>
+</html>

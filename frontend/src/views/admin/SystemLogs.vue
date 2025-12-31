@@ -629,6 +629,7 @@ export default {
       'MONTHLY_BATCH_STATS': '月度批次统计',
       'LOG_EXPORT': '日志导出',
       'SYSTEM_LOG': '系统日志',
+      'INCOMING_INSPECTION': '来料检验',
       'UNKNOWN': '未知模块'
     }
     
@@ -873,8 +874,8 @@ export default {
     const viewLogDetail = async (row) => {
       try {
         const response = await api.get(`/system-logs/${row.ID}`)
-        if (response.data.success) {
-          currentLog.value = response.data.data
+        if (response.success) {
+          currentLog.value = response.data
           detailDialogVisible.value = true
         }
       } catch (error) {

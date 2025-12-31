@@ -2,11 +2,56 @@
   <div class="sample-approval">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2>
-        <el-icon style="margin-right: 8px; vertical-align: middle;"><Document /></el-icon>
-        样板承认书
-      </h2>
-      <p>管理样板承认书的制作、回签、分发等流程</p>
+      <div class="header-content">
+        <div class="header-title">
+          <h2>
+            <el-icon style="margin-right: 8px; vertical-align: middle;"><Document /></el-icon>
+            样板承认书
+          </h2>
+          <p>管理样板承认书的制作、回签、分发等流程</p>
+        </div>
+        <el-popover
+          placement="bottom-end"
+          :width="480"
+          trigger="hover"
+          effect="light"
+          popper-class="notice-popover"
+          :show-after="100"
+        >
+          <template #reference>
+            <div class="notice-icon-wrapper">
+              <el-icon class="notice-icon"><InfoFilled /></el-icon>
+              <span class="notice-label">分发注意事项</span>
+            </div>
+          </template>
+          <div class="notice-container">
+            <div class="notice-header">
+              <el-icon color="#E6A23C" size="20"><InfoFilled /></el-icon>
+              <span>样板分发与保管说明</span>
+            </div>
+            <div class="notice-list">
+              <div class="notice-item">
+                <div class="notice-index">1</div>
+                <div class="notice-text">
+                  客户 <span class="highlight">A84、C38、C35、C81、C81-2</span>，客签样发放1份给<span class="highlight">柔印车间</span>保管（这几个大客户要求比较严，给到车间人员方便随时核对检查）；
+                </div>
+              </div>
+              <div class="notice-item">
+                <div class="notice-index">2</div>
+                <div class="notice-text">
+                  <span class="highlight">A125</span> 部分模内标产品系列；
+                </div>
+              </div>
+              <div class="notice-item">
+                <div class="notice-index">3</div>
+                <div class="notice-text">
+                  其他客户的签样，发放1份给<span class="highlight">跟单自己</span>保管，下单时跟随工单下发生产。
+                </div>
+              </div>
+            </div>
+          </div>
+        </el-popover>
+      </div>
     </div>
 
     <!-- 统计卡片 -->
@@ -643,7 +688,7 @@
 import { ref, reactive, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
-  Document, Check, Clock, Close, Plus, CircleClose, SuccessFilled,
+  Document, Check, Clock, Close, Plus, CircleClose, SuccessFilled, InfoFilled,
   Back, Right, DArrowRight, ZoomOut, ZoomIn, RefreshRight, RefreshLeft, Refresh, Download
 } from '@element-plus/icons-vue'
 import api from '@/utils/api'
@@ -2297,19 +2342,59 @@ onMounted(async () => {
 
 .page-header {
   margin-bottom: 20px;
+  background-color: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05);
 }
 
-.page-header h2 {
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.header-title h2 {
   margin: 0 0 8px 0;
   color: #303133;
   font-size: 24px;
   font-weight: 600;
+  display: flex;
+  align-items: center;
 }
 
-.page-header p {
+.header-title p {
   margin: 0;
-  color: #606266;
+  color: #909399;
   font-size: 14px;
+}
+
+.notice-icon-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: #E6A23C;
+  padding: 8px 16px;
+  background-color: #fdf6ec;
+  border-radius: 20px;
+  border: 1px solid #faecd8;
+  transition: all 0.3s;
+}
+
+.notice-icon-wrapper:hover {
+  background-color: #faecd8;
+  transform: translateY(-2px);
+  box-shadow: 0 2px 8px rgba(230, 162, 60, 0.2);
+}
+
+.notice-icon {
+  font-size: 18px;
+}
+
+.notice-label {
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .stats-cards {
@@ -2891,5 +2976,75 @@ onMounted(async () => {
 
 .upload-no-filename :deep(.el-upload--picture-card:hover) .upload-plus-icon {
   color: #409eff;
+}
+</style>
+
+<style>
+.notice-popover.el-popover {
+  padding: 0;
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+  border: none;
+}
+
+.notice-container {
+  overflow: hidden;
+}
+
+.notice-header {
+  background: linear-gradient(to right, #fdf6ec, #fff);
+  padding: 16px 20px;
+  border-bottom: 1px solid #faecd8;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #E6A23C;
+}
+
+.notice-list {
+  padding: 16px 20px;
+}
+
+.notice-item {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  line-height: 1.6;
+  font-size: 14px;
+  color: #606266;
+}
+
+.notice-item:last-child {
+  margin-bottom: 0;
+}
+
+.notice-index {
+  width: 20px;
+  height: 20px;
+  background-color: #fdf6ec;
+  color: #E6A23C;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: bold;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.notice-text {
+  flex: 1;
+}
+
+.highlight {
+  color: #F56C6C;
+  font-weight: 600;
+  background-color: #fef0f0;
+  padding: 0 4px;
+  border-radius: 2px;
+  margin: 0 2px;
 }
 </style>

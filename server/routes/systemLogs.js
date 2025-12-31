@@ -486,7 +486,7 @@ router.get('/config/options', async (req, res) => {
       req
     );
     
-    // 从数据库获取实际存在的模块
+    // 从数据库获取实际存在的模块，并与预定义模块合并
     let actualModules = Object.values(MODULES);
     try {
       const pool = await sql.connect(await getDynamicConfig());
@@ -498,10 +498,13 @@ router.get('/config/options', async (req, res) => {
       `;
       const moduleResult = await pool.request().query(moduleQuery);
       if (moduleResult.recordset && moduleResult.recordset.length > 0) {
-        actualModules = moduleResult.recordset.map(r => r.Module);
+        const dbModules = moduleResult.recordset.map(r => r.Module);
+        // 合并预定义模块和数据库中实际存在的模块，并去重
+        actualModules = [...new Set([...actualModules, ...dbModules])].sort();
       }
     } catch (dbError) {
       // 获取数据库模块失败，使用默认配置
+      console.error('获取数据库模块失败:', dbError);
     }
     
     res.json({

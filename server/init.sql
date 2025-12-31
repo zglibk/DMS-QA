@@ -4280,4 +4280,438 @@ PRINT '- 包含数据一致性触发器，自动同步仪器编号和管理编�
 PRINT '';
 
 PRINT '🎉 数据库初始化完成！';
+GO-- =============================================
+-- 人员资质管理模块 - 数据库表结构
+-- 创建日期: 2025-12-19
+-- 功能: 人员资质管理、FM100色觉测试记录
+-- =============================================
+
+-- 1. 人员资质�?IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PersonnelQualification' AND xtype='U')
+BEGIN
+    CREATE TABLE PersonnelQualification (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        EmployeeNo NVARCHAR(50) NOT NULL,           -- 工号
+        Name NVARCHAR(100) NOT NULL,                 -- 姓名
+        Department NVARCHAR(100),                    -- 部门
+        Position NVARCHAR(100),                      -- 岗位
+        PositionType NVARCHAR(10),                   -- 岗位类型: A/B/C/D
+        HireDate DATE,                               -- 入职日期
+        QualificationStatus NVARCHAR(20) DEFAULT '待评�?,  -- 资质状�? 合格/待评�?不合�?        CertificateExpiry DATE,                      -- 证书有效�?        Remarks NVARCHAR(500),                       -- 备注
+        CreatedAt DATETIME DEFAULT GETDATE(),        -- 创建时间
+        UpdatedAt DATETIME                           -- 更新时间
+    );
+    
+    -- 创建索引
+    CREATE UNIQUE INDEX IX_PersonnelQualification_EmployeeNo ON PersonnelQualification(EmployeeNo);
+    CREATE INDEX IX_PersonnelQualification_Department ON PersonnelQualification(Department);
+    CREATE INDEX IX_PersonnelQualification_PositionType ON PersonnelQualification(PositionType);
+    CREATE INDEX IX_PersonnelQualification_Status ON PersonnelQualification(QualificationStatus);
+    
+    PRINT '�?PersonnelQualification 创建成功';
+END
+ELSE
+BEGIN
+    PRINT '�?PersonnelQualification 已存�?;
+END
 GO
+
+-- 2. FM100 色觉测试记录�?IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='ColorVisionTest' AND xtype='U')
+BEGIN
+    CREATE TABLE ColorVisionTest (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        PersonnelID INT NOT NULL,                    -- 关联人员ID
+        TestDate DATETIME NOT NULL,                  -- 测试日期
+        Duration FLOAT,                              -- 测试时长（分钟）
+        TES INT,                                     -- 错误总分 (TES)
+        SqrtTES FLOAT,                               -- 错误总分平方�?(√TES)
+        Category NVARCHAR(50),                       -- 分类: 优秀色彩分辨�?一般色彩分辨力/低色彩分辨力
+        
+        -- 百分位数
+        PctUnselected INT,                           -- 未选定人群百分�?        PctFactory INT,                              -- 工厂人群百分�?        PctExperienced INT,                          -- 经验丰富人群百分�?        
+        -- Vingrys 分析
+        Angle FLOAT,                                 -- 角度
+        CIndex FLOAT,                                -- C 指数
+        SIndex FLOAT,                                -- S 指数
+        Diagnosis NVARCHAR(50),                      -- 诊断建议
+        
+        -- 评估结果
+        Grade NVARCHAR(20),                          -- 等级: 优异/良好/需关注/不达�?        JobMatch NVARCHAR(100),                      -- 岗位匹配结果
+        
+        -- 附件
+        ScreenshotPath NVARCHAR(500),                -- 测试软件截图路径
+        ReportPath NVARCHAR(500),                    -- 生成报告路径
+        
+        CreatedAt DATETIME DEFAULT GETDATE(),        -- 创建时间
+        
+        -- 外键约束
+        CONSTRAINT FK_ColorVisionTest_Personnel FOREIGN KEY (PersonnelID)
+            REFERENCES PersonnelQualification(ID) ON DELETE CASCADE
+    );
+    
+    -- 创建索引
+    CREATE INDEX IX_ColorVisionTest_PersonnelID ON ColorVisionTest(PersonnelID);
+    CREATE INDEX IX_ColorVisionTest_TestDate ON ColorVisionTest(TestDate);
+    CREATE INDEX IX_ColorVisionTest_Grade ON ColorVisionTest(Grade);
+    
+    PRINT '�?ColorVisionTest 创建成功';
+END
+ELSE
+BEGIN
+    PRINT '�?ColorVisionTest 已存�?;
+END
+GO
+
+-- 3. 添加注释
+EXEC sp_addextendedproperty
+    @name = N'MS_Description',
+    @value = N'人员资质管理�?- 记录关键岗位人员的资质信�?,
+    @level0type = N'SCHEMA', @level0name = N'dbo',
+    @level1type = N'TABLE', @level1name = N'PersonnelQualification';
+
+EXEC sp_addextendedproperty
+    @name = N'MS_Description',
+    @value = N'FM100色觉测试记录�?- 记录Farnsworth-Munsell 100 Hue Test测试结果',
+    @level0type = N'SCHEMA', @level0name = N'dbo',
+    @level1type = N'TABLE', @level1name = N'ColorVisionTest';
+
+-- 4. 插入示例数据（可选）
+/*
+INSERT INTO PersonnelQualification (EmployeeNo, Name, Department, Position, PositionType, HireDate, QualificationStatus)
+VALUES
+    ('EMP001', '张三', '印刷�?, '调墨�?, 'A', '2020-03-15', '合格'),
+    ('EMP002', '李四', '品质�?, '终检�?, 'B', '2021-06-20', '合格'),
+    ('EMP003', '王五', '品质�?, '过程检验员', 'C', '2022-01-10', '待评�?),
+    ('EMP004', '赵六', '印前�?, '调墨学徒', 'A', '2024-11-01', '待评�?);
+*/
+
+PRINT '人员资质管理模块数据库表创建完成�?;
+GO
+-- =============================================
+-- 人员资质管理模块 - 补充表结�?-- 创建日期: 2025-12-23
+-- 功能: 资质类型、资质认证、考核记录
+-- =============================================
+
+-- 3. 资质类型�?IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='QualificationType' AND xtype='U')
+BEGIN
+    CREATE TABLE QualificationType (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        CategoryCode NVARCHAR(50) NOT NULL,          -- 类别编码: QUALITY/SKILL/etc
+        CategoryName NVARCHAR(50) NOT NULL,          -- 类别名称: 质量检�?生产技�?etc
+        TypeCode NVARCHAR(50) NOT NULL,              -- 类型编码
+        TypeName NVARCHAR(100) NOT NULL,             -- 资质名称
+        Description NVARCHAR(500),                   -- 描述
+        RequiresTest BIT DEFAULT 0,                  -- 是否需要考核
+        TestType NVARCHAR(50),                       -- 考核类型: WRITTEN/PRACTICAL/FM100/etc
+        ValidityPeriod INT,                          -- 有效�?�?, NULL为长�?        CertLevels NVARCHAR(200),                    -- 认证等级(逗号分隔): 初级,中级,高级
+        SortOrder INT DEFAULT 0,                     -- 排序
+        IsActive BIT DEFAULT 1,                      -- 是否启用
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME
+    );
+    
+    CREATE UNIQUE INDEX IX_QualificationType_TypeCode ON QualificationType(TypeCode);
+    CREATE INDEX IX_QualificationType_CategoryCode ON QualificationType(CategoryCode);
+    
+    PRINT '�?QualificationType 创建成功';
+    
+    -- 插入初始数据
+    INSERT INTO QualificationType (CategoryCode, CategoryName, TypeCode, TypeName, Description, RequiresTest, TestType, ValidityPeriod, CertLevels, SortOrder)
+    VALUES 
+    ('QUALITY', '质量检�?, 'FM100', 'FM100色觉测试', 'Farnsworth-Munsell 100 Hue Test 色彩辨别能力测试', 1, 'FM100', 12, '优异,良好,合格', 1),
+    ('QUALITY', '质量检�?, 'INSPECTOR', '质检员上岗证', '质量检验岗位资格认�?, 1, 'WRITTEN', 24, '初级,中级,高级', 2),
+    ('SKILL', '生产技�?, 'COLOR_MATCH', '调色技�?, '油墨调配与色彩管理技�?, 1, 'PRACTICAL', 24, '合格,优秀', 3);
+END
+ELSE
+BEGIN
+    PRINT '�?QualificationType 已存�?;
+END
+GO
+
+-- 4. 资质认证�?IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='PersonnelCertification' AND xtype='U')
+BEGIN
+    CREATE TABLE PersonnelCertification (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        PersonnelID INT NOT NULL,                    -- 人员ID
+        QualificationTypeID INT NOT NULL,            -- 资质类型ID
+        CertLevel NVARCHAR(50),                      -- 认证等级
+        CertNo NVARCHAR(100),                        -- 证书编号
+        CertDate DATE NOT NULL,                      -- 认证日期
+        ExpiryDate DATE,                             -- 到期日期
+        Issuer NVARCHAR(100),                        -- 发证机构
+        CertStatus NVARCHAR(20) DEFAULT '有效',      -- 状�? 有效/已过�?吊销
+        AttachmentPath NVARCHAR(500),                -- 附件路径
+        Remarks NVARCHAR(500),                       -- 备注
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME,
+        
+        CONSTRAINT FK_PersonnelCertification_Personnel FOREIGN KEY (PersonnelID)
+            REFERENCES PersonnelQualification(ID) ON DELETE CASCADE,
+        CONSTRAINT FK_PersonnelCertification_QualificationType FOREIGN KEY (QualificationTypeID)
+            REFERENCES QualificationType(ID) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IX_PersonnelCertification_PersonnelID ON PersonnelCertification(PersonnelID);
+    CREATE INDEX IX_PersonnelCertification_QualificationTypeID ON PersonnelCertification(QualificationTypeID);
+    CREATE INDEX IX_PersonnelCertification_ExpiryDate ON PersonnelCertification(ExpiryDate);
+    
+    PRINT '�?PersonnelCertification 创建成功';
+END
+ELSE
+BEGIN
+    PRINT '�?PersonnelCertification 已存�?;
+END
+GO
+
+-- 5. 考核记录�?(通用)
+IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='QualificationTest' AND xtype='U')
+BEGIN
+    CREATE TABLE QualificationTest (
+        ID INT IDENTITY(1,1) PRIMARY KEY,
+        PersonnelID INT NOT NULL,                    -- 人员ID
+        QualificationTypeID INT NOT NULL,            -- 资质类型ID
+        TestDate DATETIME NOT NULL,                  -- 考核日期
+        TestType NVARCHAR(50),                       -- 考核类型
+        Score DECIMAL(10, 2),                        -- 得分
+        Grade NVARCHAR(50),                          -- 等级
+        TestResult NVARCHAR(20),                     -- 结果: 通过/不通过
+        Duration INT,                                -- 时长(分钟)
+        Examiner NVARCHAR(50),                       -- 考核�?        Remarks NVARCHAR(500),                       -- 备注
+        CreatedAt DATETIME DEFAULT GETDATE(),
+        UpdatedAt DATETIME,
+        
+        CONSTRAINT FK_QualificationTest_Personnel FOREIGN KEY (PersonnelID)
+            REFERENCES PersonnelQualification(ID) ON DELETE CASCADE,
+        CONSTRAINT FK_QualificationTest_QualificationType FOREIGN KEY (QualificationTypeID)
+            REFERENCES QualificationType(ID) ON DELETE CASCADE
+    );
+    
+    CREATE INDEX IX_QualificationTest_PersonnelID ON QualificationTest(PersonnelID);
+    CREATE INDEX IX_QualificationTest_TestDate ON QualificationTest(TestDate);
+    
+    PRINT '�?QualificationTest 创建成功';
+END
+ELSE
+BEGIN
+    PRINT '�?QualificationTest 已存�?;
+END
+GO
+
+-- 添加注释
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'资质类型定义�?, @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'QualificationType';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'人员资质认证记录�?, @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'PersonnelCertification';
+EXEC sp_addextendedproperty @name = N'MS_Description', @value = N'资质考核记录�?, @level0type = N'SCHEMA', @level0name = N'dbo', @level1type = N'TABLE', @level1name = N'QualificationTest';
+-- =============================================
+-- 修正 PersonnelQualification 表结构以匹配代码
+-- =============================================
+
+-- 1. 重命�?QualificationStatus �?OverallStatus
+IF EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PersonnelQualification') AND name = 'QualificationStatus')
+BEGIN
+    EXEC sp_rename 'PersonnelQualification.QualificationStatus', 'OverallStatus', 'COLUMN';
+    PRINT '�?QualificationStatus 已重命名�?OverallStatus';
+END
+GO
+
+-- 2. 添加 IsActive 字段
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PersonnelQualification') AND name = 'IsActive')
+BEGIN
+    ALTER TABLE PersonnelQualification ADD IsActive BIT DEFAULT 1;
+    PRINT '�?IsActive 已添�?;
+END
+GO
+
+-- 3. 添加 PersonID 字段 (用于关联基础人员�?
+IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('PersonnelQualification') AND name = 'PersonID')
+BEGIN
+    ALTER TABLE PersonnelQualification ADD PersonID INT NULL;
+    PRINT '�?PersonID 已添�?;
+END
+GO
+
+-- =====================================================
+-- 来料检验管理相关表
+-- =====================================================
+
+-- 1. 检验项目表 (InspectionItems)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[InspectionItems]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[InspectionItems] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,
+        [ItemName] NVARCHAR(100) NOT NULL,
+        [Description] NVARCHAR(500),
+        [SortOrder] INT DEFAULT 0,
+        [DataType] NVARCHAR(50) DEFAULT 'Normal', -- Normal, Dimension, Force, etc.
+        [InspectionStandard] NVARCHAR(200),
+        [AcceptanceCriteria] NVARCHAR(200),
+        [MaterialCategory] NVARCHAR(50), -- Added field
+        [Status] BIT DEFAULT 1,
+        [CreatedBy] NVARCHAR(50),
+        [CreatedAt] DATETIME DEFAULT GETDATE(),
+        [UpdatedBy] NVARCHAR(50),
+        [UpdatedAt] DATETIME DEFAULT GETDATE()
+    );
+    PRINT '�?InspectionItems 表创建成�?;
+END
+ELSE
+BEGIN
+    PRINT '⚠️ InspectionItems 表已存在，跳过创�?;
+END
+
+-- 2. 来料检验报告表 (IncomingInspectionReports)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[IncomingInspectionReports]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[IncomingInspectionReports] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,
+        [ReportNo] NVARCHAR(50) NOT NULL UNIQUE,
+        [Supplier] NVARCHAR(200),
+        [ProductName] NVARCHAR(200),
+        [Specification] NVARCHAR(200),
+        [Quantity] DECIMAL(18, 2),
+        [PackageCount] INT, -- Added field
+        [ArrivalDate] DATE,
+        [SamplingQuantity] INT,
+        [InspectionBasis] NVARCHAR(200),
+        [PONumber] NVARCHAR(50),
+        [Type] NVARCHAR(50),
+        [TestImages] NVARCHAR(MAX),
+        [ReportResult] NVARCHAR(50), -- 合格, 不合�? 特采
+        [ReportRemark] NVARCHAR(1000),
+        [Inspector] NVARCHAR(50),
+        [InspectionDate] DATE,
+        [Auditor] NVARCHAR(50),
+        [AuditDate] DATE,
+        [Status] NVARCHAR(50) DEFAULT 'Saved', -- Saved, Submitted, Approved, Rejected
+        [CreatedBy] NVARCHAR(50),
+        [CreatedAt] DATETIME DEFAULT GETDATE(),
+        [UpdatedBy] NVARCHAR(50),
+        [UpdatedAt] DATETIME,
+        [IsDeleted] BIT DEFAULT 0
+    );
+    PRINT '�?IncomingInspectionReports 表创建成�?;
+END
+ELSE
+BEGIN
+    PRINT '⚠️ IncomingInspectionReports 表已存在，跳过创�?;
+END
+
+-- 3. 检验报告明细表 (IncomingInspectionDetails)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[IncomingInspectionDetails]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[IncomingInspectionDetails] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,
+        [ReportID] INT NOT NULL,
+        [ItemID] INT,
+        [ItemName] NVARCHAR(100),
+        [InspectionContent] NVARCHAR(500),
+        [SingleItemJudgment] NVARCHAR(50), -- 合格, 不合�?        [ResultJudgment] NVARCHAR(200), -- 具体数值或文本
+        [ItemRemark] NVARCHAR(500),
+        [SampleValues] NVARCHAR(MAX), -- JSON array of values
+        [Unit] NVARCHAR(50),
+        [SubMethod] NVARCHAR(50), -- For dimensions: LW, Diameter
+        [InspectionStandard] NVARCHAR(200),
+        [AcceptanceCriteria] NVARCHAR(200),
+        
+        CONSTRAINT FK_IncomingInspectionDetails_Report 
+            FOREIGN KEY (ReportID) REFERENCES [dbo].[IncomingInspectionReports](ID) ON DELETE CASCADE
+    );
+    PRINT '�?IncomingInspectionDetails 表创建成�?;
+END
+ELSE
+BEGIN
+    PRINT '⚠️ IncomingInspectionDetails 表已存在，跳过创�?;
+END
+
+
+-- =====================================================
+-- 来料检验管理相关表
+-- =====================================================
+
+-- 1. 检验项目表 (InspectionItems)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[InspectionItems]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[InspectionItems] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,
+        [ItemName] NVARCHAR(100) NOT NULL,
+        [Description] NVARCHAR(500),
+        [SortOrder] INT DEFAULT 0,
+        [DataType] NVARCHAR(50) DEFAULT 'Normal', -- Normal, Dimension, Force, etc.
+        [InspectionStandard] NVARCHAR(200),
+        [AcceptanceCriteria] NVARCHAR(200),
+        [MaterialCategory] NVARCHAR(50), -- Added field
+        [Status] BIT DEFAULT 1,
+        [CreatedBy] NVARCHAR(50),
+        [CreatedAt] DATETIME DEFAULT GETDATE(),
+        [UpdatedBy] NVARCHAR(50),
+        [UpdatedAt] DATETIME DEFAULT GETDATE()
+    );
+    PRINT '✅ InspectionItems 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ InspectionItems 表已存在，跳过创建';
+END
+
+-- 2. 来料检验报告表 (IncomingInspectionReports)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[IncomingInspectionReports]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[IncomingInspectionReports] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,
+        [ReportNo] NVARCHAR(50) NOT NULL UNIQUE,
+        [Supplier] NVARCHAR(200),
+        [ProductName] NVARCHAR(200),
+        [Specification] NVARCHAR(200),
+        [Quantity] DECIMAL(18, 2),
+        [PackageCount] INT, -- Added field
+        [ArrivalDate] DATE,
+        [SamplingQuantity] INT,
+        [InspectionBasis] NVARCHAR(200),
+        [PONumber] NVARCHAR(50),
+        [Type] NVARCHAR(50),
+        [TestImages] NVARCHAR(MAX),
+        [ReportResult] NVARCHAR(50), -- 合格, 不合格, 特采
+        [ReportRemark] NVARCHAR(1000),
+        [Inspector] NVARCHAR(50),
+        [InspectionDate] DATE,
+        [Auditor] NVARCHAR(50),
+        [AuditDate] DATE,
+        [Status] NVARCHAR(50) DEFAULT 'Saved', -- Saved, Submitted, Approved, Rejected
+        [CreatedBy] NVARCHAR(50),
+        [CreatedAt] DATETIME DEFAULT GETDATE(),
+        [UpdatedBy] NVARCHAR(50),
+        [UpdatedAt] DATETIME,
+        [IsDeleted] BIT DEFAULT 0
+    );
+    PRINT '✅ IncomingInspectionReports 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ IncomingInspectionReports 表已存在，跳过创建';
+END
+
+-- 3. 检验报告明细表 (IncomingInspectionDetails)
+IF NOT EXISTS (SELECT * FROM sys.objects WHERE object_id = OBJECT_ID(N'[dbo].[IncomingInspectionDetails]') AND type in (N'U'))
+BEGIN
+    CREATE TABLE [dbo].[IncomingInspectionDetails] (
+        [ID] INT IDENTITY(1,1) PRIMARY KEY,
+        [ReportID] INT NOT NULL,
+        [ItemID] INT,
+        [ItemName] NVARCHAR(100),
+        [InspectionContent] NVARCHAR(500),
+        [SingleItemJudgment] NVARCHAR(50), -- 合格, 不合格
+        [ResultJudgment] NVARCHAR(200), -- 具体数值或文本
+        [ItemRemark] NVARCHAR(500),
+        [SampleValues] NVARCHAR(MAX), -- JSON array of values
+        [Unit] NVARCHAR(50),
+        [SubMethod] NVARCHAR(50), -- For dimensions: LW, Diameter
+        [InspectionStandard] NVARCHAR(200),
+        [AcceptanceCriteria] NVARCHAR(200),
+        
+        CONSTRAINT FK_IncomingInspectionDetails_Report 
+            FOREIGN KEY (ReportID) REFERENCES [dbo].[IncomingInspectionReports](ID) ON DELETE CASCADE
+    );
+    PRINT '✅ IncomingInspectionDetails 表创建成功';
+END
+ELSE
+BEGIN
+    PRINT '⚠️ IncomingInspectionDetails 表已存在，跳过创建';
+END

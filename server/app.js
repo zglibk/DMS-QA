@@ -73,6 +73,11 @@ const instrumentsRouter = require('./routes/instruments');       // 仪器管理
 const qrScanRouter = require('./routes/qrScan');              // 二维码扫描管理路由
 const reportTemplatesRouter = require('./routes/reportTemplates'); // 出货报告模板管理路由
 const defectiveRouter = require('./routes/defective');             // 不良类别管理路由
+const qualificationRouter = require('./routes/qualification');     // 人员资质管理路由
+const incomingInspectionRouter = require('./routes/incomingInspection'); // 来料检验报告路由
+const inspectionItemsRouter = require('./routes/inspectionItems'); // 检验项目管理路由
+const materialRouter = require('./routes/material'); // 材料入库查询路由
+const categoryConfigRouter = require('./routes/categoryConfig'); // 物料分类映射配置路由
 const erpSyncService = require('./services/erpSyncService');
 const { startFileServer } = require('./file-server');
 const { logCleanupService } = require('./services/logCleanupService');
@@ -302,6 +307,13 @@ app.use('/api/assessment', assessmentRouter);
 app.use('/api/qr-scan', qrScanRouter);
 app.use('/api/shipment-report/templates', reportTemplatesRouter); // 出货报告模板管理
 app.use('/api/defective', defectiveRouter);                       // 不良类别管理
+app.use('/api/qualification', qualificationRouter);               // 人员资质管理
+app.use('/api/inspection/incoming', incomingInspectionRouter);      // 来料检验报告
+app.use('/api/inspection/items', inspectionItemsRouter);            // 检验项目管理
+app.use('/api/material', materialRouter);                           // 材料入库查询
+app.use('/api/category-config', categoryConfigRouter);              // 物料分类映射配置
+app.use('/api/inspection/performance', require('./routes/performanceInspection')); // 性能实验报告
+app.use('/api/inspection/dashboard', require('./routes/inspectionDashboard')); // 检验工作台
 app.use('/api/log-export', require('./routes/logExport'));
 
 // 错误日志记录中间件（必须在所有路由之后）
@@ -344,6 +356,8 @@ app.use('/files/supplier-complaint', staticCorsMiddleware, express.static(path.j
 app.use('/files/notice-images', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/notice-images')));
 app.use('/files/rework-attachments', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/rework-attachments')));
 app.use('/files/report-templates', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/report-templates'))); // 模板文件
+app.use('/files/qualification', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/qualification'))); // 资质管理文件
+app.use('/files/inspection', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/inspection'))); // 检验报告图片
 app.use('/uploads/complaints', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/complaints')));
 
 // 添加共享文件访问路由

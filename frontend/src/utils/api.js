@@ -58,14 +58,15 @@ const shouldRefreshToken = (token) => {
  */
 const refreshToken = async () => {
   try {
-    const response = await axios.post('/api/auth/refresh-token', {}, {
+    // Use the api instance but the interceptor will skip refresh check for this URL
+    const response = await api.post('/auth/refresh-token', {}, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`
       }
     })
     
-    if (response.data.success && response.data.data && response.data.data.token) {
-      const newToken = response.data.data.token
+    if (response.success && response.data && response.data.token) {
+      const newToken = response.data.token
       localStorage.setItem('token', newToken)
       return newToken
     } else {
@@ -171,6 +172,11 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   async config => {
+    // Skip token refresh logic for refresh-token request itself to avoid infinite loop
+    if (config.url && config.url.includes('refresh-token')) {
+        return config
+    }
+
     // 从localStorage获取token
     let token = localStorage.getItem('token')
     

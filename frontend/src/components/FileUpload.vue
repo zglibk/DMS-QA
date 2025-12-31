@@ -1,6 +1,7 @@
 <script setup>
 import { ref, watchEffect, onMounted, onUnmounted } from 'vue'
 import { Upload } from '@element-plus/icons-vue'
+import { ElImageViewer } from 'element-plus'
 
 // 组件属性定义
 const props = defineProps({
@@ -77,6 +78,9 @@ const showUpload = ref(1)
 const uploading = ref(Array(props.maxCount).fill(false))
 const uploadInput = ref()
 const uploadContainer = ref() // 上传容器引用，用于粘贴事件监听
+const previewVisible = ref(false)
+const previewImage = ref('')
+
 watchEffect(() => {
   // 回调立即执行一次，同时会自动跟踪回调中所依赖的所有响应式依赖
   initUpload()
@@ -289,11 +293,20 @@ function base64Upload(file, index) {
     // 当读取操作成功完成时调用
     // console.log('读取成功 onload:', e)
     // 该文件的base64数据，如果是图片，则前端可直接用来展示图片
-    uploadedFiles.value.push({
+    // Fix: 更新现有项而不是push，避免重复
+    if (uploadedFiles.value[index]) {
+      uploadedFiles.value[index] = {
+        ...uploadedFiles.value[index],
+        name: file.name,
+        url: e.target?.result
+      }
+    } else {
+      uploadedFiles.value.push({
         name: file.name,
         url: e.target?.result
       })
-      console.log(props.actionMessage.upload || '上传成功')
+    }
+      // console.log(props.actionMessage.upload || '上传成功')
       emits('update:fileList', uploadedFiles.value)
       emits('change', uploadedFiles.value)
   }
@@ -355,6 +368,10 @@ function onPreview(n, url) {
   
   // 触发自定义预览事件，让父组件处理预览逻辑
   emits('preview', fileInfo, previewUrl)
+  
+  // Internal preview
+  previewImage.value = previewUrl
+  previewVisible.value = true
 }
 function onRemove(index) {
   if (uploadedFiles.value.length < props.maxCount) {
@@ -374,11 +391,11 @@ function onRemove(index) {
  */
 function onImageLoad(index, url) {
   const fileInfo = uploadedFiles.value[index]
-  console.log('图片加载成功:', {
+  /* console.log('图片加载成功:', {
     文件名: fileInfo?.name || fileInfo?.filename,
     加载来源: url,
     文件信息: fileInfo
-  })
+  }) */
 }
 
 /**
@@ -482,7 +499,7 @@ defineExpose({
               ></path>
             </svg>
             <div class="file-mask">
-              <a v-show="!disabled" class="file-icon" title="预览" @click.prevent.stop="onPreview(n - 1, uploadedFiles[n - 1].previewUrl || uploadedFiles[n - 1].url)">
+              <a class="file-icon" title="预览" @click.prevent.stop="onPreview(n - 1, uploadedFiles[n - 1].previewUrl || uploadedFiles[n - 1].url)">
                 <svg class="icon-svg" focusable="false" data-icon="eye" aria-hidden="true" viewBox="64 64 896 896">
                   <path d="M942.2 486.2C847.4 286.5 704.1 186 512 186c-192.2 0-335.4 100.5-430.2 300.3a60.3 60.3 0 000 51.5C176.6 737.5 319.9 838 512 838c192.2 0 335.4-100.5 430.2-300.3 7.7-16.2 7.7-35 0-51.5zM512 766c-161.3 0-279.4-81.8-362.7-254C232.6 339.8 350.7 258 512 258c161.3 0 279.4 81.8 362.7 254C791.5 684.2 673.4 766 512 766zm-4-430c-97.2 0-176 78.8-176 176s78.8 176 176 176 176-78.8 176-176-78.8-176-176-176zm0 288c-61.9 0-112-50.1-112-112s50.1-112 112-112 112 50.1 112 112-50.1 112-112 112z"></path>
                 </svg>
@@ -500,6 +517,12 @@ defineExpose({
       </div>
     </div>
   </div>
+  
+  <el-image-viewer
+    v-if="previewVisible"
+    :url-list="[previewImage]"
+    @close="previewVisible = false"
+  />
 </template>
 <style lang="less" scoped>
 .m-upload-wrap {

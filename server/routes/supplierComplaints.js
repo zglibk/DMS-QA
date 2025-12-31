@@ -9,6 +9,29 @@ const router = express.Router()
 const sql = require('mssql')
 const { getConnection } = require('../db')
 const { authenticateToken } = require('../middleware/auth')
+const multer = require('multer')
+const XLSX = require('xlsx')
+const path = require('path')
+const fs = require('fs')
+
+// 配置multer用于文件上传
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadDir = path.join(__dirname, '../uploads/temp');
+    if (!fs.existsSync(uploadDir)) {
+      fs.mkdirSync(uploadDir, { recursive: true });
+    }
+    cb(null, uploadDir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, 'import-' + Date.now() + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB
+});
 
 /**
  * 获取供应商投诉列表
@@ -25,7 +48,16 @@ router.get('/', async (req, res) => {
       complaintType = '',
       status = '',
       startDate = '',
-      endDate = ''
+      endDate = '',
+      hasClaimAmount = '', // 是否有索赔金额
+      hasActualClaim = '', // 是否有实际索赔
+      // 新增筛选条件
+      materialCode = '',
+      purchaseOrderNo = '',
+      defectCategory = '',
+      defectItem = '',
+      customerCode = '',
+      workOrderNo = ''
     } = req.query
     
     const offset = (page - 1) * size
@@ -38,6 +70,44 @@ router.get('/', async (req, res) => {
     if (keyword) {
       whereConditions.push('(sc.ComplaintNo LIKE @keyword OR sc.MaterialName LIKE @keyword OR sc.Description LIKE @keyword)')
       queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${keyword}%` })
+    }
+
+    if (materialCode) {
+      whereConditions.push('sc.MaterialCode LIKE @materialCode')
+      queryParams.push({ name: 'materialCode', type: sql.NVarChar(100), value: `%${materialCode}%` })
+    }
+
+    if (purchaseOrderNo) {
+      whereConditions.push('sc.PurchaseOrderNo LIKE @purchaseOrderNo')
+      queryParams.push({ name: 'purchaseOrderNo', type: sql.NVarChar(100), value: `%${purchaseOrderNo}%` })
+    }
+
+    if (defectCategory) {
+      whereConditions.push('sc.DefectCategory = @defectCategory')
+      queryParams.push({ name: 'defectCategory', type: sql.NVarChar(100), value: defectCategory })
+    }
+
+    if (defectItem) {
+      whereConditions.push('sc.DefectItem LIKE @defectItem')
+      queryParams.push({ name: 'defectItem', type: sql.NVarChar(200), value: `%${defectItem}%` })
+    }
+
+    if (customerCode) {
+      whereConditions.push('sc.CustomerCode LIKE @customerCode')
+      queryParams.push({ name: 'customerCode', type: sql.NVarChar(50), value: `%${customerCode}%` })
+    }
+
+    if (workOrderNo) {
+      whereConditions.push('sc.WorkOrderNo LIKE @workOrderNo')
+      queryParams.push({ name: 'workOrderNo', type: sql.NVarChar(100), value: `%${workOrderNo}%` })
+    }
+
+    if (hasClaimAmount === 'true') {
+      whereConditions.push('sc.ClaimAmount > 0')
+    }
+
+    if (hasActualClaim === 'true') {
+      whereConditions.push('sc.ActualClaim > 0')
     }
     
     if (supplierName) {
@@ -335,6 +405,37 @@ router.get('/suppliers', async (req, res) => {
 })
 
 /**
+ * 获取不重复的不良类别和不良项（包含级联关系）
+ * GET /api/supplier-complaints/distinct-values
+ */
+router.get('/distinct-values', async (req, res) => {
+  try {
+    const pool = await getConnection()
+
+    // 查询不良类别和不良项的组合，用于前端建立级联关系
+    // 不再强制要求两者都非空，以确保能获取到所有存在的类别和不良项
+    const relationResult = await pool.request().query(`
+      SELECT DISTINCT DefectCategory, DefectItem
+      FROM SupplierComplaints
+      WHERE Status != 0 
+      ORDER BY DefectCategory, DefectItem
+    `)
+
+    res.json({
+      success: true,
+      data: relationResult.recordset
+    })
+  } catch (error) {
+    console.error('获取不重复值失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取不重复值失败',
+      error: error.message
+    })
+  }
+})
+
+/**
  * 获取表字段信息
  * GET /api/supplier-complaints/table-fields
  */
@@ -417,6 +518,92 @@ router.get('/table-fields', async (req, res) => {
       success: false,
       message: '获取表字段信息失败',
       error: error.message
+    })
+  }
+})
+
+/**
+ * 获取投诉统计数据
+ * GET /api/supplier-complaints/statistics
+ * 注意：必须放在 /:id 路由之前，否则会被参数化路由拦截
+ */
+router.get('/statistics', async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query
+    const pool = await getConnection()
+    
+    let dateCondition = ''
+    let queryParams = []
+    
+    if (startDate && endDate) {
+      dateCondition = 'AND ComplaintDate BETWEEN @startDate AND @endDate'
+      queryParams.push(
+        { name: 'startDate', type: sql.DateTime, value: new Date(startDate) },
+        { name: 'endDate', type: sql.DateTime, value: new Date(endDate) }
+      )
+    }
+    
+    let request = pool.request()
+    queryParams.forEach(param => {
+      request.input(param.name, param.type, param.value)
+    })
+    
+    const result = await request.query(`
+      SELECT 
+        COUNT(*) as totalComplaints,
+        SUM(CASE WHEN ProcessStatus = 'pending' OR ProcessStatus = '待处理' THEN 1 ELSE 0 END) as pendingCount,
+        SUM(CASE WHEN ProcessStatus = 'processing' OR ProcessStatus = '处理中' THEN 1 ELSE 0 END) as processingCount,
+        SUM(CASE WHEN ProcessStatus = 'completed' OR ProcessStatus = '已完成' THEN 1 ELSE 0 END) as completedCount,
+        SUM(CASE WHEN ProcessStatus = 'closed' OR ProcessStatus = '已关闭' THEN 1 ELSE 0 END) as closedCount,
+        ISNULL(SUM(TotalAmount), 0) as totalAmount,
+        ISNULL(SUM(ClaimAmount), 0) as totalClaimAmount,
+        ISNULL(SUM(ActualClaim), 0) as totalActualClaim,
+        ISNULL(AVG(TotalAmount), 0) as avgAmount
+      FROM SupplierComplaints
+      WHERE Status != 0 ${dateCondition}
+    `)
+    
+    res.json({
+      success: true,
+      data: result.recordset[0]
+    })
+  } catch (error) {
+    console.error('获取投诉统计数据失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '获取投诉统计数据失败',
+      error: error.message
+    })
+  }
+})
+
+/**
+ * 获取人员列表（用于下拉选择）
+ * GET /api/supplier-complaints/persons
+ * 注意：必须放在 /:id 路由之前
+ */
+router.get('/persons', async (req, res) => {
+  try {
+    const pool = await getConnection()
+    
+    // 从Person表获取在职人员列表
+    const result = await pool.request().query(`
+      SELECT ID as id, Name as name, Department as department, Position as position
+      FROM Person
+      WHERE Status = 1
+      ORDER BY Department, Name
+    `)
+    
+    res.json({
+      success: true,
+      data: result.recordset
+    })
+  } catch (error) {
+    console.error('获取人员列表失败:', error)
+    // 如果Person表不存在或查询失败，返回空数组而不是错误
+    res.json({
+      success: true,
+      data: []
     })
   }
 })
@@ -1041,6 +1228,71 @@ router.delete('/batch', async (req, res) => {
 })
 
 /**
+ * 物理删除供应商投诉记录（支持批量）
+ * DELETE /api/supplier-complaints/physical
+ * 功能：物理删除记录，如果表被清空则重置自增ID
+ */
+router.delete('/physical', async (req, res) => {
+  try {
+    const { ids, deleteAll } = req.body
+    
+    const pool = await getConnection()
+    let result
+    
+    if (deleteAll) {
+      // 清空整张表
+      await pool.request().query('TRUNCATE TABLE SupplierComplaints')
+      // TRUNCATE 会自动重置自增ID，无需额外操作
+      
+      result = { rowsAffected: ['ALL'] }
+    } else {
+      if (!ids || !Array.isArray(ids) || ids.length === 0) {
+        return res.status(400).json({
+          success: false,
+          message: '请提供要删除的记录ID列表'
+        })
+      }
+      
+      // 构建批量删除的SQL语句
+      const placeholders = ids.map((_, index) => `@id${index}`).join(',')
+      let request = pool.request()
+      
+      // 添加参数
+      ids.forEach((id, index) => {
+        request.input(`id${index}`, sql.Int, id)
+      })
+      
+      // 执行物理删除
+      result = await request.query(`
+        DELETE FROM SupplierComplaints 
+        WHERE ID IN (${placeholders})
+      `)
+      
+      // 检查表是否为空，如果为空则重置自增ID
+      const countResult = await pool.request().query('SELECT COUNT(*) as count FROM SupplierComplaints')
+      if (countResult.recordset[0].count === 0) {
+        await pool.request().query("DBCC CHECKIDENT ('SupplierComplaints', RESEED, 0)")
+      }
+    }
+    
+    res.json({
+      success: true,
+      message: deleteAll ? '已清空所有数据并重置自增ID' : `成功物理删除 ${result.rowsAffected[0]} 条记录`,
+      data: {
+        deletedCount: deleteAll ? 'ALL' : result.rowsAffected[0]
+      }
+    })
+  } catch (error) {
+    console.error('物理删除供应商投诉记录失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '物理删除供应商投诉记录失败',
+      error: error.message
+    })
+  }
+})
+
+/**
  * 删除供应商投诉记录（软删除）
  * DELETE /api/supplier-complaints/:id
  */
@@ -1090,7 +1342,7 @@ router.delete('/:id', async (req, res) => {
 /**
  * 导出供应商投诉数据
  * POST /api/supplier-complaints/export
- * 功能：根据筛选条件和选择的字段导出完整数据
+ * 功能：根据筛选条件和选择的字段导出完整数据为Excel文件，支持图片嵌入
  */
 router.post('/export', async (req, res) => {
   try {
@@ -1108,6 +1360,69 @@ router.post('/export', async (req, res) => {
     
     const pool = await getConnection()
     
+    // 字段中文名称映射
+    const fieldLabels = {
+      'ComplaintNo': '投诉编号',
+      'ComplaintDate': '投诉日期',
+      'SupplierName': '供应商名称',
+      'MaterialName': '材料名称',
+      'MaterialCode': '材料编号',
+      'MaterialSpecification': '材料规格',
+      'MaterialUnit': '材料单位',
+      'MaterialBrand': '材料品牌',
+      'ComplaintType': '投诉类型',
+      'Description': '问题描述',
+      'Quantity': '问题数量',
+      'UnitPrice': '单价',
+      'TotalAmount': '总金额',
+      'UrgencyLevel': '紧急程度',
+      'ExpectedSolution': '期望解决方案',
+      'ProcessStatus': '处理状态',
+      'ProcessResult': '处理结果',
+      'SolutionDescription': '解决方案描述',
+      'VerificationResult': '验证结果',
+      'ClaimAmount': '索赔金额',
+      'ActualClaim': '实际索赔',
+      'ActualLoss': '实际损失',
+      'CompensationAmount': '赔偿金额',
+      'ReworkCost': '返工成本',
+      'ReplacementCost': '更换成本',
+      'ReturnQuantity': '退货数量',
+      'ReturnAmount': '退货金额',
+      'FollowUpActions': '后续行动',
+      'PreventiveMeasures': '预防措施',
+      'SupplierResponse': '供应商回复',
+      'AttachmentPaths': '附件路径',
+      'CompletedDate': '完成日期',
+      'ClosedDate': '关闭日期',
+      'PurchaseOrderNo': '采购单号',
+      'IncomingDate': '来料日期',
+      'BatchQuantity': '批量数量',
+      'InspectionDate': '检验日期',
+      'WorkOrderNo': '使用工单',
+      'SampleQuantity': '抽检数量',
+      'AttachedImages': '异常图片',
+      'IQCResult': 'IQC判定',
+      'InitiatedBy': '发起人',
+      'CustomerCode': '客户编号',
+      'ProductCode': '产品编号',
+      'CPO': 'CPO',
+      'ProductQuantity': '产品数量',
+      'ProductUnit': '产品单位',
+      'DefectQuantity': '不合格数',
+      'DefectCategory': '不良类别',
+      'DefectItem': '不良项',
+      'DefectCauseAnalysis': '不合格原因分析',
+      'FeedbackUnit': '反馈单位',
+      'Inspector': '检验员',
+      'AbnormalDisposal': '异常处置',
+      'ComplaintDocument': '投诉书',
+      'ReplyDate': '回复日期',
+      'ImprovementEffectEvaluation': '改善效果评估',
+      'QA': 'QA',
+      'Remarks': '备注'
+    }
+
     // 构建字段选择语句
     const selectFields = fields.map(field => `sc.${field}`).join(', ')
     
@@ -1161,10 +1476,120 @@ router.post('/export', async (req, res) => {
       ORDER BY sc.ComplaintDate DESC, sc.CreatedAt DESC
     `)
     
-    res.json({
-      success: true,
-      data: dataResult.recordset
-    })
+    const rows = dataResult.recordset
+    
+    // 创建Excel工作簿
+    const ExcelJS = require('exceljs')
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('供应商投诉数据')
+    
+    // 设置列头
+    const columns = fields.map(field => ({
+      header: fieldLabels[field] || field,
+      key: field,
+      width: field === 'AttachedImages' ? 15 : 20 // 图片列宽一点，其他默认20
+    }))
+    worksheet.columns = columns
+    
+    // 设置表头样式
+    const headerRow = worksheet.getRow(1)
+    headerRow.font = { bold: true }
+    headerRow.alignment = { horizontal: 'center', vertical: 'middle' }
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    }
+    
+    // 填充数据
+    for (let i = 0; i < rows.length; i++) {
+      const rowData = rows[i]
+      const row = worksheet.addRow(rowData)
+      const rowIndex = row.number // Excel行号，从1开始（表头是1，数据从2开始）
+      
+      // 设置行高（如果有图片列，设置高一点）
+      if (fields.includes('AttachedImages')) {
+        row.height = 60 // 图片行高
+      } else {
+        row.height = 25
+      }
+      
+      // 处理图片
+      if (fields.includes('AttachedImages') && rowData.AttachedImages) {
+        try {
+          // 获取图片路径
+          // 数据库中存储的是URL路径，如 /files/supplier-complaint/filename.jpg
+          // 我们需要转换为服务器本地物理路径
+          const imageUrl = rowData.AttachedImages
+          let imagePath = ''
+          
+          if (imageUrl.includes('/supplier-complaint/')) {
+            const filename = path.basename(imageUrl)
+            // 假设图片存储在 uploads/supplier-complaint 目录下
+            imagePath = path.join(__dirname, '../uploads/supplier-complaint', filename)
+          } else if (imageUrl.includes('/customer-complaint/')) {
+             // 兼容可能混入的其他类型
+             const filename = path.basename(imageUrl)
+             imagePath = path.join(__dirname, '../uploads/customer-complaint', filename)
+          } else {
+             // 尝试直接作为文件名在supplier-complaint下查找
+             const filename = path.basename(imageUrl)
+             imagePath = path.join(__dirname, '../uploads/supplier-complaint', filename)
+          }
+          
+          if (fs.existsSync(imagePath)) {
+            // 读取图片
+            const imageBuffer = fs.readFileSync(imagePath)
+            const extension = path.extname(imagePath).substring(1).toLowerCase()
+            
+            // 添加图片到工作簿
+            const imageId = workbook.addImage({
+              buffer: imageBuffer,
+              extension: extension === 'jpg' ? 'jpeg' : extension
+            })
+            
+            // 计算图片列的索引
+            const colIndex = fields.indexOf('AttachedImages')
+            
+            // 将图片嵌入单元格
+            worksheet.addImage(imageId, {
+              tl: { col: colIndex, row: rowIndex - 1 }, // top-left (0-based index)
+              br: { col: colIndex + 1, row: rowIndex }, // bottom-right
+              editAs: 'oneCell' // 图片随单元格大小变化
+            })
+            
+            // 清空该单元格的文本内容（只显示图片）
+            row.getCell(colIndex + 1).value = ''
+          }
+        } catch (imgErr) {
+          console.error('处理图片失败:', imgErr)
+          // 图片处理失败，保留文本路径
+        }
+      }
+      
+      // 格式化日期等字段
+      row.eachCell((cell, colNumber) => {
+        const fieldKey = fields[colNumber - 1]
+        if (['ComplaintDate', 'IncomingDate', 'InspectionDate', 'ReplyDate', 'CompletedDate', 'ClosedDate'].includes(fieldKey)) {
+           if (cell.value) {
+             // 格式化日期
+             const date = new Date(cell.value)
+             cell.value = date.toLocaleDateString('zh-CN')
+           }
+        }
+        // 设置居中
+        cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true }
+      })
+    }
+    
+    // 设置响应头
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', 'attachment; filename=' + encodeURIComponent('供应商投诉数据.xlsx'))
+    
+    // 发送工作簿
+    await workbook.xlsx.write(res)
+    res.end()
+    
   } catch (error) {
     console.error('导出供应商投诉数据失败:', error)
     res.status(500).json({
@@ -1176,8 +1601,9 @@ router.post('/export', async (req, res) => {
 })
 
 /**
- * 获取投诉统计数据
- * GET /api/supplier-complaints/statistics
+ * 获取投诉统计数据（兼容路由）
+ * GET /api/supplier-complaints/statistics/overview
+ * 兼容旧版API调用，直接复制/statistics的逻辑
  */
 router.get('/statistics/overview', async (req, res) => {
   try {
@@ -1203,12 +1629,14 @@ router.get('/statistics/overview', async (req, res) => {
     const result = await request.query(`
       SELECT 
         COUNT(*) as totalComplaints,
-        SUM(CASE WHEN ProcessStatus = 'pending' THEN 1 ELSE 0 END) as pendingCount,
-        SUM(CASE WHEN ProcessStatus = 'processing' THEN 1 ELSE 0 END) as processingCount,
-        SUM(CASE WHEN ProcessStatus = 'completed' THEN 1 ELSE 0 END) as completedCount,
-        SUM(CASE WHEN ProcessStatus = 'closed' THEN 1 ELSE 0 END) as closedCount,
-        SUM(TotalAmount) as totalAmount,
-        AVG(TotalAmount) as avgAmount
+        SUM(CASE WHEN ProcessStatus = 'pending' OR ProcessStatus = '待处理' THEN 1 ELSE 0 END) as pendingCount,
+        SUM(CASE WHEN ProcessStatus = 'processing' OR ProcessStatus = '处理中' THEN 1 ELSE 0 END) as processingCount,
+        SUM(CASE WHEN ProcessStatus = 'completed' OR ProcessStatus = '已完成' THEN 1 ELSE 0 END) as completedCount,
+        SUM(CASE WHEN ProcessStatus = 'closed' OR ProcessStatus = '已关闭' THEN 1 ELSE 0 END) as closedCount,
+        ISNULL(SUM(TotalAmount), 0) as totalAmount,
+        ISNULL(SUM(ClaimAmount), 0) as totalClaimAmount,
+        ISNULL(SUM(ActualClaim), 0) as totalActualClaim,
+        ISNULL(AVG(TotalAmount), 0) as avgAmount
       FROM SupplierComplaints
       WHERE Status != 0 ${dateCondition}
     `)
@@ -1586,6 +2014,223 @@ router.post('/generate-report', async (req, res) => {
       success: false,
       message: '生成投诉书失败: ' + error.message
     })
+  }
+})
+
+/**
+ * 批量导入供应商投诉
+ * POST /api/supplier-complaints/import
+ */
+router.post('/import', upload.single('file'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: '请选择要上传的文件' })
+    }
+
+    const workbook = XLSX.readFile(req.file.path)
+    const sheetName = workbook.SheetNames[0]
+    const worksheet = workbook.Sheets[sheetName]
+    // cellDates: true 会将Excel日期转换为JS Date对象
+    // dateNF: 'yyyy-mm-dd' 设置日期格式字符串
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { 
+      cellDates: true,
+      raw: false // 使用raw: false以获取格式化后的值，避免日期序列号问题
+    })
+
+    if (jsonData.length === 0) {
+      fs.unlinkSync(req.file.path)
+      return res.status(400).json({ success: false, message: 'Excel文件内容为空' })
+    }
+
+    const pool = await getConnection()
+    let successCount = 0
+    let errorCount = 0
+    const errors = []
+
+    const colMap = {
+      '投诉编号': 'ComplaintNo',
+      '投诉日期': 'ComplaintDate',
+      '物料编码': 'MaterialCode',
+      '物料名称': 'MaterialName',
+      '材料规格': 'MaterialSpecification',
+      '材料数量': 'BatchQuantity',
+      '材料单位': 'MaterialUnit',
+      '材料品牌': 'MaterialBrand',
+      '供应商': 'SupplierName',
+      '采购单号': 'PurchaseOrderNo',
+      '来料日期': 'IncomingDate',
+      '客户编号': 'CustomerCode',
+      '工单号': 'WorkOrderNo',
+      '产品编号': 'ProductCode',
+      'CPO': 'CPO',
+      '产品数量': 'ProductQuantity',
+      '产品单位': 'ProductUnit',
+      '抽检数量': 'SampleQuantity',
+      '不合格数': 'DefectQuantity',
+      '投诉类型': 'ComplaintType',
+      '不良类别': 'DefectCategory',
+      '不良项': 'DefectItem',
+      '不合格描述': 'Description',
+      '不合格原因分析': 'DefectCauseAnalysis',
+      '异常图片': 'AttachedImages',
+      '反馈单位': 'FeedbackUnit',
+      '检验日期': 'InspectionDate',
+      '检验员': 'Inspector',
+      '异常处置': 'AbnormalDisposal',
+      '投诉书': 'ComplaintDocument',
+      '发起人': 'InitiatedBy',
+      '回复日期': 'ReplyDate',
+      '改善效果评估': 'ImprovementEffectEvaluation',
+      '索赔金额': 'ClaimAmount',
+      '实际索赔': 'ActualClaim',
+      'QA': 'QA',
+      '备注': 'Remarks'
+    }
+
+    for (let i = 0; i < jsonData.length; i++) {
+      const row = jsonData[i]
+      try {
+        const record = {}
+        // 去除表头空格，增加容错
+        const cleanRow = {}
+        Object.keys(row).forEach(k => {
+          cleanRow[k.trim()] = row[k]
+        })
+
+        for (const [cn, en] of Object.entries(colMap)) {
+           // 尝试匹配去除空格后的表头
+          const val = cleanRow[cn]
+          if (val !== undefined) {
+            let finalVal = val
+            // 处理Excel日期格式（可能是数字或字符串）
+            if (['ComplaintDate', 'IncomingDate', 'InspectionDate', 'ReplyDate'].includes(en)) {
+              if (typeof finalVal === 'number') {
+                // 如果是Excel序列号（例如 45938），转换为JS Date
+                // Excel基准日期是 1899-12-30
+                const excelBaseDate = new Date(1899, 11, 30)
+                const dateVal = new Date(excelBaseDate.getTime() + finalVal * 24 * 60 * 60 * 1000)
+                if (!isNaN(dateVal.getTime())) {
+                   finalVal = dateVal
+                }
+              } else if (typeof finalVal === 'string') {
+                 // 尝试解析字符串日期
+                 const dateVal = new Date(finalVal)
+                 if (!isNaN(dateVal.getTime())) {
+                    finalVal = dateVal
+                 }
+              }
+            }
+
+            // 如果是日期对象，且是无效日期，设为null
+            if (finalVal instanceof Date && isNaN(finalVal)) {
+               finalVal = null
+            }
+            record[en] = finalVal
+          }
+        }
+        
+        // 校验必填项
+        if (!record.SupplierName || !record.MaterialName || !record.ComplaintType) {
+           throw new Error(`缺少必填字段(供应商/物料名称/投诉类型)。解析到的数据: ${JSON.stringify(record)}`)
+        }
+
+        // 校验/处理投诉编号
+        let existingId = null
+        if (record.ComplaintNo) {
+           const check = await pool.request()
+             .input('no', sql.NVarChar, record.ComplaintNo)
+             .query('SELECT ID FROM SupplierComplaints WHERE ComplaintNo = @no')
+           
+           if (check.recordset.length > 0) {
+             existingId = check.recordset[0].ID
+           }
+        } else {
+             // 如果没有投诉编号，自动生成
+             const today = new Date(record.ComplaintDate || new Date())
+             const year = today.getFullYear().toString().slice(-2)
+             const month = (today.getMonth() + 1).toString().padStart(2, '0')
+             
+             // 获取当月最大流水号
+             const seqRes = await pool.request()
+                .input('prefix', sql.NVarChar, `MC-TJ${year}${month}%`)
+                .query(`
+                  SELECT TOP 1 ComplaintNo 
+                  FROM SupplierComplaints 
+                  WHERE ComplaintNo LIKE @prefix
+                  ORDER BY ComplaintNo DESC
+                `)
+             
+             let seq = 1
+             if (seqRes.recordset.length > 0) {
+                const lastNo = seqRes.recordset[0].ComplaintNo
+                const lastSeq = parseInt(lastNo.slice(-3))
+                if (!isNaN(lastSeq)) seq = lastSeq + 1
+             }
+             
+             record.ComplaintNo = `MC-TJ${year}${month}${seq.toString().padStart(3, '0')}`
+        }
+
+        const keys = Object.keys(record)
+        const request = pool.request()
+        keys.forEach(key => {
+            let type = sql.NVarChar
+            if (['BatchQuantity', 'ProductQuantity', 'SampleQuantity', 'DefectQuantity', 'Quantity'].includes(key)) type = sql.Decimal(18, 2)
+            if (['ClaimAmount', 'ActualClaim', 'UnitPrice', 'TotalAmount', 'CompensationAmount', 'ReworkCost', 'ReplacementCost', 'ReturnQuantity', 'ReturnAmount', 'ActualLoss'].includes(key)) type = sql.Decimal(18, 2)
+            if (['ComplaintDate', 'IncomingDate', 'InspectionDate', 'ReplyDate'].includes(key)) type = sql.DateTime
+            
+            // Handle null/undefined
+            let val = record[key]
+            if (val === undefined) val = null
+            
+            request.input(key, type, val)
+        })
+        
+        request.input('Status', sql.Int, 1)
+        
+        if (existingId) {
+            // 更新现有记录
+            request.input('ID', sql.Int, existingId)
+            request.input('UpdatedAt', sql.DateTime, new Date())
+            // 默认 UpdatedBy 为系统或管理员 (假设ID 1)
+            request.input('UpdatedBy', sql.Int, 1)
+
+            const setClause = keys.map(k => `${k} = @${k}`).join(', ')
+            await request.query(`UPDATE SupplierComplaints SET ${setClause}, Status = @Status, UpdatedAt = @UpdatedAt, UpdatedBy = @UpdatedBy WHERE ID = @ID`)
+        } else {
+            // 插入新记录
+            request.input('CreatedAt', sql.DateTime, new Date())
+            // 默认 CreatedBy 为系统或管理员 (假设ID 1)
+            request.input('CreatedBy', sql.Int, 1) 
+            
+            const cols = [...keys, 'Status', 'CreatedAt', 'CreatedBy'].join(',')
+            const params = [...keys.map(k => '@'+k), '@Status', '@CreatedAt', '@CreatedBy'].join(',')
+            
+            await request.query(`INSERT INTO SupplierComplaints (${cols}) VALUES (${params})`)
+        }
+        
+        successCount++
+        
+      } catch (err) {
+        errorCount++
+        errors.push(`第 ${i + 2} 行: ${err.message}`) // i从0开始，第1行是表头，所以数据行是i+2
+      }
+    }
+
+    fs.unlinkSync(req.file.path)
+    
+    res.json({
+      success: true,
+      data: {
+        successCount,
+        errorCount,
+        errors
+      }
+    })
+
+  } catch (error) {
+    console.error('导入失败:', error)
+    if (req.file && fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path)
+    res.status(500).json({ success: false, message: '导入失败: ' + error.message })
   }
 })
 

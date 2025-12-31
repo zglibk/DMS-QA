@@ -106,7 +106,7 @@ class ErpService {
             // 通过API获取ERP配置失败，使用环境变量配置
             
             // 使用环境变量配置作为备选
-            this.baseUrl = process.env.ERP_BASE_URL || 'http://http://192.168.1.168:99';
+            this.baseUrl = process.env.ERP_BASE_URL || 'http://192.168.1.168:99';
             this.appId = process.env.ERP_APP_ID || 'default_app_id';
             this.appSecret = process.env.ERP_APP_SECRET || 'default_app_secret';
             this.configLoaded = true;
@@ -821,6 +821,32 @@ class ErpService {
             }
             
             const result = await this.makeRequest('/api/stock/bilOfInM/getList', 'GET', null, params);
+            return result;
+        } catch (error) {
+            console.error('获取物料入库明细列表失败:', error.message);
+            throw error;
+        }
+    }
+
+    /**
+     * 查询物料入库明细列表 (新版接口)
+     * 根据接口文档: /api/InStock/GetInStockList
+     * @param {Object} filters - 过滤条件
+     * @param {string} filters.StartDate - 开始时间 (yyyy-MM-dd HH:mm:ss)
+     * @param {string} filters.EndDate - 结束时间 (yyyy-MM-dd HH:mm:ss)
+     * @returns {Promise<Array>} 物料入库明细数据
+     */
+    async getInStockList(filters = {}) {
+        try {
+            const params = {};
+            if (filters.StartDate) {
+                params.StartDate = filters.StartDate;
+            }
+            if (filters.EndDate) {
+                params.EndDate = filters.EndDate;
+            }
+            
+            const result = await this.makeRequest('/api/InStock/GetInStockList', 'GET', null, params);
             return result;
         } catch (error) {
             console.error('获取物料入库明细列表失败:', error.message);

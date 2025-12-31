@@ -330,6 +330,32 @@ export const breadcrumbConfig = {
     icon: 'mdi:chart-pie'
   },
 
+  // =====================================================
+  // 人员资质管理 v2.0
+  // =====================================================
+  '/admin/quality/qualification': {
+    title: '人员资质管理',
+    icon: 'mdi:account-box-multiple'
+  },
+  '/admin/quality/qualification/personnel': {
+    title: '资质人员',
+    icon: 'mdi:account-box'
+  },
+  '/admin/quality/qualification/fm100': {
+    title: 'FM100色觉测试',
+    icon: 'mdi:eye-check'
+  },
+  '/admin/quality/qualification/types': {
+    title: '资质类型配置',
+    icon: 'mdi:cog'
+  },
+  // 兼容旧路径
+  '/admin/quality/qualification/color-test': {
+    title: 'FM100色觉测试',
+    icon: 'mdi:eye'
+  },
+  // =====================================================
+
   // 材料管理
   '/admin/material': {
     title: '材料管理',
@@ -591,6 +617,28 @@ export const breadcrumbConfig = {
   },
 
   // 检验报告
+  '/admin/inspection': {
+    title: '检验报告',
+    icon: 'mdi:file-document-outline'
+  },
+  '/admin/inspection/incoming': {
+    title: '来料检验报告',
+    icon: 'mdi:truck-delivery'
+  },
+  '/admin/inspection/performance': {
+    title: '性能实验报告',
+    icon: 'mdi:flask'
+  },
+  '/admin/inspection/items': {
+    title: '检验项目管理',
+    icon: 'mdi:format-list-checks'
+  },
+  '/admin/inspection/category-config': {
+    title: '物料分类配置',
+    icon: 'mdi:cog'
+  },
+
+  // 出货报告模块
   '/admin/shipment-report': {
     title: '出货检验报告',
     icon: 'DocumentChecked'
@@ -720,6 +768,16 @@ function generateDefaultTitle(segment) {
     'position': '岗位',
     'rework': '返工管理',
     'dept': '部门管理',
+    // 质量管理相关
+    'qualification': '人员资质管理',
+    'personnel': '资质人员',
+    'fm100': 'FM100色觉测试',
+    'types': '资质类型配置',
+    'color-test': '色觉测试',
+    'targets': '目标管理',
+    'assessment': '考核记录管理',
+    'defective-management': '不良类别管理',
+    'publishing-exceptions': '出版异常',
     // 工作计划相关映射
     'work-plan': '工作计划',
     'work': '工作',

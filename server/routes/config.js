@@ -774,9 +774,8 @@ router.post('/test-connection', async (req, res) => {
 
 // 获取主页卡片配置
 router.get('/home-cards', async (req, res) => {
-  let connection;
   try {
-    connection = await getConnection();
+    const connection = await getConnection();
 
     // 检查表是否存在
     const tableCheckResult = await connection.request()
@@ -857,20 +856,15 @@ router.get('/home-cards', async (req, res) => {
       success: false,
       message: '获取配置失败: ' + error.message
     });
-  } finally {
-    if (connection) {
-      connection.close();
-    }
   }
 });
 
 // 保存主页卡片配置
 router.put('/home-cards', async (req, res) => {
-  let connection;
   try {
     const { showTodayCount, showMonthCount, displayUnits, setAsDefault } = req.body;
 
-    connection = await getConnection();
+    const connection = await getConnection();
 
     // 检查表是否存在
     const tableCheckResult = await connection.request()
@@ -974,10 +968,6 @@ router.put('/home-cards', async (req, res) => {
       success: false,
       message: '保存配置失败: ' + error.message
     });
-  } finally {
-    if (connection) {
-      connection.close();
-    }
   }
 });
 
@@ -1131,9 +1121,9 @@ router.put('/site-config', async (req, res) => {
               return await pool.request()
                 .input('ConfigKey', sql.NVarChar, item.key)
                 .input('ConfigValue', sql.NVarChar, item.value)
-                .input('ConfigType', sql.NVarChar, item.key.includes('Url') ? 'image' : 'text')
+                .input('ConfigType', sql.NVarChar, (item.key.includes('Url') || item.key.includes('Img')) ? 'image' : 'text')
                 .input('Description', sql.NVarChar, description[item.key] || '网站配置项')
-                .query('INSERT INTO SiteConfig (ConfigKey, ConfigValue, ConfigType, Description) VALUES (@ConfigKey, @ConfigValue, @ConfigType, @Description)');
+                .query('INSERT INTO SiteConfig (ConfigKey, ConfigValue, ConfigType, Description, IsActive, CreatedAt, UpdatedAt) VALUES (@ConfigKey, @ConfigValue, @ConfigType, @Description, 1, GETDATE(), GETDATE())');
             });
             console.log(`插入配置项: ${item.key} = ${item.value.length > 100 ? item.value.substring(0, 100) + '...' : item.value}`);
           }

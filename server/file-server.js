@@ -75,7 +75,8 @@ function initializeUploadDirectories() {
     path.join(FILE_STORAGE_PATH, 'customer-complaint'),
     path.join(FILE_STORAGE_PATH, 'notice-images'),
     path.join(FILE_STORAGE_PATH, 'rework-attachments'),
-    path.join(FILE_STORAGE_PATH, 'complaints')
+    path.join(FILE_STORAGE_PATH, 'complaints'),
+    path.join(FILE_STORAGE_PATH, 'qualification')
   ];
 
   directories.forEach(ensureDirectoryExists);
@@ -111,7 +112,8 @@ fileApp.get('/', (req, res) => {
       '/files/customer-complaint/ - 客户投诉文件',
       '/files/notice-images/ - 通知图片',
       '/files/rework-attachments/ - 返工附件',
-      '/files/complaints/ - 投诉文件'
+      '/files/complaints/ - 投诉文件',
+      '/files/qualification/ - 资质管理文件'
     ]
   });
 });

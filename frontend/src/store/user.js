@@ -53,6 +53,10 @@ const defaultUser = {
   PositionID: null, // 兼容后端字段
   positionName: '',
   PositionName: '', // 兼容后端字段
+  positionLevel: null,
+  PositionLevel: null, // 兼容后端字段
+  positionParentId: null,
+  PositionParentID: null, // 兼容后端字段
   CreatedAt: null, // 后端字段
   // 角色信息（支持多角色）
   roles: [],
@@ -194,6 +198,10 @@ export const useUserStore = defineStore('user', {
               PositionID: state.user.PositionID,
               positionName: state.user.positionName,
               PositionName: state.user.PositionName,
+              positionLevel: state.user.positionLevel,
+              PositionLevel: state.user.PositionLevel,
+              positionParentId: state.user.positionParentId,
+              PositionParentID: state.user.PositionParentID,
               CreatedAt: state.user.CreatedAt,
               roles: state.user.roles || [],
               permissions: state.user.permissions || { menus: [], departments: [], actions: [] }
@@ -367,7 +375,12 @@ export const useUserStore = defineStore('user', {
     // 检查用户是否有特定操作权限（支持用户级权限优先级）
     hasActionPermissionAsync: (state) => async (action) => {
       try {
-        // 如果是管理员，直接返回true
+        // 如果用户名是 admin，直接返回true
+        if (state.user?.username === 'admin' || state.user?.Username === 'admin') {
+          return true
+        }
+
+        // 如果是管理员角色，直接返回true
         if ((state.user?.roles || []).some(role => 
           role.name === 'admin' || role.name === '系统管理员' ||
           role.Name === 'admin' || role.Name === '系统管理员' ||
@@ -414,6 +427,11 @@ export const useUserStore = defineStore('user', {
 
     // 通用权限检查方法
     hasPermission: (state) => (permission) => {
+      // 检查用户名是否为 admin，如果是则拥有所有权限
+      if (state.user?.username === 'admin' || state.user?.Username === 'admin') {
+        return true
+      }
+
       // 检查是否为管理员，管理员拥有所有权限
       // 兼容不同的字段名格式：name/Name, code/Code
       if ((state.user?.roles || []).some(role => 
@@ -427,17 +445,13 @@ export const useUserStore = defineStore('user', {
       // 检查菜单权限中是否包含该权限
       const menus = state.user?.permissions?.menus || []
       return menus.some(menu => {
-        // 检查菜单的Permission字段
+        // 检查菜单的Permission字段 (精确匹配)
         if (menu.Permission === permission) {
           return true
         }
-        // 检查菜单代码是否匹配权限
-        if (menu.MenuCode && permission.includes(menu.MenuCode)) {
-          return true
-        }
-        // 检查路径是否匹配权限
-        if (menu.path && permission.includes(menu.path.replace('/', ''))) {
-          return true
+        // 检查菜单代码 (精确匹配)
+        if (menu.MenuCode === permission) {
+           return true
         }
         return false
       })
@@ -551,6 +565,10 @@ export const useUserStore = defineStore('user', {
             PositionID: userData.PositionID, // 保留原字段以兼容现有代码
             positionName: userData.PositionName,
             PositionName: userData.PositionName, // 保留原字段以兼容现有代码
+            positionLevel: userData.PositionLevel,
+            PositionLevel: userData.PositionLevel, // 保留原字段以兼容现有代码
+            positionParentId: userData.PositionParentID,
+            PositionParentID: userData.PositionParentID, // 保留原字段以兼容现有代码
             CreatedAt: userData.CreatedAt
           }
           

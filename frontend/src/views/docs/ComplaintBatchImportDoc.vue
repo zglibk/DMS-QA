@@ -30,25 +30,30 @@
       </template>
       <ol class="doc-steps">
         <li v-for="(step, idx) in steps2" :key="idx">
-          <div class="step-text">{{ step.text }}</div>
-          <ul v-if="step.subBullets && step.subBullets.length" class="bullet">
-            <li v-for="(b, i) in step.subBullets" :key="i">{{ b }}</li>
-          </ul>
-          <div class="step-actions" v-if="isAdmin">
-            <el-button type="primary" size="small" plain @click="openAddImages(idx)">
-              <el-icon class="mr-4"><Plus /></el-icon>
-              添加图片
-            </el-button>
-          </div>
-          <div class="step-images" v-if="getStepImageList(idx).length">
-            <el-upload
-              :file-list="getStepImageList(idx)"
-              list-type="picture-card"
-              :on-preview="(file) => handlePictureCardPreview(file, idx)"
-              :before-remove="(file) => handleFileRemove(file, idx)"
-              :class="{ 'display-only': !isAdmin }"
-            >
-            </el-upload>
+          <div class="step-content-wrapper">
+            <div class="step-header">
+              <span class="step-label">步骤 {{ idx + 1 }}</span>
+            </div>
+            <div class="step-text">{{ step.text }}</div>
+            <ul v-if="step.subBullets && step.subBullets.length" class="bullet sub-bullet">
+              <li v-for="(b, i) in step.subBullets" :key="i">{{ b }}</li>
+            </ul>
+            <div class="step-actions" v-if="isAdmin">
+              <el-button type="primary" size="small" plain @click="openAddImages(idx)">
+                <el-icon class="mr-4"><Plus /></el-icon>
+                添加图片
+              </el-button>
+            </div>
+            <div class="step-images" v-if="getStepImageList(idx).length">
+              <el-upload
+                :file-list="getStepImageList(idx)"
+                list-type="picture-card"
+                :on-preview="(file) => handlePictureCardPreview(file, idx)"
+                :before-remove="(file) => handleFileRemove(file, idx)"
+                :class="{ 'display-only': !isAdmin }"
+              >
+              </el-upload>
+            </div>
           </div>
         </li>
       </ol>
@@ -508,26 +513,227 @@ async function handleFileRemove(file, stepIdx) {
 </script>
 
 <style scoped>
-/* 列表美化：为此页面的要点与步骤统一样式（如果存在） */
-.doc-steps { list-style: none; padding-left: 0; counter-reset: step; }
-.doc-steps li { position: relative; padding-left: 42px; margin: 8px 0; line-height: 1.7; background: #f9fbff; border: 1px solid #eef3ff; border-radius: 8px; padding: 10px 12px 10px 42px; }
-.doc-steps li::before { counter-increment: step; content: counter(step); position: absolute; left: 12px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; border-radius: 50%; background: #409EFF; color: #fff; font-weight: 600; display: flex; align-items: center; justify-content: center; font-size: 13px; box-shadow: 0 2px 4px rgba(64,158,255,.3); }
+/* ============================================
+   时间线步骤样式
+   ============================================ */
+.doc-steps {
+  list-style: none;
+  padding-left: 0;
+  counter-reset: step;
+  margin: 0;
+  position: relative;
+}
 
+/* 时间线主轴 */
+.doc-steps::before {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 28px;
+  bottom: 28px;
+  width: 2px;
+  background: linear-gradient(180deg, 
+    #409eff 0%, 
+    #79bbff 25%, 
+    #a0cfff 50%, 
+    #79bbff 75%, 
+    #409eff 100%
+  );
+  border-radius: 1px;
+  box-shadow: 0 0 6px rgba(64, 158, 255, 0.2);
+}
+
+.doc-steps li {
+  position: relative;
+  padding: 0 0 0 44px;
+  margin: 0 0 20px 0;
+  line-height: 1.7;
+  transition: all 0.3s ease;
+}
+
+.doc-steps li:last-child {
+  margin-bottom: 0;
+}
+
+/* 时间线节点 - 步骤数字圆圈 */
+.doc-steps li::before {
+  counter-increment: step;
+  content: counter(step);
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: linear-gradient(145deg, #409eff 0%, #66b1ff 50%, #409eff 100%);
+  color: #fff;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  box-shadow: 
+    0 3px 10px rgba(64, 158, 255, 0.35),
+    inset 0 1px 3px rgba(255, 255, 255, 0.3);
+  z-index: 2;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 2px solid #fff;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.15);
+}
+
+/* 时间线节点外圈 */
+.doc-steps li::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  top: -2px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid rgba(64, 158, 255, 0.2);
+  z-index: 1;
+  opacity: 0;
+  transition: all 0.3s ease;
+}
+
+/* 步骤内容卡片 */
+.doc-steps li .step-content-wrapper {
+  background: #fff;
+  border: 1px solid #e8f0f8;
+  border-radius: 10px;
+  padding: 14px 16px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+/* 卡片左侧指向时间线的小三角 */
+.doc-steps li .step-content-wrapper::before {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: 8px;
+  width: 0;
+  height: 0;
+  border-top: 7px solid transparent;
+  border-bottom: 7px solid transparent;
+  border-right: 7px solid #e8f0f8;
+}
+
+.doc-steps li .step-content-wrapper::after {
+  content: '';
+  position: absolute;
+  left: -5px;
+  top: 9px;
+  width: 0;
+  height: 0;
+  border-top: 6px solid transparent;
+  border-bottom: 6px solid transparent;
+  border-right: 6px solid #fff;
+}
+
+/* 悬停效果 */
+.doc-steps li:hover::before {
+  transform: scale(1.1);
+  box-shadow: 
+    0 4px 14px rgba(64, 158, 255, 0.45),
+    inset 0 1px 3px rgba(255, 255, 255, 0.4);
+}
+
+.doc-steps li:hover::after {
+  opacity: 1;
+}
+
+.doc-steps li:hover .step-content-wrapper {
+  border-color: var(--el-color-primary);
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.12);
+  transform: translateX(3px);
+}
+
+/* 步骤标题 */
+.step-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.step-header .step-label {
+  background: linear-gradient(135deg, #e8f4ff 0%, #f0f7ff 100%);
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 11px;
+  color: #409eff;
+  font-weight: 600;
+}
+
+/* 步骤内容 */
+.step-text {
+  font-size: 14px;
+  color: #4a5568;
+  line-height: 1.7;
+}
+
+.step-actions {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #e8f0f8;
+}
+
+.step-images {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #e8f0f8;
+}
+
+/* 隐藏步骤图片区域的上传按钮（纯展示模式） */
+.step-images .el-upload--picture-card {
+  display: none;
+}
+
+/* ============================================
+   子列表样式（在步骤卡片内）
+   ============================================ */
+.sub-bullet {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed #e8f0f8;
+}
+
+.sub-bullet li {
+  background: #f8fafc !important;
+  border-color: #eef2f7 !important;
+  padding: 6px 8px 6px 20px !important;
+  margin: 4px 0 !important;
+  font-size: 13px;
+}
+
+.sub-bullet li::before {
+  width: 6px !important;
+  height: 6px !important;
+  left: 8px !important;
+  background: #79bbff !important;
+}
+
+/* ============================================
+   原有样式保留
+   ============================================ */
 .bullet { list-style: none; padding-left: 0; }
 .bullet li { position: relative; padding-left: 22px; margin: 6px 0; line-height: 1.7; background: #fafafa; border: 1px solid #f0f0f0; border-radius: 8px; padding: 8px 10px 8px 22px; color: #333; }
 .bullet li::before { content: ""; position: absolute; left: 10px; top: 50%; transform: translateY(-50%); width: 8px; height: 8px; border-radius: 50%; background: #a0c4ff; box-shadow: 0 2px 4px rgba(160,196,255,.4); }
-/* 基础主题与卡片风格：与"内部投诉操作指南"保持一致 */
+.bullet li:hover { border-color: #dbe7ff; background: #f5f9ff; }
+
+/* 基础主题与卡片风格 */
 .doc-theme { max-width: 1000px; margin: 0 auto; }
-.doc-header h1 { display: flex; align-items: center; gap: 8px; }
+.doc-header h1 { display: flex; align-items: center; gap: 8px; color: #303133; }
+.doc-header h1 :deep(.el-icon) { color: #409EFF; }
 .fancy { border-radius: 10px; box-shadow: 0 6px 20px rgba(0,0,0,0.06); }
-.card-header .hd { margin-right: 6px; }
+.card-header { color: #303133; }
+.card-header .hd { margin-right: 6px; color: #409EFF; }
 .doc-section { margin: 8px 0; }
-/* 列表美化补充：交互悬停效果与内部投诉页保持一致 */
-.doc-steps li:hover, .bullet li:hover { border-color: #dbe7ff; background: #f5f9ff; }
-/* 步骤内操作与图片区域样式（与内部投诉说明页保持一致） */
-.step-text { font-size: 14px; color: #333; }
-.step-actions { margin-top: 8px; }
-.step-images { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 8px; }
 
 /* 添加步骤图片弹窗样式 */
 .add-dialog-body { display: flex; flex-direction: column; gap: 12px; }
@@ -535,14 +741,7 @@ async function handleFileRemove(file, stepIdx) {
 .choose-tip { margin-left: 15px; color: #999; font-size: 13px; }
 .selected-previews { display: flex; flex-wrap: wrap; gap: 8px; }
 .preview-item { width: 120px; height: 90px; border-radius: 6px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); }
-/* 头部标题与图标颜色：强化主标题辨识度 */
-.doc-header h1 { color: #303133; }
-.doc-header h1 :deep(.el-icon) { color: #409EFF; }
 
-/* 卡片头部标题与图标颜色 */
-.card-header { color: #303133; }
-.card-header .hd { color: #409EFF; }
-
-/* 信息提示颜色微调：与主题色协调 */
+/* 信息提示颜色微调 */
 .tip :deep(.el-alert__title) { color: #606266; }
 </style>

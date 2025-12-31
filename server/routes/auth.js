@@ -227,7 +227,12 @@ router.post('/login', async (req, res) => {
     // 先查询用户信息，以便在所有失败情况下都能记录UserID
     const result = await pool.request()
       .input('Username', sql.NVarChar, username)
-      .query('SELECT * FROM [User] WHERE Username = @Username');
+      .query(`
+        SELECT u.*, p.PositionName, p.Level as PositionLevel, p.ParentID as PositionParentID 
+        FROM [User] u
+        LEFT JOIN Positions p ON u.PositionID = p.ID
+        WHERE u.Username = @Username
+      `);
 
     const user = result.recordset[0];
 
@@ -392,7 +397,12 @@ router.post('/login', async (req, res) => {
     // 重新查询用户信息以获取更新后的LastLoginTime
     const updatedUserResult = await pool.request()
       .input('UserId', sql.Int, user.ID)
-      .query('SELECT * FROM [User] WHERE ID = @UserId');
+      .query(`
+        SELECT u.*, p.PositionName, p.Level as PositionLevel, p.ParentID as PositionParentID 
+        FROM [User] u
+        LEFT JOIN Positions p ON u.PositionID = p.ID
+        WHERE u.ID = @UserId
+      `);
     
     const updatedUser = updatedUserResult.recordset[0];
 
@@ -528,6 +538,10 @@ router.post('/login', async (req, res) => {
         id: updatedUser.ID,
         username: updatedUser.Username,
         realName: updatedUser.RealName,
+        departmentId: updatedUser.DepartmentID,
+        positionId: updatedUser.PositionID,
+        positionLevel: updatedUser.PositionLevel,
+        positionParentId: updatedUser.PositionParentID,
         lastLoginTime: updatedUser.LastLoginTime ? updatedUser.LastLoginTime.toISOString() : null
       }
     };
@@ -666,6 +680,8 @@ router.get('/profile', authenticateToken, async (req, res) => {
           d.Name as DepartmentName,
           u.PositionID,
           p.PositionName,
+          p.Level as PositionLevel,
+          p.ParentID as PositionParentID,
           u.CreatedAt
         FROM [User] u
         LEFT JOIN [Department] d ON u.DepartmentID = d.ID
@@ -744,6 +760,8 @@ router.post('/profile', authenticateToken, async (req, res) => {
           d.Name as DepartmentName,
           u.PositionID,
           p.PositionName,
+          p.Level as PositionLevel,
+          p.ParentID as PositionParentID,
           u.CreatedAt
         FROM [User] u
         LEFT JOIN [Department] d ON u.DepartmentID = d.ID
@@ -940,10 +958,15 @@ router.post('/user-status', authenticateToken, async (req, res) => {
 // 参数: Username, Password, Role, Department, RealName, Avatar, Email, Phone, PositionID, DepartmentID, Gender, Birthday, Address, Remark
 router.post('/add-user', authenticateToken, async (req, res) => {
   try {
-    const { checkUserPermission } = require('../middleware/auth');
-    const hasPermission = await checkUserPermission(req.user.id, 'sys:user:add');
-    if (!hasPermission) {
-      return res.status(403).json({ success: false, message: '权限不足，无法添加用户' });
+    // 管理员拥有所有权限，直接跳过检查
+    if (req.user.username === 'admin' || req.user.role === 'admin' || req.user.roleCode === 'admin') {
+      // pass
+    } else {
+      const { checkUserPermission } = require('../middleware/auth');
+      const hasPermission = await checkUserPermission(req.user.id, 'sys:user:add');
+      if (!hasPermission) {
+        return res.status(403).json({ success: false, message: '权限不足，无法添加用户' });
+      }
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: '权限检查失败' });
@@ -1024,10 +1047,15 @@ router.post('/add-user', authenticateToken, async (req, res) => {
 // 更新用户信息（管理员功能）
 router.put('/update-user', authenticateToken, async (req, res) => {
   try {
-    const { checkUserPermission } = require('../middleware/auth');
-    const hasPermission = await checkUserPermission(req.user.id, 'sys:user:edit');
-    if (!hasPermission) {
-      return res.status(403).json({ success: false, message: '权限不足，无法编辑用户' });
+    // 管理员拥有所有权限，直接跳过检查
+    if (req.user.username === 'admin' || req.user.role === 'admin' || req.user.roleCode === 'admin') {
+      // pass
+    } else {
+      const { checkUserPermission } = require('../middleware/auth');
+      const hasPermission = await checkUserPermission(req.user.id, 'sys:user:edit');
+      if (!hasPermission) {
+        return res.status(403).json({ success: false, message: '权限不足，无法编辑用户' });
+      }
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: '权限检查失败' });
@@ -1181,21 +1209,25 @@ router.post('/refresh-permissions', authenticateToken, async (req, res) => {
     
     // 检查权限：只有管理员可以刷新其他用户的权限，普通用户只能刷新自己的权限
     if (userId && userId !== req.user.id) {
-      // 检查当前用户是否有管理员权限
-      const adminCheckResult = await pool.request()
-        .input('UserId', sql.Int, req.user.id)
-        .query(`
-          SELECT COUNT(*) as count
-          FROM [UserRoles] ur
-          INNER JOIN [Roles] r ON ur.RoleID = r.ID
-          WHERE ur.UserID = @UserId AND r.RoleCode = 'admin' AND r.Status = 1
-        `);
-      
-      if (adminCheckResult.recordset[0].count === 0) {
-        return res.status(403).json({ 
-          success: false, 
-          message: '权限不足，只能刷新自己的权限' 
-        });
+      // 检查当前用户是否有管理员权限（优先检查用户名/角色信息）
+      if (req.user.username === 'admin' || req.user.role === 'admin' || req.user.roleCode === 'admin') {
+        // 管理员直接通过
+      } else {
+        const adminCheckResult = await pool.request()
+          .input('UserId', sql.Int, req.user.id)
+          .query(`
+            SELECT COUNT(*) as count
+            FROM [UserRoles] ur
+            INNER JOIN [Roles] r ON ur.RoleID = r.ID
+            WHERE ur.UserID = @UserId AND r.RoleCode = 'admin' AND r.Status = 1
+          `);
+        
+        if (adminCheckResult.recordset[0].count === 0) {
+          return res.status(403).json({ 
+            success: false, 
+            message: '权限不足，只能刷新自己的权限' 
+          });
+        }
       }
     }
     
@@ -1278,11 +1310,16 @@ router.post('/refresh-permissions', authenticateToken, async (req, res) => {
 // 管理员重置指定用户的密码
 router.post('/reset-user-password', authenticateToken, async (req, res) => {
   try {
-    const { checkUserPermission } = require('../middleware/auth');
-    // 使用 sys:user:reset-pwd 权限
-    const hasPermission = await checkUserPermission(req.user.id, 'sys:user:reset-pwd');
-    if (!hasPermission) {
-      return res.status(403).json({ success: false, message: '权限不足，无法重置密码' });
+    // 管理员拥有所有权限，直接跳过检查
+    if (req.user.username === 'admin' || req.user.role === 'admin' || req.user.roleCode === 'admin') {
+      // pass
+    } else {
+      const { checkUserPermission } = require('../middleware/auth');
+      // 使用 sys:user:reset-pwd 权限
+      const hasPermission = await checkUserPermission(req.user.id, 'sys:user:reset-pwd');
+      if (!hasPermission) {
+        return res.status(403).json({ success: false, message: '权限不足，无法重置密码' });
+      }
     }
   } catch (error) {
     return res.status(500).json({ success: false, message: '权限检查失败' });
@@ -1366,24 +1403,31 @@ router.post('/user/:userId/assign-roles', authenticateToken, async (req, res) =>
     let pool = await sql.connect(await getDynamicConfig());
     
     // 权限检查：只有管理员或拥有 sys:user:role 权限的用户可以分配角色
-    const checkPermResult = await pool.request()
-      .input('UserId', sql.Int, req.user.id)
-      .input('Permission', sql.NVarChar, 'sys:user:role')
-      .query(`
-        -- 检查是否为管理员
-        SELECT COUNT(*) as count FROM UserRoles ur
-        INNER JOIN Roles r ON ur.RoleID = r.ID
-        WHERE ur.UserID = @UserId AND (r.RoleCode = 'admin' OR r.RoleName = '系统管理员') AND r.Status = 1
+    let hasPermission = false;
+    
+    // 优先检查用户名/角色信息
+    if (req.user.username === 'admin' || req.user.role === 'admin' || req.user.roleCode === 'admin') {
+      hasPermission = true;
+    } else {
+      const checkPermResult = await pool.request()
+        .input('UserId', sql.Int, req.user.id)
+        .input('Permission', sql.NVarChar, 'sys:user:role')
+        .query(`
+          -- 检查是否为管理员
+          SELECT COUNT(*) as count FROM UserRoles ur
+          INNER JOIN Roles r ON ur.RoleID = r.ID
+          WHERE ur.UserID = @UserId AND (r.RoleCode = 'admin' OR r.RoleName = '系统管理员') AND r.Status = 1
+          
+          UNION ALL
+          
+          -- 检查是否有分配角色权限
+          SELECT COUNT(*) as count FROM V_UserCompletePermissions
+          WHERE UserID = @UserId AND Permission = @Permission AND HasPermission = 1
+        `);
         
-        UNION ALL
-        
-        -- 检查是否有分配角色权限
-        SELECT COUNT(*) as count FROM V_UserCompletePermissions
-        WHERE UserID = @UserId AND Permission = @Permission AND HasPermission = 1
-      `);
-      
-    // 检查结果集中是否有大于0的记录
-    const hasPermission = checkPermResult.recordset && checkPermResult.recordset.some(row => row.count > 0);
+      // 检查结果集中是否有大于0的记录
+      hasPermission = checkPermResult.recordset && checkPermResult.recordset.some(row => row.count > 0);
+    }
     
     if (!hasPermission) {
       return res.status(403).json({ success: false, message: '权限不足，无法分配角色' });
@@ -1662,12 +1706,17 @@ router.delete('/user/:userId', authenticateToken, async (req, res) => {
   const { userId } = req.params;
   
   try {
-    const { checkUserPermission } = require('../middleware/auth');
-    
-    // 权限检查
-    const hasPermission = await checkUserPermission(req.user.id, 'sys:user:delete');
-    if (!hasPermission) {
-      return res.status(403).json({ success: false, message: '权限不足，无法删除用户' });
+    // 管理员拥有所有权限，直接跳过检查
+    if (req.user.username === 'admin' || req.user.role === 'admin' || req.user.roleCode === 'admin') {
+      // pass
+    } else {
+      const { checkUserPermission } = require('../middleware/auth');
+      
+      // 权限检查
+      const hasPermission = await checkUserPermission(req.user.id, 'sys:user:delete');
+      if (!hasPermission) {
+        return res.status(403).json({ success: false, message: '权限不足，无法删除用户' });
+      }
     }
     
     let pool = await sql.connect(await getDynamicConfig());

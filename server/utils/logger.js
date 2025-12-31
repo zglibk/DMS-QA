@@ -3,7 +3,7 @@
  * 提供标准化的日志记录功能
  */
 
-const { sql, getDynamicConfig } = require('../db');
+const { sql, getConnection } = require('../db');
 const { v4: uuidv4 } = require('uuid');
 
 /**
@@ -71,6 +71,7 @@ const MODULES = {
   SAMPLE: 'SAMPLE',
   MENU: 'MENU',
   MONTHLY_BATCH_STATS: 'MONTHLY_BATCH_STATS',
+  INCOMING_INSPECTION: 'INCOMING_INSPECTION',
   ERP: 'ERP'
 };
 
@@ -86,10 +87,9 @@ class SystemLogger {
    * 获取数据库连接池
    */
   async getPool() {
-    if (!this.pool) {
-      this.pool = await sql.connect(await getDynamicConfig());
-    }
-    return this.pool;
+    // 始终从db模块获取最新连接，不由logger自行缓存
+    // 避免因连接池重建导致的引用失效问题
+    return await getConnection();
   }
 
   /**
@@ -116,6 +116,13 @@ class SystemLogger {
    */
   async log(logData) {
     try {
+      console.log('SystemLogger.log 被调用:', JSON.stringify({
+        Category: logData.category,
+        Module: logData.module,
+        Action: logData.action,
+        ResourceType: logData.resourceType
+      }));
+
       const pool = await this.getPool();
       
       // 生成TraceID（如果未提供）
@@ -324,7 +331,8 @@ class SystemLogger {
       'ERP': MODULES.ERP,
       'MATERIAL': MODULES.MATERIAL,
       'SAMPLE': MODULES.SAMPLE,
-      'MENU': MODULES.MENU
+      'MENU': MODULES.MENU,
+      'IncomingInspectionReport': MODULES.INCOMING_INSPECTION
     };
     return moduleMap[resourceType] || '';
   }
@@ -333,10 +341,7 @@ class SystemLogger {
    * 关闭数据库连接
    */
   async close() {
-    if (this.pool) {
-      await this.pool.close();
-      this.pool = null;
-    }
+    // Shared pool is managed by db.js
   }
 
   /**

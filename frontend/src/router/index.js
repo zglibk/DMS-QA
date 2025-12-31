@@ -66,18 +66,47 @@ const routes = [
   // 二维码扫描页面
   { path: '/qr-scan', component: () => import('../views/QrScanPage.vue') },
 
-  // 出货报告页面（根级路由）
+  // 前台访问的检验报告路由（复用组件，但不使用AdminLayout）
+  {
+    path: '/inspection',
+    component: () => import('../views/FrontendLayout.vue'),
+    children: [
+      {
+        path: 'incoming',
+        name: 'IncomingInspectionFront',
+        component: () => import('../views/quality/inspection/IncomingInspection.vue'),
+        meta: { title: '来料检验报告', requiresAuth: true }
+      },
+      {
+        path: 'performance',
+        name: 'PerformanceReportFront',
+        component: () => import('../views/quality/inspection/performance/Index.vue'),
+        meta: { title: '性能实验报告', requiresAuth: true }
+      },
+      // 出货报告页面（移动到这里作为前台页面）
+      {
+        path: 'shipment',
+        name: 'ShipmentReportFront',
+        component: () => import('../views/ShipmentReport.vue'),
+        meta: { title: '出货报告', requiresAuth: true }
+      },
+      {
+        path: 'shipment/template-mapping/:id',
+        name: 'TemplateMappingEditorFront',
+        component: () => import('../views/TemplateMappingEditor.vue'),
+        meta: { title: '模板映射编辑', requiresAuth: true }
+      }
+    ]
+  },
+
+  // 兼容旧路由（重定向）
   {
     path: '/shipment-report',
-    name: 'ShipmentReportRoot',
-    component: () => import('../views/ShipmentReport.vue'),
-    meta: { title: '出货报告', requiresAuth: true }
+    redirect: '/inspection/shipment'
   },
   {
     path: '/shipment-report/template-mapping/:id',
-    name: 'TemplateMappingEditorRoot',
-    component: () => import('../views/TemplateMappingEditor.vue'),
-    meta: { title: '模板映射编辑', requiresAuth: true }
+    redirect: to => `/inspection/shipment/template-mapping/${to.params.id}`
   },
 
   // 个人资料页面（懒加载）
@@ -87,7 +116,19 @@ const routes = [
     component: () => import('../views/Profile.vue')
   },
 
-
+  // 检验报告打印预览页面（独立页面）
+  {
+    path: '/print/incoming/:id',
+    name: 'IncomingReportPrintPreview',
+    component: () => import('../views/quality/inspection/IncomingReportPreview.vue'),
+    meta: { title: '来料检验报告打印预览', requiresAuth: true }
+  },
+  {
+    path: '/print/performance/:id',
+    name: 'PerformanceReportPrintPreview',
+    component: () => import('../views/quality/inspection/performance/ReportPrintPage.vue'),
+    meta: { title: '性能实验报告打印预览', requiresAuth: true }
+  },
 
   // 管理后台路由（嵌套路由结构）
   {
@@ -159,6 +200,34 @@ const routes = [
         component: () => import('../views/admin/PersonManagement.vue'), // 人员管理页面
         meta: { requiresAuth: true }
       },
+      
+      // 人员资质管理模块
+      {
+        path: 'quality/qualification',
+        redirect: '/admin/quality/qualification/personnel'
+      },
+      // 人员资质管理模块 v2.0
+      {
+        path: 'quality/qualification/personnel',
+        component: () => import('../views/admin/qualification/PersonnelList.vue'),
+        meta: { title: '资质人员' }
+      },
+      {
+        path: 'quality/qualification/fm100',
+        component: () => import('../views/admin/qualification/FM100TestPage.vue'),
+        meta: { title: 'FM100色觉测试' }
+      },
+      {
+        path: 'quality/qualification/types',
+        component: () => import('../views/admin/qualification/QualificationTypes.vue'),
+        meta: { title: '资质类型配置' }
+      },
+      // 兼容旧路径
+      {
+        path: 'quality/qualification/color-test',
+        redirect: '/admin/quality/qualification/fm100'
+      },
+      
       {
         path: 'quality/data-management',
         component: () => import('../views/admin/DataManagement.vue'), // 质量异常数据导入页面
@@ -480,18 +549,73 @@ const routes = [
         meta: { requiresAuth: true }
       },
 
-      // 出货报告模块
+      // 兼容旧管理后台路由
       {
         path: 'shipment-report',
-        name: 'ShipmentReport',
-        component: () => import('../views/ShipmentReport.vue'),
-        meta: { title: '出货报告', requiresAuth: true }
+        redirect: '/admin/inspection/shipment'
       },
+
+      // 检验报告模块
       {
-        path: 'shipment-report/template-mapping/:id',
-        name: 'TemplateMappingEditor',
-        component: () => import('../views/TemplateMappingEditor.vue'),
-        meta: { title: '模板映射编辑', requiresAuth: true }
+        path: 'inspection',
+        component: () => import('../views/admin/ParentRoute.vue'),
+        meta: { title: '检验报告', requiresAuth: true },
+        redirect: '/admin/inspection/incoming',
+        children: [
+          {
+            path: 'dashboard', // 工作台
+            component: () => import('../views/admin/inspection/Dashboard.vue'), 
+            meta: { title: '工作台', requiresAuth: true }
+          },
+          {
+            path: 'incoming',
+            component: () => import('../views/quality/inspection/IncomingInspection.vue'),
+            meta: { title: '来料检验报告', requiresAuth: true }
+          },
+          {
+            path: 'performance',
+            name: 'PerformanceReportIndex',
+            component: () => import('../views/quality/inspection/performance/Index.vue'),
+            meta: { title: '性能实验报告', requiresAuth: true }
+          },
+          {
+            path: 'shipment',
+            name: 'ShipmentReport',
+            component: () => import('../views/ShipmentReport.vue'),
+            meta: { title: '出货检验报告', requiresAuth: true }
+          },
+          // Hidden detail routes
+          {
+            path: 'incoming/create',
+            component: () => import('../views/quality/inspection/IncomingInspectionForm.vue'),
+            meta: { title: '新增来料检验报告', requiresAuth: true, activeMenu: '/admin/inspection/incoming' },
+            hidden: true
+          },
+          {
+            path: 'incoming/edit/:id',
+            component: () => import('../views/quality/inspection/IncomingInspectionForm.vue'),
+            meta: { title: '编辑来料检验报告', requiresAuth: true, activeMenu: '/admin/inspection/incoming' },
+            hidden: true
+          },
+          {
+            path: 'items',
+            component: () => import('../views/quality/inspection/InspectionItemConfig.vue'),
+            meta: { title: '检验项目管理', requiresAuth: true }
+          },
+          {
+            path: 'category-config',
+            name: 'MaterialCategoryConfig',
+            component: () => import('../views/quality/inspection/MaterialCategoryConfig.vue'),
+            meta: { title: '物料分类映射配置', requiresAuth: true }
+          },
+          {
+            path: 'shipment/template-mapping/:id',
+            name: 'TemplateMappingEditor',
+            component: () => import('../views/TemplateMappingEditor.vue'),
+            meta: { title: '模板映射编辑', requiresAuth: true, activeMenu: '/admin/inspection/shipment' },
+            hidden: true
+          }
+        ]
       },
     ]
   }

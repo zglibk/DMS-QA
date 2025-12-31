@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue'
 import { resolve } from 'path'
 
 // https://vitejs.dev/config/
+// Trigger reload
 export default defineConfig({
   plugins: [vue()],
   resolve: {

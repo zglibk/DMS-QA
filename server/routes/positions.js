@@ -73,6 +73,8 @@ router.get('/', async (req, res) => {
             p.PositionCode as Code,
             p.DepartmentID,
             d.Name as DepartmentName,
+            p.ParentID,
+            pp.PositionName as ParentName,
             p.Level,
             p.Description,
             p.Requirements,
@@ -82,6 +84,7 @@ router.get('/', async (req, res) => {
             p.UpdatedAt
           FROM Positions p
           LEFT JOIN Department d ON p.DepartmentID = d.ID
+          LEFT JOIN Positions pp ON p.ParentID = pp.ID
           WHERE ${whereClause}
         ) AS T
         WHERE T.RowNum BETWEEN @offset + 1 AND @offset + @size
@@ -138,6 +141,8 @@ router.get('/:id', async (req, res) => {
           p.PositionCode as Code,
           p.DepartmentID,
           d.Name as DepartmentName,
+          p.ParentID,
+          pp.PositionName as ParentName,
           p.Level,
           p.Description,
           p.Requirements,
@@ -147,6 +152,7 @@ router.get('/:id', async (req, res) => {
           p.UpdatedAt
         FROM Positions p
         LEFT JOIN Department d ON p.DepartmentID = d.ID
+        LEFT JOIN Positions pp ON p.ParentID = pp.ID
         WHERE p.ID = @id
       `)
     
@@ -178,6 +184,7 @@ router.post('/', async (req, res) => {
       Name,
       Code,
       DepartmentID,
+      ParentID,
       Level,
       Description,
       Requirements,
@@ -218,12 +225,24 @@ router.post('/', async (req, res) => {
         message: '所属部门不存在'
       })
     }
+
+    // 检查上级岗位是否存在（如果有）
+    if (ParentID) {
+        const parentCheck = await pool.request()
+            .input('parentId', sql.Int, ParentID)
+            .query('SELECT COUNT(*) as count FROM Positions WHERE ID = @parentId');
+        
+        if (parentCheck.recordset[0].count === 0) {
+            return res.status(400).json({ success: false, message: '上级岗位不存在' });
+        }
+    }
     
     // 插入新岗位
     const result = await pool.request()
       .input('name', sql.NVarChar(50), Name)
       .input('code', sql.NVarChar(20), Code)
       .input('departmentId', sql.Int, DepartmentID)
+      .input('parentId', sql.Int, ParentID || null)
       .input('level', sql.Int, Level)
       .input('description', sql.NVarChar(500), Description)
       .input('requirements', sql.NVarChar(1000), Requirements)
@@ -231,12 +250,12 @@ router.post('/', async (req, res) => {
       .input('status', sql.Bit, Status)
       .query(`
         INSERT INTO Positions (
-          PositionName, PositionCode, DepartmentID, Level, Description, Requirements,
+          PositionName, PositionCode, DepartmentID, ParentID, Level, Description, Requirements,
           SortOrder, Status, CreatedAt, UpdatedAt
         ) 
         OUTPUT INSERTED.ID
         VALUES (
-          @name, @code, @departmentId, @level, @description, @requirements,
+          @name, @code, @departmentId, @parentId, @level, @description, @requirements,
           @sortOrder, @status, GETDATE(), GETDATE()
         )
       `)
@@ -264,6 +283,7 @@ router.put('/:id', async (req, res) => {
       Name,
       Code,
       DepartmentID,
+      ParentID,
       Level,
       Description,
       Requirements,
@@ -277,6 +297,10 @@ router.put('/:id', async (req, res) => {
         success: false,
         message: '岗位名称、岗位编码和所属部门为必填项'
       })
+    }
+    
+    if (ParentID && parseInt(ParentID) === parseInt(id)) {
+        return res.status(400).json({ success: false, message: '上级岗位不能是自己' });
     }
 
     const pool = await getConnection()
@@ -317,6 +341,17 @@ router.put('/:id', async (req, res) => {
         message: '所属部门不存在'
       })
     }
+
+    // 检查上级岗位是否存在（如果有）
+    if (ParentID) {
+        const parentCheck = await pool.request()
+            .input('parentId', sql.Int, ParentID)
+            .query('SELECT COUNT(*) as count FROM Positions WHERE ID = @parentId');
+        
+        if (parentCheck.recordset[0].count === 0) {
+            return res.status(400).json({ success: false, message: '上级岗位不存在' });
+        }
+    }
     
     // 更新岗位
     await pool.request()
@@ -324,6 +359,7 @@ router.put('/:id', async (req, res) => {
       .input('name', sql.NVarChar(50), Name)
       .input('code', sql.NVarChar(20), Code)
       .input('departmentId', sql.Int, DepartmentID)
+      .input('parentId', sql.Int, ParentID || null)
       .input('level', sql.Int, Level)
       .input('description', sql.NVarChar(500), Description)
       .input('requirements', sql.NVarChar(1000), Requirements)
@@ -334,6 +370,7 @@ router.put('/:id', async (req, res) => {
           PositionName = @name,
           PositionCode = @code,
           DepartmentID = @departmentId,
+          ParentID = @parentId,
           Level = @level,
           Description = @description,
           Requirements = @requirements,

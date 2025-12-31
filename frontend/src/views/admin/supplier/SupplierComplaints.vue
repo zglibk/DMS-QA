@@ -12,13 +12,12 @@
     <!-- 搜索和操作区域 -->
     <div class="search-section">
       <el-card shadow="never" class="search-card">
-        <el-form :model="searchForm" inline class="search-form">
+        <el-form :model="searchForm" class="search-form">
           <el-form-item label="投诉编号">
             <el-input 
               v-model="searchForm.complaintNo" 
               placeholder="请输入投诉编号" 
               clearable
-              style="width: 200px"
             />
           </el-form-item>
           <el-form-item label="供应商名称">
@@ -26,7 +25,6 @@
               v-model="searchForm.supplierName" 
               placeholder="请输入供应商名称" 
               clearable
-              style="width: 200px"
             />
           </el-form-item>
           <el-form-item label="投诉类型">
@@ -34,7 +32,6 @@
               v-model="searchForm.complaintType" 
               placeholder="请选择投诉类型" 
               clearable
-              style="width: 150px"
             >
               <el-option label="质量问题" value="质量问题" />
               <el-option label="交货延迟" value="交货延迟" />
@@ -44,12 +41,72 @@
               <el-option label="其他" value="其他" />
             </el-select>
           </el-form-item>
+          <el-form-item label="不良类别">
+            <el-select 
+              v-model="searchForm.defectCategory" 
+              placeholder="请选择不良类别" 
+              clearable
+              filterable
+              allow-create
+              @change="handleCategoryChange"
+            >
+              <el-option 
+                v-for="item in defectCategoryOptions" 
+                :key="item" 
+                :label="item" 
+                :value="item" 
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="不良项">
+            <el-select 
+              v-model="searchForm.defectItem" 
+              placeholder="请选择不良项" 
+              clearable
+              filterable
+              allow-create
+            >
+              <el-option 
+                v-for="item in currentDefectItemOptions" 
+                :key="item" 
+                :label="item" 
+                :value="item" 
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="物料编码">
+            <el-input 
+              v-model="searchForm.materialCode" 
+              placeholder="请输入物料编码" 
+              clearable
+            />
+          </el-form-item>
+          <el-form-item label="采购单号">
+            <el-input 
+              v-model="searchForm.purchaseOrderNo" 
+              placeholder="请输入采购单号" 
+              clearable
+            />
+          </el-form-item>
+          <el-form-item label="客户编号">
+            <el-input 
+              v-model="searchForm.customerCode" 
+              placeholder="请输入客户编号" 
+              clearable
+            />
+          </el-form-item>
+          <el-form-item label="工单号">
+            <el-input 
+              v-model="searchForm.workOrderNo" 
+              placeholder="请输入工单号" 
+              clearable
+            />
+          </el-form-item>
           <el-form-item label="处理状态">
             <el-select 
               v-model="searchForm.processStatus" 
               placeholder="请选择处理状态" 
               clearable
-              style="width: 150px"
             >
               <el-option label="待处理" value="pending" />
               <el-option label="处理中" value="processing" />
@@ -57,7 +114,7 @@
               <el-option label="已关闭" value="closed" />
             </el-select>
           </el-form-item>
-          <el-form-item label="投诉日期">
+          <el-form-item label="投诉日期" class="date-item">
             <el-date-picker
               v-model="searchForm.dateRange"
               type="daterange"
@@ -66,7 +123,6 @@
               end-placeholder="结束日期"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
-              style="width: 240px"
             />
           </el-form-item>
           <el-form-item class="search-btn">
@@ -80,7 +136,7 @@
     <!-- 统计卡片 -->
     <div class="statistics-section" v-if="showStatistics">
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :span="4">
           <el-card class="stat-card pending">
             <div class="stat-content">
               <div class="stat-icon">
@@ -93,7 +149,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4">
           <el-card class="stat-card processing">
             <div class="stat-content">
               <div class="stat-icon">
@@ -106,7 +162,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4">
           <el-card class="stat-card completed">
             <div class="stat-content">
               <div class="stat-icon">
@@ -119,7 +175,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :span="4">
           <el-card class="stat-card total">
             <div class="stat-content">
               <div class="stat-icon">
@@ -132,7 +188,45 @@
             </div>
           </el-card>
         </el-col>
+        <el-col :span="4">
+          <el-card class="stat-card amount clickable" @click="handleAmountFilter('claim')">
+            <div class="stat-content">
+              <div class="stat-icon">
+                <el-icon><Money /></el-icon>
+              </div>
+              <div class="stat-info">
+                <div class="stat-number amount-text">¥{{ formatNumber(statistics.totalClaimAmount) }}</div>
+                <div class="stat-label">质量罚款</div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :span="4">
+          <el-card class="stat-card amount clickable" @click="handleAmountFilter('actual')">
+            <div class="stat-content">
+              <div class="stat-icon">
+                <el-icon><Wallet /></el-icon>
+              </div>
+              <div class="stat-info">
+                <div class="stat-number amount-text">¥{{ formatNumber(statistics.totalActualClaim) }}</div>
+                <div class="stat-label">实际金额</div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
       </el-row>
+    </div>
+
+    <!-- 筛选状态提示 -->
+    <div v-if="activeAmountFilter" class="filter-status-bar" style="margin-bottom: 15px;">
+      <el-alert
+        :title="activeAmountFilter === 'claim' ? '当前已筛选：显示有【质量罚款】的记录' : '当前已筛选：显示有【实际金额】的记录'"
+        type="success"
+        effect="dark"
+        show-icon
+        close-text="清除筛选"
+        @close="clearAmountFilter"
+      />
     </div>
 
     <!-- 数据表格 -->
@@ -140,9 +234,14 @@
       <div class="table-header">
         <div class="action-buttons">
           <el-button type="primary" @click="handleAdd" :icon="Plus">新增投诉</el-button>
+          <el-button type="info" @click="importDialogVisible = true" :icon="Upload">批量导入</el-button>
           <el-button type="success" @click="handleExport" :icon="Download">导出数据</el-button>
           <el-button type="warning" @click="handleGenerateComplaintReport" :icon="Document" :disabled="selectedRows.length === 0 || !canGenerateReport">生成投诉书</el-button>
           <el-button type="danger" @click="handleBatchDelete" :icon="Delete" :disabled="selectedRows.length === 0">批量删除</el-button>
+          <el-button type="danger" plain @click="handlePhysicalDelete" :icon="Delete" v-if="canPhysicalDelete">彻底删除</el-button>
+        </div>
+        <div style="margin-left: auto;">
+          <el-button @click="columnSettingsVisible = true" :icon="Setting">列设置</el-button>
         </div>
       </div>
       <el-table 
@@ -157,50 +256,47 @@
           @selection-change="handleSelectionChange"
         >
           <el-table-column type="selection" width="55" />
-          <el-table-column prop="ComplaintNo" label="投诉编号" width="140" fixed="left">
+          
+          <el-table-column v-for="col in visibleColumns" :key="col.prop" v-bind="col">
             <template #default="{ row }">
-              <el-link type="primary" @click="handleView(row)">{{ row.ComplaintNo }}</el-link>
+              <div v-if="col.prop === 'ComplaintNo'">
+                <el-link type="primary" @click="handleView(row)">{{ row.ComplaintNo }}</el-link>
+              </div>
+              <div v-else-if="col.prop === 'ComplaintDate' || col.prop === 'IncomingDate' || col.prop === 'ReplyDate' || col.prop === 'InspectionDate'">
+                {{ formatDate(row[col.prop]) }}
+              </div>
+              <div v-else-if="col.prop === 'ComplaintType'">
+                <el-tag :type="getComplaintTypeColor(row[col.prop])">{{ row[col.prop] }}</el-tag>
+              </div>
+              <div v-else-if="col.prop === 'UrgencyLevel'">
+                <el-tag :type="getUrgencyColor(row[col.prop])">{{ getUrgencyText(row[col.prop]) }}</el-tag>
+              </div>
+              <div v-else-if="col.prop === 'ProcessStatus'">
+                <el-tag :type="getStatusColor(row[col.prop])">{{ getStatusText(row[col.prop]) }}</el-tag>
+              </div>
+              <div v-else-if="col.prop === 'IQCResult'">
+                <el-tag :type="getIQCResultColor(row[col.prop])">{{ row[col.prop] }}</el-tag>
+              </div>
+              <div v-else-if="col.prop === 'AttachedImages'">
+                 <el-button 
+                   v-if="row.AttachedImages" 
+                   type="primary" 
+                   link 
+                   @click="handleViewTableImage(row)"
+                 >
+                   查看图片
+                 </el-button>
+                 <span v-else>-</span>
+              </div>
+              <div v-else-if="['TotalAmount', 'ClaimAmount', 'ActualClaim', 'ProductQuantity', 'BatchQuantity', 'SampleQuantity', 'Quantity', 'DefectQuantity'].includes(col.prop)">
+                 {{ ['TotalAmount', 'ClaimAmount', 'ActualClaim'].includes(col.prop) ? '¥' : '' }}{{ formatNumber(row[col.prop]) }}
+              </div>
+              <div v-else>
+                {{ row[col.prop] }}
+              </div>
             </template>
           </el-table-column>
-          <el-table-column prop="ComplaintDate" label="投诉日期" width="120">
-            <template #default="{ row }">
-              {{ formatDate(row.ComplaintDate) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="SupplierName" label="供应商名称" width="180" show-overflow-tooltip />
-          <el-table-column prop="MaterialName" label="材料名称" width="150" show-overflow-tooltip />
-          <el-table-column prop="MaterialCode" label="物料编码" width="120" show-overflow-tooltip />
-          <el-table-column prop="MaterialSpecification" label="材料规格" width="120" show-overflow-tooltip />
-          <el-table-column prop="CustomerCode" label="客户编号" width="120" show-overflow-tooltip />
-          <el-table-column prop="ProductCode" label="产品编号" width="120" show-overflow-tooltip />
-          <el-table-column prop="DefectCategory" label="不良类别" width="120" show-overflow-tooltip />
-          <el-table-column prop="ComplaintType" label="投诉类型" width="120">
-            <template #default="{ row }">
-              <el-tag :type="getComplaintTypeColor(row.ComplaintType)">{{ row.ComplaintType }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="UrgencyLevel" label="紧急程度" width="100">
-            <template #default="{ row }">
-              <el-tag :type="getUrgencyColor(row.UrgencyLevel)">{{ getUrgencyText(row.UrgencyLevel) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="Quantity" label="数量" width="100" align="right">
-            <template #default="{ row }">
-              {{ formatNumber(row.Quantity) }}
-            </template>
-          </el-table-column>
-          <el-table-column prop="TotalAmount" label="涉及金额" width="120" align="right">
-            <template #default="{ row }">
-              <span class="amount-text">¥{{ formatNumber(row.TotalAmount) }}</span>
-            </template>
-          </el-table-column>
-          <el-table-column prop="ProcessStatus" label="处理状态" width="100">
-            <template #default="{ row }">
-              <el-tag :type="getStatusColor(row.ProcessStatus)">{{ getStatusText(row.ProcessStatus) }}</el-tag>
-            </template>
-          </el-table-column>
-          <el-table-column prop="InitiatedBy" label="发起人" width="100" />
-          <el-table-column prop="Description" label="问题描述" width="200" show-overflow-tooltip />
+
           <el-table-column label="操作" width="220" fixed="right">
             <template #default="{ row }">
               <div class="action-buttons">
@@ -767,24 +863,6 @@
             placeholder="请评估改善效果"
           />
         </el-form-item>
-        
-        <el-form-item label="期望解决方案">
-          <el-input 
-            v-model="formData.ExpectedSolution" 
-            type="textarea" 
-            :rows="3" 
-            placeholder="请描述期望的解决方案"
-          />
-        </el-form-item>
-        
-        <el-form-item label="期望解决方案">
-          <el-input 
-            v-model="formData.ExpectedSolution" 
-            type="textarea" 
-            :rows="3" 
-            placeholder="请描述期望的解决方案"
-          />
-        </el-form-item>
        
         <!-- 处理结果相关字段 -->
         <div v-if="formData.ProcessStatus !== 'pending'" class="process-section">
@@ -1215,6 +1293,71 @@
 
     <!-- 图片预览组件 - 使用封装的ImgPreview组件 -->
     <ImgPreview v-model="imageViewerVisible" :imgs="previewImageUrls" />
+
+    <!-- 导入对话框 -->
+    <el-dialog
+      v-model="importDialogVisible"
+      title="批量导入供应商投诉"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <div class="import-container">
+        <el-upload
+          class="upload-demo"
+          drag
+          action="#"
+          :auto-upload="false"
+          :on-change="handleFileChange"
+          :limit="1"
+          accept=".xlsx,.xls"
+          :show-file-list="true"
+          v-model:file-list="importFileList"
+        >
+          <el-icon class="el-icon--upload"><UploadFilled /></el-icon>
+          <div class="el-upload__text">
+            拖拽文件到此处或 <em>点击上传</em>
+          </div>
+          <template #tip>
+            <div class="el-upload__tip">
+              只能上传 xlsx/xls 文件，且不超过 10MB。
+              支持导入异常图片路径。
+            </div>
+          </template>
+        </el-upload>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="importDialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleImport" :loading="importLoading">
+            开始导入
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+    <!-- 列设置对话框 -->
+    <el-dialog
+      v-model="columnSettingsVisible"
+      title="列设置"
+      width="500px"
+      :close-on-click-modal="false"
+    >
+      <div class="column-settings">
+        <el-scrollbar max-height="400px">
+          <div v-for="(col, index) in columns" :key="col.prop" class="setting-item">
+            <el-checkbox v-model="col.visible">{{ col.label }}</el-checkbox>
+            <div class="sort-buttons">
+              <el-button link size="small" :icon="ArrowUp" @click="moveColumn(index, 'up')" :disabled="index === 0" />
+              <el-button link size="small" :icon="ArrowDown" @click="moveColumn(index, 'down')" :disabled="index === columns.length - 1" />
+            </div>
+          </div>
+        </el-scrollbar>
+      </div>
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="columnSettingsVisible = false">关闭</el-button>
+        </span>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1224,7 +1367,8 @@ import { ElMessage, ElMessageBox, ElLoading } from 'element-plus'
 import {
   Search, Refresh, Plus, Download, DataAnalysis,
   View, Edit, Delete, Warning, Clock, Loading,
-  CircleCheck, Histogram, Document
+  CircleCheck, Histogram, Document, Upload, UploadFilled,
+  Setting, ArrowUp, ArrowDown, Picture
 } from '@element-plus/icons-vue'
 import api from '@/services/api'
 import { useUserStore } from '@/store/user'
@@ -1243,6 +1387,13 @@ const canGenerateReport = computed(() => {
   return hasAdminRole || hasReportPermission
 })
 
+// 物理删除权限检查
+const canPhysicalDelete = computed(() => {
+  const hasAdminRole = userStore.hasRole('admin') || userStore.hasRole('系统管理员')
+  const hasPhysicalDeletePermission = userStore.hasActionPermission('supplier:complaints:physical-delete')
+  return hasAdminRole || hasPhysicalDeletePermission
+})
+
 // 响应式数据
 const loading = ref(false)
 const submitLoading = ref(false)
@@ -1253,6 +1404,85 @@ const showStatistics = ref(true)
 const statistics = ref({})
 const supplierList = ref([])
 const personList = ref([]) // 人员列表
+const defectCategoryOptions = ref([]) // 移除硬编码，完全基于数据库
+const allDefectRelations = ref([]) // 存储所有类别与项的关系
+const currentDefectItemOptions = computed(() => {
+  if (!searchForm.defectCategory) {
+    // 如果没有选择类别，显示所有去重后的非空不良项
+    const allItems = new Set(
+      allDefectRelations.value
+        .map(item => item.DefectItem)
+        .filter(item => item && item.trim() !== '')
+    )
+    return Array.from(allItems).sort()
+  }
+  // 如果选择了类别，过滤出对应的不良项
+  return allDefectRelations.value
+    .filter(item => item.DefectCategory === searchForm.defectCategory && item.DefectItem && item.DefectItem.trim() !== '')
+    .map(item => item.DefectItem)
+    .sort()
+})
+
+// 列设置相关
+const columns = reactive([
+  // 默认显示 (14个字段)
+  { prop: 'ComplaintNo', label: '投诉编号', width: '140', visible: true, fixed: 'left', showOverflowTooltip: true, align: 'center' },
+  { prop: 'ComplaintDate', label: '投诉日期', width: '120', visible: true, sortable: true, showOverflowTooltip: true, align: 'center' },
+  { prop: 'MaterialName', label: '物料名称', width: '150', visible: true, showOverflowTooltip: true, align: 'left' },
+  { prop: 'BatchQuantity', label: '材料数量', width: '100', visible: true, align: 'center', showOverflowTooltip: true },
+  { prop: 'SupplierName', label: '供应商', width: '180', visible: true, showOverflowTooltip: true, align: 'left' },
+  { prop: 'PurchaseOrderNo', label: '采购单号', width: '120', visible: true, showOverflowTooltip: true, align: 'center' },
+  { prop: 'IncomingDate', label: '来料日期', width: '120', visible: true, sortable: true, showOverflowTooltip: true, align: 'center' },
+  { prop: 'ComplaintType', label: '投诉类型', width: '120', visible: true, showOverflowTooltip: true, align: 'center' },
+  { prop: 'DefectCategory', label: '不良类别', width: '120', visible: true, showOverflowTooltip: true, align: 'center' },
+  { prop: 'DefectItem', label: '不良项', width: '120', visible: true, showOverflowTooltip: true, align: 'center' },
+  { prop: 'Description', label: '不合格描述', width: '200', visible: true, showOverflowTooltip: true, align: 'left' },
+  { prop: 'DefectCauseAnalysis', label: '不合格原因分析', width: '200', visible: true, showOverflowTooltip: true, align: 'left' },
+  { prop: 'AttachedImages', label: '异常图片', width: '100', visible: true, align: 'center' },
+  { prop: 'Remarks', label: '备注', width: '150', visible: true, showOverflowTooltip: true, align: 'left' },
+
+  // 默认隐藏
+  { prop: 'MaterialCode', label: '物料编码', width: '120', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'MaterialSpecification', label: '材料规格', width: '120', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'CustomerCode', label: '客户编号', width: '120', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'ProductCode', label: '产品编号', width: '120', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'CPO', label: 'CPO', width: '120', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'ProductQuantity', label: '产品数量', width: '100', visible: false, align: 'center', showOverflowTooltip: true },
+  { prop: 'ProductUnit', label: '产品单位', width: '80', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'DefectQuantity', label: '不合格数', width: '100', visible: false, align: 'center', showOverflowTooltip: true },
+  { prop: 'UrgencyLevel', label: '紧急程度', width: '100', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'Quantity', label: '问题数量', width: '100', visible: false, align: 'center', showOverflowTooltip: true },
+  { prop: 'TotalAmount', label: '涉及金额', width: '120', visible: false, align: 'center', showOverflowTooltip: true },
+  { prop: 'ProcessStatus', label: '处理状态', width: '100', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'InitiatedBy', label: '发起人', width: '100', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'MaterialUnit', label: '材料单位', width: '80', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'InspectionDate', label: '检验日期', width: '120', visible: false, align: 'center', showOverflowTooltip: true },
+  { prop: 'WorkOrderNo', label: '工单号', width: '120', visible: false, align: 'center', showOverflowTooltip: true },
+  { prop: 'SampleQuantity', label: '抽检数量', width: '100', visible: false, align: 'center', showOverflowTooltip: true },
+  { prop: 'FeedbackUnit', label: '反馈单位', width: '120', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'Inspector', label: '检验员', width: '100', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'AbnormalDisposal', label: '异常处置', width: '150', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'ComplaintDocument', label: '投诉书', width: '120', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'ReplyDate', label: '回复日期', width: '120', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'ImprovementEffectEvaluation', label: '改善效果评估', width: '150', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'ClaimAmount', label: '索赔金额', width: '120', visible: false, align: 'center', showOverflowTooltip: true },
+  { prop: 'ActualClaim', label: '实际索赔', width: '120', visible: false, align: 'center', showOverflowTooltip: true },
+  { prop: 'QA', label: 'QA', width: '100', visible: false, showOverflowTooltip: true, align: 'center' }
+])
+
+const visibleColumns = computed(() => columns.filter(c => c.visible))
+
+const moveColumn = (index, direction) => {
+  if (direction === 'up' && index > 0) {
+    const temp = columns[index]
+    columns[index] = columns[index - 1]
+    columns[index - 1] = temp
+  } else if (direction === 'down' && index < columns.length - 1) {
+    const temp = columns[index]
+    columns[index] = columns[index + 1]
+    columns[index + 1] = temp
+  }
+}
 
 // 搜索表单
 const searchForm = reactive({
@@ -1260,7 +1490,14 @@ const searchForm = reactive({
   supplierName: '',
   complaintType: '',
   processStatus: '',
-  dateRange: []
+  dateRange: [],
+  // 新增查询字段
+  materialCode: '',
+  purchaseOrderNo: '',
+  defectCategory: '',
+  defectItem: '',
+  customerCode: '',
+  workOrderNo: ''
 })
 
 // 分页数据
@@ -1363,6 +1600,7 @@ onMounted(async () => {
   loadSuppliers()
   loadPersonList() // 加载人员列表
   loadStatistics()
+  loadDistinctValues() // 加载不重复的不良类别和不良项
   
   // 添加全局粘贴事件监听器，支持Ctrl+V粘贴图片
   document.addEventListener('paste', handleGlobalPaste)
@@ -1437,6 +1675,29 @@ const handleGlobalPaste = (e) => {
 
 // 方法定义
 
+// 金额筛选状态
+const activeAmountFilter = ref('') // '' | 'claim' | 'actual'
+
+// 处理金额筛选点击
+const handleAmountFilter = (type) => {
+  // 如果点击的是当前已激活的筛选，则取消筛选
+  if (activeAmountFilter.value === type) {
+    activeAmountFilter.value = ''
+    ElMessage.info('已取消金额筛选')
+  } else {
+    activeAmountFilter.value = type
+    const filterName = type === 'claim' ? '质量罚款' : '实际金额'
+    ElMessage.success(`已筛选：有${filterName}的记录`)
+  }
+  handleSearch()
+}
+
+// 清除金额筛选
+const clearAmountFilter = () => {
+  activeAmountFilter.value = ''
+  handleSearch()
+}
+
 /**
  * 加载数据列表
  */
@@ -1453,6 +1714,13 @@ const loadData = async () => {
     if (searchForm.dateRange && searchForm.dateRange.length === 2) {
       params.startDate = searchForm.dateRange[0]
       params.endDate = searchForm.dateRange[1]
+    }
+
+    // 处理金额筛选
+    if (activeAmountFilter.value === 'claim') {
+      params.hasClaimAmount = 'true'
+    } else if (activeAmountFilter.value === 'actual') {
+      params.hasActualClaim = 'true'
     }
     
     const response = await api.get('/supplier-complaints', { params })
@@ -1534,6 +1802,45 @@ const loadPersonList = async () => {
 }
 
 /**
+ * 不良类别变化处理
+ */
+const handleCategoryChange = () => {
+  // 当类别改变时，如果当前选中的不良项不在新类别的选项中，清空不良项
+  if (searchForm.defectItem && searchForm.defectCategory) {
+    const validItems = allDefectRelations.value
+      .filter(item => item.DefectCategory === searchForm.defectCategory)
+      .map(item => item.DefectItem)
+    
+    if (!validItems.includes(searchForm.defectItem)) {
+      searchForm.defectItem = ''
+    }
+  }
+}
+
+/**
+ * 加载不重复的不良类别和不良项
+ */
+const loadDistinctValues = async () => {
+  try {
+    const response = await api.get('/supplier-complaints/distinct-values')
+    if (response.data.success) {
+      // 后端直接返回了 {DefectCategory, DefectItem} 的数组
+      allDefectRelations.value = response.data.data
+      
+      // 提取所有非空类别
+      const categoriesFromDB = new Set(
+        allDefectRelations.value
+          .map(item => item.DefectCategory)
+          .filter(c => c && c.trim() !== '')
+      )
+      defectCategoryOptions.value = Array.from(categoriesFromDB).sort()
+    }
+  } catch (error) {
+    console.error('加载选项数据失败:', error)
+  }
+}
+
+/**
  * 加载统计数据
  */
 const loadStatistics = async () => {
@@ -1564,7 +1871,13 @@ const handleReset = () => {
     supplierName: '',
     complaintType: '',
     processStatus: '',
-    dateRange: []
+    dateRange: [],
+    materialCode: '',
+    purchaseOrderNo: '',
+    defectCategory: '',
+    defectItem: '',
+    customerCode: '',
+    workOrderNo: ''
   })
   handleSearch()
 }
@@ -1786,32 +2099,6 @@ const confirmExport = async () => {
       background: 'rgba(0, 0, 0, 0.7)'
     })
 
-    // 根据选中的字段key获取完整的字段信息，并按照用户调整的顺序排列
-    const selectedFields = selectedExportFields.value.map(fieldKey => 
-      allExportFieldsForTransfer.value.find(field => field.key === fieldKey)
-    ).filter(field => field) // 过滤掉可能的undefined值
-    
-    // 获取要导出的数据，传递选择的字段信息
-    const exportData = await getExportData(selectedFields)
-    
-    // 导出Excel
-    await exportToExcel(exportData, selectedFields)
-    
-    loadingInstance.close()
-    exportDialogVisible.value = false
-    ElMessage.success(`成功导出 ${exportData.length} 条记录`)
-  } catch (error) {
-    console.error('导出失败:', error)
-    ElMessage.error('导出失败，请重试')
-  }
-}
-
-/**
- * 获取导出数据
- * 功能：根据用户选择的字段和当前筛选条件从后端获取完整数据
- */
-const getExportData = async (selectedFields) => {
-  try {
     // 构建筛选条件
     const filters = {
       ...searchForm
@@ -1824,162 +2111,72 @@ const getExportData = async (selectedFields) => {
       delete filters.dateRange
     }
     
-    // 提取字段名称列表
-    const fieldKeys = selectedFields.map(field => field.key)
-    
-    // 调用专门的导出API
+    // 调用导出API
     const response = await api.post('/supplier-complaints/export', {
-      fields: fieldKeys,
+      fields: selectedExportFields.value,
       filters: filters
+    }, {
+      responseType: 'blob' // 重要：指定响应类型为blob
     })
     
-    if (response.data.success) {
-      return response.data.data || []
+    // 创建下载链接
+    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    
+    // 生成文件名
+    const now = new Date()
+    const fileName = `供应商投诉数据_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}.xlsx`
+    
+    // 检查浏览器是否支持 File System Access API
+    if ('showSaveFilePicker' in window) {
+      try {
+        const fileHandle = await window.showSaveFilePicker({
+          suggestedName: fileName,
+          types: [{
+            description: 'Excel文件',
+            accept: {
+              'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
+            }
+          }]
+        })
+        
+        const writable = await fileHandle.createWritable()
+        await writable.write(blob)
+        await writable.close()
+        
+        ElMessage.success('文件保存成功')
+      } catch (saveError) {
+        if (saveError.name !== 'AbortError') {
+          console.warn('使用文件保存API失败，回退到传统下载:', saveError)
+          // 回退到传统下载
+          const url = window.URL.createObjectURL(blob)
+          const link = document.createElement('a')
+          link.href = url
+          link.download = fileName
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
+          window.URL.revokeObjectURL(url)
+        }
+      }
     } else {
-      throw new Error(response.data.message || '获取导出数据失败')
+      // 传统下载方式
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = fileName
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
     }
+    
+    loadingInstance.close()
+    exportDialogVisible.value = false
+    ElMessage.success('导出成功')
   } catch (error) {
-    console.error('获取导出数据失败:', error)
-    throw error
+    console.error('导出失败:', error)
+    ElMessage.error('导出失败，请重试')
   }
-}
-
-/**
- * 导出到Excel
- * 功能：将数据导出为Excel文件，包含优化的表格样式
- */
-const exportToExcel = async (data, selectedFields) => {
-  const ExcelJS = await import('exceljs')
-  const { saveAs } = await import('file-saver')
-  
-  // 创建工作簿
-  const workbook = new ExcelJS.Workbook()
-  const worksheet = workbook.addWorksheet('供应商投诉数据')
-  
-  // 设置列标题
-  const headers = selectedFields.map(field => field.label)
-  worksheet.addRow(headers)
-  
-  // 设置标题行样式（浅灰色背景）
-  const headerRow = worksheet.getRow(1)
-  headerRow.font = { bold: true, color: { argb: '333333' } }
-  headerRow.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'F5F5F5' } // 浅灰色背景
-  }
-  headerRow.alignment = { horizontal: 'center', vertical: 'middle' }
-  headerRow.height = 25
-  
-  // 添加数据行
-  data.forEach((item, index) => {
-    const rowData = selectedFields.map(field => {
-      let value = item[field.key]
-      
-      // 格式化特殊字段
-      switch (field.key) {
-        case 'ComplaintDate':
-        case 'IncomingDate':
-          return value ? formatDate(value) : ''
-        case 'UrgencyLevel':
-          return getUrgencyText(value)
-        case 'ProcessStatus':
-          return getStatusText(value)
-        case 'Quantity':
-        case 'UnitPrice':
-        case 'TotalAmount':
-        case 'ClaimAmount':
-        case 'ActualLoss':
-        case 'CompensationAmount':
-          return value ? formatNumber(value) : ''
-        default:
-          return value || ''
-      }
-    })
-    const row = worksheet.addRow(rowData)
-    
-    // 设置隔行变色（偶数行浅灰色背景）
-    if ((index + 1) % 2 === 0) {
-      row.fill = {
-        type: 'pattern',
-        pattern: 'solid',
-        fgColor: { argb: 'FAFAFA' } // 更浅的灰色用于隔行变色
-      }
-    }
-    
-    // 设置行高
-    row.height = 20
-  })
-  
-  // 自动调整列宽
-  selectedFields.forEach((field, index) => {
-    const column = worksheet.getColumn(index + 1)
-    column.width = Math.max(field.label.length * 2, 15)
-  })
-  
-  // 设置表格边框（浅灰色）
-  const maxCol = selectedFields.length
-  const maxRow = data.length + 1 // 包含标题行
-  
-  for (let row = 1; row <= maxRow; row++) {
-    for (let col = 1; col <= maxCol; col++) {
-      const cell = worksheet.getCell(row, col)
-      cell.border = {
-        top: { style: 'thin', color: { argb: 'D3D3D3' } },    // 浅灰色边框
-        left: { style: 'thin', color: { argb: 'D3D3D3' } },
-        bottom: { style: 'thin', color: { argb: 'D3D3D3' } },
-        right: { style: 'thin', color: { argb: 'D3D3D3' } }
-      }
-      
-      // 设置数据行的对齐方式
-      if (row > 1) {
-        cell.alignment = { horizontal: 'left', vertical: 'middle' }
-      }
-    }
-  }
-  
-  // 生成文件名
-  const now = new Date()
-  const fileName = `供应商投诉数据_${now.getFullYear()}${(now.getMonth() + 1).toString().padStart(2, '0')}${now.getDate().toString().padStart(2, '0')}_${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}.xlsx`
-  
-  // 导出文件
-  const buffer = await workbook.xlsx.writeBuffer()
-  const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-  
-  // 检查浏览器是否支持 File System Access API
-  if ('showSaveFilePicker' in window) {
-    try {
-      // 使用现代浏览器的文件保存API，让用户选择保存位置
-      const fileHandle = await window.showSaveFilePicker({
-        suggestedName: fileName,
-        types: [{
-          description: 'Excel文件',
-          accept: {
-            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx']
-          }
-        }]
-      })
-      
-      const writable = await fileHandle.createWritable()
-      await writable.write(blob)
-      await writable.close()
-      
-      ElMessage.success('文件保存成功')
-      return
-    } catch (saveError) {
-      // 用户取消保存或其他错误，回退到传统下载方式
-      if (saveError.name !== 'AbortError') {
-        console.warn('使用文件保存API失败，回退到传统下载:', saveError)
-      } else {
-        ElMessage.info('用户取消了文件保存')
-        return
-      }
-    }
-  }
-  
-  // 回退方案：传统的下载方式（直接下载到默认目录）
-  ElMessage.info('文件将下载到浏览器默认下载目录')
-  saveAs(blob, fileName)
 }
 
 // toggleAllFields函数已移除，el-transfer组件自带全选功能
@@ -2057,6 +2254,78 @@ const handleBatchDelete = async () => {
     if (error !== 'cancel') {
       console.error('批量删除失败:', error)
       ElMessage.error('删除失败')
+    }
+  }
+}
+
+/**
+ * 彻底删除（包括清空表）
+ */
+const handlePhysicalDelete = async () => {
+  const hasSelection = selectedRows.value.length > 0
+  
+  let confirmMessage = ''
+  let confirmTitle = ''
+  let deleteAll = false
+  
+  if (hasSelection) {
+    confirmTitle = '彻底删除确认'
+    confirmMessage = `确定要<strong style="color:red">彻底删除</strong>选中的 ${selectedRows.value.length} 条记录吗？<br>此操作将永久从数据库中移除数据，<b>不可恢复</b>！`
+  } else {
+    // 如果未选择任何行，询问是否清空整张表
+    confirmTitle = '清空数据确认'
+    confirmMessage = `您未选择任何记录。是否要<strong style="color:red">清空整张表</strong>的所有数据？<br>此操作将永久删除所有记录并<b>重置自增ID</b>，<b>不可恢复</b>！`
+    deleteAll = true
+  }
+
+  try {
+    // 第一次确认
+    await ElMessageBox.confirm(
+      confirmMessage,
+      confirmTitle,
+      {
+        confirmButtonText: deleteAll ? '确定清空' : '确定删除',
+        cancelButtonText: '取消',
+        type: 'warning',
+        dangerouslyUseHTMLString: true,
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+
+    // 第二次确认（二次警告）
+    await ElMessageBox.confirm(
+      `这是最后一次警告！<br>您正在执行<strong style="color:red">${deleteAll ? '清空整张表' : '彻底删除'}</strong>操作。<br>数据一旦删除将<b>无法找回</b>。是否继续？`,
+      '再次确认',
+      {
+        confirmButtonText: '我已知晓，确认删除',
+        cancelButtonText: '放弃',
+        type: 'error',
+        dangerouslyUseHTMLString: true,
+        confirmButtonClass: 'el-button--danger'
+      }
+    )
+
+    const ids = selectedRows.value.map(row => row.ID)
+    
+    const response = await api.delete('/supplier-complaints/physical', {
+      data: { 
+        ids: hasSelection ? ids : [],
+        deleteAll: deleteAll
+      }
+    })
+
+    if (response.data.success) {
+      ElMessage.success(response.data.message)
+      selectedRows.value = []
+      loadData()
+      loadStatistics() // 重新加载统计数据
+    } else {
+      ElMessage.error(response.data.message || '操作失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('彻底删除失败:', error)
+      ElMessage.error('操作失败: ' + (error.response?.data?.message || error.message))
     }
   }
 }
@@ -2367,7 +2636,7 @@ const formatDateTime = (datetime) => {
  */
 const formatNumber = (number) => {
   if (number === null || number === undefined) return '0'
-  return Number(number).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  return Math.round(Number(number)).toLocaleString('zh-CN')
 }
 
 /**
@@ -2454,36 +2723,11 @@ const getIQCResultColor = (result) => {
  */
 const getCellStyle = ({ row, column, rowIndex, columnIndex }) => {
   const baseStyle = {
-    textAlign: 'center',
+    // textAlign: 'center', // 已移除，通过列属性align控制
     verticalAlign: 'middle',
     whiteSpace: 'nowrap',
     overflow: 'hidden',
     textOverflow: 'ellipsis'
-  }
-  
-  // 供应商名称列（第4列，索引3）左对齐
-  if (columnIndex === 3) {
-    return { ...baseStyle, textAlign: 'left' }
-  }
-  
-  // 材料名称列（第5列，索引4）左对齐
-  if (columnIndex === 4) {
-    return { ...baseStyle, textAlign: 'left' }
-  }
-  
-  // 问题描述列（第11列，索引10）左对齐
-  if (columnIndex === 10) {
-    return { ...baseStyle, textAlign: 'left' }
-  }
-  
-  // 数量列（第8列，索引7）右对齐
-  if (columnIndex === 7) {
-    return { ...baseStyle, textAlign: 'right' }
-  }
-  
-  // 涉及金额列（第9列，索引8）右对齐
-  if (columnIndex === 8) {
-    return { ...baseStyle, textAlign: 'right' }
   }
   
   return baseStyle
@@ -2570,6 +2814,14 @@ const handleImagePreview = (file) => {
     imageViewerVisible.value = true
   } else {
     ElMessage.warning('无法获取图片预览')
+  }
+}
+
+const handleViewTableImage = (row) => {
+  if (row.AttachedImages) {
+    const url = getAdaptedImageUrl(row.AttachedImages)
+    previewImageUrls.value = [url]
+    imageViewerVisible.value = true
   }
 }
 
@@ -2680,6 +2932,11 @@ const deleteOldImage = async (imageUrl) => {
       console.warn('旧图片删除失败:', response.data.message)
     }
   } catch (error) {
+    // 如果是404错误（文件不存在），忽略它，不视为错误
+    if (error.response && error.response.status === 404) {
+      console.log('旧图片不存在，无需删除:', imageUrl)
+      return
+    }
     console.error('删除旧图片时发生错误:', error)
     throw error
   }
@@ -2838,6 +3095,70 @@ const getAdaptedImageUrl = (imagePath, preventCache = false) => {
   
   return url
 }
+
+// 导入功能相关状态和方法
+const importDialogVisible = ref(false)
+const importFile = ref(null)
+const importFileList = ref([])
+const importLoading = ref(false)
+const columnSettingsVisible = ref(false)
+
+const handleFileChange = (file) => {
+  importFile.value = file.raw
+}
+
+const handleImport = async () => {
+  if (!importFile.value) {
+    ElMessage.warning('请选择要导入的Excel文件')
+    return
+  }
+  
+  const formData = new FormData()
+  formData.append('file', importFile.value)
+  
+  importLoading.value = true
+  try {
+    const res = await api.post('/supplier-complaints/import', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+    
+    if (res.data.success) {
+      ElMessage.success(`导入成功！成功: ${res.data.data.successCount}, 失败: ${res.data.data.errorCount}`)
+      
+      if (res.data.data.errorCount > 0) {
+        console.error('导入失败详情:', res.data.data.errors)
+        ElMessageBox.alert(
+          `<div style="max-height: 300px; overflow-y: auto;">
+            <p>以下数据导入失败：</p>
+            <ul>
+              ${res.data.data.errors.map(err => `<li>${err}</li>`).join('')}
+            </ul>
+          </div>`, 
+          '导入错误详情', 
+          {
+            dangerouslyUseHTMLString: true,
+            confirmButtonText: '确定'
+          }
+        )
+      }
+
+      importDialogVisible.value = false
+      importFile.value = null
+      importFileList.value = []
+      handleSearch() // 刷新列表
+      loadStatistics() // 刷新统计数据
+    } else {
+      ElMessage.error(res.data.message || '导入失败')
+    }
+  } catch (error) {
+    console.error('导入失败:', error)
+    ElMessage.error('导入失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    importLoading.value = false
+  }
+}
 </script>
 
 <style scoped>
@@ -2908,9 +3229,99 @@ const getAdaptedImageUrl = (imagePath, preventCache = false) => {
   border-radius: 8px;
 }
 
-.search-btn {
-  margin: 0px !important;
+/* 使用Grid布局优化搜索表单 */
+.search-form {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 16px 16px;
+  align-items: center;
 }
+
+/* 让表单项占满单元格 */
+.search-form .el-form-item {
+  margin-bottom: 0;
+  margin-right: 0;
+  display: flex;
+  width: 100%;
+}
+
+/* 特殊处理日期选择器，跨两列 */
+.search-form .date-item {
+  grid-column: span 2;
+}
+
+/* 统一Label宽度和对齐 */
+.search-form :deep(.el-form-item__label) {
+  width: 70px;
+  justify-content: flex-end;
+  padding-right: 8px;
+  flex-shrink: 0;
+  font-size: 12px;
+}
+
+/* 统一输入控件宽度 */
+.search-form :deep(.el-form-item__content) {
+  flex: 1;
+  min-width: 0;
+}
+
+.search-form .el-input,
+.search-form .el-select,
+.search-form .el-date-editor {
+  width: 100% !important;
+}
+
+/* 按钮组单独占一行或浮动 */
+.search-btn {
+  /* 移除强制固定列，使其自然跟随 */
+  /* grid-column: 8; */
+  display: flex;
+  justify-content: flex-start; /* 改为左对齐 */
+  margin-left: 0;
+}
+
+/* 响应式调整 */
+@media (max-width: 1600px) {
+  .search-form {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  /* 移除特定断点下的固定列 */
+  /* .search-btn {
+    grid-column: 6;
+  } */
+}
+
+@media (max-width: 1200px) {
+  .search-form {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  /* .search-btn {
+    grid-column: 4;
+  } */
+}
+
+@media (max-width: 992px) {
+  .search-form {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  /* .search-btn {
+    grid-column: 2;
+  } */
+}
+
+@media (max-width: 768px) {
+  .search-form {
+    grid-template-columns: 1fr;
+  }
+  .search-form .date-item {
+    grid-column: span 1;
+  }
+  /* .search-btn {
+    grid-column: 1;
+  } */
+}
+
+/* 按钮组样式已在上方Grid布局中定义 */
 
 .table-header {
   display: flex;
@@ -3686,7 +4097,7 @@ const getAdaptedImageUrl = (imagePath, preventCache = false) => {
   }
   
   .search-form {
-    flex-direction: column;
+    grid-template-columns: 1fr;
   }
   
   .action-buttons {
@@ -3702,5 +4113,46 @@ const getAdaptedImageUrl = (imagePath, preventCache = false) => {
     margin-right: 0;
     margin-bottom: 8px;
   }
+}
+
+/* 列设置样式 */
+.column-settings {
+  padding: 0;
+}
+
+.settings-header {
+  font-weight: 600;
+  padding: 10px 16px;
+  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 8px;
+}
+
+.setting-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 16px;
+}
+
+.setting-item:hover {
+  background-color: #f5f7fa;
+}
+
+.sort-buttons {
+  display: flex;
+  gap: 4px;
+}
+.stat-number.amount-text {
+  color: #f56c6c;
+}
+
+.clickable {
+  cursor: pointer;
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.clickable:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
 }
 </style>

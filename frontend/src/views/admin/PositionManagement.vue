@@ -72,35 +72,47 @@
         resizable
         :header-cell-style="{ background: '#f8f9fa', color: '#606266' }"
       >
-      <el-table-column label="#" type="index" width="60" fixed="left" />
-      <el-table-column prop="Name" label="岗位名称" min-width="150" resizable show-overflow-tooltip />
-      <el-table-column prop="Code" label="岗位编码" min-width="120" resizable show-overflow-tooltip />
-      <el-table-column prop="DepartmentName" label="所属部门" min-width="150" resizable show-overflow-tooltip />
-      <el-table-column prop="Level" label="岗位级别" width="100" resizable>
+      <el-table-column label="#" type="index" width="60" fixed="left" align="center" />
+      <el-table-column prop="Name" label="岗位名称" min-width="150" resizable show-overflow-tooltip align="center" />
+      <el-table-column prop="Code" label="岗位编码" min-width="120" resizable show-overflow-tooltip align="center" />
+      <el-table-column prop="DepartmentName" label="所属部门" min-width="150" resizable show-overflow-tooltip align="center" />
+      <el-table-column prop="ParentName" label="上级岗位" min-width="150" resizable show-overflow-tooltip align="center">
+        <template #default="{ row }">
+          {{ row.ParentName || '-' }}
+        </template>
+      </el-table-column>
+      <el-table-column prop="Level" label="岗位级别" width="100" resizable align="center">
         <template #default="{ row }">
           <el-tag :type="getLevelTagType(row.Level)" size="small">
             {{ getLevelText(row.Level) }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="Description" label="岗位描述" min-width="200" resizable show-overflow-tooltip />
-      <el-table-column prop="Requirements" label="任职要求" min-width="200" resizable show-overflow-tooltip />
-      <el-table-column prop="Status" label="状态" width="80" resizable>
+      <el-table-column prop="Description" label="岗位描述" min-width="200" resizable show-overflow-tooltip align="center" />
+      <el-table-column prop="Status" label="状态" width="80" resizable align="center">
         <template #default="{ row }">
           <el-tag :type="row.Status ? 'success' : 'danger'" size="small">
             {{ row.Status ? '启用' : '禁用' }}
           </el-tag>
         </template>
       </el-table-column>
-      <el-table-column prop="SortOrder" label="排序" width="80" resizable />
-      <el-table-column prop="CreatedAt" label="创建时间" min-width="160" resizable>
+      <el-table-column prop="SortOrder" label="排序" width="80" resizable align="center" />
+      <el-table-column prop="CreatedAt" label="创建时间" min-width="160" resizable align="center">
         <template #default="{ row }">
           {{ formatDate(row.CreatedAt) }}
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="180" fixed="right">
+      <el-table-column label="操作" width="220" fixed="right" align="center">
         <template #default="{ row }">
-          <div class="action-buttons">
+          <div class="action-buttons" style="justify-content: center;">
+            <el-button 
+              link 
+              type="info" 
+              @click="showDetailDialog(row)" 
+              :icon="View"
+            >
+              详情
+            </el-button>
             <el-button 
               link 
               type="primary" 
@@ -152,6 +164,7 @@
         :model="formData"
         :rules="formRules"
         label-width="100px"
+        :disabled="isDetail"
       >
         <el-row :gutter="20">
           <el-col :span="12">
@@ -179,6 +192,26 @@
             </el-form-item>
           </el-col>
           <el-col :span="12">
+            <el-form-item label="上级岗位" prop="ParentID">
+               <el-select 
+                  v-model="formData.ParentID" 
+                  placeholder="请选择上级岗位" 
+                  clearable 
+                  filterable
+               >
+                  <el-option
+                    v-for="pos in allPositions"
+                    :key="pos.ID"
+                    :label="pos.Name"
+                    :value="pos.ID"
+                    :disabled="pos.ID === currentEditId"
+                  />
+               </el-select>
+            </el-form-item>
+          </el-col>
+        </el-row>
+        <el-row :gutter="20">
+          <el-col :span="12">
             <el-form-item label="岗位级别" prop="Level">
               <el-select v-model="formData.Level" placeholder="请选择岗位级别">
                 <el-option label="初级" :value="1" />
@@ -187,6 +220,11 @@
                 <el-option label="专家" :value="4" />
                 <el-option label="管理" :value="5" />
               </el-select>
+            </el-form-item>
+          </el-col>
+          <el-col :span="12">
+            <el-form-item label="排序" prop="SortOrder">
+              <el-input-number v-model="formData.SortOrder" :min="0" :max="9999" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -208,11 +246,6 @@
         </el-form-item>
         <el-row :gutter="20">
           <el-col :span="12">
-            <el-form-item label="排序" prop="SortOrder">
-              <el-input-number v-model="formData.SortOrder" :min="0" :max="9999" />
-            </el-form-item>
-          </el-col>
-          <el-col :span="12">
             <el-form-item label="状态" prop="Status">
               <el-switch
                 v-model="formData.Status"
@@ -225,8 +258,8 @@
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="handleDialogClose">取消</el-button>
-          <el-button type="primary" @click="submitForm" :loading="submitting">
+          <el-button @click="handleDialogClose">{{ isDetail ? '关闭' : '取消' }}</el-button>
+          <el-button v-if="!isDetail" type="primary" @click="submitForm" :loading="submitting">
             确定
           </el-button>
         </span>
@@ -243,7 +276,8 @@ import {
   Edit,
   Delete,
   Refresh,
-  Search
+  Search,
+  View
 } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import { useUserStore } from '@/store/user'
@@ -255,12 +289,15 @@ const hasPermission = (permission) => {
 
 // 响应式数据
 const loading = ref(false)
+const loadingAllPositions = ref(false)
 const submitting = ref(false)
 const dialogVisible = ref(false)
 const formRef = ref()
 const positionList = ref([])
+const allPositions = ref([])
 const departmentList = ref([])
 const isEdit = ref(false)
+const isDetail = ref(false)
 const currentEditId = ref(null)
 
 // 搜索表单
@@ -273,7 +310,7 @@ const searchForm = reactive({
 // 分页数据
 const pagination = reactive({
   page: 1,
-  size: 20,
+  size: 10,
   total: 0
 })
 
@@ -282,6 +319,7 @@ const formData = reactive({
   Name: '',
   Code: '',
   DepartmentID: null,
+  ParentID: null,
   Level: null,
   Description: '',
   Requirements: '',
@@ -309,6 +347,7 @@ const formRules = {
 
 // 计算属性
 const dialogTitle = computed(() => {
+  if (isDetail.value) return '岗位详情'
   return isEdit.value ? '编辑岗位' : '新增岗位'
 })
 
@@ -405,6 +444,20 @@ const fetchPositions = async () => {
   }
 }
 
+// 获取所有岗位（用于下拉选择）
+const fetchAllPositions = async () => {
+  try {
+    loadingAllPositions.value = true
+    const params = { page: 1, size: 10000 }
+    const response = await api.get('/positions', { params })
+    allPositions.value = response.data?.list || []
+  } catch (error) {
+    console.error('获取所有岗位失败:', error)
+  } finally {
+    loadingAllPositions.value = false
+  }
+}
+
 // 搜索
 const handleSearch = () => {
   pagination.page = 1
@@ -436,6 +489,7 @@ const handleCurrentChange = (page) => {
 // 显示新增对话框
 const showAddDialog = () => {
   isEdit.value = false
+  isDetail.value = false
   currentEditId.value = null
   resetForm()
   dialogVisible.value = true
@@ -444,11 +498,32 @@ const showAddDialog = () => {
 // 显示编辑对话框
 const showEditDialog = (position) => {
   isEdit.value = true
+  isDetail.value = false
   currentEditId.value = position.ID
   Object.assign(formData, {
     Name: position.Name,
     Code: position.Code,
     DepartmentID: position.DepartmentID,
+    ParentID: position.ParentID || null,
+    Level: position.Level || null,
+    Description: position.Description || '',
+    Requirements: position.Requirements || '',
+    SortOrder: position.SortOrder || 0,
+    Status: position.Status !== false
+  })
+  dialogVisible.value = true
+}
+
+// 显示详情对话框
+const showDetailDialog = (position) => {
+  isDetail.value = true
+  isEdit.value = false
+  currentEditId.value = position.ID
+  Object.assign(formData, {
+    Name: position.Name,
+    Code: position.Code,
+    DepartmentID: position.DepartmentID,
+    ParentID: position.ParentID || null,
     Level: position.Level || null,
     Description: position.Description || '',
     Requirements: position.Requirements || '',
@@ -464,6 +539,7 @@ const resetForm = () => {
     Name: '',
     Code: '',
     DepartmentID: null,
+    ParentID: null,
     Level: null,
     Description: '',
     Requirements: '',
@@ -528,6 +604,7 @@ const deletePosition = async (position) => {
 // 刷新数据
 const refreshData = () => {
   fetchPositions()
+  fetchAllPositions()
 }
 
 // 关闭对话框
@@ -540,6 +617,7 @@ const handleDialogClose = () => {
 onMounted(async () => {
   await fetchDepartments()
   await fetchPositions()
+  await fetchAllPositions()
 })
 </script>
 
@@ -611,7 +689,7 @@ onMounted(async () => {
 }
 
 :deep(.el-table .el-table__cell) {
-  padding: 12px 0;
+  padding: 6px 0;
 }
 
 :deep(.el-form-item) {
@@ -637,7 +715,7 @@ onMounted(async () => {
 /* 操作按钮样式 */
 .action-buttons {
   display: flex;
-  gap: 4px;
+  gap: 2px;
   flex-wrap: nowrap;
   white-space: nowrap;
 }
@@ -645,7 +723,7 @@ onMounted(async () => {
 .action-buttons .el-button {
   margin: 0;
   min-width: auto;
-  padding: 5px 8px;
+  padding: 5px 4px;
 }
 
 @media (max-width: 768px) {

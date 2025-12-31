@@ -1,9 +1,8 @@
 <template>
   <component :is="containerComponent">
-    <component :is="contentComponent" :class="wrapperClass">
-      <div class="shipment-report-page" :class="{ 'admin-page': isAdmin }">
-        <!-- 页面标题 -->
-        <div class="page-header">
+    <div class="shipment-report-page" :class="{ 'admin-page': isAdmin, 'frontend-page': !isAdmin }">
+      <!-- 页面标题 -->
+      <div class="page-header">
           <div class="header-content">
             <div class="title-section">
               <el-icon class="header-icon"><Box /></el-icon>
@@ -28,29 +27,41 @@
               <template #header>
                 <div class="card-header">
                   <el-icon><Search /></el-icon>
-                  <span>第一步：查询工单信息</span>
+                  <span>第一步：查询产品信息</span>
+                  <el-radio-group v-model="searchMode" size="small" style="margin-left: auto;">
+                    <el-radio-button value="single">单条查询</el-radio-button>
+                    <el-radio-button value="batch">批量查询</el-radio-button>
+                  </el-radio-group>
                 </div>
               </template>
               
-              <el-form :model="searchForm" label-width="100px" class="search-form">
+              <!-- 单条查询模式 -->
+              <el-form v-if="searchMode === 'single'" :model="searchForm" label-width="100px" class="search-form">
                 <el-row :gutter="16">
-                  <el-col :span="8">
+                  <el-col :span="6">
                     <el-form-item label="工单号">
                       <el-input v-model.trim="searchForm.pNum" placeholder="如 GD25080001" clearable @keyup.enter="handleSearch">
                         <template #prefix><el-icon><Document /></el-icon></template>
                       </el-input>
                     </el-form-item>
                   </el-col>
-                  <el-col :span="8">
-                    <el-form-item label="物料编号">
-                      <el-input v-model.trim="searchForm.materialId" placeholder="请输入物料编码" clearable @keyup.enter="handleSearch">
+                  <el-col :span="6">
+                    <el-form-item label="产品编号">
+                      <el-input v-model.trim="searchForm.materialId" placeholder="客户料号/产品编码" clearable @keyup.enter="handleSearch">
                         <template #prefix><el-icon><Collection /></el-icon></template>
                       </el-input>
                     </el-form-item>
                   </el-col>
-                  <el-col :span="8">
-                    <el-form-item label="物料名称">
-                      <el-input v-model.trim="searchForm.materialName" placeholder="物料名称关键字" clearable @keyup.enter="handleSearch">
+                  <el-col :span="6">
+                    <el-form-item label="CPO">
+                      <el-input v-model.trim="searchForm.cpo" placeholder="客户采购订单号" clearable @keyup.enter="handleSearch">
+                        <template #prefix><el-icon><Tickets /></el-icon></template>
+                      </el-input>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="产品名称">
+                      <el-input v-model.trim="searchForm.materialName" placeholder="产品名称关键字" clearable @keyup.enter="handleSearch">
                         <template #prefix><el-icon><Goods /></el-icon></template>
                       </el-input>
                     </el-form-item>
@@ -58,17 +69,17 @@
                 </el-row>
                 
                 <el-row :gutter="16">
-                  <el-col :span="8">
+                  <el-col :span="6">
                     <el-form-item label="开始时间">
                       <el-date-picker v-model="searchForm.startDate" type="datetime" placeholder="选择开始时间" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
                     </el-form-item>
                   </el-col>
-                  <el-col :span="8">
+                  <el-col :span="6">
                     <el-form-item label="结束时间">
                       <el-date-picker v-model="searchForm.endDate" type="datetime" placeholder="选择结束时间" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
                     </el-form-item>
                   </el-col>
-                  <el-col :span="8">
+                  <el-col :span="12">
                     <el-form-item label=" ">
                       <div class="btn-group">
                         <el-button :disabled="!userStore.hasPermission('shipment:report:search')" type="primary" @click="handleSearch" :loading="loading">
@@ -77,15 +88,98 @@
                         <el-button @click="handleReset">
                           <el-icon><Refresh /></el-icon>重置
                         </el-button>
+                        <span class="search-tip">提示：无工单号时，需同时输入产品编号和CPO</span>
                       </div>
                     </el-form-item>
                   </el-col>
                 </el-row>
               </el-form>
+              
+              <!-- 批量查询模式 -->
+              <div v-else class="batch-search-form">
+                <el-row :gutter="20">
+                  <el-col :span="12">
+                    <div class="batch-input-section">
+                      <div class="section-header">
+                        <span class="section-title">从 欠料表/ERP 粘贴数据</span>
+                        <el-tooltip content="从欠料表/ERP复制2列数据（CPO列 + 产品编号列），支持多行" placement="top">
+                          <el-icon class="help-icon"><QuestionFilled /></el-icon>
+                        </el-tooltip>
+                      </div>
+                      <el-input 
+                        ref="batchInputRef"
+                        v-model="batchInputText" 
+                        type="textarea" 
+                        :rows="6" 
+                        placeholder="从欠料表/ERP批量复制后，在此处粘贴（Ctrl+V）&#10;&#10;格式：同时复制【CPO】+【产品编号】这2列的一行或多行&#10;示例：&#10;4200014505	R64-873129-020&#10;5000065230	RKT64-015392-020"
+                        @paste="handleBatchPaste"
+                      />
+                      <div class="batch-actions">
+                        <el-button size="small" @click="parseBatchInput">
+                          <el-icon><DocumentCopy /></el-icon>解析数据
+                        </el-button>
+                        <el-button size="small" @click="clearBatchInput">
+                          <el-icon><Delete /></el-icon>清空
+                        </el-button>
+                      </div>
+                    </div>
+                  </el-col>
+                  <el-col :span="12">
+                    <div class="batch-preview-section">
+                      <div class="section-header">
+                        <span class="section-title">待查询列表</span>
+                        <el-tag v-if="batchQueryList.length > 0" size="small" type="success">{{ batchQueryList.length }} 条</el-tag>
+                      </div>
+                      <el-table :data="batchQueryList" size="small" max-height="180" border>
+                        <el-table-column type="index" label="#" width="40" />
+                        <el-table-column prop="cpo" label="CPO" min-width="100" show-overflow-tooltip />
+                        <el-table-column prop="productId" label="产品编号" min-width="110" show-overflow-tooltip />
+                        <el-table-column prop="pNum" label="工单号" width="110" show-overflow-tooltip>
+                          <template #default="{ row }">
+                            <span v-if="row.pNum" class="pnum-cell">{{ row.pNum }}</span>
+                            <span v-else-if="row.matched === false" class="pnum-unmatched">未匹配</span>
+                            <span v-else class="pnum-pending">待查询</span>
+                          </template>
+                        </el-table-column>
+                        <el-table-column label="操作" width="50" align="center">
+                          <template #default="{ $index }">
+                            <el-button type="danger" link size="small" @click="removeBatchItem($index)">
+                              <el-icon><Delete /></el-icon>
+                            </el-button>
+                          </template>
+                        </el-table-column>
+                      </el-table>
+                    </div>
+                  </el-col>
+                </el-row>
+                <el-row :gutter="16" style="margin-top: 16px;">
+                  <el-col :span="6">
+                    <el-form-item label="开始时间" label-width="80px">
+                      <el-date-picker v-model="searchForm.startDate" type="datetime" placeholder="选择开始时间" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="6">
+                    <el-form-item label="结束时间" label-width="80px">
+                      <el-date-picker v-model="searchForm.endDate" type="datetime" placeholder="选择结束时间" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="12">
+                    <div class="btn-group" style="padding-top: 2px;">
+                      <el-button :disabled="!userStore.hasPermission('shipment:report:search') || batchQueryList.length === 0" type="primary" @click="handleBatchSearch" :loading="loading">
+                        <el-icon><Search /></el-icon>批量查询 ({{ batchQueryList.length }})
+                      </el-button>
+                      <el-button @click="handleReset">
+                        <el-icon><Refresh /></el-icon>重置
+                      </el-button>
+                      <span class="search-tip">适用于A08等客户的多产品合并出货报告</span>
+                    </div>
+                  </el-col>
+                </el-row>
+              </div>
             </el-card>
 
-            <!-- 工单信息卡片 -->
-            <el-card v-if="result.workOrderInfo" shadow="hover" class="result-card">
+            <!-- 工单信息卡片（仅单条查询时显示，批量查询时不显示） -->
+            <el-card v-if="result.workOrderInfo && !result.isBatchResult" shadow="hover" class="result-card">
               <template #header>
                 <div class="card-header">
                   <el-icon><Tickets /></el-icon>
@@ -109,14 +203,16 @@
             <!-- 产品资料卡片 -->
             <el-card v-if="result.productInfo && result.productInfo.length > 0" shadow="hover" class="result-card product-card">
               <template #header>
-                <div class="card-header">
-                  <el-icon><ShoppingBag /></el-icon>
-                  <span>第二步：选择产品生成报告</span>
-                  <el-tag>{{ result.productInfo.length }} 项</el-tag>
+                <div class="card-header product-card-header">
+                  <div class="header-left">
+                    <el-icon><ShoppingBag /></el-icon>
+                    <span>第二步：选择产品生成报告</span>
+                    <el-tag>{{ result.productInfo.length }} 项</el-tag>
+                    <el-button v-if="selectedProducts.length > 1" :disabled="!userStore.hasPermission('shipment:report:export')" type="success" @click="handleBatchGenerateReport">
+                      <el-icon><Printer /></el-icon>合并生成报告 ({{ selectedProducts.length }}项)
+                    </el-button>
+                  </div>
                   <span class="header-tip">勾选多个产品可合并生成一份报告</span>
-                  <el-button v-if="selectedProducts.length > 1" :disabled="!userStore.hasPermission('shipment:report:export')" type="success" size="small" style="margin-left: auto" @click="handleBatchGenerateReport">
-                    <el-icon><Printer /></el-icon>合并生成报告 ({{ selectedProducts.length }}项)
-                  </el-button>
                 </div>
               </template>
               
@@ -130,9 +226,10 @@
                 :row-class-name="getProductRowClass"
               >
                 <el-table-column type="selection" width="45" />
-                <el-table-column prop="productId" label="产品编码" width="100" show-overflow-tooltip />
-                <el-table-column prop="cProductId" label="客户料号" min-width="120" show-overflow-tooltip />
+                <el-table-column type="index" label="序号" width="60" align="center" />
+                <el-table-column prop="cProductId" label="客户料号" min-width="140" show-overflow-tooltip />
                 <el-table-column prop="product" label="产品名称" min-width="180" show-overflow-tooltip />
+                <el-table-column prop="cpo" label="CPO" width="120" show-overflow-tooltip />
                 <el-table-column prop="cProduct" label="工厂订单号" min-width="120" show-overflow-tooltip />
                 <el-table-column prop="scale" label="规格" width="100" show-overflow-tooltip />
                 <el-table-column prop="orderCount" label="订单数" width="80" align="right" />
@@ -147,8 +244,8 @@
               </el-table>
             </el-card>
 
-            <!-- 物料信息折叠面板 -->
-            <el-collapse v-if="result.materialList.length > 0 || result.materialInList.length > 0" v-model="activeCollapse" class="material-collapse">
+            <!-- 物料信息折叠面板（仅单条查询时显示） -->
+            <el-collapse v-if="!result.isBatchResult && (result.materialList.length > 0 || result.materialInList.length > 0)" v-model="activeCollapse" class="material-collapse">
               <el-collapse-item name="material" v-if="result.materialList.length > 0">
                 <template #title>
                   <div class="collapse-title">
@@ -210,13 +307,13 @@
               </div>
             </el-empty>
 
-            <el-empty v-if="hasSearched && !result.workOrderInfo && result.materialList.length === 0" description="未查询到相关数据">
+            <el-empty v-if="hasSearched && !result.workOrderInfo && result.materialList.length === 0 && result.productInfo.length === 0" description="未查询到相关数据">
               <el-button type="primary" @click="handleReset">重置条件</el-button>
             </el-empty>
           </div>
 
-          <!-- 右侧：报告预览 -->
-          <div class="right-panel" v-if="selectedProduct">
+          <!-- 右侧：报告预览（批量查询时不显示） -->
+          <div class="right-panel" v-if="selectedProduct && !result.isBatchResult">
             <el-card shadow="hover" class="preview-card">
               <template #header>
                 <div class="card-header">
@@ -440,7 +537,6 @@
           </template>
         </el-dialog>
       </div>
-    </component>
   </component>
 </template>
 
@@ -448,27 +544,28 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Box, Search, Document, Collection, Goods, Refresh, Tickets, ShoppingBag, Files, OfficeBuilding, Setting, Plus, Upload, Download, Printer, RefreshRight, Check } from '@element-plus/icons-vue'
+import { Box, Search, Document, Collection, Goods, Refresh, Tickets, ShoppingBag, Files, OfficeBuilding, Setting, Plus, Upload, Download, Printer, RefreshRight, Check, QuestionFilled, DocumentCopy, Delete } from '@element-plus/icons-vue'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 import ExcelJS from 'exceljs'
-import AppLayout from '@/components/common/AppLayout.vue'
-import ContentWrapper from '@/components/common/ContentWrapper.vue'
 import api from '@/utils/api'
 
 const route = useRoute()
 const isAdmin = computed(() => route.path.startsWith('/admin'))
-const containerComponent = computed(() => isAdmin.value ? 'div' : AppLayout)
-const contentComponent = computed(() => isAdmin.value ? 'div' : ContentWrapper)
-const wrapperClass = computed(() => isAdmin.value ? '' : 'shipment-content-wrapper')
+const containerComponent = computed(() => 'div')
 
-const searchForm = reactive({ pNum: '', materialId: '', materialName: '', startDate: '', endDate: '' })
-const router = useRouter()
+const searchForm = reactive({ pNum: '', materialId: '', materialName: '', cpo: '', startDate: '', endDate: '' })
 const loading = ref(false)
 const hasSearched = ref(false)
-const result = reactive({ workOrderInfo: null, materialList: [], materialInList: [], productInfo: [] })
+const result = reactive({ workOrderInfo: null, materialList: [], materialInList: [], productInfo: [], isBatchResult: false })
 const activeCollapse = ref(['material'])
 const selectedProduct = ref(null)
+
+// 批量查询相关
+const searchMode = ref('batch')  // 默认批量查询模式
+const batchInputText = ref('')
+const batchQueryList = ref([])  // { cpo: string, productId: string, pNum?: string }[]
+const batchInputRef = ref(null)
 const previewRef = ref(null)
 const reportPreview = reactive({ reportNo: '', date: '' })
 const productTableRef = ref(null)
@@ -848,7 +945,11 @@ function getCustomerHandler(customerID) {
  */
 function buildTemplateContext() {
   const wo = result.workOrderInfo || {}
-  const customerID = wo.CustomerID || ''
+  // 优先从工单信息获取客户编码，其次从产品数据获取
+  const customerID = wo.CustomerID || 
+                     reportDialogProducts.value?.[0]?.customerId || 
+                     selectedProduct.value?.customerId || 
+                     ''
   
   // 获取客户特殊处理器
   const handler = getCustomerHandler(customerID)
@@ -1095,7 +1196,11 @@ async function exportFromTemplate(template) {
     }
 
     // 列宽处理：优先使用映射配置中的columnWidths，其次使用客户硬编码配置
-    const customerID = result.workOrderInfo?.CustomerID || ''
+    // 优先从工单信息获取客户编码，其次从产品数据获取
+    const customerID = result.workOrderInfo?.CustomerID || 
+                       reportDialogProducts.value?.[0]?.customerId || 
+                       selectedProduct.value?.customerId || 
+                       ''
     const handler = getCustomerHandler(customerID)
     const targetSheetIndex = mapping?.table?.sheetIndex || 0
     const ws = workbook.worksheets[targetSheetIndex]
@@ -1431,17 +1536,82 @@ async function printFromTemplate(template) {
       buf = resp
     }
     if (!buf) { throw new Error('未加载Excel模板文件') }
-    const wb = XLSX.read(buf, { type: 'array' })
+    
+    // 使用 ExcelJS 加载模板（与 exportFromTemplate 相同的逻辑）
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(buf)
+    
+    // 优先使用后端保存的映射
+    let mapping = null
+    try {
+      const resp = await api.get(`/shipment-report/templates/${template.id}/mapping`)
+      mapping = resp?.data ?? resp
+      console.log('printFromTemplate - 获取到的映射配置:', mapping)
+    } catch (e) {
+      console.warn('获取映射配置失败:', e)
+    }
+
     const ctx = buildTemplateContext()
-    const filled = fillWorkbookPlaceholders(wb, ctx)
-    const firstSheet = filled.Sheets[filled.SheetNames[0]]
-    const html = XLSX.utils.sheet_to_html(firstSheet)
+    console.log('printFromTemplate - 构建的上下文数据:', ctx)
+    
+    // 检查映射是否有效
+    const hasValidMapping = mapping && 
+      (
+        (mapping.fields && mapping.fields.length > 0) || 
+        (mapping.table && mapping.table.columns && mapping.table.columns.length > 0) ||
+        (mapping.placeholders && mapping.placeholders.length > 0)
+      )
+    
+    if (hasValidMapping) {
+      console.log('printFromTemplate - 使用映射配置填充模板')
+      applyMappingFill(workbook, mapping, ctx)
+    } else {
+      console.log('printFromTemplate - 无有效映射，使用自动识别填充')
+      const worksheet = workbook.worksheets[0]
+      const headerPairs = [
+        { label: '客户编码', value: result.workOrderInfo?.CustomerID },
+        { label: '工单号', value: result.workOrderInfo?.PNum },
+        { label: '订单号', value: result.workOrderInfo?.OrderNum },
+        { label: '客户料号', value: selectedProduct.value?.cProductId },
+        { label: '产品名称', value: selectedProduct.value?.product },
+        { label: '规格', value: selectedProduct.value?.scale },
+        { label: '数量', value: selectedProduct.value?.pCount || selectedProduct.value?.orderCount },
+        { label: 'CPO', value: result.workOrderInfo?.CPO },
+        { label: '报告编号', value: reportPreview.reportNo },
+        { label: '日期', value: reportPreview.date }
+      ]
+      writeLabelValues(worksheet, headerPairs)
+    }
+    
+    // 获取列宽配置
+    const customerID = result.workOrderInfo?.CustomerID || 
+                       reportDialogProducts.value?.[0]?.customerId || 
+                       selectedProduct.value?.customerId || 
+                       ''
+    const handler = getCustomerHandler(customerID)
+    
+    // 列宽来源优先级：1.映射配置  2.客户处理器硬编码
+    let columnWidths = null
+    if (mapping?.layout?.columnWidths && Array.isArray(mapping.layout.columnWidths) && mapping.layout.columnWidths.length > 0) {
+      columnWidths = mapping.layout.columnWidths
+      console.log('printFromTemplate - 使用映射配置列宽')
+    } else if (handler?.columnWidths && Array.isArray(handler.columnWidths)) {
+      columnWidths = handler.columnWidths
+      console.log('printFromTemplate - 使用客户处理器列宽')
+    }
+    
+    // 将 ExcelJS 工作簿转换为可打印的 HTML
+    const worksheet = workbook.worksheets[mapping?.table?.sheetIndex || 0]
+    const tableStartRow = mapping?.table?.startRow || 10  // 表格数据起始行
+    const html = generatePrintHtml(worksheet, ctx, columnWidths, tableStartRow)
+    
+    // 打开打印窗口
     let win = window.open('', '_blank')
     if (win) {
       win.document.write(html)
       win.document.close()
       win.focus()
-      win.print()
+      setTimeout(() => win.print(), 300)  // 延迟打印，确保样式加载完成
     } else {
       const iframe = document.createElement('iframe')
       iframe.style.position = 'fixed'
@@ -1457,13 +1627,468 @@ async function printFromTemplate(template) {
       doc.write(html)
       doc.close()
       iframe.contentWindow?.focus()
-      iframe.contentWindow?.print()
-      setTimeout(() => document.body.removeChild(iframe), 200)
+      setTimeout(() => {
+        iframe.contentWindow?.print()
+        setTimeout(() => document.body.removeChild(iframe), 500)
+      }, 300)
     }
     ElMessage.success('按模板打印成功')
   } catch (e) {
     ElMessage.error('模板打印失败：' + (e.message || '未知错误'))
   }
+}
+
+/**
+ * 根据 GB/T 2828.1-2012 标准计算抽检数量
+ * 正常检验一次抽样方案，检验水平II，AQL=4.0
+ * @param {number} lotSize - 批量（出货数量）
+ * @returns {number} 抽检数量
+ */
+function calculateSampleSize(lotSize) {
+  if (!lotSize || lotSize <= 1) return ''
+  
+  // GB/T 2828.1 抽样表（检验水平II，一次抽样）
+  if (lotSize >= 2 && lotSize <= 8) return 2
+  if (lotSize >= 9 && lotSize <= 15) return 3
+  if (lotSize >= 16 && lotSize <= 25) return 5
+  if (lotSize >= 26 && lotSize <= 50) return 8
+  if (lotSize >= 51 && lotSize <= 90) return 13
+  if (lotSize >= 91 && lotSize <= 150) return 20
+  if (lotSize >= 151 && lotSize <= 280) return 32
+  if (lotSize >= 281 && lotSize <= 500) return 50
+  if (lotSize >= 501 && lotSize <= 1200) return 80
+  if (lotSize >= 1201 && lotSize <= 3200) return 125
+  if (lotSize >= 3201 && lotSize <= 10000) return 200
+  if (lotSize >= 10001 && lotSize <= 35000) return 315
+  if (lotSize >= 35001 && lotSize <= 150000) return 500
+  if (lotSize >= 150001 && lotSize <= 500000) return 800
+  if (lotSize >= 500001) return 1250
+  
+  return ''
+}
+
+/**
+ * 将 ExcelJS 工作表转换为可打印的 HTML
+ * @param {ExcelJS.Worksheet} worksheet - ExcelJS 工作表
+ * @param {Object} ctx - 填充上下文
+ * @param {Array} columnWidths - 列宽配置数组（可选）
+ * @param {number} tableStartRow - 表格数据起始行（默认10）
+ * @returns {string} HTML 字符串
+ */
+function generatePrintHtml(worksheet, ctx, columnWidths = null, tableStartRow = 10) {
+  const rows = []
+  const mergedCells = new Map()  // 记录合并单元格信息
+  const skipCells = new Set()    // 记录需要跳过的单元格
+  
+  // 解析合并单元格 - ExcelJS 使用 worksheet.model.merges 数组
+  // 格式如: ['A1:C3', 'D5:F5'] 或通过 _merges 对象
+  const merges = worksheet.model?.merges || []
+  console.log('合并单元格信息:', merges)
+  
+  // 计算有效的最大列数（包含数据或合并单元格的最大列）
+  let maxCol = 0
+  
+  // 从合并单元格中获取最大列
+  merges.forEach(mergeRange => {
+    // 解析合并范围，如 "A1:C3"
+    const match = mergeRange.match(/([A-Z]+)(\d+):([A-Z]+)(\d+)/)
+    if (match) {
+      const startCol = colLetterToNumber(match[1])
+      const startRow = parseInt(match[2])
+      const endCol = colLetterToNumber(match[3])
+      const endRow = parseInt(match[4])
+      
+      maxCol = Math.max(maxCol, endCol)
+      
+      const rowspan = endRow - startRow + 1
+      const colspan = endCol - startCol + 1
+      
+      // 记录合并单元格的起始位置
+      mergedCells.set(`${startRow}-${startCol}`, { rowspan, colspan })
+      
+      // 标记被合并的单元格（需要跳过）
+      for (let r = startRow; r <= endRow; r++) {
+        for (let c = startCol; c <= endCol; c++) {
+          if (r !== startRow || c !== startCol) {
+            skipCells.add(`${r}-${c}`)
+          }
+        }
+      }
+    }
+  })
+  
+  // 遍历所有行，找出包含数据的最大列
+  const rowCount = Math.min(worksheet.rowCount || 30, 50)
+  for (let rowNumber = 1; rowNumber <= rowCount; rowNumber++) {
+    const row = worksheet.getRow(rowNumber)
+    row.eachCell({ includeEmpty: false }, (cell, colNumber) => {
+      if (cell.value !== null && cell.value !== undefined && cell.value !== '') {
+        maxCol = Math.max(maxCol, colNumber)
+      }
+    })
+  }
+  
+  // 确保至少有一列，最多不超过工作表列数
+  const colCount = Math.max(1, Math.min(maxCol, worksheet.columnCount || 50))
+  console.log('有效最大列数:', colCount)
+  
+  console.log('合并单元格Map:', mergedCells)
+  console.log('跳过单元格Set:', skipCells)
+  
+  // 获取列宽 - 优先使用传入的配置，否则从工作表读取
+  const colWidths = []
+  for (let i = 1; i <= colCount; i++) {
+    if (columnWidths && columnWidths[i - 1]) {
+      // 使用传入的列宽配置（Excel单位转像素，乘以约7）
+      colWidths[i - 1] = columnWidths[i - 1] * 7
+    } else {
+      const col = worksheet.getColumn(i)
+      colWidths[i - 1] = col.width ? col.width * 7 : 60
+    }
+  }
+  console.log('列宽配置:', colWidths)
+  
+  // 遍历工作表生成表格行
+  for (let rowNumber = 1; rowNumber <= rowCount; rowNumber++) {
+    const row = worksheet.getRow(rowNumber)
+    const cells = []
+    const rowHeight = row.height ? row.height * 1.33 : 20
+    
+    for (let colNumber = 1; colNumber <= colCount; colNumber++) {
+      const mergeKey = `${rowNumber}-${colNumber}`
+      
+      // 跳过被合并的单元格
+      if (skipCells.has(mergeKey)) {
+        continue
+      }
+      
+      const cell = row.getCell(colNumber)
+      let value = cell.value
+      
+      // 处理各种类型的值
+      if (value && typeof value === 'object') {
+        if (value.richText) {
+          // 富文本
+          value = value.richText.map(rt => rt.text).join('')
+        } else if (value.text !== undefined) {
+          // 超链接等
+          value = value.text
+        } else if (value.result !== undefined) {
+          // 公式结果已计算
+          value = value.result
+        } else if (value.formula !== undefined) {
+          // 有公式但无结果的情况
+          // 检查是否是 I 列（第9列）且在数据行范围内 - 抽检数量公式
+          if (colNumber === 9 && rowNumber >= tableStartRow) {
+            // 获取前一列（H列，第8列）的出货数量值
+            const quantityCell = row.getCell(8)  // H列
+            let quantity = quantityCell.value
+            if (quantity && typeof quantity === 'object') {
+              quantity = quantity.result || quantity.text || 0
+            }
+            quantity = parseInt(quantity) || 0
+            // 使用 GB/T 2828.1 计算抽检数量
+            value = calculateSampleSize(quantity)
+          } else {
+            value = ''
+          }
+        } else if (value.sharedFormula !== undefined) {
+          // 共享公式
+          if (value.result !== undefined) {
+            value = value.result
+          } else if (colNumber === 9 && rowNumber >= tableStartRow) {
+            // 抽检数量共享公式
+            const quantityCell = row.getCell(8)
+            let quantity = quantityCell.value
+            if (quantity && typeof quantity === 'object') {
+              quantity = quantity.result || quantity.text || 0
+            }
+            quantity = parseInt(quantity) || 0
+            value = calculateSampleSize(quantity)
+          } else {
+            value = ''
+          }
+        } else {
+          // 其他对象类型，尝试转字符串或置空
+          console.log(`单元格 ${rowNumber}-${colNumber} 为对象类型:`, value)
+          value = ''
+        }
+      }
+      
+      // 获取单元格样式（包含边框）
+      let style = getCellStyle(cell)
+      const mergeInfo = mergedCells.get(mergeKey)
+      
+      // 调试：检查边框信息
+      if (rowNumber <= 12 && colNumber <= 8) {
+        console.log(`单元格 ${rowNumber}-${colNumber} 边框:`, JSON.stringify(cell.border), '原始样式:', style)
+      }
+      
+      // 判断是否有内容
+      const hasValue = value !== null && value !== undefined && value !== ''
+      const hasBorder = style.includes('border')
+      
+      // 智能边框策略：
+      // 1. 如果模板有边框设置（hasBorder），使用模板边框
+      // 2. 如果没有边框，根据区域判断是否需要添加：
+      //    - 表头区域（约第7-9行，对应序号、物料编号等列头）需要边框
+      //    - 数据区域（从tableStartRow开始）需要边框
+      //    - 其他区域（公司名称、标题等）不需要边框
+      
+      // 检测是否在表格区域（表头行或数据行）
+      // 表头通常在 tableStartRow - 2 到 tableStartRow - 1 行
+      const isTableHeader = rowNumber >= (tableStartRow - 3) && rowNumber < tableStartRow
+      const isDataRow = rowNumber >= tableStartRow
+      const isTableArea = isTableHeader || isDataRow
+      
+      // 只对表格区域内没有边框的单元格添加默认边框
+      if (!hasBorder && isTableArea) {
+        style = style ? style + '; border: 1px solid #000' : 'border: 1px solid #000'
+      }
+      
+      cells.push({
+        value: value ?? '',
+        style,
+        colspan: mergeInfo?.colspan || 1,
+        rowspan: mergeInfo?.rowspan || 1,
+        width: colWidths[colNumber - 1] || 60,
+        colNumber,
+        rowNumber,
+        hasValue
+      })
+    }
+    
+    rows.push({ cells, height: rowHeight, rowNumber })
+  }
+  
+  // 分析表格结构，找出表头行和数据区域
+  // 通常表头行是连续的有内容的行，数据区域从 tableStartRow 开始
+  const headerEndRow = tableStartRow - 1  // 表头结束行
+  
+  // 生成 HTML
+  let tableHtml = '<table>'
+  
+  // 生成列宽定义
+  tableHtml += '<colgroup>'
+  for (let i = 0; i < colCount; i++) {
+    tableHtml += `<col style="width: ${colWidths[i] || 60}px;">`
+  }
+  tableHtml += '</colgroup>'
+  
+  rows.forEach(row => {
+    tableHtml += `<tr style="height: ${row.height}px;">`
+    row.cells.forEach(cell => {
+      const attrs = []
+      if (cell.colspan > 1) attrs.push(`colspan="${cell.colspan}"`)
+      if (cell.rowspan > 1) attrs.push(`rowspan="${cell.rowspan}"`)
+      attrs.push(`style="${cell.style}"`)
+      tableHtml += `<td ${attrs.join(' ')}>${escapeHtml(String(cell.value))}</td>`
+    })
+    tableHtml += '</tr>'
+  })
+  
+  tableHtml += '</table>'
+  
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>出货检验报告</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 5mm;
+    }
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+    body {
+      font-family: "SimSun", "宋体", "Microsoft YaHei", sans-serif;
+      font-size: 9pt;
+      margin: 0;
+      padding: 3mm;
+      line-height: 1.2;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+    td {
+      padding: 2px 3px;
+      word-wrap: break-word;
+      overflow: hidden;
+      vertical-align: middle;
+      text-align: center;
+      font-size: 9pt;
+      /* 默认无边框，由单元格样式控制 */
+    }
+    @media print {
+      body { 
+        margin: 0; 
+        padding: 2mm; 
+        -webkit-print-color-adjust: exact;
+        print-color-adjust: exact;
+      }
+      table { page-break-inside: avoid; }
+    }
+  </style>
+</head>
+<body>
+  ${tableHtml}
+</body>
+</html>`
+}
+
+/**
+ * 将列字母转换为数字（A=1, B=2, ..., Z=26, AA=27...）
+ */
+function colLetterToNumber(letters) {
+  let result = 0
+  for (let i = 0; i < letters.length; i++) {
+    result = result * 26 + (letters.charCodeAt(i) - 64)
+  }
+  return result
+}
+
+/**
+ * 获取单元格样式字符串
+ */
+function getCellStyle(cell) {
+  const styles = []
+  
+  // 字体
+  if (cell.font) {
+    if (cell.font.bold) styles.push('font-weight: bold')
+    if (cell.font.size) styles.push(`font-size: ${cell.font.size}pt`)
+    if (cell.font.name) {
+      // 映射常用字体
+      const fontMap = {
+        '宋体': '"SimSun", "宋体"',
+        'SimSun': '"SimSun", "宋体"',
+        '黑体': '"SimHei", "黑体"',
+        '微软雅黑': '"Microsoft YaHei", "微软雅黑"',
+        'Arial': 'Arial, sans-serif'
+      }
+      const fontFamily = fontMap[cell.font.name] || `"${cell.font.name}"`
+      styles.push(`font-family: ${fontFamily}`)
+    }
+  }
+  
+  // 对齐 - 水平对齐
+  if (cell.alignment) {
+    if (cell.alignment.horizontal) {
+      const alignMap = { 
+        left: 'left', 
+        center: 'center', 
+        right: 'right',
+        fill: 'center',
+        justify: 'justify',
+        centerContinuous: 'center',
+        distributed: 'center'
+      }
+      styles.push(`text-align: ${alignMap[cell.alignment.horizontal] || 'center'}`)
+    }
+    // 垂直对齐
+    if (cell.alignment.vertical) {
+      const vAlignMap = { 
+        top: 'top', 
+        middle: 'middle', 
+        bottom: 'bottom',
+        justify: 'middle',
+        distributed: 'middle'
+      }
+      styles.push(`vertical-align: ${vAlignMap[cell.alignment.vertical] || 'middle'}`)
+    }
+    // 自动换行
+    if (cell.alignment.wrapText) {
+      styles.push('white-space: normal')
+      styles.push('word-break: break-all')
+    }
+  }
+  
+  // 背景色
+  if (cell.fill) {
+    if (cell.fill.type === 'pattern' && cell.fill.pattern === 'solid') {
+      const fgColor = cell.fill.fgColor
+      if (fgColor) {
+        let color = null
+        if (fgColor.argb && fgColor.argb !== 'FFFFFFFF' && fgColor.argb !== '00000000') {
+          color = '#' + fgColor.argb.substring(2)
+        } else if (fgColor.theme !== undefined) {
+          // 主题色 - 使用常见的浅色
+          const themeColors = {
+            0: '#FFFFFF', // 背景1
+            1: '#000000', // 文字1
+            2: '#E7E6E6', // 背景2
+            3: '#44546A', // 文字2
+            4: '#4472C4', // 着色1
+            5: '#ED7D31', // 着色2
+            6: '#A5A5A5', // 着色3
+            7: '#FFC000', // 着色4
+            8: '#5B9BD5', // 着色5
+            9: '#70AD47'  // 着色6
+          }
+          color = themeColors[fgColor.theme] || null
+        }
+        if (color && color !== '#FFFFFF') {
+          styles.push(`background-color: ${color}`)
+        }
+      }
+    }
+  }
+  
+  // 边框处理 - 根据单元格实际边框设置
+  // ExcelJS 的边框可能在 cell.border 或 cell.style?.border 中
+  const border = cell.border || cell.style?.border
+  
+  const borderStyleMap = {
+    thin: '1px solid #000',
+    medium: '2px solid #000',
+    thick: '3px solid #000',
+    dotted: '1px dotted #000',
+    dashed: '1px dashed #000',
+    double: '3px double #000',
+    hair: '1px solid #ccc',
+    mediumDashed: '2px dashed #000',
+    dashDot: '1px dashed #000',
+    mediumDashDot: '2px dashed #000',
+    dashDotDot: '1px dotted #000',
+    slantDashDot: '1px dashed #000'
+  }
+  
+  if (border) {
+    // 上边框
+    if (border.top && border.top.style) {
+      styles.push(`border-top: ${borderStyleMap[border.top.style] || '1px solid #000'}`)
+    }
+    // 下边框
+    if (border.bottom && border.bottom.style) {
+      styles.push(`border-bottom: ${borderStyleMap[border.bottom.style] || '1px solid #000'}`)
+    }
+    // 左边框
+    if (border.left && border.left.style) {
+      styles.push(`border-left: ${borderStyleMap[border.left.style] || '1px solid #000'}`)
+    }
+    // 右边框
+    if (border.right && border.right.style) {
+      styles.push(`border-right: ${borderStyleMap[border.right.style] || '1px solid #000'}`)
+    }
+  }
+  
+  return styles.join('; ')
+}
+
+/**
+ * HTML 转义
+ */
+function escapeHtml(text) {
+  const div = document.createElement('div')
+  div.textContent = text
+  return div.innerHTML
 }
 
 /**
@@ -1479,10 +2104,20 @@ function getSelectedTemplate() {
  * 执行查询，根据工单/物料条件获取报告所需数据
  */
 async function handleSearch() {
-  if (!searchForm.pNum && !searchForm.materialId && !searchForm.materialName) {
+  // 验证查询条件
+  if (!searchForm.pNum && !searchForm.materialId && !searchForm.materialName && !searchForm.cpo) {
     ElMessage.warning('请至少输入一个查询条件')
     return
   }
+  
+  // 无工单号时，必须同时输入产品编号和CPO
+  if (!searchForm.pNum && (searchForm.materialId || searchForm.cpo)) {
+    if (!searchForm.materialId || !searchForm.cpo) {
+      ElMessage.warning('无工单号时，需同时输入产品编号和CPO进行查询')
+      return
+    }
+  }
+  
   loading.value = true
   hasSearched.value = true
   selectedProduct.value = null
@@ -1491,6 +2126,7 @@ async function handleSearch() {
     if (searchForm.pNum) params.pNum = searchForm.pNum.trim()
     if (searchForm.materialId) params.materialId = searchForm.materialId.trim()
     if (searchForm.materialName) params.materialName = searchForm.materialName.trim()
+    if (searchForm.cpo) params.cpo = searchForm.cpo.trim()
     params.StartDate = searchForm.startDate || formatDateTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
     params.EndDate = searchForm.endDate || formatDateTime(new Date())
 
@@ -1499,13 +2135,13 @@ async function handleSearch() {
 
     if (res.code !== undefined) {
       if (res.code === 0 && res.data) {
-        Object.assign(result, { workOrderInfo: res.data.workOrderInfo, materialList: res.data.materialList || [], materialInList: res.data.materialInList || [], productInfo: res.data.productInfo || [] })
+        Object.assign(result, { workOrderInfo: res.data.workOrderInfo, materialList: res.data.materialList || [], materialInList: res.data.materialInList || [], productInfo: res.data.productInfo || [], isBatchResult: false })
       } else {
         ElMessage.error(res.message || '查询失败')
         return
       }
     } else {
-      Object.assign(result, { workOrderInfo: res.workOrderInfo, materialList: res.materialList || [], materialInList: res.materialInList || [], productInfo: res.productInfo || [] })
+      Object.assign(result, { workOrderInfo: res.workOrderInfo, materialList: res.materialList || [], materialInList: res.materialInList || [], productInfo: res.productInfo || [], isBatchResult: false })
     }
 
     const parts = []
@@ -1533,14 +2169,225 @@ function formatDateTime(date) {
  * 重置查询条件与结果
  */
 function handleReset() {
-  Object.assign(searchForm, { pNum: '', materialId: '', materialName: '', startDate: '', endDate: '' })
-  Object.assign(result, { workOrderInfo: null, materialList: [], materialInList: [], productInfo: [] })
+  Object.assign(searchForm, { pNum: '', materialId: '', materialName: '', cpo: '', startDate: '', endDate: '' })
+  Object.assign(result, { workOrderInfo: null, materialList: [], materialInList: [], productInfo: [], isBatchResult: false })
   hasSearched.value = false
   selectedProduct.value = null
   selectedProducts.value = []
   reportDialogProducts.value = []
+  // 重置批量查询
+  batchInputText.value = ''
+  batchQueryList.value = []
   if (productTableRef.value) {
     productTableRef.value.clearSelection()
+  }
+}
+
+/**
+ * 处理Excel粘贴事件
+ * 解析从Excel复制的表格数据（Tab分隔的CPO和产品编号）
+ */
+function handleBatchPaste(event) {
+  // 延迟执行，确保文本已粘贴到输入框
+  setTimeout(() => {
+    parseBatchInput()
+  }, 100)
+}
+
+/**
+ * 解析批量输入的文本
+ * 支持格式：
+ * 1. Tab分隔：CPO[Tab]产品编号
+ * 2. 空格分隔：CPO 产品编号
+ * 3. 逗号分隔：CPO,产品编号
+ */
+function parseBatchInput() {
+  const text = batchInputText.value.trim()
+  if (!text) {
+    ElMessage.warning('请先粘贴数据')
+    return
+  }
+  
+  const lines = text.split(/\r?\n/).filter(line => line.trim())
+  const newItems = []
+  const errors = []
+  
+  lines.forEach((line, index) => {
+    // 尝试不同的分隔符
+    let parts = null
+    
+    // 优先Tab分隔（Excel默认）
+    if (line.includes('\t')) {
+      parts = line.split('\t').map(s => s.trim()).filter(s => s)
+    }
+    // 其次尝试多个空格分隔
+    else if (/\s{2,}/.test(line)) {
+      parts = line.split(/\s{2,}/).map(s => s.trim()).filter(s => s)
+    }
+    // 逗号分隔
+    else if (line.includes(',')) {
+      parts = line.split(',').map(s => s.trim()).filter(s => s)
+    }
+    // 单个空格分隔（至少2个部分）
+    else {
+      parts = line.split(/\s+/).map(s => s.trim()).filter(s => s)
+    }
+    
+    if (parts && parts.length >= 2) {
+      // 取前两列：CPO 和 产品编号
+      const cpo = parts[0]
+      const productId = parts[1]
+      
+      // 检查是否已存在相同组合
+      const exists = newItems.some(item => item.cpo === cpo && item.productId === productId)
+      if (!exists) {
+        newItems.push({ cpo, productId })
+      }
+    } else if (parts && parts.length === 1) {
+      // 只有一列，可能是产品编号，暂存但标记警告
+      errors.push(`第${index + 1}行格式不完整，需要CPO和产品编号两列`)
+    }
+  })
+  
+  if (newItems.length > 0) {
+    // 合并到现有列表（去重）
+    newItems.forEach(newItem => {
+      const exists = batchQueryList.value.some(
+        item => item.cpo === newItem.cpo && item.productId === newItem.productId
+      )
+      if (!exists) {
+        batchQueryList.value.push(newItem)
+      }
+    })
+    
+    ElMessage.success(`成功解析 ${newItems.length} 条数据`)
+    
+    if (errors.length > 0) {
+      ElMessage.warning(errors.slice(0, 3).join('；') + (errors.length > 3 ? '...' : ''))
+    }
+  } else {
+    ElMessage.error('未能解析出有效数据，请确保每行包含CPO和产品编号（用Tab或空格分隔）')
+  }
+}
+
+/**
+ * 清空批量输入
+ */
+function clearBatchInput() {
+  batchInputText.value = ''
+  batchQueryList.value = []
+}
+
+/**
+ * 移除批量列表中的单项
+ */
+function removeBatchItem(index) {
+  batchQueryList.value.splice(index, 1)
+}
+
+/**
+ * 批量查询
+ * 将多个CPO+产品编号组合发送到后端进行查询
+ */
+async function handleBatchSearch() {
+  if (batchQueryList.value.length === 0) {
+    ElMessage.warning('请先添加要查询的CPO和产品编号')
+    return
+  }
+  
+  loading.value = true
+  hasSearched.value = true
+  selectedProduct.value = null
+  
+  try {
+    const params = {
+      batchQuery: JSON.stringify(batchQueryList.value),  // 批量查询参数
+      StartDate: searchForm.startDate || formatDateTime(new Date(Date.now() - 90 * 24 * 60 * 60 * 1000)),  // 默认90天
+      EndDate: searchForm.endDate || formatDateTime(new Date())
+    }
+    
+    const response = await api.get('/erp/shipment-report', { params })
+    let res = response.data && response.data.workOrderInfo !== undefined ? response.data : response
+    
+    if (res.code !== undefined) {
+      if (res.code === 0 && res.data) {
+        Object.assign(result, { 
+          workOrderInfo: res.data.workOrderInfo, 
+          materialList: res.data.materialList || [], 
+          materialInList: res.data.materialInList || [], 
+          productInfo: res.data.productInfo || [],
+          isBatchResult: true  // 标记为批量查询结果
+        })
+      } else {
+        ElMessage.error(res.message || '查询失败')
+        return
+      }
+    } else {
+      Object.assign(result, { 
+        workOrderInfo: res.workOrderInfo, 
+        materialList: res.materialList || [], 
+        materialInList: res.materialInList || [], 
+        productInfo: res.productInfo || [],
+        isBatchResult: true  // 标记为批量查询结果
+      })
+    }
+    
+    // 更新待查询列表中的工单号（根据返回的产品信息匹配）
+    let matchedCount = 0
+    let unmatchedCount = 0
+    
+    batchQueryList.value.forEach(queryItem => {
+      const searchCpo = (queryItem.cpo || '').toLowerCase().trim()
+      const searchProductId = (queryItem.productId || '').toLowerCase().trim()
+      
+      // 在返回结果中查找匹配的产品，获取工单号（精确匹配）
+      const matchedProduct = result.productInfo.find(p => {
+        const itemCpo = (p.cpo || '').toLowerCase().trim()
+        const itemCProductId = (p.cProductId || '').toLowerCase().trim()
+        const itemProductId = (p.productId || '').toLowerCase().trim()
+        
+        return itemCpo === searchCpo && 
+               (itemCProductId === searchProductId || itemProductId === searchProductId)
+      })
+      
+      if (matchedProduct) {
+        queryItem.pNum = matchedProduct.pNum || ''
+        queryItem.matched = true
+        matchedCount++
+      } else {
+        queryItem.pNum = ''
+        queryItem.matched = false
+        unmatchedCount++
+      }
+    })
+    
+    const parts = []
+    if (result.productInfo?.length > 0) parts.push(`产品 ${result.productInfo.length} 项`)
+    if (result.materialList.length > 0) parts.push(`物料 ${result.materialList.length} 项`)
+    if (result.materialInList.length > 0) parts.push(`入库明细 ${result.materialInList.length} 条`)
+    
+    if (parts.length > 0) {
+      ElMessage.success(`批量查询成功：${parts.join('、')}`)
+      
+      // 如果有未匹配的项目，给出提示
+      if (unmatchedCount > 0) {
+        ElMessage.warning(`${unmatchedCount} 条数据未匹配到入库记录，可能尚未入库或时间范围不够`)
+      }
+      
+      // A08客户提示：可以合并生成报告
+      if (result.productInfo?.length > 1) {
+        const customerId = result.productInfo[0]?.customerId || result.workOrderInfo?.CustomerID
+        if (customerId === 'A08') {
+          ElMessage.info('A08客户：可勾选多个产品合并生成一份报告')
+        }
+      }
+    } else {
+      ElMessage.info('未找到匹配的数据，请检查CPO和产品编号是否正确，或扩大时间范围')
+    }
+  } catch (error) {
+    ElMessage.error('批量查询失败: ' + (error.response?.data?.message || error.message))
+  } finally {
+    loading.value = false
   }
 }
 
@@ -1575,7 +2422,8 @@ function handleGenerateReport(row) {
   selectedProduct.value = row
   reportDialogProduct.value = row
   reportDialogProducts.value = [row]  // 单产品数组
-  const customerId = result.workOrderInfo?.CustomerID
+  // 优先从工单信息获取客户编码，其次从产品数据获取
+  const customerId = result.workOrderInfo?.CustomerID || row.customerId || ''
   const matched = templateList.value.find(t => t.customerId === customerId && t.enabled)
   selectedTemplateId.value = matched?.id || templateList.value[0]?.id
   showReportDialog.value = true
@@ -1592,7 +2440,8 @@ function handleBatchGenerateReport() {
   selectedProduct.value = selectedProducts.value[0]
   reportDialogProduct.value = selectedProducts.value[0]
   reportDialogProducts.value = [...selectedProducts.value]  // 多产品数组
-  const customerId = result.workOrderInfo?.CustomerID
+  // 优先从工单信息获取客户编码，其次从产品数据获取
+  const customerId = result.workOrderInfo?.CustomerID || selectedProducts.value[0]?.customerId || ''
   const matched = templateList.value.find(t => t.customerId === customerId && t.enabled)
   selectedTemplateId.value = matched?.id || templateList.value[0]?.id
   showReportDialog.value = true
@@ -1951,8 +2800,15 @@ onMounted(() => {
 .card-header .el-tag { margin-left: auto; }
 .header-tip { font-size: 12px; color: #94a3b8; font-weight: normal; margin-left: 8px; }
 
+/* 产品卡片header特殊布局 */
+.product-card-header { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+.product-card-header .header-left { display: flex; align-items: center; gap: 8px; }
+.product-card-header .header-left .el-tag { margin-left: 0; }
+.product-card-header .header-tip { margin-left: 0; }
+
 .search-form { padding: 10px 0; }
-.btn-group { display: flex; gap: 10px; }
+.btn-group { display: flex; gap: 10px; align-items: center; }
+.search-tip { font-size: 12px; color: #94a3b8; margin-left: 12px; }
 
 .product-card :deep(.el-table) { cursor: pointer; }
 .product-card :deep(.selected-row) { background-color: #e8f4ff !important; }
@@ -2092,18 +2948,74 @@ onMounted(() => {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05); /* 减弱阴影 */
 }
 
-/* 前台页面特定样式 - 修复顶部空距过大问题 */
-:deep(.shipment-content-wrapper .content-container) {
-  /* 恢复对 ShipmentReport 页面的特殊处理 */
-  /* 抵消 AppLayout 的 header-gap，使该页面紧贴导航栏 */
-  margin-top: calc(-1 * var(--header-gap)) !important; 
-  /* 重新计算高度以适应负边距 */
-  min-height: calc(100vh - 7.5rem + var(--header-gap) - 10px) !important;
+/* 前台页面特定样式 */
+.frontend-page {
+  padding: 0;
+  height: 100%;
 }
 
+.frontend-page .page-header {
+  border-radius: 8px;
+  margin-bottom: 24px;
+}
+
+.frontend-page .main-content {
+  height: calc(100vh - 200px); /* 减去头部和底部的大致高度 */
+}
+
+/* 移除旧的特定样式 */
+/* 前台页面特定样式 - 修复顶部空距过大问题 */
 /* 调整 AppLayout 带来的顶部间距 */
-:deep(.app-layout .scrollable-content) {
-  /* 这里无法直接影响父组件 AppLayout 的样式，但可以通过负 margin 调整视觉效果 */
-  /* 或者让 content-container 向上移动 */
+
+/* 批量查询样式 */
+.batch-search-form {
+  padding: 10px 0;
+}
+.batch-input-section,
+.batch-preview-section {
+  background: #f8fafc;
+  border-radius: 8px;
+  padding: 16px;
+  height: 100%;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.section-title {
+  font-weight: 600;
+  color: #334155;
+  font-size: 14px;
+}
+.help-icon {
+  color: #94a3b8;
+  cursor: help;
+}
+.batch-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+}
+.batch-preview-section :deep(.el-table) {
+  background: transparent;
+}
+.batch-preview-section :deep(.el-table__empty-block) {
+  min-height: 80px;
+}
+.pnum-cell {
+  color: #409eff;
+  font-weight: 500;
+}
+.pnum-pending {
+  color: #c0c4cc;
+  font-size: 12px;
+  font-style: italic;
+}
+.pnum-unmatched {
+  color: #f56c6c;
+  font-size: 12px;
+  font-weight: 500;
 }
 </style>

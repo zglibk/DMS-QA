@@ -13,7 +13,12 @@
           <el-menu-item index="stats">数据可视化</el-menu-item>
           <el-menu-item index="rework">返工分析</el-menu-item>
           <el-menu-item index="publishing-exceptions">出版异常</el-menu-item>
-          <el-menu-item index="shipment-report">出货报告</el-menu-item>
+          <el-sub-menu index="inspection">
+            <template #title>检验报告</template>
+            <el-menu-item index="incoming-inspection">来料检验报告</el-menu-item>
+            <el-menu-item index="performance-report">性能实验报告</el-menu-item>
+            <el-menu-item index="shipment-report">出货检验报告</el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </div>
     </div>
@@ -68,8 +73,12 @@ const activeMenu = computed(() => {
     return 'rework'
   } else if (path === '/publishing-exceptions') {
     return 'publishing-exceptions'
-  } else if (path === '/shipment-report') {
+  } else if (path.startsWith('/inspection/shipment')) {
     return 'shipment-report'
+  } else if (path.startsWith('/inspection/incoming')) {
+    return 'incoming-inspection'
+  } else if (path.startsWith('/inspection/performance')) {
+    return 'performance-report'
   }
   return ''
 })
@@ -85,7 +94,11 @@ const handleMenuSelect = (index) => {
   } else if (index === 'publishing-exceptions') {
     router.push('/publishing-exceptions')
   } else if (index === 'shipment-report') {
-    router.push('/shipment-report')
+    router.push('/inspection/shipment')
+  } else if (index === 'incoming-inspection') {
+    router.push('/inspection/incoming')
+  } else if (index === 'performance-report') {
+    router.push('/inspection/performance')
   }
 }
 
@@ -174,9 +187,60 @@ const handleLogoError = (event) => {
 .nav-menu {
   background: transparent;
   border-bottom: none;
-  display: inline-block;
   min-width: 0;
   flex-shrink: 0;
+}
+
+.nav-menu :deep(.el-sub-menu) {
+  /* Remove explicit display override to let flex work naturally */
+}
+
+.nav-menu :deep(.el-sub-menu__title) {
+  background: transparent !important;
+  position: relative;
+  padding: 0 32px 0 16px !important; /* Adjusted padding: left 16px, right 32px for arrow */
+  margin: 0 8px;
+  border-radius: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  overflow: visible;
+  font-size: 16px;
+  font-weight: 500;
+  border-bottom: none !important;
+  height: 56px;
+  line-height: 56px;
+}
+
+.nav-menu :deep(.el-sub-menu .el-sub-menu__icon-arrow) {
+  position: absolute;
+  right: 8px; /* Move arrow closer to text but keep space */
+  top: 50%;
+  margin-top: -6px; /* Center vertically */
+  font-size: 12px;
+}
+.nav-menu :deep(.el-sub-menu.is-active .el-sub-menu__title) {
+  border-bottom: none !important;
+  color: #409EFF !important;
+}
+
+/* 底部指示线 for sub-menu */
+.nav-menu :deep(.el-sub-menu__title)::after {
+  content: '';
+  display: block;
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  width: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #409EFF, #67C23A);
+  border-radius: 2px 2px 0 0;
+  transform: translateX(-50%);
+  transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(64, 158, 255, 0.3);
+}
+
+.nav-menu :deep(.el-sub-menu:hover .el-sub-menu__title)::after,
+.nav-menu :deep(.el-sub-menu.is-active .el-sub-menu__title)::after {
+  width: 80%;
 }
 
 .nav-menu :deep(.el-menu-item) {
