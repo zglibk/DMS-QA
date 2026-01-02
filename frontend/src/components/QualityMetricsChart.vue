@@ -637,20 +637,22 @@ const updateChart = () => {
   }
 
   try {
+    // 基础空配置（用于无数据或出错时重置）
+    const getEmptyOption = () => ({
+      ...chartOption.value,
+      xAxis: {
+        ...chartOption.value.xAxis,
+        data: []
+      },
+      series: chartOption.value.series.map(s => ({
+        ...s,
+        data: []
+      }))
+    })
+
     // 处理空数据的情况
     if (!chartData.value || !Array.isArray(chartData.value) || !chartData.value.length) {
-      const emptyOption = {
-        xAxis: {
-          data: []
-        },
-        series: [
-          { data: [] },    // 交检批次
-          { data: [] },    // 发货批次
-          { data: [] },    // 一次交检合格率
-          { data: [] }     // 交货批次合格率
-        ]
-      }
-      chartInstance.value.setOption(emptyOption, true)
+      chartInstance.value.setOption(getEmptyOption(), true)
       return
     }
 
@@ -692,11 +694,16 @@ const updateChart = () => {
   } catch (error) {
     console.error('图表更新失败:', error)
     // 发生错误时显示空状态
-    const emptyOption = {
-      xAxis: { data: [] },
-      series: [{ data: [] }, { data: [] }, { data: [] }, { data: [] }]
+    try {
+      const emptyOption = {
+        ...chartOption.value,
+        xAxis: { ...chartOption.value.xAxis, data: [] },
+        series: chartOption.value.series.map(s => ({ ...s, data: [] }))
+      }
+      chartInstance.value.setOption(emptyOption, true)
+    } catch (e) {
+      console.error('重置图表失败:', e)
     }
-    chartInstance.value.setOption(emptyOption, true)
   }
 }
 

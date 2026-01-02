@@ -43,7 +43,7 @@ const getNoticeList = async (req, res) => {
         const { 
             limit = 10, 
             page = 1, 
-            size = 10, 
+            size, // Remove default value for size to avoid overriding limit
             type, 
             timeRange, 
             readStatus,
@@ -52,7 +52,8 @@ const getNoticeList = async (req, res) => {
         const userId = req.user?.id || 1; // 临时使用默认用户ID
         
         // 计算分页参数
-        const pageSize = parseInt(size) || parseInt(limit) || 10;
+        // 优先使用 size (如果存在), 否则使用 limit, 最后默认为 10
+        const pageSize = (size && parseInt(size)) ? parseInt(size) : (parseInt(limit) || 10);
         const pageNum = parseInt(page) || 1;
         const offset = (pageNum - 1) * pageSize;
         

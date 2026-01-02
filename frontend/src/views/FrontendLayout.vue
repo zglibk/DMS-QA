@@ -44,7 +44,7 @@ const currentYear = computed(() => new Date().getFullYear())
 .main-content {
   flex: 1;
   width: 100%;
-  max-width: 1400px;
+  max-width: 1600px; /* Increased from 1400px */
   margin: 0 auto;
   padding: 24px;
   box-sizing: border-box;
@@ -59,14 +59,6 @@ const currentYear = computed(() => new Date().getFullYear())
   padding: 12px 0; /* Reduce padding slightly */
   border-top: 1px solid #ebeef5;
   z-index: 1000;
-}
-
-.frontend-layout {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background-color: #f5f7fa;
-  padding-bottom: 50px; /* Space for fixed footer */
 }
 
 .copyright {

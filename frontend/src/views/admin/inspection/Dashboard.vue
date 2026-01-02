@@ -191,19 +191,22 @@
         <!-- Notices / Tips -->
         <el-card class="sidebar-card" shadow="hover" style="margin-top: 15px">
             <template #header>
-                <div class="card-header">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center">
                     <span>系统公告</span>
+                    <el-button link type="primary" size="small" @click="router.push('/admin/system/notices')">更多</el-button>
                 </div>
             </template>
-            <div class="notice-list">
-                <div class="notice-item">
-                    <el-tag size="small" type="danger">通知</el-tag>
-                    <span class="notice-text">请尽快完成本月审核任务</span>
+            <div class="notice-list" v-if="notices.length > 0">
+                <div class="notice-item" v-for="notice in notices" :key="notice.ID" @click="viewNotice(notice)" style="cursor: pointer;">
+                    <el-tag size="small" :type="getNoticeTypeTag(notice.Type)" effect="plain">
+                        {{ getNoticeTypeLabel(notice.Type) }}
+                    </el-tag>
+                    <span class="notice-text" :title="notice.Title">{{ notice.Title }}</span>
+                    <span v-if="!notice.IsRead" class="new-dot"></span>
                 </div>
-                <div class="notice-item">
-                    <el-tag size="small" type="success">更新</el-tag>
-                    <span class="notice-text">检验系统 v2.1 上线</span>
-                </div>
+            </div>
+            <div v-else class="empty-text">
+                暂无公告
             </div>
         </el-card>
         
@@ -379,20 +382,22 @@
 </template>
 
 <script setup>
-import { ref, onMounted, reactive, watch, onUnmounted } from 'vue'
+import { ref, onMounted, reactive, watch, onUnmounted, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore } from '@/store/user'
+import api from '@/api'
 import { getDashboardSummary, getDashboardTasks, batchAudit } from '@/api/inspectionDashboard'
 import { getIncomingReportDetail } from '@/api/inspection'
 import { getReport as getPerformanceReport } from '@/api/performance'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Search, Plus, Timer, EditPen, Calendar, Warning, CircleCloseFilled, DataLine, PieChart, Clock } from '@element-plus/icons-vue'
+import { Search, Plus, Timer, EditPen, Calendar, Warning, CircleCloseFilled, DataLine, PieChart, Clock, Bell } from '@element-plus/icons-vue'
 
 const router = useRouter()
 const userStore = useUserStore()
 
 const stats = ref({})
 const tableData = ref([])
+const notices = ref([])
 const total = ref(0)
 const loading = ref(false)
 const searchKeyword = ref('')
@@ -423,6 +428,64 @@ const detailDialogVisible = ref(false)
 const detailLoading = ref(false)
 const detailData = ref({})
 const detailType = ref('')
+
+// Notice Logic
+const noticeDialogVisible = ref(false)
+const currentNotice = ref({})
+
+const fetchNotices = async () => {
+    try {
+        const res = await api.get('/api/notice', {
+            params: {
+                limit: 3,
+                page: 1,
+                // type: 'system' 
+            }
+        })
+        if (res.data.success) {
+            notices.value = res.data.data
+        }
+    } catch (e) {
+        console.error('获取公告失败', e)
+    }
+}
+
+const viewNotice = async (notice) => {
+    try {
+        const res = await api.get(`/api/notice/${notice.ID}`)
+        if (res.data.success) {
+            currentNotice.value = res.data.data
+            noticeDialogVisible.value = true
+            if (!notice.IsRead) {
+                notice.IsRead = 1 
+            }
+        }
+    } catch (e) {
+        ElMessage.error('获取公告详情失败')
+    }
+}
+
+const getNoticeTypeTag = (type) => {
+    const map = {
+        'system': 'danger',
+        'important': 'warning',
+        'general': 'info',
+        'announcement': 'primary',
+        'update': 'success'
+    }
+    return map[type] || 'info'
+}
+
+const getNoticeTypeLabel = (type) => {
+    const map = {
+        'system': '系统',
+        'important': '重要',
+        'general': '通知',
+        'announcement': '公告',
+        'update': '更新'
+    }
+    return map[type] || '通知'
+}
 
 const fetchStats = async () => {
     try {
@@ -602,6 +665,7 @@ const updateTime = () => {
 onMounted(() => {
     fetchStats()
     fetchTasks()
+    fetchNotices()
     updateTime()
     timer = setInterval(updateTime, 1000)
 })
@@ -790,6 +854,21 @@ onUnmounted(() => {
 .dot-green { background-color: #67c23a; }
 .dot-red { background-color: #f56c6c; }
 .dot-gray { background-color: #909399; }
+
+.empty-text {
+    text-align: center;
+    color: #909399;
+    padding: 20px 0;
+    font-size: 13px;
+}
+
+.new-dot {
+    width: 6px;
+    height: 6px;
+    background-color: #f56c6c;
+    border-radius: 50%;
+    margin-left: 5px;
+}
 
 .dist-item {
     padding: 5px 0;

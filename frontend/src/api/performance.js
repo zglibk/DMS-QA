@@ -120,3 +120,10 @@ export function deleteConfig(id) {
     method: 'delete'
   })
 }
+
+export function createRecheckReport(id) {
+  return request({
+    url: `/inspection/performance/${id}/recheck`,
+    method: 'post'
+  })
+}

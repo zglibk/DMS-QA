@@ -67,8 +67,10 @@ router.get('/list', authenticateToken, async (req, res) => {
                 WITH PagedCTE AS (
                     SELECT 
                         r.*,
+                        u.RealName as CreatorName,
                         ROW_NUMBER() OVER (ORDER BY r.CreatedAt DESC) AS RowNum
                     FROM PerformanceReports r
+                    LEFT JOIN [User] u ON r.CreatedBy = u.Username
                     ${whereClause}
                 )
                 SELECT 
@@ -270,16 +272,198 @@ router.get('/:id', authenticateToken, async (req, res) => {
     }
 });
 
+// Create Recheck Report
+router.post('/:id/recheck', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const currentUser = req.user.username;
+
+        let newId = null;
+        let finalReportNo = '';
+
+        await executeQuery(async (pool) => {
+            // 1. Get Original Report
+            const originResult = await pool.request()
+                .input('ID', sql.Int, id)
+                .query('SELECT * FROM PerformanceReports WHERE ID = @ID');
+            
+            if (originResult.recordset.length === 0) {
+                throw new Error('Original report not found');
+            }
+            const originReport = originResult.recordset[0];
+
+            // 2. Determine Base Report No
+            // Check if origin is already a recheck
+            const recheckMatch = originReport.ReportNo.match(/^(.*)-R(\d+)$/);
+            let baseReportNo = originReport.ReportNo;
+            if (recheckMatch) {
+                baseReportNo = recheckMatch[1];
+            }
+
+            // 3. Generate New Report No
+            const prefix = `${baseReportNo}-R`;
+            const countResult = await pool.request()
+                .input('Prefix', sql.NVarChar, `${prefix}%`)
+                .query(`
+                    SELECT MAX(ReportNo) as MaxNo 
+                    FROM PerformanceReports 
+                    WHERE ReportNo LIKE @Prefix + '%'
+                `);
+            
+            let nextSeq = 1;
+            if (countResult.recordset[0].MaxNo) {
+                const parts = countResult.recordset[0].MaxNo.split('-R');
+                const lastSeq = parseInt(parts[parts.length - 1]);
+                if (!isNaN(lastSeq)) {
+                    nextSeq = lastSeq + 1;
+                }
+            }
+            finalReportNo = `${prefix}${nextSeq}`;
+
+            // 4. Insert New Report
+            // Copy fields from originReport, but reset Status, Dates, Creator
+            const insertResult = await pool.request()
+                .input('ReportNo', sql.NVarChar, finalReportNo)
+                .input('TestDate', sql.DateTime, new Date()) // Reset test date to now
+                .input('CustomerCode', sql.NVarChar, originReport.CustomerCode)
+                .input('SampleName', sql.NVarChar, originReport.SampleName)
+                .input('SampleModel', sql.NVarChar, originReport.SampleModel)
+                .input('BatchNo', sql.NVarChar, originReport.BatchNo)
+                .input('Supplier', sql.NVarChar, originReport.Supplier)
+                .input('Specification', sql.NVarChar, originReport.Specification)
+                .input('CreatedBy', sql.NVarChar, currentUser)
+                .query(`
+                    INSERT INTO PerformanceReports (
+                        ReportNo, TestDate, CustomerCode, SampleName, SampleModel, 
+                        BatchNo, Supplier, Specification, CreatedBy, Status
+                    )
+                    OUTPUT INSERTED.ID
+                    VALUES (
+                        @ReportNo, @TestDate, @CustomerCode, @SampleName, @SampleModel, 
+                        @BatchNo, @Supplier, @Specification, @CreatedBy, 'Draft'
+                    )
+                `);
+            newId = insertResult.recordset[0].ID;
+
+            // 5. Copy Items
+            const itemsResult = await pool.request()
+                .input('OriginID', sql.Int, id)
+                .query('SELECT * FROM PerformanceReportItems WHERE ReportID = @OriginID');
+            
+            const items = itemsResult.recordset;
+            if (items.length > 0) {
+                const transaction = new sql.Transaction(pool);
+                await transaction.begin();
+                try {
+                    for (const item of items) {
+                        const req = transaction.request();
+                        req.input('ReportID', sql.Int, newId)
+                           .input('TestType', sql.NVarChar, item.TestType)
+                           .input('InstrumentID', sql.Int, item.InstrumentID)
+                           .input('Standard', sql.NVarChar, item.Standard)
+                           .input('Method', sql.NVarChar, item.Method)
+                           .input('Conditions', sql.NVarChar, item.Conditions) // Keep conditions
+                           .input('ResultData', sql.NVarChar, '{}') // Clear data
+                           .input('Conclusion', sql.NVarChar, null) // Clear conclusion
+                           .input('Images', sql.NVarChar, '[]'); // Clear images
+                        
+                        await req.query(`
+                            INSERT INTO PerformanceReportItems (
+                                ReportID, TestType, InstrumentID, Standard, Method, 
+                                Conditions, ResultData, Conclusion, Images
+                            )
+                            VALUES (
+                                @ReportID, @TestType, @InstrumentID, @Standard, @Method, 
+                                @Conditions, @ResultData, @Conclusion, @Images
+                            )
+                        `);
+                    }
+                    await transaction.commit();
+                } catch (err) {
+                    await transaction.rollback();
+                    throw err;
+                }
+            }
+        });
+
+        res.json({ success: true, message: 'Recheck report created', id: newId, reportNo: finalReportNo });
+    } catch (e) {
+        console.error(e);
+        res.status(500).json({ success: false, message: 'Create recheck failed: ' + e.message });
+    }
+});
+
 // Create Report
 router.post('/', authenticateToken, async (req, res) => {
     try {
-        const { ReportNo, TestDate, CustomerCode, SampleName, SampleModel, BatchNo, Supplier, Specification } = req.body;
-        
-        // Auto-generate ReportNo if not provided
-        const finalReportNo = ReportNo || `PERF-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(Math.random()*1000).toString().padStart(3,'0')}`;
+        const { 
+            ReportNo, TestDate, CustomerCode, SampleName, SampleModel, 
+            BatchNo, Supplier, Specification,
+            ReportType, OriginalReportNo // Optional fields for recheck logic
+        } = req.body;
         
         let newId = null;
+        let finalReportNo = ReportNo;
+
         await executeQuery(async (pool) => {
+            // Auto-generate ReportNo if not provided
+            if (!finalReportNo) {
+                // --- Recheck Number Rule ---
+                // If it is a recheck report (ReportType='Recheck' and OriginalReportNo provided)
+                // Rule: OriginalReportNo + "-R" + Sequence (e.g., TJ-PERF2501001-R1)
+                if (ReportType === 'Recheck' && OriginalReportNo) {
+                    const recheckPrefix = `${OriginalReportNo}-R`;
+                    const recheckResult = await pool.request()
+                        .input('Prefix', sql.NVarChar, `${recheckPrefix}%`)
+                        .query(`
+                            SELECT MAX(ReportNo) as MaxNo 
+                            FROM PerformanceReports 
+                            WHERE ReportNo LIKE @Prefix
+                        `);
+                    
+                    let nextRSeq = 1;
+                    if (recheckResult.recordset[0].MaxNo) {
+                        const parts = recheckResult.recordset[0].MaxNo.split('-R');
+                        const lastRSeq = parseInt(parts[parts.length - 1]);
+                        if (!isNaN(lastRSeq)) {
+                            nextRSeq = lastRSeq + 1;
+                        }
+                    }
+                    finalReportNo = `${OriginalReportNo}-R${nextRSeq}`;
+                } else {
+                    // --- Main Number Rule ---
+                    // Rule: "TJ" + "-PERF" + YYMM + "000" (Sequence)
+                    // Example: TJ-PERF2501001
+                    const now = new Date();
+                    const year = String(now.getFullYear()).slice(-2); // YY (e.g., 25)
+                    const month = String(now.getMonth() + 1).padStart(2, '0'); // MM (e.g., 01)
+                    const prefix = `TJ-PERF${year}${month}`;
+
+                    // Find max existing number for current month to increment
+                    // Filter specifically for the standard format to avoid confusion with other formats
+                    const countResult = await pool.request()
+                        .input('Prefix', sql.NVarChar, `${prefix}%`)
+                        .query(`
+                            SELECT MAX(ReportNo) as MaxNo 
+                            FROM PerformanceReports 
+                            WHERE ReportNo LIKE @Prefix + '[0-9][0-9][0-9]' 
+                            AND ReportNo NOT LIKE '%-R%' -- Exclude recheck reports just in case
+                        `);
+                    
+                    let nextSeq = 1;
+                    if (countResult.recordset[0].MaxNo) {
+                        // Extract the last 3 digits
+                        const lastSeqStr = countResult.recordset[0].MaxNo.replace(prefix, '');
+                        const lastSeq = parseInt(lastSeqStr);
+                        if (!isNaN(lastSeq)) {
+                            nextSeq = lastSeq + 1;
+                        }
+                    }
+                    
+                    finalReportNo = `${prefix}${String(nextSeq).padStart(3, '0')}`;
+                }
+            }
+
             const result = await pool.request()
                 .input('ReportNo', sql.NVarChar, finalReportNo)
                 .input('TestDate', sql.DateTime, TestDate || new Date())

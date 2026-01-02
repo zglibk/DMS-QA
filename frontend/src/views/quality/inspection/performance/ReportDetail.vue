@@ -12,6 +12,7 @@
                 
                 <el-button type="warning" :icon="Promotion" v-if="report.Status === 'Draft' || report.Status === 'Rejected'" @click="handleSubmit" :disabled="!isEditable || !userStore.hasPermission('quality:performance:edit')">提交审核</el-button>
                 <el-button type="success" :icon="Check" v-if="report.Status === 'Submitted'" @click="handleAudit" :disabled="!canAudit">审核通过</el-button>
+                <el-button type="warning" plain :icon="RefreshRight" v-if="canRecheck" @click="handleRecheck">复检</el-button>
              </div>
              <el-button circle :icon="Close" @click="handleClose" title="关闭" class="close-btn"></el-button>
         </div>
@@ -53,10 +54,11 @@ import { ref, watch, onMounted, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import BasicInfoForm from './components/BasicInfoForm.vue'
 import TestItemsManager from './components/TestItemsManager.vue'
-import { getReport, updateReport, addReportItem, updateReportItem, deleteReportItem, getInstruments } from '@/api/performance'
+import { getReport, updateReport, addReportItem, updateReportItem, deleteReportItem, getInstruments, createRecheckReport } from '@/api/performance'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Close, Check, Promotion, Printer, DocumentAdd } from '@element-plus/icons-vue'
+import { Close, Check, Promotion, Printer, DocumentAdd, RefreshRight } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
+import { checkPerformanceAuditPermission, checkPerformanceEditPermission } from '@/utils/permission'
 
 import { useUserStore } from '@/store/user'
 
@@ -78,53 +80,17 @@ const itemsSnapshot = ref('')
 const isDirty = ref(false)
 
 const isEditable = computed(() => {
-    if (!report.value) return false
-    const isCreator = report.value.CreatedBy === userStore.user.username
-    // Only creator can edit/submit. Admin can only Delete/Audit.
-    return (report.value.Status === 'Draft' || report.value.Status === 'Rejected') && isCreator
+    return checkPerformanceEditPermission(report.value)
 })
 
 const canAudit = computed(() => {
+    return checkPerformanceAuditPermission(report.value)
+})
+
+const canRecheck = computed(() => {
     if (!report.value) return false
     const isCreator = report.value.CreatedBy === userStore.user.username
-    
-    // 2. Check Department and Position (Dept Leader Logic)
-    // Assuming we can get dept/position info. If not available, we rely on permissions below.
-    const isDeptLeader = () => {
-        const user = userStore.user
-        if (!user) return false
-        
-        // Use logic similar to IncomingInspection if data is available
-        // Since we don't have CreatorDeptID on report easily here without joining,
-        // we will skip strict dept matching for now or assume permission handles it.
-        // However, user asked for "具备权限管理赋予的审核权限（如岗位）才可以审核"
-        
-        // Check if user has 'Leader' role or position
-        const posName = (user.positionName || '').toLowerCase()
-        const roleNames = (user.roles || []).map(r => (r.Name || r.name || '').toLowerCase())
-        const leaderKeywords = ['主管', '经理', '部长', '总监', 'supervisor', 'manager', 'director']
-        
-        const isLeader = leaderKeywords.some(k => posName.includes(k)) || 
-                         roleNames.some(r => leaderKeywords.some(k => r.includes(k)))
-                         
-        return isLeader
-    }
-
-    // 3. Permission Check
-    // 'quality:performance:audit' should be configured in backend for specific roles/users
-    const hasAuditPerm = userStore.hasPermission ? userStore.hasPermission('quality:performance:audit') : false
-    
-    // Final logic:
-    // Status is Submitted
-    // AND Not Creator
-    // AND (Admin OR (HasAuditPermission AND IsDeptLeader/Authorized))
-    // We combine HasAuditPerm and IsDeptLeader as an OR or AND depending on strictness.
-    // User said: "must possess audit permission granted by permission management (e.g. position)"
-    // So likely permission check is key.
-    
-    return report.value.Status === 'Submitted' && 
-           !isCreator && 
-           (userStore.isAdmin || hasAuditPerm)
+    return isCreator && report.value.Status === 'Audited'
 })
 
 const updateSnapshot = () => {
@@ -246,6 +212,31 @@ const handleSubmit = async () => {
             console.error(e)
         }
     }
+}
+
+const handleRecheck = () => {
+    ElMessageBox.confirm(
+        '确定要对该报告进行复检吗？这将生成一份新的报告，并保留原有样品信息。',
+        '复检确认',
+        {
+            confirmButtonText: '确定复检',
+            cancelButtonText: '取消',
+            type: 'warning'
+        }
+    ).then(async () => {
+        try {
+            loading.value = true
+            const res = await createRecheckReport(report.value.ID)
+            ElMessage.success('复检报告创建成功')
+            emit('refresh')
+            emit('close')
+        } catch (e) {
+            console.error(e)
+            ElMessage.error('创建复检报告失败')
+        } finally {
+            loading.value = false
+        }
+    }).catch(() => {})
 }
 
 const auditDialogVisible = ref(false)
@@ -378,6 +369,9 @@ const handleClose = () => {
     justify-content: space-between;
     align-items: center;
     background: #fff;
+    position: sticky;
+    top: 0;
+    z-index: 100;
 }
 .header-left {
     display: flex;
