@@ -370,7 +370,7 @@
           :total="total"
           v-model:page-size="pageSize"
           v-model:current-page="page"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[5, 10, 20, 50, 100]"
           class="modern-pagination"
         />
       </div>
@@ -1139,7 +1139,7 @@ const search = ref('')
 const users = ref([])
 const total = ref(0)
 const page = ref(1)
-const pageSize = ref(10)
+const pageSize = ref(5)
 const loading = ref(false)
 const submitLoading = ref(false)
 
@@ -1994,12 +1994,6 @@ const setPermission = async (row) => {
  */
 const exportUsers = async () => {
   try {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      ElMessage.error('请先登录')
-      return
-    }
-
     // 构建查询参数
     const params = {
       page: 1,
@@ -2011,13 +2005,11 @@ const exportUsers = async () => {
 
     ElMessage.info('正在导出用户数据...')
     
-    const res = await api.get('/auth/user-list', {
-      params,
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/auth/user-list', { params })
 
-    if (res.data && res.data.success) {
-      const userData = res.data.data
+    // api拦截器已返回response.data，直接判断res.success
+    if (res && res.success) {
+      const userData = res.data
       
       // 导入本地安装的xlsx-js-style库（支持样式）
        const XLSX = await import('xlsx-js-style')
@@ -2147,7 +2139,7 @@ const exportUsers = async () => {
       
       ElMessage.success(`成功导出 ${userData.length} 条用户数据到 ${fileName}`)
     } else {
-      ElMessage.error(res.data.message || '获取用户数据失败')
+      ElMessage.error(res?.message || '获取用户数据失败')
     }
   } catch (error) {
     console.error('导出用户数据失败:', error)
@@ -2187,12 +2179,6 @@ const exportUsers = async () => {
  */
 const exportUsersAsCSV = async () => {
   try {
-    const token = localStorage.getItem('token')
-    if (!token) {
-      ElMessage.error('请先登录')
-      return
-    }
-
     // 构建查询参数
     const params = {
       page: 1,
@@ -2202,13 +2188,11 @@ const exportUsersAsCSV = async () => {
     if (filterRole.value !== '') params.role = filterRole.value
     if (filterStatus.value !== '') params.status = filterStatus.value
 
-    const res = await api.get('/auth/user-list', {
-      params,
-      headers: { Authorization: `Bearer ${token}` }
-    })
+    const res = await api.get('/auth/user-list', { params })
 
-    if (res.data && res.data.success) {
-      const userData = res.data.data
+    // api拦截器已返回response.data，直接判断res.success
+    if (res && res.success) {
+      const userData = res.data
       
       // 准备导出数据
       const exportData = userData.map((user, index) => ({
@@ -2247,7 +2231,7 @@ const exportUsersAsCSV = async () => {
       
       ElMessage.success(`成功导出 ${userData.length} 条用户数据（CSV格式）`)
     } else {
-      ElMessage.error(res.data.message || '获取用户数据失败')
+      ElMessage.error(res?.message || '获取用户数据失败')
     }
   } catch (error) {
     console.error('CSV导出失败:', error)
@@ -2495,18 +2479,16 @@ const changeStatus = async (row, val) => {
   }
   const oldStatus = row.Status;
   row.Status = val;
-  const token = localStorage.getItem('token');
   try {
     const res = await api.post('/auth/user-status', {
       username: row.Username,
       status: val
-    }, {
-      headers: { Authorization: `Bearer ${token}` }
     });
-    if (res.data && res.data.success) {
+    // api拦截器已返回response.data，所以直接判断res.success
+    if (res && res.success) {
       ElMessage.success('状态已更新');
     } else {
-      ElMessage.error(res.data.message || '状态更新失败');
+      ElMessage.error(res?.message || '状态更新失败');
       row.Status = oldStatus;
     }
   } catch (e) {
@@ -3047,8 +3029,22 @@ const getUserIdTagStyle = (userId) => {
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
 }
 
+/* 减小卡片头部高度 */
+.table-card :deep(.el-card__header) {
+  padding: 12px 16px;
+}
+
 .table-card :deep(.el-card__body) {
-  padding: 16px 20px 12px 20px;
+  padding: 12px 16px 10px 16px;
+}
+
+/* 减小表格行高度 */
+.table-card :deep(.el-table .el-table__cell) {
+  padding: 8px 0;
+}
+
+.table-card :deep(.el-table__header th) {
+  padding: 10px 0;
 }
 
 .table-container {
@@ -3091,14 +3087,14 @@ const getUserIdTagStyle = (userId) => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 0;
+  padding: 0;
 }
 
 .table-title {
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 18px;
+  gap: 10px;
+  font-size: 16px;
   font-weight: 600;
   color: #303133;
 }
@@ -3125,7 +3121,7 @@ const getUserIdTagStyle = (userId) => {
 .user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .user-avatar {
@@ -3141,13 +3137,13 @@ const getUserIdTagStyle = (userId) => {
 .user-details {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 0;
 }
 
 .username {
   font-weight: 600;
   color: #303133;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .user-id {
@@ -3156,17 +3152,17 @@ const getUserIdTagStyle = (userId) => {
 }
 
 .user-id-container {
-  margin-top: 4px;
+  margin-top: 2px;
 }
 
 .user-id-container .el-tag {
   font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 12px;
+  padding: 1px 6px;
+  border-radius: 10px;
 }
 
 .user-id-container .el-icon {
-  margin-right: 3px;
+  margin-right: 2px;
   font-size: 10px;
 }
 
@@ -3834,6 +3830,23 @@ const getUserIdTagStyle = (userId) => {
   justify-content: center;
   align-items: center;
   gap: 8px;
+}
+
+/* 修复分页器每页数量选择框宽度 */
+:deep(.el-pagination .el-pagination__sizes) {
+  margin-right: 8px;
+}
+
+:deep(.el-pagination .el-pagination__sizes .el-select) {
+  width: 100px;
+}
+
+:deep(.el-pagination .el-pagination__sizes .el-input) {
+  width: 100px !important;
+}
+
+:deep(.el-pagination .el-pagination__sizes .el-input__wrapper) {
+  min-width: 80px;
 }
 
 :deep(.el-pagination .btn-next),

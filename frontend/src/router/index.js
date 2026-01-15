@@ -129,6 +129,12 @@ const routes = [
     component: () => import('../views/quality/inspection/performance/ReportPrintPage.vue'),
     meta: { title: '性能实验报告打印预览', requiresAuth: true }
   },
+  {
+    path: '/print/supplier-complaint/:id',
+    name: 'SupplierComplaintPrintPreview',
+    component: () => import('../views/admin/supplier/ComplaintPrintPreview.vue'),
+    meta: { title: '供应商投诉打印预览', requiresAuth: true }
+  },
 
   // 管理后台路由（嵌套路由结构）
   {
@@ -137,6 +143,9 @@ const routes = [
     children: [
       // 默认欢迎页面
       { path: '', component: () => import('../views/admin/NewWelcome.vue') },
+      
+      // 待办中心
+      { path: 'todo', component: () => import('../views/admin/todo/TodoCenter.vue'), meta: { title: '待办中心', requiresAuth: true } },
       
       // 仪表板
       { path: 'dashboard', component: Dashboard },
@@ -158,7 +167,24 @@ const routes = [
       { path: 'supplier/inspection', component: () => import('../views/admin/supplier/InspectionReports.vue'), meta: { requiresAuth: true } },
       { path: 'supplier/annual-audit-plan', component: () => import('../views/admin/supplier/AnnualAuditPlan.vue'), meta: { requiresAuth: true } },
       { path: 'supplier/audit-reports', component: () => import('../views/admin/supplier/AuditReports.vue'), meta: { requiresAuth: true } },
-      { path: 'supplier/complaints', component: () => import('../views/admin/supplier/SupplierComplaints.vue'), meta: { requiresAuth: true } },
+      // 供应商投诉管理模块（嵌套结构以支持面包屑层级）
+      {
+        path: 'supplier/complaints',
+        component: () => import('../components/common/EmptyLayout.vue'),
+        meta: { title: '供应商投诉', requiresAuth: true },
+        children: [
+          {
+            path: '',
+            component: () => import('../views/admin/supplier/SupplierComplaints.vue'),
+            meta: { title: '列表' } // 面包屑通常会忽略或合并这里的显示，取决于实现
+          },
+          {
+            path: 'templates', // 修改为相对路径，使 URL 变为 /admin/supplier/complaints/templates
+            component: () => import('../views/admin/supplier/SupplierComplaintTemplates.vue'),
+            meta: { title: '投诉书模板管理', requiresAuth: true }
+          }
+        ]
+      },
 
       // 样版管理
       { path: 'sample', redirect: '/admin/sample/approval' }, // 重定向到样品承认书
@@ -238,6 +264,11 @@ const routes = [
         name: 'DefectiveManagement',
         component: () => import('../views/admin/DefectiveManagement.vue'), // 不良类别管理页面
         meta: { title: '不良类别管理', requiresAuth: true }
+      },
+      {
+        path: 'quality/equipment-parameters/hp-indigo',
+        component: () => import('../views/quality/DeviceParameters.vue'),
+        meta: { title: 'HP Indigo 数码印刷机', requiresAuth: true }
       },
       {
         path: 'quality/targets',
@@ -386,6 +417,11 @@ const routes = [
         meta: { requiresAuth: true }
       },
       {
+        path: 'system/seals',
+        component: () => import('../views/admin/system/ElectronicSeal.vue'), // 电子签章管理页面
+        meta: { requiresAuth: true }
+      },
+      {
         path: 'system/erp',
         component: () => import('../views/admin/ErpManagement.vue'), // ERP管理页面
         meta: { requiresAuth: true }
@@ -430,6 +466,12 @@ const routes = [
       {
         path: 'instruments',
         redirect: '/admin/instruments/ledger'
+      },
+      {
+        path: 'instruments/import',
+        component: () => import('../views/admin/instruments/InstrumentImport.vue'),
+        meta: { title: '批量导入仪器', requiresAuth: true, activeMenu: '/admin/instruments/ledger' },
+        hidden: true
       },
       {
         path: 'instruments/list',
@@ -577,6 +619,22 @@ const routes = [
             name: 'PerformanceReportIndex',
             component: () => import('../views/quality/inspection/performance/Index.vue'),
             meta: { title: '性能实验报告', requiresAuth: true }
+          },
+          {
+            path: 'performance/detail/:id',
+            name: 'PerformanceReportDetail',
+            component: () => import('../views/quality/inspection/performance/ReportDetail.vue'),
+            meta: { title: '性能实验报告详情', requiresAuth: true, activeMenu: '/admin/inspection/performance' },
+            props: (route) => ({ reportId: route.params.id }),
+            hidden: true
+          },
+          {
+            path: 'performance/edit/:id',
+            name: 'PerformanceReportEdit',
+            component: () => import('../views/quality/inspection/performance/ReportDetail.vue'),
+            meta: { title: '编辑性能实验报告', requiresAuth: true, activeMenu: '/admin/inspection/performance' },
+            props: (route) => ({ reportId: route.params.id }),
+            hidden: true
           },
           {
             path: 'shipment',

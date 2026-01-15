@@ -2,12 +2,33 @@
   <div class="peel-form">
     <el-form :model="localData" label-width="100px" size="small" :disabled="readonly">
       <el-row :gutter="20">
+        <!-- Row 1 -->
         <el-col :span="8">
           <el-form-item label="试验项目">
-            <el-radio-group v-model="localData.Conditions.SpecificTestName">
-                <el-radio label="剥离力">剥离力</el-radio>
-                <el-radio label="离型力">离型力</el-radio>
-            </el-radio-group>
+            <el-checkbox 
+              :model-value="localData.Conditions.SpecificTestName === '剥离力'"
+              @change="(val) => handleTestNameChange('剥离力', val)"
+              label="剥离力"
+            />
+            <el-checkbox 
+              :model-value="localData.Conditions.SpecificTestName === '离型力'"
+              @change="(val) => handleTestNameChange('离型力', val)"
+              label="离型力"
+            />
+          </el-form-item>
+        </el-col>
+        <el-col :span="8">
+          <el-form-item label="试验角度">
+            <el-checkbox 
+              :model-value="localData.Conditions.Angle === '180°'"
+              @change="(val) => handleAngleChange('180°', val)"
+              label="180°"
+            />
+            <el-checkbox 
+              :model-value="localData.Conditions.Angle === '90°'"
+              @change="(val) => handleAngleChange('90°', val)"
+              label="90°"
+            />
           </el-form-item>
         </el-col>
         <el-col :span="8">
@@ -19,6 +40,8 @@
             </el-radio-group>
           </el-form-item>
         </el-col>
+
+        <!-- Row 2 -->
         <el-col :span="8">
           <el-form-item label="测试仪器">
             <el-select 
@@ -36,13 +59,6 @@
             </el-select>
           </el-form-item>
         </el-col>
-
-        <!-- Row 1 -->
-        <el-col :span="8">
-          <el-form-item label="试验人员">
-            <el-input v-model="localData.Conditions.Tester" />
-          </el-form-item>
-        </el-col>
         <el-col :span="8">
           <el-form-item label="试验标准">
             <el-input v-model="localData.Standard" placeholder="自动加载" />
@@ -53,13 +69,13 @@
             <el-input v-model="localData.Conditions.Spec" />
           </el-form-item>
         </el-col>
-
-        <!-- Row 2 -->
         <el-col :span="8">
           <el-form-item label="试验速度">
             <el-input v-model="localData.Conditions.Speed" />
           </el-form-item>
         </el-col>
+
+        <!-- Row 2 -->
         <el-col :span="8">
           <el-form-item label="实验时间">
             <el-input v-model="localData.Conditions.Time" />
@@ -70,11 +86,9 @@
             <el-input v-model="localData.Conditions.PurchaseNo" />
           </el-form-item>
         </el-col>
-
-        <!-- Row 3 -->
         <el-col :span="8">
-          <el-form-item label="参考标准">
-            <el-input v-model="localData.Conditions.RefStandard" placeholder="手动填入合格标准" />
+          <el-form-item label="合格标准">
+            <el-input v-model="localData.Conditions.RefStandard" placeholder="自动加载或手动填入" />
           </el-form-item>
         </el-col>
         <el-col :span="8">
@@ -95,7 +109,12 @@
       <el-row :gutter="20">
         <el-col :span="24">
           <div style="padding: 0 10px;">
-            <div class="table-title">{{ localData.Conditions.SpecificTestName || '数据' }}明细 (支持从Excel粘贴)</div>
+            <div class="table-title">
+                {{ localData.Conditions.SpecificTestName || '数据' }}明细
+                <el-tooltip content="支持从Excel批量粘贴" placement="top">
+                    <el-icon style="margin-left: 5px; cursor: help; vertical-align: middle; color: var(--el-color-warning)"><QuestionFilled /></el-icon>
+                </el-tooltip>
+            </div>
             <table class="custom-table">
                 <thead>
                     <tr>
@@ -167,6 +186,7 @@
 <script setup>
 import { ref, watch, computed, onMounted, nextTick } from 'vue'
 import FileUpload from '@/components/FileUpload.vue'
+import { QuestionFilled } from '@element-plus/icons-vue'
 
 const props = defineProps({
   modelValue: Object,
@@ -217,6 +237,36 @@ const localData = ref({
 const fileList = ref([])
 const isInternalUpdate = ref(false)
 
+const handleTestNameChange = (name, checked) => {
+    // 切换时清空
+    localData.value.Standard = ''
+    localData.value.Conditions.RefStandard = ''
+    
+    if (checked) {
+        localData.value.Conditions.SpecificTestName = name
+    } else {
+        // 如果取消选中当前项，则清空
+        if (localData.value.Conditions.SpecificTestName === name) {
+            localData.value.Conditions.SpecificTestName = ''
+        }
+    }
+}
+
+const handleAngleChange = (angle, checked) => {
+    // 切换时清空
+    localData.value.Standard = ''
+    localData.value.Conditions.RefStandard = ''
+    
+    if (checked) {
+        localData.value.Conditions.Angle = angle
+    } else {
+        // 如果取消选中当前项，则清空
+        if (localData.value.Conditions.Angle === angle) {
+            localData.value.Conditions.Angle = ''
+        }
+    }
+}
+
 watch(fileList, (val) => {
     if (isInternalUpdate.value) return
     // Sync with localData
@@ -226,32 +276,70 @@ watch(fileList, (val) => {
     emit('update:modelValue', localData.value)
 }, { deep: true })
 
-watch(() => localData.value.Conditions.SpecificTestName, (name) => {
-    if (name && props.inspectionItems) {
-        let match = props.inspectionItems.find(i => i.ItemName === name)
-        if (!match) {
-            match = props.inspectionItems.find(i => i.ItemName.includes(name))
-        }
-        if (match) {
-            // Populate Standard (Test Standard) from InspectionBasis (Document Name)
-            if (match.InspectionBasis) localData.value.Standard = match.InspectionBasis
-            // RefStandard (Pass Criteria) is left manual
-        }
+watch(() => [localData.value.Conditions.SpecificTestName, localData.value.Conditions.Angle, props.inspectionItems], ([name, angle, items]) => {
+    // 每次条件变化或项目列表变化时，先清空自动加载的字段，确保数据准确性
+    // 注意：如果是手动输入的值，也会被清空。这是符合预期的，因为条件变了，旧的标准不再适用。
+    if (name || angle) { // 仅当有条件时才清空，避免初始化全空时的不必要操作（虽然清空空值也没事）
+         localData.value.Standard = ''
+         localData.value.Conditions.RefStandard = ''
     }
-}, { immediate: true })
 
-watch(() => props.inspectionItems, (items) => {
-    const name = localData.value.Conditions.SpecificTestName
-    if (name && items) {
-         let match = items.find(i => i.ItemName === name)
-         if (!match) {
-             match = items.find(i => i.ItemName.includes(name))
-         }
-         if (match) {
-             if (match.InspectionBasis) localData.value.Standard = match.InspectionBasis
-         }
+    // 确保有 items 且 name 不为空
+    if (name && items && items.length > 0) {
+        let match = null
+        
+        // 尝试构建精确匹配名称，如 "剥离力(180)" 或 "剥离力(180°)"
+        if (angle) {
+             // 优先尝试: 剥离力 + "(" + 纯数字 + ")"
+             // 如: 剥离力(180)
+             const angleNum = angle.replace(/[^\d]/g, '')
+             if (angleNum) {
+                 const targetNameNum = `${name}(${angleNum})`
+                 match = items.find(i => i.ItemName === targetNameNum)
+             }
+             
+             // 其次尝试: 剥离力 + "(" + 原始角度值 + ")"
+             // 如: 剥离力(180°)
+             if (!match) {
+                 const targetNameFull = `${name}(${angle})`
+                 match = items.find(i => i.ItemName === targetNameFull)
+             }
+
+             // 注意：当指定了角度时，不再降级匹配不带角度的名称(如"剥离力")，
+             // 也不进行模糊匹配，以确保 180° 和 90° 严格区分。
+             // 如果配置中只有 "剥离力"，请修改配置为 "剥离力(180°)" 以便明确匹配。
+        } else {
+            // 如果未指定角度（虽然UI上通常有默认值），则尝试匹配不带角度的名称
+            if (!match) {
+                match = items.find(i => i.ItemName === name)
+            }
+            
+            // 最后尝试: 模糊匹配
+            if (!match) {
+                match = items.find(i => i.ItemName.includes(name))
+            }
+        }
+        
+        if (match) {
+            // 自动填充试验标准 (InspectionBasis)
+            if (match.InspectionBasis) {
+                localData.value.Standard = match.InspectionBasis
+            }
+            // 自动填充合格标准 (优先使用 AcceptanceCriteria)
+            const standard = match.AcceptanceCriteria
+            // 即使为空字符串也允许覆盖，以便清空旧值
+            if (standard !== undefined && standard !== null) {
+                localData.value.Conditions.RefStandard = standard
+            }
+        } else {
+            // 如果没匹配到，清空之前自动填入的值？
+            // 暂时不清空，避免用户手动输入被误删，或者保持上一次的值
+            // 但如果切换了角度导致不匹配，可能应该清空标准，以免误导
+            // 可是用户可能想手动填。
+            // 折中方案：不做操作。
+        }
     }
-}, { immediate: true })
+}, { immediate: true, deep: true })
 
 const groups = ref([])
 
@@ -371,6 +459,15 @@ watch(() => stats.value.avg.avg, (newVal) => {
     }
 })
 
+watch(uniqueInstruments, (insts) => {
+    if (!localData.value.InstrumentID && insts.length > 0) {
+        const defaultInst = insts.find(i => i.InstrumentName === '电脑式剥离力试验机' || i.InstrumentName === '电脑式剥离试验机')
+        if (defaultInst) {
+            localData.value.InstrumentID = defaultInst.ID
+        }
+    }
+}, { immediate: true })
+
 watch(() => props.modelValue, (val) => {
   if (val) {
     isLoading.value = true
@@ -378,9 +475,46 @@ watch(() => props.modelValue, (val) => {
     if (!val.ResultData) val.ResultData = {}
     localData.value = val
     
-    // Ensure Unit exists
+    // Set Defaults
+    if (!localData.value.Conditions.SpecificTestName) {
+        localData.value.Conditions.SpecificTestName = '剥离力'
+    }
+    if (!localData.value.Conditions.Angle) {
+        localData.value.Conditions.Angle = '180°'
+    }
     if (!localData.value.Conditions.Unit) {
         localData.value.Conditions.Unit = 'N'
+    }
+    
+    // 强制触发一次匹配逻辑，确保初始化默认值后能加载合格标准
+    // 由于watch监听的是 localData.Conditions.SpecificTestName，这里赋值可能不会立即触发深度监听
+    // 或者因为 inspectionItems 可能还没加载完。
+    // 但 props.inspectionItems 也是 watch 的依赖项，所以如果 items 后加载，应该会自动触发。
+    // 问题可能在于：watch 的 immediate: true 执行时，props.inspectionItems 是空的，
+    // 而当 items 加载完变化时，watch 会再次执行。
+    // 但如果 items 先加载完，localData 还没初始化默认值，watch 执行时 name/angle 为空。
+    // 当这里初始化默认值后，Vue 的响应式系统应该会触发 watch。
+    // 为了保险起见，我们在 nextTick 中再次确认触发。
+    nextTick(() => {
+        // 这里的赋值是冗余的，旨在确保响应式更新
+        localData.value.Conditions.SpecificTestName = localData.value.Conditions.SpecificTestName
+    })
+    if (!localData.value.Conditions.Spec) {
+        localData.value.Conditions.Spec = '24.5mm×300mm'
+    }
+    if (!localData.value.Conditions.Speed) {
+        localData.value.Conditions.Speed = '300mm/min'
+    }
+    if (!localData.value.Conditions.Time) {
+        localData.value.Conditions.Time = '30s'
+    }
+    
+    // Try to set default instrument if not set and instruments available
+    if (!localData.value.InstrumentID && uniqueInstruments.value.length > 0) {
+        const defaultInst = uniqueInstruments.value.find(i => i.InstrumentName === '电脑式剥离力试验机' || i.InstrumentName === '电脑式剥离试验机')
+        if (defaultInst) {
+            localData.value.InstrumentID = defaultInst.ID
+        }
     }
     
     if (val.ResultData.groups && val.ResultData.groups.length > 0) {

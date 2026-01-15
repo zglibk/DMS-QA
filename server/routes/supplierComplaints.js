@@ -131,8 +131,10 @@ router.get('/', async (req, res) => {
     }
     
     if (endDate) {
+      const end = new Date(endDate)
+      end.setHours(23, 59, 59, 999)
       whereConditions.push('sc.ComplaintDate <= @endDate')
-      queryParams.push({ name: 'endDate', type: sql.DateTime, value: new Date(endDate) })
+      queryParams.push({ name: 'endDate', type: sql.DateTime, value: end })
     }
     
     const whereClause = whereConditions.join(' AND ')
@@ -220,8 +222,15 @@ router.get('/', async (req, res) => {
         CompletedDate,
         ClosedDate,
         CreatedBy,
+        CreatedByName,
         CreatedAt,
         UpdatedAt,
+        AuditStatus,
+        AuditBy,
+        AuditByName,
+        AuditTime,
+        AuditRemark,
+        SubmitTime,
         RowNum
       FROM (
         SELECT 
@@ -284,10 +293,18 @@ router.get('/', async (req, res) => {
           sc.CompletedDate,
           sc.ClosedDate,
           sc.CreatedBy,
+          COALESCE(u.RealName, u.Username) as CreatedByName,
           sc.CreatedAt,
           sc.UpdatedAt,
+          COALESCE(sc.AuditStatus, 'draft') as AuditStatus,
+          sc.AuditBy,
+          sc.AuditByName,
+          sc.AuditTime,
+          sc.AuditRemark,
+          sc.SubmitTime,
           ROW_NUMBER() OVER (ORDER BY sc.ComplaintDate DESC, sc.CreatedAt DESC) as RowNum
         FROM SupplierComplaints sc
+        LEFT JOIN [User] u ON sc.CreatedBy = u.ID
         WHERE ${whereClause}
       ) AS PagedResults
       WHERE RowNum > @offset AND RowNum <= (@offset + @size)
@@ -555,6 +572,9 @@ router.get('/statistics', async (req, res) => {
         SUM(CASE WHEN ProcessStatus = 'processing' OR ProcessStatus = '处理中' THEN 1 ELSE 0 END) as processingCount,
         SUM(CASE WHEN ProcessStatus = 'completed' OR ProcessStatus = '已完成' THEN 1 ELSE 0 END) as completedCount,
         SUM(CASE WHEN ProcessStatus = 'closed' OR ProcessStatus = '已关闭' THEN 1 ELSE 0 END) as closedCount,
+        SUM(CASE WHEN ReplyDate IS NOT NULL AND DATEDIFF(day, ComplaintDate, ReplyDate) <= 3 THEN 1 ELSE 0 END) as timelyReplyCount,
+        SUM(CASE WHEN ReplyDate IS NOT NULL AND DATEDIFF(day, ComplaintDate, ReplyDate) > 3 THEN 1 ELSE 0 END) as overdueReplyCount,
+        SUM(CASE WHEN ReplyDate IS NULL THEN 1 ELSE 0 END) as noReplyCount,
         ISNULL(SUM(TotalAmount), 0) as totalAmount,
         ISNULL(SUM(ClaimAmount), 0) as totalClaimAmount,
         ISNULL(SUM(ActualClaim), 0) as totalActualClaim,
@@ -609,6 +629,106 @@ router.get('/persons', async (req, res) => {
 })
 
 /**
+ * 下载导入模板
+ * GET /api/supplier-complaints/template
+ */
+router.get('/template', async (req, res) => {
+  try {
+    const ExcelJS = require('exceljs')
+    const workbook = new ExcelJS.Workbook()
+    const worksheet = workbook.addWorksheet('供应商投诉导入模板')
+    
+    // 定义模板字段
+    const columns = [
+      { header: '投诉编号', key: 'ComplaintNo', width: 20 },
+      { header: '投诉日期', key: 'ComplaintDate', width: 15 },
+      { header: '物料编码', key: 'MaterialCode', width: 15 },
+      { header: '物料名称', key: 'MaterialName', width: 20 },
+      { header: '材料规格', key: 'MaterialSpecification', width: 20 },
+      { header: '材料数量', key: 'BatchQuantity', width: 15 },
+      { header: '材料单位', key: 'MaterialUnit', width: 10 },
+      { header: '材料品牌', key: 'MaterialBrand', width: 15 },
+      { header: '供应商', key: 'SupplierName', width: 25 },
+      { header: '采购单号', key: 'PurchaseOrderNo', width: 20 },
+      { header: '来料日期', key: 'IncomingDate', width: 15 },
+      { header: '客户编号', key: 'CustomerCode', width: 15 },
+      { header: '工单号', key: 'WorkOrderNo', width: 20 },
+      { header: '产品编号', key: 'ProductCode', width: 20 },
+      { header: 'CPO', key: 'CPO', width: 15 },
+      { header: '产品数量', key: 'ProductQuantity', width: 15 },
+      { header: '产品单位', key: 'ProductUnit', width: 10 },
+      { header: '抽检数量', key: 'SampleQuantity', width: 15 },
+      { header: '不合格数', key: 'DefectQuantity', width: 15 },
+      { header: '投诉类型', key: 'ComplaintType', width: 15 },
+      { header: '不良类别', key: 'DefectCategory', width: 15 },
+      { header: '不良项', key: 'DefectItem', width: 20 },
+      { header: '不合格描述', key: 'Description', width: 30 },
+      { header: '不合格原因分析', key: 'DefectCauseAnalysis', width: 30 },
+      { header: '异常图片', key: 'AttachedImages', width: 20 },
+      { header: '反馈单位', key: 'FeedbackUnit', width: 20 },
+      { header: '检验日期', key: 'InspectionDate', width: 15 },
+      { header: '检验员', key: 'Inspector', width: 15 },
+      { header: '异常处置', key: 'AbnormalDisposal', width: 20 },
+      { header: '投诉书', key: 'ComplaintDocument', width: 20 },
+      { header: '发起人', key: 'InitiatedBy', width: 15 },
+      { header: '回复日期', key: 'ReplyDate', width: 15 },
+      { header: '改善效果评估', key: 'ImprovementEffectEvaluation', width: 30 },
+      { header: '索赔金额', key: 'ClaimAmount', width: 15 },
+      { header: '实际索赔', key: 'ActualClaim', width: 15 },
+      { header: 'QA', key: 'QA', width: 15 },
+      { header: '备注', key: 'Remarks', width: 30 }
+    ]
+    
+    worksheet.columns = columns
+    
+    // 设置表头样式
+    const headerRow = worksheet.getRow(1)
+    headerRow.font = { bold: true }
+    headerRow.alignment = { horizontal: 'center', vertical: 'middle' }
+    headerRow.fill = {
+      type: 'pattern',
+      pattern: 'solid',
+      fgColor: { argb: 'FFE0E0E0' }
+    }
+    
+    // 添加示例数据
+    worksheet.addRow({
+      ComplaintNo: 'MC-TJ2501001',
+      ComplaintDate: new Date(),
+      MaterialCode: 'M001',
+      MaterialName: '示例材料',
+      MaterialSpecification: '规格A',
+      BatchQuantity: 100,
+      MaterialUnit: '个',
+      SupplierName: '示例供应商',
+      PurchaseOrderNo: 'PO20250101',
+      IncomingDate: new Date(),
+      ComplaintType: '外观不良',
+      DefectCategory: '外观',
+      DefectItem: '划痕',
+      Description: '表面有明显划痕',
+      InitiatedBy: '张三'
+    })
+    
+    // 设置响应头
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
+    res.setHeader('Content-Disposition', 'attachment; filename=' + encodeURIComponent('供应商投诉导入模板.xlsx'))
+    
+    // 发送文件
+    await workbook.xlsx.write(res)
+    res.end()
+    
+  } catch (error) {
+    console.error('生成导入模板失败:', error)
+    res.status(500).json({
+      success: false,
+      message: '生成导入模板失败',
+      error: error.message
+    })
+  }
+})
+
+/**
  * 获取单个供应商投诉详情
  * GET /api/supplier-complaints/:id
  */
@@ -622,8 +742,8 @@ router.get('/:id', async (req, res) => {
       .query(`
         SELECT 
           sc.*,
-          u1.Username as CreatedByName,
-          u2.Username as UpdatedByName
+          COALESCE(u1.RealName, u1.Username) as CreatedByName,
+          COALESCE(u2.RealName, u2.Username) as UpdatedByName
         FROM SupplierComplaints sc
         LEFT JOIN [User] u1 ON sc.CreatedBy = u1.ID
         LEFT JOIN [User] u2 ON sc.UpdatedBy = u2.ID
@@ -658,48 +778,74 @@ router.get('/:id', async (req, res) => {
 router.post('/', async (req, res) => {
   try {
     const {
-      supplierName,
-      materialName,
-      materialCode,
-      materialSpecification,
-      materialUnit,
-      purchaseOrderNo,
-      incomingDate,
-      batchQuantity,
-      inspectionDate,
-      workOrderNo,
-      customerCode,
-      productCode,
-      cpo,
-      productQuantity,
-      productUnit,
-      sampleQuantity,
-      defectQuantity,
-      defectCategory,
-      defectItem,
-      defectCauseAnalysis,
-      attachedImages,
-      feedbackUnit,
-      inspector,
-      iqcResult,
-      abnormalDisposal,
-      complaintDocument,
-      replyDate,
-      improvementEffectEvaluation,
-      claimAmount,
-      actualClaim,
-      qa,
-      remarks,
-      complaintType,
-      description,
-      quantity,
-      unitPrice,
-      initiatedBy,
-      urgencyLevel = 'medium',
-      expectedSolution,
-      processResult,
-      verificationResult
+      // PascalCase fields (from frontend)
+      SupplierName, MaterialName, MaterialCode, MaterialSpecification, MaterialUnit,
+      PurchaseOrderNo, IncomingDate, BatchQuantity, InspectionDate, WorkOrderNo,
+      CustomerCode, ProductCode, CPO, ProductQuantity, ProductUnit, SampleQuantity,
+      DefectQuantity, DefectCategory, DefectItem, DefectCauseAnalysis, AttachedImages,
+      FeedbackUnit, Inspector, IQCResult, AbnormalDisposal, ComplaintDocument,
+      ReplyDate, ImprovementEffectEvaluation, ClaimAmount, ActualClaim, QA, Remarks,
+      ComplaintType, Description, Quantity, UnitPrice, InitiatedBy, UrgencyLevel,
+      ExpectedSolution, ProcessResult, VerificationResult,
+
+      // camelCase fields (aliased to avoid conflict, used as fallback)
+      supplierName: _supplierName, materialName: _materialName, materialCode: _materialCode,
+      materialSpecification: _materialSpecification, materialUnit: _materialUnit,
+      purchaseOrderNo: _purchaseOrderNo, incomingDate: _incomingDate, batchQuantity: _batchQuantity,
+      inspectionDate: _inspectionDate, workOrderNo: _workOrderNo, customerCode: _customerCode,
+      productCode: _productCode, cpo: _cpo, productQuantity: _productQuantity, productUnit: _productUnit,
+      sampleQuantity: _sampleQuantity, defectQuantity: _defectQuantity, defectCategory: _defectCategory,
+      defectItem: _defectItem, defectCauseAnalysis: _defectCauseAnalysis, attachedImages: _attachedImages,
+      feedbackUnit: _feedbackUnit, inspector: _inspector, iqcResult: _iqcResult, abnormalDisposal: _abnormalDisposal,
+      complaintDocument: _complaintDocument, replyDate: _replyDate, improvementEffectEvaluation: _improvementEffectEvaluation,
+      claimAmount: _claimAmount, actualClaim: _actualClaim, qa: _qa, remarks: _remarks,
+      complaintType: _complaintType, description: _description, quantity: _quantity, unitPrice: _unitPrice,
+      initiatedBy: _initiatedBy, urgencyLevel: _urgencyLevel, expectedSolution: _expectedSolution,
+      processResult: _processResult, verificationResult: _verificationResult
     } = req.body
+
+    // Merge values (prefer PascalCase)
+    const supplierName = SupplierName || _supplierName
+    const materialName = MaterialName || _materialName
+    const materialCode = MaterialCode || _materialCode
+    const materialSpecification = MaterialSpecification || _materialSpecification
+    const materialUnit = MaterialUnit || _materialUnit
+    const purchaseOrderNo = PurchaseOrderNo || _purchaseOrderNo
+    const incomingDate = IncomingDate || _incomingDate
+    const batchQuantity = BatchQuantity || _batchQuantity
+    const inspectionDate = InspectionDate || _inspectionDate
+    const workOrderNo = WorkOrderNo || _workOrderNo
+    const customerCode = CustomerCode || _customerCode
+    const productCode = ProductCode || _productCode
+    const cpo = CPO || _cpo
+    const productQuantity = ProductQuantity || _productQuantity
+    const productUnit = ProductUnit || _productUnit
+    const sampleQuantity = SampleQuantity || _sampleQuantity
+    const defectQuantity = DefectQuantity || _defectQuantity
+    const defectCategory = DefectCategory || _defectCategory
+    const defectItem = DefectItem || _defectItem
+    const defectCauseAnalysis = DefectCauseAnalysis || _defectCauseAnalysis
+    const attachedImages = AttachedImages || _attachedImages
+    const feedbackUnit = FeedbackUnit || _feedbackUnit
+    const inspector = Inspector || _inspector
+    const iqcResult = IQCResult || _iqcResult
+    const abnormalDisposal = AbnormalDisposal || _abnormalDisposal
+    const complaintDocument = ComplaintDocument || _complaintDocument
+    const replyDate = ReplyDate || _replyDate
+    const improvementEffectEvaluation = ImprovementEffectEvaluation || _improvementEffectEvaluation
+    const claimAmount = ClaimAmount || _claimAmount
+    const actualClaim = ActualClaim || _actualClaim
+    const qa = QA || _qa
+    const remarks = Remarks || _remarks
+    const complaintType = ComplaintType || _complaintType
+    const description = Description || _description
+    const quantity = Quantity || _quantity
+    const unitPrice = UnitPrice || _unitPrice
+    const initiatedBy = InitiatedBy || _initiatedBy
+    const urgencyLevel = UrgencyLevel || _urgencyLevel || 'medium'
+    const expectedSolution = ExpectedSolution || _expectedSolution
+    const processResult = ProcessResult || _processResult
+    const verificationResult = VerificationResult || _verificationResult
     
     // 验证必填字段
     if (!supplierName || !materialName || !complaintType || !description) {
@@ -1633,6 +1779,9 @@ router.get('/statistics/overview', async (req, res) => {
         SUM(CASE WHEN ProcessStatus = 'processing' OR ProcessStatus = '处理中' THEN 1 ELSE 0 END) as processingCount,
         SUM(CASE WHEN ProcessStatus = 'completed' OR ProcessStatus = '已完成' THEN 1 ELSE 0 END) as completedCount,
         SUM(CASE WHEN ProcessStatus = 'closed' OR ProcessStatus = '已关闭' THEN 1 ELSE 0 END) as closedCount,
+        SUM(CASE WHEN ReplyDate IS NOT NULL AND DATEDIFF(day, ComplaintDate, ReplyDate) <= 3 THEN 1 ELSE 0 END) as timelyReplyCount,
+        SUM(CASE WHEN ReplyDate IS NOT NULL AND DATEDIFF(day, ComplaintDate, ReplyDate) > 3 THEN 1 ELSE 0 END) as overdueReplyCount,
+        SUM(CASE WHEN ReplyDate IS NULL THEN 1 ELSE 0 END) as noReplyCount,
         ISNULL(SUM(TotalAmount), 0) as totalAmount,
         ISNULL(SUM(ClaimAmount), 0) as totalClaimAmount,
         ISNULL(SUM(ActualClaim), 0) as totalActualClaim,
@@ -1704,6 +1853,8 @@ router.post('/generate-report', async (req, res) => {
         sc.ProcessStatus,
         sc.ProcessResult,
         sc.InitiatedBy,
+        sc.Inspector,
+        sc.AttachedImages,
         sc.CreatedBy,
         sc.CreatedAt
       FROM SupplierComplaints sc
@@ -1917,26 +2068,32 @@ router.post('/generate-report', async (req, res) => {
         // I9: 问题描述
         fillCellWithData('I9', complaint.Description || '')
         
-        // C22: IQC判定 - 映射为中文
-        const processStatus = complaint.ProcessStatus || ''
-        let statusValue = ''
+        // 不合格类别 (构造复选框形式)
+        const defectCategories = ['外观', '卫生', '规格尺寸', '物理性能', '环保要求', '虫害防控', '其它']
+        const currentCategory = complaint.DefectCategory || ''
+        const categoryCheckboxText = defectCategories.map(cat => {
+          const isChecked = currentCategory === cat ? '\u2611' : '\u2610'
+          return `${isChecked} ${cat}`
+        }).join('  ')
+        // 假设不合格类别在下一行 I10
+        fillCellWithData('I10', categoryCheckboxText)
         
-        // 根据ProcessStatus的值映射为中文
+        // C22: IQC判定 - 使用复选框形式
+        const processStatus = complaint.IQCResult || complaint.ProcessStatus || ''
+        let isQualified = false
+        let hasResult = false
+        
         if (processStatus) {
+          hasResult = true
           const statusLower = processStatus.toLowerCase()
           if (statusLower.includes('qualified') || statusLower.includes('pass') || statusLower.includes('合格') || statusLower === 'completed') {
-            statusValue = '合格'
-          } else if (statusLower.includes('unqualified') || statusLower.includes('fail') || statusLower.includes('不合格') || statusLower.includes('reject')) {
-            statusValue = '不合格'
-          } else if (statusLower.includes('pending') || statusLower.includes('待处理')) {
-            statusValue = '待处理'
-          } else {
-            // 如果无法识别，保持原值但尝试转换
-            statusValue = processStatus
+            isQualified = true
           }
         }
         
-        fillCellWithData('C22', statusValue)
+        const iqcCheckboxText = `${isQualified ? '\u2611' : '\u2610'} 合格  ${!isQualified && hasResult ? '\u2611' : '\u2610'} 不合格`
+        
+        fillCellWithData('C22', iqcCheckboxText)
         
         // G22: 发起人
         fillCellWithData('G22', complaint.InitiatedBy || complaint.CreatedBy || '')
@@ -2233,5 +2390,440 @@ router.post('/import', upload.single('file'), async (req, res) => {
     res.status(500).json({ success: false, message: '导入失败: ' + error.message })
   }
 })
+
+// =====================================================
+// 审核流程相关API
+// =====================================================
+
+/**
+ * 获取部门主管（用于审核流程）
+ * 优先获取当前用户所属部门的主管，如果没有则获取品质部门主管
+ */
+async function getDepartmentSupervisor(pool, userId) {
+  // 先获取当前用户的部门
+  const userResult = await pool.request()
+    .input('userId', sql.Int, userId)
+    .query(`
+      SELECT u.DepartmentID, d.ManagerID, d.DeptName,
+             m.ID as ManagerUserId, m.RealName as ManagerName
+      FROM [User] u
+      LEFT JOIN Department d ON u.DepartmentID = d.ID
+      LEFT JOIN [User] m ON d.ManagerID = m.ID
+      WHERE u.ID = @userId
+    `);
+  
+  if (userResult.recordset.length > 0 && userResult.recordset[0].ManagerUserId) {
+    return {
+      id: userResult.recordset[0].ManagerUserId,
+      name: userResult.recordset[0].ManagerName,
+      deptId: userResult.recordset[0].DepartmentID
+    };
+  }
+  
+  // 如果没有部门主管，获取品质部门主管
+  const qaDeptResult = await pool.request()
+    .query(`
+      SELECT TOP 1 d.ID as DeptID, d.ManagerID, m.ID as ManagerUserId, m.RealName as ManagerName
+      FROM Department d
+      LEFT JOIN [User] m ON d.ManagerID = m.ID
+      WHERE d.DeptName LIKE N'%品质%' OR d.DeptName LIKE N'%质量%'
+      ORDER BY d.ID
+    `);
+  
+  if (qaDeptResult.recordset.length > 0 && qaDeptResult.recordset[0].ManagerUserId) {
+    return {
+      id: qaDeptResult.recordset[0].ManagerUserId,
+      name: qaDeptResult.recordset[0].ManagerName,
+      deptId: qaDeptResult.recordset[0].DeptID
+    };
+  }
+  
+  // 最后尝试获取管理员
+  const adminResult = await pool.request()
+    .query(`
+      SELECT TOP 1 u.ID, u.RealName
+      FROM [User] u
+      INNER JOIN UserRoles ur ON u.ID = ur.UserID
+      INNER JOIN Roles r ON ur.RoleID = r.ID
+      WHERE r.RoleCode = 'admin' OR r.RoleName LIKE N'%管理员%'
+      ORDER BY u.ID
+    `);
+  
+  if (adminResult.recordset.length > 0) {
+    return {
+      id: adminResult.recordset[0].ID,
+      name: adminResult.recordset[0].RealName,
+      deptId: null
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * 记录审核日志
+ */
+async function createAuditLog(pool, logData) {
+  await pool.request()
+    .input('businessType', sql.NVarChar(50), logData.businessType)
+    .input('businessId', sql.Int, logData.businessId)
+    .input('businessNo', sql.NVarChar(50), logData.businessNo || '')
+    .input('action', sql.NVarChar(20), logData.action)
+    .input('fromStatus', sql.NVarChar(20), logData.fromStatus || '')
+    .input('toStatus', sql.NVarChar(20), logData.toStatus)
+    .input('operatorId', sql.Int, logData.operatorId)
+    .input('operatorName', sql.NVarChar(50), logData.operatorName || '')
+    .input('remark', sql.NVarChar(500), logData.remark || '')
+    .query(`
+      INSERT INTO AuditLogs (BusinessType, BusinessID, BusinessNo, Action, FromStatus, ToStatus, OperatorID, OperatorName, Remark)
+      VALUES (@businessType, @businessId, @businessNo, @action, @fromStatus, @toStatus, @operatorId, @operatorName, @remark)
+    `);
+}
+
+/**
+ * 提交审核
+ * POST /api/supplier-complaints/:id/submit
+ */
+router.post('/:id/submit', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userName = req.user.realName || req.user.username;
+    const pool = await getConnection();
+    
+    // 检查投诉记录是否存在及当前状态
+    const checkResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT ID, ComplaintNo, AuditStatus, CreatedBy 
+        FROM SupplierComplaints 
+        WHERE ID = @id AND Status != 0
+      `);
+    
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '投诉记录不存在' });
+    }
+    
+    const complaint = checkResult.recordset[0];
+    
+    // 只有草稿或驳回状态可以提交
+    if (complaint.AuditStatus && !['draft', 'rejected'].includes(complaint.AuditStatus)) {
+      return res.status(400).json({ 
+        success: false, 
+        message: `当前状态为"${getAuditStatusText(complaint.AuditStatus)}"，不能提交审核` 
+      });
+    }
+    
+    // 获取审核人（部门主管）
+    const supervisor = await getDepartmentSupervisor(pool, userId);
+    if (!supervisor) {
+      return res.status(400).json({ success: false, message: '未找到审核人，请联系管理员配置部门主管' });
+    }
+    
+    const fromStatus = complaint.AuditStatus || 'draft';
+    
+    // 更新投诉记录状态为待审核
+    await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        UPDATE SupplierComplaints 
+        SET AuditStatus = 'pending', SubmitTime = GETDATE(), UpdatedAt = GETDATE()
+        WHERE ID = @id
+      `);
+    
+    // 创建待办事项
+    const { createTodoItem } = require('./todoItems');
+    await createTodoItem({
+      todoType: 'supplier_complaint_audit',
+      businessId: parseInt(id),
+      businessNo: complaint.ComplaintNo,
+      title: `供应商投诉审核 - ${complaint.ComplaintNo}`,
+      content: `${userName}提交的供应商投诉记录待审核`,
+      priority: 'high',
+      createdBy: userId,
+      createdByName: userName,
+      assignedTo: supervisor.id,
+      assignedToName: supervisor.name,
+      assignedDeptId: supervisor.deptId
+    });
+    
+    // 记录审核日志
+    await createAuditLog(pool, {
+      businessType: 'supplier_complaint',
+      businessId: parseInt(id),
+      businessNo: complaint.ComplaintNo,
+      action: 'submit',
+      fromStatus: fromStatus,
+      toStatus: 'pending',
+      operatorId: userId,
+      operatorName: userName,
+      remark: '提交审核'
+    });
+    
+    res.json({ 
+      success: true, 
+      message: '已提交审核，待办事项已发送给' + supervisor.name 
+    });
+  } catch (error) {
+    console.error('提交审核失败:', error);
+    res.status(500).json({ success: false, message: '提交审核失败', error: error.message });
+  }
+});
+
+/**
+ * 审核通过
+ * POST /api/supplier-complaints/:id/approve
+ */
+router.post('/:id/approve', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remark } = req.body;
+    const userId = req.user.id;
+    const userName = req.user.realName || req.user.username;
+    const pool = await getConnection();
+    
+    // 检查投诉记录状态
+    const checkResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT ID, ComplaintNo, AuditStatus 
+        FROM SupplierComplaints 
+        WHERE ID = @id AND Status != 0
+      `);
+    
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '投诉记录不存在' });
+    }
+    
+    const complaint = checkResult.recordset[0];
+    
+    if (complaint.AuditStatus !== 'pending') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `当前状态为"${getAuditStatusText(complaint.AuditStatus)}"，不能审核` 
+      });
+    }
+    
+    // 更新为已审核通过
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('auditBy', sql.Int, userId)
+      .input('auditByName', sql.NVarChar(50), userName)
+      .input('remark', sql.NVarChar(500), remark || '')
+      .query(`
+        UPDATE SupplierComplaints 
+        SET AuditStatus = 'approved', AuditBy = @auditBy, AuditByName = @auditByName, 
+            AuditTime = GETDATE(), AuditRemark = @remark, UpdatedAt = GETDATE()
+        WHERE ID = @id
+      `);
+    
+    // 完成待办事项
+    const { completeTodoItem } = require('./todoItems');
+    await completeTodoItem(parseInt(id), 'supplier_complaint_audit', '审核通过');
+    
+    // 记录审核日志
+    await createAuditLog(pool, {
+      businessType: 'supplier_complaint',
+      businessId: parseInt(id),
+      businessNo: complaint.ComplaintNo,
+      action: 'approve',
+      fromStatus: 'pending',
+      toStatus: 'approved',
+      operatorId: userId,
+      operatorName: userName,
+      remark: remark || '审核通过'
+    });
+    
+    res.json({ success: true, message: '审核通过' });
+  } catch (error) {
+    console.error('审核失败:', error);
+    res.status(500).json({ success: false, message: '审核失败', error: error.message });
+  }
+});
+
+/**
+ * 审核驳回
+ * POST /api/supplier-complaints/:id/reject
+ */
+router.post('/:id/reject', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { remark } = req.body;
+    const userId = req.user.id;
+    const userName = req.user.realName || req.user.username;
+    const pool = await getConnection();
+    
+    if (!remark) {
+      return res.status(400).json({ success: false, message: '请填写驳回原因' });
+    }
+    
+    // 检查投诉记录状态
+    const checkResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT ID, ComplaintNo, AuditStatus 
+        FROM SupplierComplaints 
+        WHERE ID = @id AND Status != 0
+      `);
+    
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '投诉记录不存在' });
+    }
+    
+    const complaint = checkResult.recordset[0];
+    
+    if (complaint.AuditStatus !== 'pending') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `当前状态为"${getAuditStatusText(complaint.AuditStatus)}"，不能驳回` 
+      });
+    }
+    
+    // 更新为已驳回
+    await pool.request()
+      .input('id', sql.Int, id)
+      .input('auditBy', sql.Int, userId)
+      .input('auditByName', sql.NVarChar(50), userName)
+      .input('remark', sql.NVarChar(500), remark)
+      .query(`
+        UPDATE SupplierComplaints 
+        SET AuditStatus = 'rejected', AuditBy = @auditBy, AuditByName = @auditByName, 
+            AuditTime = GETDATE(), AuditRemark = @remark, UpdatedAt = GETDATE()
+        WHERE ID = @id
+      `);
+    
+    // 完成待办事项
+    const { completeTodoItem } = require('./todoItems');
+    await completeTodoItem(parseInt(id), 'supplier_complaint_audit', '审核驳回: ' + remark);
+    
+    // 记录审核日志
+    await createAuditLog(pool, {
+      businessType: 'supplier_complaint',
+      businessId: parseInt(id),
+      businessNo: complaint.ComplaintNo,
+      action: 'reject',
+      fromStatus: 'pending',
+      toStatus: 'rejected',
+      operatorId: userId,
+      operatorName: userName,
+      remark: remark
+    });
+    
+    res.json({ success: true, message: '已驳回' });
+  } catch (error) {
+    console.error('驳回失败:', error);
+    res.status(500).json({ success: false, message: '驳回失败', error: error.message });
+  }
+});
+
+/**
+ * 撤回审核
+ * POST /api/supplier-complaints/:id/revoke
+ */
+router.post('/:id/revoke', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const userId = req.user.id;
+    const userName = req.user.realName || req.user.username;
+    const pool = await getConnection();
+    
+    // 检查投诉记录状态及是否为创建人
+    const checkResult = await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        SELECT ID, ComplaintNo, AuditStatus, CreatedBy 
+        FROM SupplierComplaints 
+        WHERE ID = @id AND Status != 0
+      `);
+    
+    if (checkResult.recordset.length === 0) {
+      return res.status(404).json({ success: false, message: '投诉记录不存在' });
+    }
+    
+    const complaint = checkResult.recordset[0];
+    
+    // 只有创建人可以撤回
+    if (complaint.CreatedBy !== userId) {
+      return res.status(403).json({ success: false, message: '只有创建人可以撤回' });
+    }
+    
+    // 只有待审核状态可以撤回
+    if (complaint.AuditStatus !== 'pending') {
+      return res.status(400).json({ 
+        success: false, 
+        message: `当前状态为"${getAuditStatusText(complaint.AuditStatus)}"，不能撤回` 
+      });
+    }
+    
+    // 更新为草稿状态
+    await pool.request()
+      .input('id', sql.Int, id)
+      .query(`
+        UPDATE SupplierComplaints 
+        SET AuditStatus = 'draft', AuditBy = NULL, AuditByName = NULL, 
+            AuditTime = NULL, AuditRemark = NULL, SubmitTime = NULL, UpdatedAt = GETDATE()
+        WHERE ID = @id
+      `);
+    
+    // 取消待办事项
+    const { cancelTodoItem } = require('./todoItems');
+    await cancelTodoItem(parseInt(id), 'supplier_complaint_audit');
+    
+    // 记录审核日志
+    await createAuditLog(pool, {
+      businessType: 'supplier_complaint',
+      businessId: parseInt(id),
+      businessNo: complaint.ComplaintNo,
+      action: 'revoke',
+      fromStatus: 'pending',
+      toStatus: 'draft',
+      operatorId: userId,
+      operatorName: userName,
+      remark: '撤回审核'
+    });
+    
+    res.json({ success: true, message: '已撤回' });
+  } catch (error) {
+    console.error('撤回失败:', error);
+    res.status(500).json({ success: false, message: '撤回失败', error: error.message });
+  }
+});
+
+/**
+ * 获取审核日志
+ * GET /api/supplier-complaints/:id/audit-logs
+ */
+router.get('/:id/audit-logs', authenticateToken, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const pool = await getConnection();
+    
+    const result = await pool.request()
+      .input('businessId', sql.Int, id)
+      .query(`
+        SELECT * FROM AuditLogs 
+        WHERE BusinessType = 'supplier_complaint' AND BusinessID = @businessId
+        ORDER BY CreatedAt DESC
+      `);
+    
+    res.json({ success: true, data: result.recordset });
+  } catch (error) {
+    console.error('获取审核日志失败:', error);
+    res.status(500).json({ success: false, message: '获取审核日志失败', error: error.message });
+  }
+});
+
+/**
+ * 获取审核状态文本
+ */
+function getAuditStatusText(status) {
+  const statusMap = {
+    'draft': '草稿',
+    'pending': '待审核',
+    'approved': '已通过',
+    'rejected': '已驳回'
+  };
+  return statusMap[status] || status;
+}
 
 module.exports = router

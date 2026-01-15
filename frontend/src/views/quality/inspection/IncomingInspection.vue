@@ -1,21 +1,56 @@
 <template>
   <div class="app-container">
-    <!-- Page Header -->
-    <div class="page-header" style="margin-bottom: 20px; display: flex; align-items: center;">
-      <el-icon :size="24" color="#409EFF" style="margin-right: 10px;"><Document /></el-icon>
-      <span style="font-size: 20px; font-weight: 600; color: #303133;">来料检验报告</span>
+    <!-- Page Header with Actions -->
+    <div class="page-header-card">
+      <div class="header-left">
+        <el-icon :size="24" color="#409EFF" style="margin-right: 10px;"><Document /></el-icon>
+        <span style="font-size: 20px; font-weight: 600; color: #303133;">来料检验报告</span>
+      </div>
+      <div class="header-right">
+        <el-button type="primary" :icon="Plus" @click="handleCreate" v-if="hasPermission('quality:incoming:add')">新增报告</el-button>
+        <el-button type="success" :icon="Lightning" @click="handleBatchGenerate" v-if="hasPermission('quality:incoming:add')">批量生成</el-button>
+        <el-button :icon="Printer" @click="handleBatchPrint" :disabled="listSelection.length === 0">批量打印</el-button>
+        <el-button type="danger" :icon="Delete" @click="handleBatchDelete" :disabled="listSelection.length === 0" v-if="hasPermission('quality:incoming:delete')">批量删除</el-button>
+      </div>
     </div>
 
     <!-- Filter -->
     <div class="filter-container">
-      <el-input v-model="listQuery.supplier" placeholder="供应商" style="width: 200px;" class="filter-item" @keyup.enter="handleFilter" />
-      <el-input v-model="listQuery.reportNo" placeholder="报告编号" style="width: 200px;" class="filter-item" @keyup.enter="handleFilter" />
-      <el-date-picker v-model="listQuery.startDate" type="date" placeholder="开始日期" style="width: 150px;" class="filter-item" value-format="YYYY-MM-DD" />
-      <el-date-picker v-model="listQuery.endDate" type="date" placeholder="结束日期" style="width: 150px;" class="filter-item" value-format="YYYY-MM-DD" />
-      <el-button class="filter-item" type="primary" :icon="Search" @click="handleFilter" v-if="hasPermission('quality:incoming:list')">搜索</el-button>
-      <el-button class="filter-item" style="margin-left: 10px;" type="primary" :icon="Plus" @click="handleCreate" v-if="hasPermission('quality:incoming:add')">新增报告</el-button>
-      <el-button class="filter-item" type="success" :icon="Lightning" @click="handleBatchGenerate" v-if="hasPermission('quality:incoming:add')">批量生成</el-button>
-      <el-button class="filter-item" type="danger" :icon="Delete" @click="handleBatchDelete" :disabled="listSelection.length === 0" v-if="hasPermission('quality:incoming:delete')">批量删除</el-button>
+      <!-- 模糊搜索 -->
+      <el-input v-model="listQuery.keyword" placeholder="品名/供应商 模糊搜索" style="width: 200px;" class="filter-item" clearable @keyup.enter="handleFilter">
+        <template #prefix><el-icon><Search /></el-icon></template>
+      </el-input>
+      
+      <!-- 供应商下拉 -->
+      <el-select v-model="listQuery.supplier" placeholder="供应商" style="width: 160px;" class="filter-item" clearable filterable>
+        <el-option v-for="item in filterOptions.suppliers" :key="item" :label="item" :value="item" />
+      </el-select>
+      
+      <!-- 创建人下拉 -->
+      <el-select v-model="listQuery.createdBy" placeholder="创建人" style="width: 120px;" class="filter-item" clearable filterable>
+        <el-option v-for="item in filterOptions.creators" :key="item.value" :label="item.label" :value="item.value" />
+      </el-select>
+      
+      <!-- 状态下拉 -->
+      <el-select v-model="listQuery.status" placeholder="状态" style="width: 100px;" class="filter-item" clearable>
+        <el-option label="草稿" value="Saved" />
+        <el-option label="待审核" value="Submitted" />
+        <el-option label="已通过" value="Approved" />
+        <el-option label="已驳回" value="Rejected" />
+      </el-select>
+      
+      <!-- 判定结果下拉 -->
+      <el-select v-model="listQuery.result" placeholder="判定结果" style="width: 110px;" class="filter-item" clearable>
+        <el-option label="合格" value="合格" />
+        <el-option label="不合格" value="不合格" />
+      </el-select>
+      
+      <!-- 日期范围 -->
+      <el-date-picker v-model="listQuery.startDate" type="date" placeholder="开始日期" style="width: 140px;" class="filter-item" value-format="YYYY-MM-DD" />
+      <el-date-picker v-model="listQuery.endDate" type="date" placeholder="结束日期" style="width: 140px;" class="filter-item" value-format="YYYY-MM-DD" />
+      
+      <el-button class="filter-item" type="primary" :icon="Search" @click="handleFilter">搜索</el-button>
+      <el-button class="filter-item" :icon="Refresh" @click="handleReset">重置</el-button>
     </div>
 
     <!-- Table -->
@@ -26,63 +61,61 @@
       fit 
       highlight-current-row 
       stripe
-      style="width: 100%; margin-top: 20px;"
-      :header-cell-style="{ textAlign: 'center' }"
-      :cell-style="{ whiteSpace: 'nowrap' }"
+      style="width: 100%;"
+      :header-cell-style="{ background: '#f5f7fa', color: '#606266', fontWeight: 'bold', textAlign: 'center' }"
       @row-dblclick="handleRowDblClick"
       @selection-change="handleListSelectionChange"
     >
-      <el-table-column type="selection" width="55" align="center" fixed="left" />
-      <el-table-column label="序号" type="index" width="60" align="center" show-overflow-tooltip />
-      <el-table-column label="报告编号" prop="ReportNo" width="120" align="center" show-overflow-tooltip />
-      <el-table-column label="供应商" prop="Supplier" min-width="150" align="left" header-align="center" show-overflow-tooltip />
-      <el-table-column label="品名" prop="ProductName" min-width="150" align="left" header-align="center" show-overflow-tooltip />
-      <el-table-column label="检验日期" prop="InspectionDate" width="120" align="center" show-overflow-tooltip>
+      <el-table-column type="selection" width="45" align="center" fixed="left" />
+      <el-table-column label="序号" type="index" width="55" align="center" />
+      <el-table-column label="报告编号" prop="ReportNo" width="130" align="center" show-overflow-tooltip />
+      <el-table-column label="供应商" prop="Supplier" min-width="140" align="left" header-align="center" show-overflow-tooltip />
+      <el-table-column label="品名" prop="ProductName" min-width="140" align="left" header-align="center" show-overflow-tooltip />
+      <el-table-column label="检验日期" prop="InspectionDate" width="110" align="center">
         <template #default="{ row }">{{ formatDate(row.InspectionDate) }}</template>
       </el-table-column>
-      <el-table-column label="创建人" prop="CreatorName" width="100" align="center" show-overflow-tooltip />
-      <el-table-column label="判定结果" prop="ReportResult" width="100" align="center" show-overflow-tooltip>
+      <el-table-column label="创建人" prop="CreatorName" width="80" align="center" />
+      <el-table-column label="判定结果" prop="ReportResult" width="90" align="center">
         <template #default="{ row }">
-          <el-tag :type="row.ReportResult === '合格' ? 'success' : 'danger'">{{ row.ReportResult }}</el-tag>
+          <el-tag :type="row.ReportResult === '合格' ? 'success' : 'danger'" size="small">{{ row.ReportResult }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="状态" prop="Status" width="100" align="center" show-overflow-tooltip>
+      <el-table-column label="状态" prop="Status" width="90" align="center">
         <template #default="{ row }">
-            <el-tag v-if="row.Status === 'Saved'" type="info">草稿</el-tag>
-            <el-tag v-else-if="row.Status === 'Submitted'" type="warning">已提交</el-tag>
-            <el-tag v-else-if="row.Status === 'Audited'" type="success">已审核</el-tag>
-            <el-tag v-else-if="row.Status === 'Rejected'" type="danger">已驳回</el-tag>
-            <el-tag v-else>{{ row.Status }}</el-tag>
+            <el-tag v-if="row.Status === 'Saved'" type="info" size="small">草稿</el-tag>
+            <el-tag v-else-if="row.Status === 'Submitted'" type="warning" size="small">待审核</el-tag>
+            <el-tag v-else-if="row.Status === 'Approved' || row.Status === 'Audited'" type="success" size="small">已通过</el-tag>
+            <el-tag v-else-if="row.Status === 'Rejected'" type="danger" size="small">已驳回</el-tag>
+            <el-tag v-else size="small">{{ row.Status }}</el-tag>
         </template>
       </el-table-column>
-      <el-table-column label="操作" width="330" align="center" fixed="right">
+      <el-table-column label="操作" width="180" align="center" fixed="right">
         <template #default="{ row }">
-          <div style="display: flex; align-items: center; justify-content: center; flex-wrap: nowrap;">
-            <!-- Edit -->
-            <el-button link type="primary" size="small" :icon="Edit" @click="handleUpdate(row)" :disabled="!hasPermission('quality:incoming:edit') || !isCreator(row) || (row.Status !== 'Saved' && row.Status !== 'Rejected')">编辑</el-button>
-            
-            <!-- Submit/Audit/Placeholder -->
-            <template v-if="['Saved', 'Rejected'].includes(row.Status)">
-                <el-button link type="success" size="small" :icon="Promotion" @click="handleSubmit(row)" :disabled="!hasPermission('quality:incoming:edit') || !isCreator(row)">提交</el-button>
-            </template>
-            
-            <template v-else-if="row.Status === 'Submitted'">
-                 <el-button link v-if="isCreator(row)" type="warning" size="small" :icon="RefreshLeft" @click="handleWithdraw(row)">撤回</el-button>
-                 <el-button link v-else type="warning" size="small" :icon="Stamp" @click="handleAudit(row)" :disabled="(!hasPermission('quality:incoming:audit') && !isDeptLeader(row)) || isCreator(row)">审核</el-button>
-            </template>
-            
-            <template v-else>
-                 <el-button link type="success" size="small" :icon="Check" disabled>完成</el-button>
-            </template>
-
-            <!-- View Detail (Explicit Button) -->
-            <el-button link type="primary" size="small" :icon="View" @click="handleView(row)">详情</el-button>
-
-            <!-- Print -->
-            <el-button link type="info" size="small" :icon="Printer" @click="handlePrint(row)" :disabled="!hasPermission('quality:incoming:print')">打印</el-button>
-            
-            <!-- Delete -->
-            <el-button link type="danger" size="small" :icon="Delete" @click="handleDelete(row)" :disabled="!hasPermission('quality:incoming:delete') || (!userStore.isAdmin && (!isCreator(row) || (row.Status !== 'Saved' && row.Status !== 'Rejected')))">删除</el-button>
+          <div class="action-buttons">
+            <el-button link type="primary" size="small" @click="handleView(row)">详情</el-button>
+            <el-button link type="primary" size="small" @click="handleUpdate(row)" :disabled="!canEdit(row)">编辑</el-button>
+            <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, row)">
+              <el-button link type="primary" size="small">更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="submit" :disabled="!canSubmit(row)">
+                    <el-icon color="#67c23a"><Promotion /></el-icon> 提交审核
+                  </el-dropdown-item>
+                  <el-dropdown-item command="withdraw" :disabled="!canRevoke(row)">
+                    <el-icon color="#e6a23c"><RefreshLeft /></el-icon> 撤回
+                  </el-dropdown-item>
+                  <el-dropdown-item command="audit" :disabled="!canAudit(row)">
+                    <el-icon color="#67c23a"><Stamp /></el-icon> 审核
+                  </el-dropdown-item>
+                  <el-dropdown-item command="print" divided>
+                    <el-icon color="#909399"><Printer /></el-icon> 打印
+                  </el-dropdown-item>
+                  <el-dropdown-item command="delete" :disabled="!canDelete(row)">
+                    <el-icon color="#f56c6c"><Delete /></el-icon> 删除
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
           </div>
         </template>
       </el-table-column>
@@ -280,10 +313,10 @@
 <script setup>
 import { ref, reactive, onMounted, nextTick, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { getIncomingReports, updateIncomingReport, deleteIncomingReport, getIncomingReportDetail, searchMaterials, batchGenerateInspectionReports, withdrawIncomingReport, batchDeleteIncomingReports } from '@/api/inspection'
+import { getIncomingReports, updateIncomingReport, deleteIncomingReport, getIncomingReportDetail, searchMaterials, batchGenerateInspectionReports, withdrawIncomingReport, batchDeleteIncomingReports, submitIncomingReport, approveIncomingReport, rejectIncomingReport, getIncomingFilterOptions } from '@/api/inspection'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
-import { Search, Plus, Lightning, Edit, Check, Stamp, Printer, Delete, Refresh, Download, RefreshLeft, Promotion, View, Document } from '@element-plus/icons-vue'
+import { Search, Plus, Lightning, Edit, Check, Stamp, Printer, Delete, Refresh, Download, RefreshLeft, Promotion, View, Document, ArrowDown } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
 import ExcelJS from 'exceljs'
 import { saveAs } from 'file-saver'
@@ -296,12 +329,49 @@ const listLoading = ref(true)
 const listSelection = ref([]) // Main list selection
 const listQuery = reactive({
   page: 1,
-  pageSize: 10, // Default 10
+  pageSize: 10,
+  keyword: '',
   supplier: '',
   reportNo: '',
   startDate: '',
-  endDate: ''
+  endDate: '',
+  status: '',
+  result: '',
+  createdBy: ''
 })
+
+// 筛选选项
+const filterOptions = ref({
+  suppliers: [],
+  creators: [],
+  productNames: []
+})
+
+// 获取筛选选项
+const fetchFilterOptions = async () => {
+  try {
+    const res = await getIncomingFilterOptions()
+    if (res.success) {
+      filterOptions.value = res.data
+    }
+  } catch (e) {
+    console.error('获取筛选选项失败:', e)
+  }
+}
+
+// 重置筛选条件
+const handleReset = () => {
+  listQuery.keyword = ''
+  listQuery.supplier = ''
+  listQuery.reportNo = ''
+  listQuery.startDate = ''
+  listQuery.endDate = ''
+  listQuery.status = ''
+  listQuery.result = ''
+  listQuery.createdBy = ''
+  listQuery.page = 1
+  getList()
+}
 
 const handleListSelectionChange = (val) => {
     listSelection.value = val
@@ -358,6 +428,42 @@ const handlePrint = (row) => {
     window.open(routeData.href, '_blank')
 }
 
+// 下拉菜单命令处理
+const handleCommand = (command, row) => {
+    switch (command) {
+        case 'submit':
+            handleSubmit(row)
+            break
+        case 'withdraw':
+            handleWithdraw(row)
+            break
+        case 'audit':
+            handleAudit(row)
+            break
+        case 'print':
+            handlePrint(row)
+            break
+        case 'delete':
+            handleDelete(row)
+            break
+    }
+}
+
+// 批量打印
+const handleBatchPrint = () => {
+    if (listSelection.value.length === 0) {
+        ElMessage.warning('请先选择要打印的报告')
+        return
+    }
+    
+    // 依次打开打印预览
+    listSelection.value.forEach((row, index) => {
+        setTimeout(() => {
+            handlePrint(row)
+        }, index * 500) // 每隔500ms打开一个，避免浏览器拦截
+    })
+}
+
 // Audit Logic
 const auditDialogVisible = ref(false)
 const auditLoading = ref(false)
@@ -392,6 +498,7 @@ const handleRowDblClick = (row) => {
 
 onMounted(() => {
   getList()
+  fetchFilterOptions()
 })
 
 const getList = async () => {
@@ -473,21 +580,46 @@ const isCreator = (row) => {
     return row.CreatorID === userStore.userInfo.id
 }
 
+// 统一的权限判断方法
+const canEdit = (row) => {
+    if (!row) return false
+    const allowedStatus = ['Saved', 'Rejected']
+    return allowedStatus.includes(row.Status) && isCreator(row)
+}
+
+const canSubmit = (row) => {
+    if (!row) return false
+    const allowedStatus = ['Saved', 'Rejected']
+    return allowedStatus.includes(row.Status) && isCreator(row)
+}
+
+const canRevoke = (row) => {
+    if (!row) return false
+    return row.Status === 'Submitted' && isCreator(row)
+}
+
+const canAudit = (row) => {
+    if (!row) return false
+    if (row.Status !== 'Submitted') return false
+    if (isCreator(row)) return false // 不能审核自己的
+    // admin 或 部门主管可以审核
+    return userStore.isAdmin || isDeptLeader(row)
+}
+
+const canDelete = (row) => {
+    if (!row) return false
+    if (userStore.isAdmin) return true // admin可以删除任何
+    const allowedStatus = ['Saved', 'Rejected']
+    return allowedStatus.includes(row.Status) && isCreator(row)
+}
+
 const handleSubmit = (row) => {
-    ElMessageBox.confirm('确认提交该报告吗？提交后不可修改。', '提示', { type: 'warning' }).then(() => {
-        // Fetch full data to update status
-        getIncomingReportDetail(row.ID).then(res => {
-            const data = res.data
-            data.Status = 'Submitted'
-            // We need to construct FormData as update API expects it
-            const formData = new FormData()
-            formData.append('data', JSON.stringify(data))
-            // No new files
-            
-            updateIncomingReport(row.ID, formData).then(() => {
-                ElMessage.success('提交成功')
-                getList()
-            })
+    ElMessageBox.confirm('确认提交该报告进行审核吗？提交后将发送待办事项给审核人。', '提交审核', { type: 'warning' }).then(() => {
+        submitIncomingReport(row.ID).then(res => {
+            ElMessage.success(res.message || '提交成功')
+            getList()
+        }).catch(err => {
+            ElMessage.error(err.response?.data?.message || '提交失败')
         })
     })
 }
@@ -562,35 +694,17 @@ const confirmAudit = () => {
     auditLoading.value = true
     const row = currentAuditRow.value
     
-    getIncomingReportDetail(row.ID).then(res => {
-        const data = res.data
-        // 根据审核结果设置状态
-        if (auditForm.action === 'pass') {
-            data.Status = 'Audited'
-        } else {
-            data.Status = 'Rejected' // 驳回状态
-        }
-        
-        data.Auditor = userStore.user?.username || 'Admin'
-        data.AuditDate = dayjs().format('YYYY-MM-DD')
-        // 将审核意见追加到备注或存入专门字段，这里假设存入 ReportRemark 或新增 AuditComment 字段
-        // 如果后端支持追加备注：
-        if (auditForm.comment) {
-            const newComment = `[审核${auditForm.action === 'pass' ? '通过' : '驳回'}]: ${auditForm.comment} - ${data.Auditor} ${data.AuditDate}`
-            data.ReportRemark = data.ReportRemark ? `${data.ReportRemark}\n${newComment}` : newComment
-        }
-        
-        const formData = new FormData()
-        formData.append('data', JSON.stringify(data))
-        
-        updateIncomingReport(row.ID, formData).then(() => {
-            ElMessage.success('审核完成')
-            auditDialogVisible.value = false
-            getList()
-        }).finally(() => {
-            auditLoading.value = false
-        })
-    }).catch(() => {
+    const apiCall = auditForm.action === 'pass' 
+        ? approveIncomingReport(row.ID, auditForm.comment)
+        : rejectIncomingReport(row.ID, auditForm.comment)
+    
+    apiCall.then(res => {
+        ElMessage.success(res.message || '审核完成')
+        auditDialogVisible.value = false
+        getList()
+    }).catch(err => {
+        ElMessage.error(err.response?.data?.message || '审核失败')
+    }).finally(() => {
         auditLoading.value = false
     })
 }
@@ -873,8 +987,69 @@ const exportBatchList = async () => {
 </style>
 
 <style scoped>
+/* 页面标题栏 */
+.page-header-card {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: #fff;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  border: 1px solid #ebeef5;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+}
+
+.header-right {
+  display: flex;
+  gap: 10px;
+}
+
+/* 筛选区域 */
 .filter-container {
-    padding-bottom: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 15px;
+  background: #fff;
+  border-radius: 4px;
+  margin-bottom: 16px;
+  border: 1px solid #ebeef5;
+}
+
+.filter-item {
+  margin-right: 0;
+}
+
+/* 表格样式 */
+:deep(.el-table th.el-table__cell) {
+  background-color: #f5f7fa !important;
+  color: #606266;
+  font-weight: bold;
+}
+
+:deep(.el-table .el-table__row--striped td.el-table__cell) {
+  background-color: #fafafa;
+}
+
+/* 操作列按钮样式 */
+.action-buttons {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+  height: 100%;
+}
+
+.action-buttons .el-dropdown {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
 }
 
 /* Dialog Styles */

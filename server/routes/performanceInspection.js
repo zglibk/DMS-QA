@@ -115,7 +115,8 @@ router.get('/instruments', authenticateToken, async (req, res) => {
 router.get('/inspection-items', authenticateToken, async (req, res) => {
     try {
         const result = await executeQuery(async (pool) => {
-            return await pool.request().query('SELECT ItemName, InspectionStandard, InspectionBasis FROM InspectionItems');
+            // AcceptanceCriteria is the one used in management UI
+            return await pool.request().query('SELECT ItemName, AcceptanceCriteria, InspectionBasis FROM InspectionItems ORDER BY ItemName');
         });
         res.json({ success: true, data: result.recordset });
     } catch (e) {
@@ -659,6 +660,186 @@ router.delete('/item/:id', authenticateToken, async (req, res) => {
     } catch (e) {
         console.error(e);
         res.status(500).json({ success: false, message: 'Delete item failed' });
+    }
+});
+
+// =====================================================
+// 审核流程API - 集成待办事项
+// =====================================================
+
+const auditService = require('../services/auditService');
+const { getConnection } = require('../db');
+
+/**
+ * 提交审核
+ * POST /api/inspection/performance/:id/submit
+ */
+router.post('/:id/submit', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await getConnection();
+        const user = await auditService.getUserByUsername(pool, req.user.username);
+        
+        if (!user) {
+            return res.status(400).json({ success: false, message: '用户信息获取失败' });
+        }
+        
+        const result = await auditService.submitForAudit({
+            pool,
+            tableName: 'PerformanceReports',
+            businessNoField: 'ReportNo',
+            businessId: parseInt(id),
+            todoType: auditService.TODO_TYPES.PERFORMANCE_INSPECTION,
+            businessType: auditService.BUSINESS_TYPES.PERFORMANCE_INSPECTION,
+            titlePrefix: '性能实验报告',
+            userId: user.id,
+            userName: user.realName
+        });
+        
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    } catch (error) {
+        console.error('提交审核失败:', error);
+        res.status(500).json({ success: false, message: '提交审核失败', error: error.message });
+    }
+});
+
+/**
+ * 审核通过
+ * POST /api/inspection/performance/:id/approve
+ */
+router.post('/:id/approve', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { remark } = req.body;
+        const pool = await getConnection();
+        const user = await auditService.getUserByUsername(pool, req.user.username);
+        
+        if (!user) {
+            return res.status(400).json({ success: false, message: '用户信息获取失败' });
+        }
+        
+        const result = await auditService.approveAudit({
+            pool,
+            tableName: 'PerformanceReports',
+            businessNoField: 'ReportNo',
+            auditorField: 'AuditedBy',
+            auditorNameField: 'AuditorName',
+            auditDateField: 'AuditDate',
+            auditRemarkField: 'AuditRemark',
+            businessId: parseInt(id),
+            todoType: auditService.TODO_TYPES.PERFORMANCE_INSPECTION,
+            businessType: auditService.BUSINESS_TYPES.PERFORMANCE_INSPECTION,
+            userId: user.id,
+            userName: user.realName,
+            remark
+        });
+        
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    } catch (error) {
+        console.error('审核失败:', error);
+        res.status(500).json({ success: false, message: '审核失败', error: error.message });
+    }
+});
+
+/**
+ * 审核驳回
+ * POST /api/inspection/performance/:id/reject
+ */
+router.post('/:id/reject', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { remark } = req.body;
+        const pool = await getConnection();
+        const user = await auditService.getUserByUsername(pool, req.user.username);
+        
+        if (!user) {
+            return res.status(400).json({ success: false, message: '用户信息获取失败' });
+        }
+        
+        const result = await auditService.rejectAudit({
+            pool,
+            tableName: 'PerformanceReports',
+            businessNoField: 'ReportNo',
+            auditorField: 'AuditedBy',
+            auditorNameField: 'AuditorName',
+            auditDateField: 'AuditDate',
+            auditRemarkField: 'AuditRemark',
+            businessId: parseInt(id),
+            todoType: auditService.TODO_TYPES.PERFORMANCE_INSPECTION,
+            businessType: auditService.BUSINESS_TYPES.PERFORMANCE_INSPECTION,
+            userId: user.id,
+            userName: user.realName,
+            remark
+        });
+        
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    } catch (error) {
+        console.error('驳回失败:', error);
+        res.status(500).json({ success: false, message: '驳回失败', error: error.message });
+    }
+});
+
+/**
+ * 撤回审核
+ * POST /api/inspection/performance/:id/revoke
+ */
+router.post('/:id/revoke', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const pool = await getConnection();
+        const user = await auditService.getUserByUsername(pool, req.user.username);
+        
+        if (!user) {
+            return res.status(400).json({ success: false, message: '用户信息获取失败' });
+        }
+        
+        const result = await auditService.revokeAudit({
+            pool,
+            tableName: 'PerformanceReports',
+            businessNoField: 'ReportNo',
+            businessId: parseInt(id),
+            todoType: auditService.TODO_TYPES.PERFORMANCE_INSPECTION,
+            businessType: auditService.BUSINESS_TYPES.PERFORMANCE_INSPECTION,
+            userId: user.id,
+            userName: user.realName,
+            username: req.user.username  // 传入用户名用于创建人比较
+        });
+        
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    } catch (error) {
+        console.error('撤回失败:', error);
+        res.status(500).json({ success: false, message: '撤回失败', error: error.message });
+    }
+});
+
+/**
+ * 获取审核日志
+ * GET /api/inspection/performance/:id/audit-logs
+ */
+router.get('/:id/audit-logs', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const logs = await auditService.getAuditLogs(auditService.BUSINESS_TYPES.PERFORMANCE_INSPECTION, parseInt(id));
+        res.json({ success: true, data: logs });
+    } catch (error) {
+        console.error('获取审核日志失败:', error);
+        res.status(500).json({ success: false, message: '获取审核日志失败', error: error.message });
     }
 });
 

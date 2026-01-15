@@ -128,82 +128,111 @@
 
     <!-- 搜索表单 -->
     <el-card class="search-card" shadow="never">
-      <el-form :model="searchForm" :inline="true" class="search-form">
-        <el-form-item label="证书编号">
-          <el-input 
-            v-model="searchForm.certificateNo" 
-            placeholder="请输入证书编号" 
-            clearable 
-            @blur="handleAutoSearch"
-            @clear="handleAutoSearch"
-            style="width: 150px;" 
-          />
-        </el-form-item>
-        <el-form-item label="客户编号">
-          <el-input 
-            v-model="searchForm.customerNo" 
-            placeholder="客户编号" 
-            clearable 
-            @input="handleCustomerNoInput('search')"
-            @blur="handleAutoSearch"
-            @clear="handleAutoSearch"
-            style="width: 100px;"
-          />
-        </el-form-item>
-        <el-form-item label="工单号">
-          <el-input 
-            v-model="searchForm.workOrderNo" 
-            placeholder="请输入工单号" 
-            clearable 
-            @input="handleWorkOrderNoInput('search')"
-            @blur="handleAutoSearch"
-            @clear="handleAutoSearch"
-            style="width: 130px;" 
-          />
-        </el-form-item>
-        <el-form-item label="产品编号">
-          <el-input 
-            v-model="searchForm.productNo" 
-            placeholder="请输入产品编号" 
-            clearable 
-            @blur="handleAutoSearch"
-            @clear="handleAutoSearch"
-          />
-        </el-form-item>
-        <el-form-item label="样板状态">
-          <el-select 
-            v-model="searchForm.sampleStatus" 
-            placeholder="请选择样板状态" 
-            clearable 
-            @change="handleAutoSearch"
-            @clear="handleAutoSearch"
-            style="width: 100px;"
-          >
-            <el-option label="正常使用" value="正常使用" />
-            <el-option label="待更新" value="待更新" />
-            <el-option label="待作废" value="待作废" />
-            <el-option label="已作废" value="已作废" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="制作日期">
-          <el-date-picker
-            v-model="searchForm.createDateRange"
-            type="daterange"
-            range-separator="至"
-            start-placeholder="开始日期"
-            end-placeholder="结束日期"
-            format="YYYY-MM-DD"
-            value-format="YYYY-MM-DD"
-            @change="handleAutoSearch"
-            @clear="handleAutoSearch"
-            style="max-width: 250px;"
-          />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" @click="handleSearch">搜索</el-button>
-          <el-button @click="handleReset">重置</el-button>
-        </el-form-item>
-      </el-form>
+      <div class="search-wrapper">
+        <!-- 第一行：输入条件 -->
+        <div class="search-row">
+          <div class="search-item">
+            <span class="search-label">证书编号</span>
+            <el-input 
+              v-model="searchForm.certificateNo" 
+              placeholder="证书编号" 
+              clearable 
+              @blur="handleAutoSearch"
+              @clear="handleAutoSearch"
+              style="width: 120px;" 
+            />
+          </div>
+          <div class="search-item">
+            <span class="search-label">客户编号</span>
+            <el-input 
+              v-model="searchForm.customerNo" 
+              placeholder="客户编号" 
+              clearable 
+              @input="handleCustomerNoInput('search')"
+              @blur="handleAutoSearch"
+              @clear="handleAutoSearch"
+              style="width: 90px;"
+            />
+          </div>
+          <div class="search-item">
+            <span class="search-label">工单号</span>
+            <el-input 
+              v-model="searchForm.workOrderNo" 
+              placeholder="工单号" 
+              clearable 
+              @input="handleWorkOrderNoInput('search')"
+              @blur="handleAutoSearch"
+              @clear="handleAutoSearch"
+              style="width: 110px;" 
+            />
+          </div>
+          <div class="search-item">
+            <span class="search-label">产品编号</span>
+            <el-input 
+              v-model="searchForm.productNo" 
+              placeholder="产品编号" 
+              clearable 
+              @blur="handleAutoSearch"
+              @clear="handleAutoSearch"
+              style="width: 120px;"
+            />
+          </div>
+          <div class="search-item">
+            <span class="search-label">品名</span>
+            <el-input 
+              v-model="searchForm.productName" 
+              placeholder="品名" 
+              clearable 
+              @blur="handleAutoSearch"
+              @clear="handleAutoSearch"
+              style="width: 130px;"
+            />
+          </div>
+          <div class="search-item">
+            <span class="search-label">制作日期</span>
+            <el-date-picker
+              v-model="searchForm.createDateRange"
+              type="daterange"
+              range-separator="-"
+              start-placeholder="开始"
+              end-placeholder="结束"
+              format="YYYY-MM-DD"
+              value-format="YYYY-MM-DD"
+              @change="handleAutoSearch"
+              @clear="handleAutoSearch"
+              style="width: 220px;"
+            />
+          </div>
+          <div class="search-buttons">
+            <el-button type="primary" @click="handleSearch" :icon="Search">搜索</el-button>
+            <el-button @click="handleReset" :icon="Refresh">重置</el-button>
+          </div>
+        </div>
+        <!-- 第二行：快速过滤 -->
+        <div class="filter-row">
+          <div class="filter-group">
+            <span class="filter-label">样板状态</span>
+            <el-radio-group v-model="searchForm.sampleStatus" size="small" @change="handleAutoSearch">
+              <el-radio-button label="">全部</el-radio-button>
+              <el-radio-button label="正常使用">正常使用</el-radio-button>
+              <el-radio-button label="待更新">待更新</el-radio-button>
+              <el-radio-button label="待作废">待作废</el-radio-button>
+              <el-radio-button label="已作废">已作废</el-radio-button>
+            </el-radio-group>
+          </div>
+          <div class="filter-divider"></div>
+          <div class="filter-group">
+            <span class="filter-label">判定结果</span>
+            <el-radio-group v-model="searchForm.judgment" size="small" @change="handleAutoSearch">
+              <el-radio-button label="">全部</el-radio-button>
+              <el-radio-button label="合格">合格</el-radio-button>
+              <el-radio-button label="部分合格">部分合格</el-radio-button>
+              <el-radio-button label="不合格">不合格</el-radio-button>
+              <el-radio-button label="待定">待定</el-radio-button>
+            </el-radio-group>
+          </div>
+        </div>
+      </div>
     </el-card>
 
     <!-- 操作工具栏 -->
@@ -526,6 +555,7 @@
             <el-form-item label="判定" prop="judgment">
               <el-select v-model="formData.judgment" placeholder="请选择判定结果"  style="width: 100%">
                 <el-option label="合格" value="合格" />
+                <el-option label="部分合格" value="部分合格" />
                 <el-option label="不合格" value="不合格" />
                 <el-option label="待定" value="待定" />
               </el-select>
@@ -689,7 +719,7 @@ import { ref, reactive, onMounted, onBeforeUnmount, computed, nextTick } from 'v
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
   Document, Check, Clock, Close, Plus, CircleClose, SuccessFilled, InfoFilled,
-  Back, Right, DArrowRight, ZoomOut, ZoomIn, RefreshRight, RefreshLeft, Refresh, Download
+  Back, Right, DArrowRight, ZoomOut, ZoomIn, RefreshRight, RefreshLeft, Refresh, Download, WarningFilled, Delete, Search
 } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 import { useUserStore } from '@/store/user'
@@ -788,7 +818,9 @@ const searchForm = reactive({
   customerNo: '',
   workOrderNo: '',
   productNo: '',
+  productName: '',
   sampleStatus: '',
+  judgment: '',
   createDateRange: []
 })
 
@@ -1045,8 +1077,9 @@ function handleDepartmentChange(value) {
 function getJudgmentType(judgment) {
   switch (judgment) {
     case '合格': return 'success'
+    case '部分合格': return 'warning'
     case '不合格': return 'danger'
-    case '待定': return 'warning'
+    case '待定': return 'info'
     default: return 'info'
   }
 }
@@ -1425,7 +1458,9 @@ async function handleExportList() {
       customerNo: searchForm.customerNo,
       workOrderNo: searchForm.workOrderNo,
       productNo: searchForm.productNo,
-      sampleStatus: searchForm.sampleStatus
+      productName: searchForm.productName,
+      sampleStatus: searchForm.sampleStatus,
+      judgment: searchForm.judgment
     }
     
     // 处理日期范围
@@ -3046,5 +3081,112 @@ onMounted(async () => {
   padding: 0 4px;
   border-radius: 2px;
   margin: 0 2px;
+}
+
+/* 搜索卡片优化 */
+.search-card {
+  margin-bottom: 16px;
+}
+
+.search-card :deep(.el-card__body) {
+  padding: 16px 20px;
+}
+
+.search-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+/* 第一行：输入条件 */
+.search-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.search-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.search-label {
+  font-size: 14px;
+  color: #606266;
+  white-space: nowrap;
+}
+
+.search-buttons {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* 第二行：快速过滤 */
+.filter-row {
+  display: flex;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px dashed #e4e7ed;
+  gap: 24px;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.filter-label {
+  font-size: 13px;
+  color: #909399;
+  white-space: nowrap;
+}
+
+.filter-divider {
+  width: 1px;
+  height: 24px;
+  background-color: #dcdfe6;
+}
+
+/* Radio Button 样式优化 */
+.filter-row :deep(.el-radio-button__inner) {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.filter-row :deep(.el-radio-button:first-child .el-radio-button__inner) {
+  border-radius: 4px 0 0 4px;
+}
+
+.filter-row :deep(.el-radio-button:last-child .el-radio-button__inner) {
+  border-radius: 0 4px 4px 0;
+}
+
+/* 响应式调整 */
+@media (max-width: 1400px) {
+  .search-row {
+    gap: 12px;
+  }
+  
+  .search-buttons {
+    margin-left: 0;
+    width: 100%;
+    justify-content: flex-start;
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .filter-row {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  
+  .filter-divider {
+    display: none;
+  }
 }
 </style>

@@ -93,6 +93,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { getReports, createReport, deleteReport, updateReport } from '@/api/performance'
+import { revokePerformanceReport } from '@/api/inspection'
 import { Search, Plus, Delete, RefreshLeft } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
@@ -167,8 +168,8 @@ const handleWithdraw = async (item) => {
                 type: 'warning'
             }
         )
-        await updateReport(item.ID, { Status: 'Draft' })
-        ElMessage.success('已撤回')
+        const res = await revokePerformanceReport(item.ID)
+        ElMessage.success(res.message || '已撤回')
         // Refresh list
         fetchList()
         // If this item is currently selected, trigger a refresh on detail view too if possible,
@@ -181,7 +182,7 @@ const handleWithdraw = async (item) => {
     } catch (e) {
         if (e !== 'cancel') {
             console.error(e)
-            ElMessage.error('撤回失败')
+            ElMessage.error(e.response?.data?.message || '撤回失败')
         }
     }
 }

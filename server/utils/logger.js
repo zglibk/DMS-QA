@@ -116,13 +116,6 @@ class SystemLogger {
    */
   async log(logData) {
     try {
-      console.log('SystemLogger.log 被调用:', JSON.stringify({
-        Category: logData.category,
-        Module: logData.module,
-        Action: logData.action,
-        ResourceType: logData.resourceType
-      }));
-
       const pool = await this.getPool();
       
       // 生成TraceID（如果未提供）

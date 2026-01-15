@@ -95,8 +95,10 @@ router.get('/list', authenticateToken, async (req, res) => {
       certificateNo,
       customerNo,
       workOrderNo, 
-      productNo, 
+      productNo,
+      productName,
       sampleStatus,
+      judgment,
       createDateStart, 
       createDateEnd 
     } = req.query;
@@ -121,10 +123,18 @@ router.get('/list', authenticateToken, async (req, res) => {
       whereConditions.push('ProductNo LIKE @productNo');
       parameters.productNo = `%${productNo}%`;
     }
+    if (productName) {
+      whereConditions.push('ProductName LIKE @productName');
+      parameters.productName = `%${productName}%`;
+    }
 
     if (sampleStatus) {
       whereConditions.push('SampleStatus = @sampleStatus');
       parameters.sampleStatus = sampleStatus;
+    }
+    if (judgment) {
+      whereConditions.push('Judgment = @judgment');
+      parameters.judgment = judgment;
     }
     if (createDateStart) {
       whereConditions.push('CreateDate >= @createDateStart');
@@ -155,6 +165,7 @@ router.get('/list', authenticateToken, async (req, res) => {
     const total = countResult.recordset[0].total;
 
     // 查询数据 - 使用ROW_NUMBER()方式兼容SQL Server 2008 R2
+    // 默认按样板编号（CertificateNo）降序排列，使用字符串降序可正确处理SP2601001格式
     const offset = (page - 1) * pageSize;
     const dataQuery = `
       SELECT 
@@ -163,12 +174,12 @@ router.get('/list', authenticateToken, async (req, res) => {
         Follower, Receiver, ReturnQuantity, Signer, SignDate, ReceiveDate, Judgment,
         SampleStatus, ExpiryDate, DistributionDepartment, DistributionQuantity, Remark
       FROM (
-        SELECT *, ROW_NUMBER() OVER (ORDER BY CreateDate DESC) as RowNum
+        SELECT *, ROW_NUMBER() OVER (ORDER BY CertificateNo DESC) as RowNum
         FROM SampleApproval 
         ${whereClause}
       ) AS PagedResults
       WHERE RowNum > @offset AND RowNum <= @offset + @pageSize
-      ORDER BY CreateDate DESC
+      ORDER BY CertificateNo DESC
     `;
     
     const dataResult = await executeQuery(async (pool) => {

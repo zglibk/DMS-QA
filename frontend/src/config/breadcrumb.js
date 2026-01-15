@@ -4,6 +4,12 @@
  */
 
 export const breadcrumbConfig = {
+  // 待办中心
+  '/admin/todo': {
+    title: '待办中心',
+    icon: 'mdi:bell'
+  },
+
   // 仪表盘
   '/admin': {
     title: '仪表盘',
@@ -140,6 +146,12 @@ export const breadcrumbConfig = {
   '/admin/supplier/complaints': {
     title: '供应商投诉管理',
     icon: 'mdi:comment-alert'
+  },
+
+  // 投诉书模板管理
+  '/admin/supplier/complaints/templates': {
+    title: '投诉书模板管理',
+    icon: 'mdi:file-document-edit'
   },
 
   // 样版管理
@@ -482,6 +494,12 @@ export const breadcrumbConfig = {
     icon: 'TrendCharts'
   },
 
+  // 系统管理 - 电子印章管理
+  '/admin/system/seals': {
+    title: '电子印章管理',
+    icon: 'Stamp'
+  },
+
   // 供应商管理
   '/admin/supplier/list': {
     title: '供应商管理',
@@ -636,6 +654,20 @@ export const breadcrumbConfig = {
   '/admin/inspection/category-config': {
     title: '物料分类配置',
     icon: 'mdi:cog'
+  },
+  '/admin/inspection/shipment': {
+    title: '出货检验报告',
+    icon: 'DocumentChecked'
+  },
+
+  // 设备参数管理
+  '/admin/quality/equipment-parameters': {
+    title: '设备参数管理',
+    icon: 'mdi:tune'
+  },
+  '/admin/quality/equipment-parameters/hp-indigo': {
+    title: 'HP Indigo 数码印刷机',
+    icon: 'mdi:printer-3d'
   },
 
   // 出货报告模块

@@ -317,9 +317,8 @@ router.get('/user-menus', authenticateToken, async (req, res) => {
       
       // 对admin用户只使用角色权限，对其他用户同时考虑角色权限和用户权限
       if (username === 'admin') {
-        // admin用户：只通过角色权限获取菜单
+        // admin用户：获取所有有效菜单（超级管理员权限）
         queryResult = await pool.request()
-          .input('userId', sql.Int, userId)
           .query(`
             SELECT DISTINCT
               m.ID,
@@ -338,8 +337,6 @@ router.get('/user-menus', authenticateToken, async (req, res) => {
               m.SortOrder,
               m.Status
             FROM Menus m
-            INNER JOIN RoleMenus rm ON m.ID = rm.MenuID
-            INNER JOIN [UserRoles] ur ON rm.RoleID = ur.RoleID AND ur.UserID = @userId
             WHERE m.Status = 1 
               AND m.Visible = 1
               AND m.MenuType IN ('catalog', 'menu')

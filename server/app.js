@@ -78,6 +78,9 @@ const incomingInspectionRouter = require('./routes/incomingInspection'); // 来�
 const inspectionItemsRouter = require('./routes/inspectionItems'); // 检验项目管理路由
 const materialRouter = require('./routes/material'); // 材料入库查询路由
 const categoryConfigRouter = require('./routes/categoryConfig'); // 物料分类映射配置路由
+const supplierComplaintTemplatesRouter = require('./routes/supplierComplaintTemplates'); // 供应商投诉模板路由
+const electronicSealsRouter = require('./routes/electronicSeals'); // 电子签章管理路由
+const todoItemsRouter = require('./routes/todoItems'); // 待办事项管理路由
 const erpSyncService = require('./services/erpSyncService');
 const { startFileServer } = require('./file-server');
 const { logCleanupService } = require('./services/logCleanupService');
@@ -310,8 +313,12 @@ app.use('/api/defective', defectiveRouter);                       // 不良类�
 app.use('/api/qualification', qualificationRouter);               // 人员资质管理
 app.use('/api/inspection/incoming', incomingInspectionRouter);      // 来料检验报告
 app.use('/api/inspection/items', inspectionItemsRouter);            // 检验项目管理
+app.use('/api/shipment-report', require('./routes/shipmentInspection')); // 出货检验报告
 app.use('/api/material', materialRouter);                           // 材料入库查询
 app.use('/api/category-config', categoryConfigRouter);              // 物料分类映射配置
+app.use('/api/supplier-complaint-templates', supplierComplaintTemplatesRouter); // 供应商投诉模板管理
+app.use('/api/electronic-seals', electronicSealsRouter); // 电子签章管理
+app.use('/api/todo-items', todoItemsRouter); // 待办事项管理
 app.use('/api/inspection/performance', require('./routes/performanceInspection')); // 性能实验报告
 app.use('/api/inspection/dashboard', require('./routes/inspectionDashboard')); // 检验工作台
 app.use('/api/log-export', require('./routes/logExport'));
@@ -358,6 +365,8 @@ app.use('/files/rework-attachments', staticCorsMiddleware, express.static(path.j
 app.use('/files/report-templates', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/report-templates'))); // 模板文件
 app.use('/files/qualification', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/qualification'))); // 资质管理文件
 app.use('/files/inspection', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/inspection'))); // 检验报告图片
+app.use('/files/supplier-complaint-templates', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/supplier-complaint-templates'))); // 供应商投诉模板
+app.use('/files/seals', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/seals'))); // 电子签章
 app.use('/uploads/complaints', staticCorsMiddleware, express.static(path.join(__dirname, 'uploads/complaints')));
 
 // 添加共享文件访问路由

@@ -12,16 +12,18 @@
           </div>
           <div class="header-actions">
             <el-button :disabled="!userStore.hasPermission('shipment:template:view')" type="primary" plain @click="showTemplateManager = true">
-              <el-icon><Setting /></el-icon>
-              模板管理
+              <el-icon style="margin-right: 4px;"><Setting /></el-icon> 模板管理
             </el-button>
           </div>
         </div>
 
         <!-- 主内容区域 -->
         <div class="main-content">
-          <!-- 左侧：查询和结果 -->
-          <div class="left-panel">
+          <el-tabs v-model="activeTab" class="main-tabs" tab-position="top" @tab-click="handleTabClick">
+            <el-tab-pane label="生成报告" name="generate">
+              <div class="generate-pane-content">
+                <!-- 左侧：查询和结果 -->
+                <div class="left-panel">
             <!-- 搜索区域 -->
             <el-card shadow="hover" class="search-card">
               <template #header>
@@ -79,14 +81,21 @@
                       <el-date-picker v-model="searchForm.endDate" type="datetime" placeholder="选择结束时间" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
                     </el-form-item>
                   </el-col>
-                  <el-col :span="12">
+                  <el-col :span="4">
+                    <el-form-item label="匹配范围">
+                       <el-tooltip content="以工单开单日期为中心，前后N个月作为物料入库匹配范围" placement="top">
+                          <el-input-number v-model="searchForm.matchMonthRange" :min="1" :max="24" style="width: 100%" controls-position="right" />
+                       </el-tooltip>
+                    </el-form-item>
+                  </el-col>
+                  <el-col :span="8">
                     <el-form-item label=" ">
                       <div class="btn-group">
                         <el-button :disabled="!userStore.hasPermission('shipment:report:search')" type="primary" @click="handleSearch" :loading="loading">
-                          <el-icon><Search /></el-icon>查询
+                          <el-icon style="margin-right: 4px;"><Search /></el-icon> 查询
                         </el-button>
                         <el-button @click="handleReset">
-                          <el-icon><Refresh /></el-icon>重置
+                          <el-icon style="margin-right: 4px;"><Refresh /></el-icon> 重置
                         </el-button>
                         <span class="search-tip">提示：无工单号时，需同时输入产品编号和CPO</span>
                       </div>
@@ -115,11 +124,11 @@
                         @paste="handleBatchPaste"
                       />
                       <div class="batch-actions">
-                        <el-button size="small" @click="parseBatchInput">
-                          <el-icon><DocumentCopy /></el-icon>解析数据
+                        <el-button type="primary" plain @click="parseBatchInput">
+                          <el-icon style="margin-right: 4px;"><DocumentCopy /></el-icon> 解析数据
                         </el-button>
-                        <el-button size="small" @click="clearBatchInput">
-                          <el-icon><Delete /></el-icon>清空
+                        <el-button type="danger" plain @click="clearBatchInput">
+                          <el-icon style="margin-right: 4px;"><Delete /></el-icon> 清空
                         </el-button>
                       </div>
                     </div>
@@ -131,20 +140,20 @@
                         <el-tag v-if="batchQueryList.length > 0" size="small" type="success">{{ batchQueryList.length }} 条</el-tag>
                       </div>
                       <el-table :data="batchQueryList" size="small" max-height="180" border>
-                        <el-table-column type="index" label="#" width="40" />
-                        <el-table-column prop="cpo" label="CPO" min-width="100" show-overflow-tooltip />
-                        <el-table-column prop="productId" label="产品编号" min-width="110" show-overflow-tooltip />
-                        <el-table-column prop="pNum" label="工单号" width="110" show-overflow-tooltip>
+                        <el-table-column type="index" label="#" width="45" align="center" />
+                        <el-table-column prop="cpo" label="CPO" width="110" show-overflow-tooltip align="center" />
+                        <el-table-column prop="productId" label="产品编号" min-width="120" show-overflow-tooltip align="center" />
+                        <el-table-column prop="pNum" label="工单号" width="110" show-overflow-tooltip align="center">
                           <template #default="{ row }">
                             <span v-if="row.pNum" class="pnum-cell">{{ row.pNum }}</span>
                             <span v-else-if="row.matched === false" class="pnum-unmatched">未匹配</span>
                             <span v-else class="pnum-pending">待查询</span>
                           </template>
                         </el-table-column>
-                        <el-table-column label="操作" width="50" align="center">
+                        <el-table-column label="操作" width="110" align="center">
                           <template #default="{ $index }">
                             <el-button type="danger" link size="small" @click="removeBatchItem($index)">
-                              <el-icon><Delete /></el-icon>
+                              <el-icon style="margin-right: 4px;"><Delete /></el-icon> 删除
                             </el-button>
                           </template>
                         </el-table-column>
@@ -154,22 +163,22 @@
                 </el-row>
                 <el-row :gutter="16" style="margin-top: 16px;">
                   <el-col :span="6">
-                    <el-form-item label="开始时间" label-width="80px">
+                    <el-form-item label="开始时间" label-width="70px" style="margin-bottom: 0;">
                       <el-date-picker v-model="searchForm.startDate" type="datetime" placeholder="选择开始时间" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
                     </el-form-item>
                   </el-col>
                   <el-col :span="6">
-                    <el-form-item label="结束时间" label-width="80px">
+                    <el-form-item label="结束时间" label-width="70px" style="margin-bottom: 0;">
                       <el-date-picker v-model="searchForm.endDate" type="datetime" placeholder="选择结束时间" format="YYYY-MM-DD HH:mm:ss" value-format="YYYY-MM-DD HH:mm:ss" style="width: 100%" />
                     </el-form-item>
                   </el-col>
                   <el-col :span="12">
-                    <div class="btn-group" style="padding-top: 2px;">
+                    <div class="btn-group" style="padding-top: 0;">
                       <el-button :disabled="!userStore.hasPermission('shipment:report:search') || batchQueryList.length === 0" type="primary" @click="handleBatchSearch" :loading="loading">
-                        <el-icon><Search /></el-icon>批量查询 ({{ batchQueryList.length }})
+                        <el-icon style="margin-right: 4px;"><Search /></el-icon> 批量查询 ({{ batchQueryList.length }})
                       </el-button>
                       <el-button @click="handleReset">
-                        <el-icon><Refresh /></el-icon>重置
+                        <el-icon style="margin-right: 4px;"><Refresh /></el-icon> 重置
                       </el-button>
                       <span class="search-tip">适用于A08等客户的多产品合并出货报告</span>
                     </div>
@@ -193,6 +202,7 @@
                 <el-descriptions-item label="订单号">{{ result.workOrderInfo.OrderNum }}</el-descriptions-item>
                 <el-descriptions-item label="CPO">{{ result.workOrderInfo.CPO || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="客户编码"><el-tag size="small">{{ result.workOrderInfo.CustomerID }}</el-tag></el-descriptions-item>
+                <el-descriptions-item label="客户名称">{{ result.workOrderInfo.Customer }}</el-descriptions-item>
                 <el-descriptions-item label="产品名称" :span="2">{{ result.workOrderInfo.Product }}</el-descriptions-item>
                 <el-descriptions-item label="开单日期">{{ result.workOrderInfo.InDate || '-' }}</el-descriptions-item>
                 <el-descriptions-item label="交货日期">{{ result.workOrderInfo.DeliveryDate }}</el-descriptions-item>
@@ -209,7 +219,7 @@
                     <span>第二步：选择产品生成报告</span>
                     <el-tag>{{ result.productInfo.length }} 项</el-tag>
                     <el-button v-if="selectedProducts.length > 1" :disabled="!userStore.hasPermission('shipment:report:export')" type="success" @click="handleBatchGenerateReport">
-                      <el-icon><Printer /></el-icon>合并生成报告 ({{ selectedProducts.length }}项)
+                      <el-icon style="margin-right: 4px;"><Printer /></el-icon> 合并生成报告 ({{ selectedProducts.length }}项)
                     </el-button>
                   </div>
                   <span class="header-tip">勾选多个产品可合并生成一份报告</span>
@@ -225,19 +235,18 @@
                 @selection-change="handleSelectionChange"
                 :row-class-name="getProductRowClass"
               >
-                <el-table-column type="selection" width="45" />
+                <el-table-column type="selection" width="45" align="center" />
                 <el-table-column type="index" label="序号" width="60" align="center" />
-                <el-table-column prop="cProductId" label="客户料号" min-width="140" show-overflow-tooltip />
-                <el-table-column prop="product" label="产品名称" min-width="180" show-overflow-tooltip />
-                <el-table-column prop="cpo" label="CPO" width="120" show-overflow-tooltip />
-                <el-table-column prop="cProduct" label="工厂订单号" min-width="120" show-overflow-tooltip />
-                <el-table-column prop="scale" label="规格" width="100" show-overflow-tooltip />
-                <el-table-column prop="orderCount" label="订单数" width="80" align="right" />
-                <el-table-column prop="pCount" label="成品数" width="80" align="right" />
+                <el-table-column prop="cpo" label="CPO" width="120" align="center" show-overflow-tooltip />
+                <el-table-column prop="cProductId" label="客户料号" min-width="140" align="center" show-overflow-tooltip />
+                <el-table-column prop="product" label="产品名称" min-width="180" header-align="center" show-overflow-tooltip />
+                <el-table-column prop="cProduct" label="工厂订单号" min-width="120" align="center" show-overflow-tooltip />
+                <el-table-column prop="orderCount" label="订单数" width="80" align="center" />
+                <el-table-column prop="pCount" label="成品数" width="80" align="center" />
                 <el-table-column label="操作" width="120" align="center" fixed="right">
                   <template #default="{ row }">
                     <el-button :disabled="!userStore.hasPermission('shipment:report:export')" type="primary" size="small" @click.stop="handleGenerateReport(row)">
-                      <el-icon><Printer /></el-icon>生成报告
+                      <el-icon style="margin-right: 4px;"><Printer /></el-icon> 生成报告
                     </el-button>
                   </template>
                 </el-table-column>
@@ -278,25 +287,31 @@
                   </div>
                 </template>
                 <el-table :data="result.materialInList" stripe border size="small" max-height="300">
-                  <el-table-column prop="inId" label="入库单号" width="100" show-overflow-tooltip />
-                  <el-table-column prop="inDate" label="入库日期" width="140" show-overflow-tooltip />
-                  <el-table-column prop="supply" label="供应商" min-width="150" show-overflow-tooltip>
+                  <el-table-column prop="inId" label="入库单号" width="110" align="center" header-align="center" show-overflow-tooltip />
+                  <el-table-column prop="inDate" label="入库日期" width="150" align="center" header-align="center" show-overflow-tooltip />
+                  <el-table-column prop="apoid" label="采购单号" width="110" align="center" header-align="center" show-overflow-tooltip />
+                  <el-table-column prop="supply" label="供应商" min-width="200" align="left" header-align="center" show-overflow-tooltip>
                     <template #default="{ row }">
                       <el-text type="primary" tag="b">{{ row.supply }}</el-text>
                     </template>
                   </el-table-column>
-                  <el-table-column prop="materialName" label="物料名称" min-width="150" show-overflow-tooltip />
-                  <el-table-column prop="model" label="型号" width="120" show-overflow-tooltip />
-                  <el-table-column prop="materialType" label="物料类型" width="90" show-overflow-tooltip />
-                  <el-table-column prop="materialSubType" label="子类型" width="90" show-overflow-tooltip />
-                  <el-table-column prop="count" label="数量" width="80" align="right" />
+                  <el-table-column prop="materialName" label="物料名称" min-width="200" align="left" header-align="center" show-overflow-tooltip />
+                  <el-table-column prop="spec" label="规格" width="120" align="center" header-align="center" show-overflow-tooltip />
+                  <el-table-column prop="model" label="型号" width="100" align="center" header-align="center" show-overflow-tooltip />
+                  <el-table-column prop="materialType" label="物料类型" width="100" align="center" header-align="center" show-overflow-tooltip />
+                  <el-table-column prop="materialSubType" label="子类型" width="120" align="center" header-align="center" show-overflow-tooltip />
+                  <el-table-column prop="count" label="入库数量" width="90" align="center" header-align="center" />
+                  <el-table-column prop="calUnit" label="单位" width="60" align="center" header-align="center" />
                 </el-table>
               </el-collapse-item>
             </el-collapse>
 
             <!-- 初始提示 -->
-            <el-empty v-if="!hasSearched" description="请输入工单号或物料信息进行查询" class="initial-hint">
-              <template #image><el-icon :size="80" color="#c0c4cc"><Search /></el-icon></template>
+            <div v-if="!hasSearched" class="initial-hint">
+              <div class="hint-header">
+                <el-icon :size="24" color="#c0c4cc"><Search /></el-icon>
+                <span class="hint-title">请输入工单号或物料信息进行查询</span>
+              </div>
               <div class="hint-text">
                 <p>使用说明：</p>
                 <ul>
@@ -305,7 +320,7 @@
                   <li>3. 系统根据客户模板生成出货检验报告</li>
                 </ul>
               </div>
-            </el-empty>
+            </div>
 
             <el-empty v-if="hasSearched && !result.workOrderInfo && result.materialList.length === 0 && result.productInfo.length === 0" description="未查询到相关数据">
               <el-button type="primary" @click="handleReset">重置条件</el-button>
@@ -320,8 +335,8 @@
                   <el-icon><Document /></el-icon>
                   <span>报告预览</span>
                   <div class="preview-actions">
-                    <el-button :disabled="!userStore.hasPermission('shipment:report:export')" type="success" size="small" @click="handleExportReport"><el-icon><Download /></el-icon>导出</el-button>
-                    <el-button :disabled="!userStore.hasPermission('shipment:report:export')" type="primary" size="small" @click="handlePrintReport"><el-icon><Printer /></el-icon>打印</el-button>
+                    <el-button :disabled="!userStore.hasPermission('shipment:report:export')" type="success" size="small" @click="handleQuickExport"><el-icon style="margin-right: 4px;"><Download /></el-icon> 导出</el-button>
+                    <el-button :disabled="!userStore.hasPermission('shipment:report:export')" type="primary" size="small" @click="handleQuickPrint"><el-icon style="margin-right: 4px;"><Printer /></el-icon> 打印</el-button>
                   </div>
                 </div>
               </template>
@@ -375,12 +390,278 @@
             </el-card>
           </div>
         </div>
+      </el-tab-pane>
+      <el-tab-pane label="报告记录" name="history">
+        <div class="history-pane-content">
+          <el-card shadow="never" class="history-card">
+            <div class="history-toolbar">
+              <el-input v-model="historyQuery.keyword" placeholder="搜索报告编号/工单号/CPO" clearable style="width: 300px" @keyup.enter="fetchHistory" @clear="fetchHistory">
+                <template #append><el-button @click="fetchHistory"><el-icon><Search /></el-icon></el-button></template>
+              </el-input>
+              <el-button @click="fetchHistory"><el-icon style="margin-right: 4px;"><Refresh /></el-icon> 刷新</el-button>
+            </div>
+            
+            <el-table 
+              :data="historyList" 
+              v-loading="historyLoading" 
+              stripe border 
+              style="width: 100%; margin-top: 12px; flex: 1; cursor: default;" 
+              :row-style="{ cursor: 'default' }"
+              highlight-current-row
+              @current-change="handleHistoryRowChange"
+            >
+              <el-table-column type="index" label="#" width="50" align="center" />
+              <el-table-column prop="ReportNo" label="报告编号" width="140" align="center" show-overflow-tooltip />
+              <el-table-column prop="CustomerID" label="客户编码" width="90" align="center" />
+              <el-table-column prop="PNum" label="工单号" min-width="140" align="center" show-overflow-tooltip />
+              <el-table-column prop="OrderNum" label="订单号" min-width="140" align="center" show-overflow-tooltip />
+              <el-table-column prop="CPO" label="CPO" min-width="130" align="center" show-overflow-tooltip />
+              <el-table-column prop="ReportDate" label="报告日期" width="160" align="center">
+                <template #default="{ row }">{{ formatDateTime(row.ReportDate) }}</template>
+              </el-table-column>
+              <el-table-column prop="CreatorName" label="创建人" width="80" align="center" />
+              <el-table-column label="状态" width="100" align="center">
+                <template #default="{ row }">
+                  <el-tag v-if="row.Status === 'Generated' || row.Status === 'Saved'" type="info" size="small">草稿</el-tag>
+                  <el-tag v-else-if="row.Status === 'Submitted'" type="warning" size="small">待审核</el-tag>
+                  <el-tag v-else-if="row.Status === 'Approved'" type="success" size="small">已审核</el-tag>
+                  <el-tag v-else-if="row.Status === 'Rejected'" type="danger" size="small">已驳回</el-tag>
+                  <el-tag v-else type="info" size="small">{{ row.Status || '草稿' }}</el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="操作" width="140" align="center" fixed="right">
+                <template #default="{ row }">
+                  <div class="action-buttons">
+                    <el-button link type="primary" size="small" @click="handleExportHistoryReport(row)">导出</el-button>
+                    <el-dropdown trigger="click" @command="(cmd) => handleShipmentCommand(cmd, row)">
+                      <el-button link type="primary" size="small">更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                      <template #dropdown>
+                        <el-dropdown-menu>
+                          <el-dropdown-item command="submit" :disabled="!canSubmitShipment(row)">
+                            <el-icon color="#67c23a"><Promotion /></el-icon> 提交审核
+                          </el-dropdown-item>
+                          <el-dropdown-item command="revoke" :disabled="!canRevokeShipment(row)">
+                            <el-icon color="#e6a23c"><RefreshLeft /></el-icon> 撤回
+                          </el-dropdown-item>
+                          <el-dropdown-item command="audit" :disabled="!canAuditShipment(row)">
+                            <el-icon color="#409eff"><Check /></el-icon> 审核
+                          </el-dropdown-item>
+                          <el-dropdown-item command="print" divided>
+                            <el-icon color="#909399"><Printer /></el-icon> 打印
+                          </el-dropdown-item>
+                          <el-dropdown-item command="delete" :disabled="row.Status === 'Submitted'">
+                            <el-icon color="#f56c6c"><Delete /></el-icon> 删除
+                          </el-dropdown-item>
+                        </el-dropdown-menu>
+                      </template>
+                    </el-dropdown>
+                  </div>
+                </template>
+              </el-table-column>
+            </el-table>
+            
+            <div class="pagination-container" style="display: flex; justify-content: center; margin-top: 16px;">
+              <el-pagination
+                v-model:current-page="historyQuery.page"
+                v-model:page-size="historyQuery.pageSize"
+                :total="historyTotal"
+                :page-sizes="[5, 10, 20, 50, 100]"
+                layout="total, sizes, prev, pager, next, jumper"
+                @size-change="fetchHistory"
+                @current-change="fetchHistory"
+              />
+            </div>
+
+            <el-card v-if="currentHistoryRow" class="detail-card" style="margin-top: 16px; flex-shrink: 0; max-height: 40%; overflow-y: auto;" shadow="never">
+              <template #header>
+                <div class="card-header" style="display: flex; align-items: center;">
+                  <el-icon style="margin-right: 6px; color: #909399;"><Tickets /></el-icon>
+                  <span>报告详情</span>
+                </div>
+              </template>
+              <div class="report-info-grid">
+                <el-row :gutter="20" justify="center">
+                  <el-col :span="6">
+                    <div class="info-block">
+                      <div class="label">报告编号：</div>
+                      <div class="value">{{ currentHistoryRow.ReportNo }}</div>
+                    </div>
+                  </el-col>
+                  <el-col :span="3">
+                    <div class="info-block">
+                      <div class="label">客户编码：</div>
+                      <div class="value">{{ currentHistoryRow.CustomerID }}</div>
+                    </div>
+                  </el-col>
+                  <el-col :span="6">
+                    <div class="info-block">
+                      <div class="label">报告日期：</div>
+                      <div class="value">{{ formatDateTime(currentHistoryRow.ReportDate) }}</div>
+                    </div>
+                  </el-col>
+                  <el-col :span="3">
+                    <div class="info-block">
+                      <div class="label">创建人：</div>
+                      <div class="value">{{ currentHistoryRow.CreatorName }}</div>
+                    </div>
+                  </el-col>
+                  <el-col :span="6">
+                    <div class="info-block">
+                      <div class="label">创建时间：</div>
+                      <div class="value">{{ formatDateTime(currentHistoryRow.CreatedAt) }}</div>
+                    </div>
+                  </el-col>
+                </el-row>
+              </div>
+              
+              <div style="margin-top: 16px;">
+                <div style="margin-bottom: 8px; font-weight: bold; font-size: 14px; display: flex; align-items: center;">
+                  <el-icon style="margin-right: 6px; color: #409EFF;"><Goods /></el-icon>
+                  产品信息
+                </div>
+                <el-table 
+                  ref="historyProductTableRef"
+                  :data="currentProductList" 
+                  border 
+                  size="small"
+                  highlight-current-row
+                  @current-change="handleHistoryProductSelect"
+                  style="cursor: pointer;"
+                >
+                   <el-table-column type="index" label="#" width="45" align="center" />
+                   <el-table-column prop="cpo" label="CPO" width="110" show-overflow-tooltip align="center" />
+                   <el-table-column prop="orderNum" label="订单号" width="100" show-overflow-tooltip align="center" />
+                   <el-table-column prop="pNum" label="工单号" width="100" show-overflow-tooltip align="center" />
+                   <el-table-column prop="cProductId" label="客户料号" width="130" show-overflow-tooltip align="center" />
+                   <el-table-column prop="product" label="产品名称" min-width="120" show-overflow-tooltip header-align="center" />
+                   <el-table-column label="规格" min-width="80" show-overflow-tooltip align="center">
+                     <template #default="{ row }">
+                       {{ getProductScaleFromInspectionData(row) || row.scale || '-' }}
+                     </template>
+                   </el-table-column>
+                   <el-table-column prop="cProduct" label="工厂订单号" width="90" show-overflow-tooltip align="center" />
+                   <el-table-column prop="orderCount" label="订单数" width="70" align="center" />
+                   <el-table-column prop="pCount" label="成品数" width="70" align="center" />
+                   <el-table-column label="抽检数" width="70" align="center">
+                     <template #default="{ row }">
+                       {{ calculateSampleSize(row.pCount || row.orderCount) }}
+                     </template>
+                   </el-table-column>
+                </el-table>
+              </div>
+
+              <div style="margin-top: 16px;">
+                <div style="margin-bottom: 12px; font-weight: bold; font-size: 14px; display: flex; align-items: center; justify-content: space-between;">
+                  <span style="display: flex; align-items: center;">
+                    <el-icon style="margin-right: 6px; color: #67C23A;"><CircleCheck /></el-icon>
+                    检验数据
+                    <span v-if="selectedProductRow" style="font-weight: normal; color: #409EFF; font-size: 13px; margin-left: 8px;">
+                      {{ selectedProductRow.product }}
+                    </span>
+                  </span>
+                  <span v-if="getSelectedProductInspectionData().productInfo?.sampleCount" style="font-weight: normal; font-size: 13px;">
+                    <el-tag type="info" size="small" effect="plain">抽检: {{ getSelectedProductInspectionData().productInfo?.sampleCount }}</el-tag>
+                    <el-tag type="primary" size="small" effect="plain" style="margin-left: 4px;">出货: {{ getSelectedProductInspectionData().productInfo?.count }}</el-tag>
+                  </span>
+                </div>
+                <div v-if="currentHistoryRow.InspectionData && selectedProductRow">
+                  <!-- 检验核对结果表格 - 横向布局，类似Excel报告格式 -->
+                  <div style="overflow-x: auto; margin-bottom: 12px;">
+                    <table class="inspection-check-table" style="width: 100%; min-width: 900px; border-collapse: collapse; font-size: 12px;">
+                      <!-- 表头第一行：分组标题 -->
+                      <thead>
+                        <tr>
+                          <th colspan="5" style="border: 1px solid #DCDFE6; padding: 8px 4px; background: #f5f7fa; text-align: center; font-weight: 500;">首件核对</th>
+                          <th colspan="3" style="border: 1px solid #DCDFE6; padding: 8px 4px; background: #f5f7fa; text-align: center; font-weight: 500;">工单核对</th>
+                          <th colspan="2" style="border: 1px solid #DCDFE6; padding: 8px 4px; background: #f5f7fa; text-align: center; font-weight: 500;">图纸核对</th>
+                          <th rowspan="2" style="border: 1px solid #DCDFE6; padding: 8px 4px; background: #f5f7fa; text-align: center; font-weight: 500; vertical-align: middle; min-width: 80px;">规格尺寸</th>
+                          <th rowspan="2" style="border: 1px solid #DCDFE6; padding: 8px 4px; background: #f5f7fa; text-align: center; font-weight: 500; vertical-align: middle; min-width: 80px;">实测尺寸</th>
+                          <th rowspan="2" style="border: 1px solid #DCDFE6; padding: 8px 4px; background: #f5f7fa; text-align: center; font-weight: 500; vertical-align: middle; min-width: 70px;">结果判定</th>
+                        </tr>
+                        <!-- 表头第二行：具体检验项 -->
+                        <tr>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 45px;">外观</th>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 45px;">颜色</th>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 45px;">图文</th>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 45px;">字体</th>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 55px;">啤切线</th>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 65px;">物料编号</th>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 65px;">模切方式</th>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 65px;">包装方式</th>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 45px;">材质</th>
+                          <th style="border: 1px solid #DCDFE6; padding: 6px 4px; background: #fafafa; text-align: center; font-weight: normal; color: #606266; min-width: 65px;">印刷内容</th>
+                        </tr>
+                      </thead>
+                      <!-- 数据行 -->
+                      <tbody>
+                        <tr>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().firstPieceCheck?.appearance || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().firstPieceCheck?.color || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().firstPieceCheck?.graphics || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().firstPieceCheck?.font || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().firstPieceCheck?.dieLine || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().workOrderCheck?.materialNum || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().workOrderCheck?.dieCutStyle || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().workOrderCheck?.packingStyle || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().drawingCheck?.material || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().drawingCheck?.printContent || 'OK' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">{{ getSelectedProductInspectionData().productInfo?.scale || '-' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center; color: #67C23A; font-weight: 500;">{{ getSelectedProductInspectionData().measuredSize || '-' }}</td>
+                          <td style="border: 1px solid #DCDFE6; padding: 8px 4px; text-align: center;">
+                            <el-tag :type="getSelectedProductInspectionData().result === '合格' ? 'success' : 'danger'" size="small">
+                              {{ getSelectedProductInspectionData().result || '合格' }}
+                            </el-tag>
+                          </td>
+                        </tr>
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  <!-- 原材料信息 -->
+                  <div style="border: 1px solid #EBEEF5; border-radius: 6px;">
+                    <div style="background: #f5f7fa; padding: 8px 12px; border-bottom: 1px solid #EBEEF5; font-size: 13px; font-weight: 500; color: #606266; display: flex; align-items: center;">
+                      <el-icon style="margin-right: 6px; color: #E6A23C;"><Files /></el-icon>
+                      原材料信息
+                    </div>
+                    <el-table 
+                      :data="getSelectedProductInspectionData().materialList || parseInspectionData(currentHistoryRow.InspectionData)?.materialList || []" 
+                      size="small" 
+                      max-height="150"
+                      :show-header="true"
+                    >
+                      <el-table-column prop="type" label="类型" width="80" align="center" />
+                      <el-table-column prop="name" label="名称" min-width="180" show-overflow-tooltip />
+                      <el-table-column prop="brand" label="供应商/品牌" min-width="150" show-overflow-tooltip />
+                      <el-table-column prop="spec" label="规格" min-width="120" show-overflow-tooltip />
+                    </el-table>
+                    <div v-if="!(getSelectedProductInspectionData().materialList?.length || parseInspectionData(currentHistoryRow.InspectionData)?.materialList?.length)" style="text-align: center; padding: 20px; color: #C0C4CC; font-size: 12px;">
+                      暂无原材料数据
+                    </div>
+                  </div>
+                  
+                  <!-- 检验时间 -->
+                  <div v-if="getSelectedProductInspectionData().inspectedAt" style="margin-top: 8px; font-size: 11px; color: #909399; text-align: right;">
+                    检验时间: {{ formatDateTime(getSelectedProductInspectionData().inspectedAt) }}
+                  </div>
+                </div>
+                <div v-else style="text-align: center; padding: 30px 20px; color: #C0C4CC; font-size: 13px;">
+                  <el-icon style="font-size: 32px; margin-bottom: 8px;"><Document /></el-icon>
+                  <div>暂无详细检验数据</div>
+                  <div style="font-size: 12px; margin-top: 4px;">旧记录或未保存详细信息</div>
+                </div>
+              </div>
+            </el-card>
+          </el-card>
+        </div>
+      </el-tab-pane>
+    </el-tabs>
+  </div>
 
         <!-- 模板管理对话框 -->
         <el-dialog v-model="showTemplateManager" title="出货报告模板管理" width="900px">
           <div class="template-toolbar">
-            <el-button :disabled="!userStore.hasPermission('shipment:template:add')" type="primary" @click="handleAddTemplate"><el-icon><Plus /></el-icon>新增模板</el-button>
-            <el-button @click="fetchTemplates"><el-icon><Refresh /></el-icon>刷新</el-button>
+            <el-button :disabled="!userStore.hasPermission('shipment:template:add')" type="primary" @click="handleAddTemplate"><el-icon style="margin-right: 4px;"><Plus /></el-icon> 新增模板</el-button>
+            <el-button @click="fetchTemplates"><el-icon style="margin-right: 4px;"><Refresh /></el-icon> 刷新</el-button>
           </div>
           <el-table :data="templateList" stripe border>
             <el-table-column prop="customerId" label="客户编码" width="100" />
@@ -400,11 +681,17 @@
                 <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? '启用' : '停用' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="180" align="center">
+            <el-table-column label="操作" width="220" align="center">
               <template #default="{ row }">
-                <el-button :disabled="!userStore.hasPermission('shipment:template:edit')" type="primary" link size="small" @click="handleEditTemplate(row)">编辑</el-button>
-                <el-button :disabled="!userStore.hasPermission('shipment:template:delete')" type="danger" link size="small" @click="handleDeleteTemplate(row)">删除</el-button>
-                <el-button :disabled="!userStore.hasPermission('shipment:template:mapping')" type="success" link size="small" @click="openMappingDialog(row)">映射</el-button>
+                <el-button :disabled="!userStore.hasPermission('shipment:template:edit')" type="primary" link size="small" @click="handleEditTemplate(row)">
+                  <el-icon style="margin-right: 4px;"><Edit /></el-icon> 编辑
+                </el-button>
+                <el-button :disabled="!userStore.hasPermission('shipment:template:delete')" type="danger" link size="small" @click="handleDeleteTemplate(row)">
+                  <el-icon style="margin-right: 4px;"><Delete /></el-icon> 删除
+                </el-button>
+                <el-button :disabled="!userStore.hasPermission('shipment:template:mapping')" type="success" link size="small" @click="openMappingDialog(row)">
+                  <el-icon style="margin-right: 4px;"><Setting /></el-icon> 映射
+                </el-button>
               </template>
             </el-table-column>
           </el-table>
@@ -434,7 +721,7 @@
                   <el-icon><Document /></el-icon>
                   <span class="file-name" :title="templateForm.fileName">{{ templateForm.fileName }}</span>
                   <el-button type="primary" link size="small" @click="downloadCurrentTemplate">
-                    <el-icon><Download /></el-icon>下载
+                    <el-icon style="margin-right: 4px;"><Download /></el-icon> 下载
                   </el-button>
                 </div>
                 <div class="file-action">
@@ -447,7 +734,7 @@
                     :on-change="handleReplaceTemplateFile"
                   >
                     <el-button type="warning" size="small">
-                      <el-icon><RefreshRight /></el-icon>替换文件
+                      <el-icon style="margin-right: 4px;"><RefreshRight /></el-icon> 替换文件
                     </el-button>
                   </el-upload>
                   <span v-if="templateForm.newFileName" class="new-file-hint">
@@ -464,7 +751,7 @@
                 accept=".xlsx,.xls,.docx,.doc" 
                 :on-change="handleTemplateFileChange"
               >
-                <el-button type="primary"><el-icon><Upload /></el-icon>选择文件</el-button>
+                <el-button type="primary"><el-icon style="margin-right: 4px;"><Upload /></el-icon> 选择文件</el-button>
                 <template #tip><div class="el-upload__tip">支持 Excel、Word 格式</div></template>
               </el-upload>
             </el-form-item>
@@ -488,18 +775,19 @@
           />
           
           <!-- 单产品显示 -->
-          <el-descriptions v-if="reportDialogProducts.length === 1" :column="1" border size="small" style="margin-top: 16px">
-            <el-descriptions-item label="客户编码">{{ result.workOrderInfo?.CustomerID }}</el-descriptions-item>
+          <el-descriptions v-if="reportDialogProducts.length === 1" :column="2" border size="small" style="margin-top: 16px">
+            <el-descriptions-item label="客户编码">{{ result.workOrderInfo?.CustomerID || reportDialogProducts[0]?.customerId }}</el-descriptions-item>
             <el-descriptions-item label="产品编码">{{ reportDialogProducts[0]?.productId }}</el-descriptions-item>
             <el-descriptions-item label="客户料号">{{ reportDialogProducts[0]?.cProductId }}</el-descriptions-item>
             <el-descriptions-item label="产品名称">{{ reportDialogProducts[0]?.product }}</el-descriptions-item>
             <el-descriptions-item label="数量">{{ reportDialogProducts[0]?.pCount || reportDialogProducts[0]?.orderCount }}</el-descriptions-item>
+            <el-descriptions-item label="抽检数">{{ calculateSampleSize(reportDialogProducts[0]?.pCount || reportDialogProducts[0]?.orderCount) }}</el-descriptions-item>
           </el-descriptions>
           
           <!-- 多产品列表 -->
           <div v-else style="margin-top: 16px">
             <el-descriptions :column="2" border size="small">
-              <el-descriptions-item label="客户编码">{{ result.workOrderInfo?.CustomerID }}</el-descriptions-item>
+              <el-descriptions-item label="客户编码">{{ result.workOrderInfo?.CustomerID || reportDialogProducts[0]?.customerId }}</el-descriptions-item>
               <el-descriptions-item label="工单号">{{ result.workOrderInfo?.PNum }}</el-descriptions-item>
             </el-descriptions>
             <el-table :data="reportDialogProducts" border size="small" style="margin-top: 12px" max-height="200">
@@ -509,7 +797,6 @@
               <el-table-column prop="pCount" label="数量" width="80" align="right">
                 <template #default="{ row }">{{ row.pCount || row.orderCount }}</template>
               </el-table-column>
-              <el-table-column prop="scale" label="规格" width="100" show-overflow-tooltip />
             </el-table>
             <div style="margin-top: 8px; color: #909399; font-size: 12px;">
               合计：{{ reportDialogProducts.reduce((sum, p) => sum + (p.pCount || p.orderCount || 0), 0) }} 件
@@ -532,8 +819,27 @@
           <template #footer>
             <el-button @click="showReportDialog = false">取消</el-button>
             <el-button type="primary" @click="confirmGenerateReport" :loading="generatingReport">
-              <el-icon><Printer /></el-icon>生成报告
+              <el-icon style="margin-right: 4px;"><Printer /></el-icon> 生成报告
             </el-button>
+          </template>
+        </el-dialog>
+
+        <!-- 出货检验审核对话框 -->
+        <el-dialog v-model="shipmentAuditDialogVisible" title="审核出货检验报告" width="400px">
+          <el-form>
+            <el-form-item label="审核结果">
+              <el-radio-group v-model="shipmentAuditForm.action">
+                <el-radio label="pass">通过</el-radio>
+                <el-radio label="reject">驳回</el-radio>
+              </el-radio-group>
+            </el-form-item>
+            <el-form-item label="审核意见">
+              <el-input type="textarea" v-model="shipmentAuditForm.comment" :placeholder="shipmentAuditForm.action === 'reject' ? '请输入驳回原因（必填）' : '请输入审核意见（选填）'" :rows="3" />
+            </el-form-item>
+          </el-form>
+          <template #footer>
+            <el-button @click="shipmentAuditDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="confirmShipmentAudit" :loading="shipmentAuditLoading" :disabled="shipmentAuditForm.action === 'reject' && !shipmentAuditForm.comment">确定</el-button>
           </template>
         </el-dialog>
       </div>
@@ -541,20 +847,22 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { Box, Search, Document, Collection, Goods, Refresh, Tickets, ShoppingBag, Files, OfficeBuilding, Setting, Plus, Upload, Download, Printer, RefreshRight, Check, QuestionFilled, DocumentCopy, Delete } from '@element-plus/icons-vue'
+import { Box, Search, Document, Collection, Goods, Refresh, Tickets, ShoppingBag, Files, OfficeBuilding, Setting, Plus, Upload, Download, Printer, RefreshRight, Check, QuestionFilled, DocumentCopy, Delete, Edit, Grid, Position, CircleCheck, Promotion, ArrowDown, RefreshLeft } from '@element-plus/icons-vue'
 import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 import ExcelJS from 'exceljs'
 import api from '@/utils/api'
+import { submitShipmentReport, approveShipmentReport, rejectShipmentReport, revokeShipmentReport } from '@/api/inspection'
 
 const route = useRoute()
+const router = useRouter()
 const isAdmin = computed(() => route.path.startsWith('/admin'))
 const containerComponent = computed(() => 'div')
 
-const searchForm = reactive({ pNum: '', materialId: '', materialName: '', cpo: '', startDate: '', endDate: '' })
+const searchForm = reactive({ pNum: '', materialId: '', materialName: '', cpo: '', startDate: '', endDate: '', matchMonthRange: 1 })
 const loading = ref(false)
 const hasSearched = ref(false)
 const result = reactive({ workOrderInfo: null, materialList: [], materialInList: [], productInfo: [], isBatchResult: false })
@@ -569,7 +877,38 @@ const batchInputRef = ref(null)
 const previewRef = ref(null)
 const reportPreview = reactive({ reportNo: '', date: '' })
 const productTableRef = ref(null)
+const historyProductTableRef = ref(null)  // 报告详情中的产品表格 ref
 const selectedProducts = ref([])  // 多选的产品列表
+const activeTab = ref('history')
+const historyLoading = ref(false)
+const historyList = ref([])
+const historyTotal = ref(0)
+const todayReportCount = ref(0)
+const currentHistoryRow = ref(null)
+const selectedProductRow = ref(null)
+const historyQuery = reactive({
+  page: 1,
+  pageSize: 5,
+  keyword: ''
+})
+
+// 初始化查询时间范围（默认前90天）
+onMounted(() => {
+  const end = new Date()
+  const start = new Date()
+  start.setMonth(start.getMonth() - 6)
+  searchForm.startDate = formatDateTime(start)
+  searchForm.endDate = formatDateTime(end)
+  
+  // 加载模板列表
+  loadTemplatesFromStorage()
+  fetchTemplates()
+  fetchHistory()
+})
+const currentProductList = computed(() => {
+  if (!currentHistoryRow.value || !currentHistoryRow.value.ProductInfo) return []
+  return parseProductInfo(currentHistoryRow.value.ProductInfo)
+})
 
 // 引入用户Store
 import { useUserStore } from '@/store/user'
@@ -621,6 +960,902 @@ function getCurrentUserName() {
   }
   
   return '' // 未找到用户信息时返回空
+}
+
+/**
+ * 获取报告历史记录
+ */
+async function fetchHistory() {
+  historyLoading.value = true
+  try {
+    const res = await api.get('/shipment-report', {
+      params: {
+        page: historyQuery.page,
+        pageSize: historyQuery.pageSize,
+        keyword: historyQuery.keyword
+      }
+    })
+    // 注意：api 响应拦截器已经返回 response.data，所以这里直接使用 res
+    if (res) {
+      historyList.value = res.data || []
+      historyTotal.value = res.total || 0
+      todayReportCount.value = res.todayCount || 0
+    }
+  } catch (e) {
+    ElMessage.error('获取历史记录失败: ' + (e.message || '未知错误'))
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+/**
+ * 切换标签页
+ */
+function handleTabClick(tab) {
+  if (tab.paneName === 'history') {
+    fetchHistory()
+  }
+}
+
+/**
+ * 删除历史记录
+ */
+function handleDeleteHistory(row) {
+  ElMessageBox.confirm(
+    `确定要删除报告记录 "${row.ReportNo}" 吗？此操作不可恢复。`,
+    '删除确认',
+    {
+      confirmButtonText: '删除',
+      cancelButtonText: '取消',
+      type: 'warning',
+    }
+  ).then(async () => {
+    try {
+      await api.delete(`/shipment-report/${row.ID}`)
+      ElMessage.success('删除成功')
+      fetchHistory()
+      if (currentHistoryRow.value && currentHistoryRow.value.ID === row.ID) {
+        currentHistoryRow.value = null
+      }
+    } catch (e) {
+      ElMessage.error('删除失败: ' + (e.message || '未知错误'))
+    }
+  }).catch(() => {})
+}
+
+// 下拉菜单命令处理
+function handleShipmentCommand(command, row) {
+  switch (command) {
+    case 'submit':
+      handleSubmitShipment(row)
+      break
+    case 'revoke':
+      handleRevokeShipment(row)
+      break
+    case 'audit':
+      handleAuditShipment(row)
+      break
+    case 'print':
+      handleExportHistoryReport(row)
+      break
+    case 'delete':
+      handleDeleteHistory(row)
+      break
+  }
+}
+
+/**
+ * 判断当前用户是否为出货检验报告的创建人
+ * @param {Object} row 报告记录
+ * @returns {boolean}
+ */
+function isShipmentCreator(row) {
+  if (!row || !userStore.user) return false
+  
+  // 比较用户名（CreatedBy存储的是username）
+  const createdBy = (row.CreatedBy || '').toLowerCase()
+  const currentUsername = (userStore.user.username || '').toLowerCase()
+  
+  if (createdBy && currentUsername && createdBy === currentUsername) {
+    return true
+  }
+  
+  // 也比较用户ID（如果有的话）
+  if (row.CreatedByID && userStore.user.id && row.CreatedByID === userStore.user.id) {
+    return true
+  }
+  
+  // 比较真实姓名（作为兜底）
+  const creatorName = (row.CreatorName || '').toLowerCase()
+  const currentRealName = (userStore.user.realName || userStore.user.RealName || '').toLowerCase()
+  
+  if (creatorName && currentRealName && creatorName === currentRealName) {
+    return true
+  }
+  
+  return false
+}
+
+/**
+ * 判断是否可以提交审核
+ * 条件：草稿/生成/驳回状态 且 是创建人
+ */
+function canSubmitShipment(row) {
+  if (!row) return false
+  const allowedStatus = ['Generated', 'Saved', 'Rejected', '', null, undefined]
+  const statusOk = !row.Status || allowedStatus.includes(row.Status)
+  return statusOk && isShipmentCreator(row)
+}
+
+/**
+ * 判断是否可以撤回
+ * 条件：待审核状态 且 是创建人
+ */
+function canRevokeShipment(row) {
+  if (!row) return false
+  return row.Status === 'Submitted' && isShipmentCreator(row)
+}
+
+/**
+ * 判断是否可以审核
+ * 条件：待审核状态 且 不是创建人
+ */
+function canAuditShipment(row) {
+  if (!row) return false
+  return row.Status === 'Submitted' && !isShipmentCreator(row)
+}
+
+/**
+ * 提交出货检验报告审核
+ */
+async function handleSubmitShipment(row) {
+  try {
+    await ElMessageBox.confirm(
+      '确定要提交此报告进行审核吗？提交后将发送待办事项给审核人。',
+      '提交审核',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    const res = await submitShipmentReport(row.ID)
+    ElMessage.success(res.message || '已提交审核')
+    fetchHistory()
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error(e)
+      ElMessage.error(e.response?.data?.message || '提交失败')
+    }
+  }
+}
+
+/**
+ * 撤回出货检验报告审核
+ */
+async function handleRevokeShipment(row) {
+  try {
+    await ElMessageBox.confirm(
+      '确定要撤回此报告的审核申请吗？',
+      '撤回审核',
+      { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
+    )
+    const res = await revokeShipmentReport(row.ID)
+    ElMessage.success(res.message || '已撤回')
+    fetchHistory()
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error(e)
+      ElMessage.error(e.response?.data?.message || '撤回失败')
+    }
+  }
+}
+
+/**
+ * 审核出货检验报告
+ */
+const shipmentAuditDialogVisible = ref(false)
+const shipmentAuditRow = ref(null)
+const shipmentAuditForm = reactive({
+  action: 'pass',
+  comment: ''
+})
+const shipmentAuditLoading = ref(false)
+
+function handleAuditShipment(row) {
+  shipmentAuditRow.value = row
+  shipmentAuditForm.action = 'pass'
+  shipmentAuditForm.comment = ''
+  shipmentAuditDialogVisible.value = true
+}
+
+async function confirmShipmentAudit() {
+  if (!shipmentAuditRow.value) return
+  
+  shipmentAuditLoading.value = true
+  try {
+    const apiCall = shipmentAuditForm.action === 'pass'
+      ? approveShipmentReport(shipmentAuditRow.value.ID, shipmentAuditForm.comment)
+      : rejectShipmentReport(shipmentAuditRow.value.ID, shipmentAuditForm.comment)
+    
+    const res = await apiCall
+    ElMessage.success(res.message || '审核完成')
+    shipmentAuditDialogVisible.value = false
+    fetchHistory()
+  } catch (e) {
+    console.error(e)
+    ElMessage.error(e.response?.data?.message || '审核失败')
+  } finally {
+    shipmentAuditLoading.value = false
+  }
+}
+
+function handleHistoryRowChange(val) {
+  currentHistoryRow.value = val
+  selectedProductRow.value = null // 清空之前选中的产品
+  if (val) {
+    // 默认选中第一个产品，显示其检验数据
+    const products = parseProductInfo(val.ProductInfo)
+    if (products.length > 0) {
+      selectedProductRow.value = products[0]
+      // 使用 nextTick 确保表格渲染后再设置选中行
+      nextTick(() => {
+        if (historyProductTableRef.value) {
+          historyProductTableRef.value.setCurrentRow(products[0])
+        }
+      })
+    }
+  }
+}
+
+function handleHistoryProductSelect(val) {
+  console.log('handleHistoryProductSelect called, val =', val)
+  // 如果 val 为 null（取消选择），保持当前选中的产品
+  if (val !== null) {
+    selectedProductRow.value = val
+  }
+}
+
+/**
+ * 获取选中产品的检验数据
+ * 支持新版数据结构（带首件核对、工单核对、图纸核对等）
+ */
+function getSelectedProductInspectionData() {
+  if (!currentHistoryRow.value?.InspectionData) {
+    console.log('getSelectedProductInspectionData: No InspectionData')
+    return { productInfo: {}, materialList: [] }
+  }
+  
+  if (!selectedProductRow.value) {
+    console.log('getSelectedProductInspectionData: No selectedProductRow')
+    return { productInfo: {}, materialList: [] }
+  }
+  
+  const data = parseInspectionData(currentHistoryRow.value.InspectionData)
+  console.log('getSelectedProductInspectionData: parsed data keys =', Object.keys(data))
+  console.log('getSelectedProductInspectionData: selectedProductRow =', selectedProductRow.value)
+  
+  // 新版数据结构（v2）：按产品ID存储，包含完整检验数据
+  if (data.products) {
+    // 尝试多种方式匹配产品
+    const row = selectedProductRow.value
+    const possibleKeys = [
+      row.cProductId,
+      row.productId, 
+      row.CProductID,
+      row.ProductID
+    ].filter(Boolean)
+    
+    console.log('getSelectedProductInspectionData: possibleKeys =', possibleKeys)
+    console.log('getSelectedProductInspectionData: available keys =', Object.keys(data.products))
+    
+    let productData = null
+    
+    // 直接匹配
+    for (const key of possibleKeys) {
+      if (data.products[key]) {
+        productData = data.products[key]
+        console.log('getSelectedProductInspectionData: found by direct key =', key)
+        break
+      }
+    }
+    
+    // 遍历查找
+    if (!productData) {
+      for (const key in data.products) {
+        const pd = data.products[key]
+        const pdCProductId = pd.productInfo?.cProductId || pd.productInfo?.CProductID
+        const pdProductId = pd.productInfo?.productId || pd.productInfo?.ProductID
+        
+        if (possibleKeys.includes(pdCProductId) || possibleKeys.includes(pdProductId) || possibleKeys.includes(key)) {
+          productData = pd
+          console.log('getSelectedProductInspectionData: found by iteration, key =', key)
+          break
+        }
+      }
+    }
+    
+    if (productData) {
+      console.log('getSelectedProductInspectionData: found productData =', productData)
+      
+      // 新版结构包含 firstPieceCheck, workOrderCheck, drawingCheck 等
+      if (productData.firstPieceCheck !== undefined) {
+        return {
+          ...productData,
+          materialList: productData.materialList || data.materialList || []
+        }
+      }
+      
+      // 兼容旧版 v1 结构
+      return {
+        materialList: productData.materialList || data.materialList || [],
+        inspectionResults: formatInspectionResults(productData.inspectionResults),
+        productInfo: productData.productInfo || {},
+        sampleSize: productData.sampleSize,
+        totalQuantity: productData.totalQuantity,
+        inspectedAt: productData.inspectedAt
+      }
+    } else {
+      console.log('getSelectedProductInspectionData: productData not found for any key')
+    }
+  }
+  
+  // 兼容旧版数据结构：直接返回全局数据
+  console.log('getSelectedProductInspectionData: fallback to global data')
+  return {
+    materialList: data.materialList || [],
+    inspectionResults: formatInspectionResults(data.inspectionResults),
+    productInfo: {},
+    summary: data.summary
+  }
+}
+
+/**
+ * 将检验核对数据转换为表格格式
+ * 用于更整洁的表格展示
+ */
+function getInspectionCheckTableData() {
+  const data = getSelectedProductInspectionData()
+  
+  return [
+    {
+      category: '首件核对',
+      item1: { label: '外观', value: data.firstPieceCheck?.appearance },
+      item2: { label: '颜色', value: data.firstPieceCheck?.color },
+      item3: { label: '图文', value: data.firstPieceCheck?.graphics },
+      item4: { label: '字体', value: data.firstPieceCheck?.font },
+      item5: { label: '啤切线', value: data.firstPieceCheck?.dieLine }
+    },
+    {
+      category: '工单核对',
+      item1: { label: '物料编号', value: data.workOrderCheck?.materialNum },
+      item2: { label: '模切方式', value: data.workOrderCheck?.dieCutStyle },
+      item3: { label: '包装方式', value: data.workOrderCheck?.packingStyle },
+      item4: null,
+      item5: null
+    },
+    {
+      category: '图纸核对',
+      item1: { label: '材质', value: data.drawingCheck?.material },
+      item2: { label: '印刷内容', value: data.drawingCheck?.printContent },
+      item3: null,
+      item4: null,
+      item5: null
+    },
+    {
+      category: '结果判定',
+      item1: { label: '判定结果', value: data.result },
+      item2: null,
+      item3: null,
+      item4: null,
+      item5: null
+    }
+  ]
+}
+
+/**
+ * 将检验核对数据转换为扁平化的表格格式（每个检验项一行）
+ * 用于名称和判定结果分列显示
+ */
+function getInspectionCheckFlatData() {
+  const data = getSelectedProductInspectionData()
+  
+  const rows = []
+  
+  // 首件核对 - 5项
+  const firstPieceItems = [
+    { name: '外观', value: data.firstPieceCheck?.appearance },
+    { name: '颜色', value: data.firstPieceCheck?.color },
+    { name: '图文', value: data.firstPieceCheck?.graphics },
+    { name: '字体', value: data.firstPieceCheck?.font },
+    { name: '啤切线', value: data.firstPieceCheck?.dieLine }
+  ]
+  firstPieceItems.forEach((item, index) => {
+    rows.push({
+      category: '首件核对',
+      name: item.name,
+      value: item.value,
+      rowIndex: rows.length,
+      categoryRowSpan: index === 0 ? 5 : 0
+    })
+  })
+  
+  // 工单核对 - 3项
+  const workOrderItems = [
+    { name: '物料编号', value: data.workOrderCheck?.materialNum },
+    { name: '模切方式', value: data.workOrderCheck?.dieCutStyle },
+    { name: '包装方式', value: data.workOrderCheck?.packingStyle }
+  ]
+  workOrderItems.forEach((item, index) => {
+    rows.push({
+      category: '工单核对',
+      name: item.name,
+      value: item.value,
+      rowIndex: rows.length,
+      categoryRowSpan: index === 0 ? 3 : 0
+    })
+  })
+  
+  // 图纸核对 - 2项
+  const drawingItems = [
+    { name: '材质', value: data.drawingCheck?.material },
+    { name: '印刷内容', value: data.drawingCheck?.printContent }
+  ]
+  drawingItems.forEach((item, index) => {
+    rows.push({
+      category: '图纸核对',
+      name: item.name,
+      value: item.value,
+      rowIndex: rows.length,
+      categoryRowSpan: index === 0 ? 2 : 0
+    })
+  })
+  
+  // 结果判定 - 1项
+  rows.push({
+    category: '结果判定',
+    name: '综合判定',
+    value: data.result,
+    rowIndex: rows.length,
+    categoryRowSpan: 1
+  })
+  
+  return rows
+}
+
+/**
+ * 检验数据表格的单元格合并方法
+ */
+function inspectionTableSpanMethod({ row, column, rowIndex, columnIndex }) {
+  if (columnIndex === 0) {
+    // 第一列（检验类别）需要合并
+    if (row.categoryRowSpan > 0) {
+      return { rowspan: row.categoryRowSpan, colspan: 1 }
+    } else {
+      return { rowspan: 0, colspan: 0 }
+    }
+  }
+}
+
+/**
+ * 从 InspectionData 中获取产品的规格尺寸
+ * @param {Object} row - 产品行数据
+ * @returns {string} 规格尺寸
+ */
+function getProductScaleFromInspectionData(row) {
+  if (!currentHistoryRow.value?.InspectionData) return ''
+  
+  const data = parseInspectionData(currentHistoryRow.value.InspectionData)
+  if (!data.products) return ''
+  
+  const productKey = row.cProductId || row.productId
+  
+  // 直接匹配
+  let productData = data.products[productKey]
+  
+  // 遍历查找
+  if (!productData) {
+    for (const key in data.products) {
+      const pd = data.products[key]
+      const pdCProductId = pd.productInfo?.cProductId || pd.productInfo?.CProductID
+      const pdProductId = pd.productInfo?.productId || pd.productInfo?.ProductID
+      if (pdCProductId === productKey || pdProductId === productKey || key === productKey) {
+        productData = pd
+        break
+      }
+    }
+  }
+  
+  if (productData) {
+    return productData.productInfo?.scale || ''
+  }
+  
+  return ''
+}
+
+/**
+ * 格式化检验结果，兼容新旧数据结构
+ * 旧版：{ appearance: '合格', dimension: '合格', ... }
+ * 新版：{ appearance: { result: '合格', details: '...' }, ... }
+ */
+function formatInspectionResults(results) {
+  if (!results) return {}
+  
+  const formatted = {}
+  for (const key in results) {
+    const value = results[key]
+    if (typeof value === 'string') {
+      // 旧版格式
+      formatted[key] = value
+    } else if (typeof value === 'object' && value !== null) {
+      // 新版格式，提取 result 字段用于显示
+      formatted[key] = value.result || '-'
+      // 保留完整对象用于详情展示
+      formatted[`${key}Detail`] = value
+    }
+  }
+  return formatted
+}
+
+function parseProductInfo(jsonStr) {
+  try {
+    if (!jsonStr) return []
+    const parsed = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr
+    return Array.isArray(parsed) ? parsed : [parsed]
+  } catch (e) {
+    console.error('Parse product info error:', e)
+    return []
+  }
+}
+
+const parseInspectionData = (jsonStr) => {
+  try {
+    if (!jsonStr) return { materialList: [], inspectionResults: {} }
+    return typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr
+  } catch (e) {
+    console.error('Parse inspection data error:', e)
+    return { materialList: [], inspectionResults: {} }
+  }
+}
+
+/**
+ * 查看/重新生成历史报告
+ */
+function handleViewHistory(row) {
+  try {
+    // 恢复产品信息
+    let products = []
+    if (typeof row.ProductInfo === 'string') {
+      products = JSON.parse(row.ProductInfo)
+    } else {
+      products = row.ProductInfo
+    }
+    
+    if (!products || products.length === 0) {
+      ElMessage.warning('该记录缺少产品信息，无法预览')
+      return
+    }
+
+    // 切换到生成报告标签页
+    activeTab.value = 'generate'
+    
+    // 设置模式为单条或批量（根据产品数量）
+    if (products.length > 1) {
+      // 批量模式模拟
+      // 这里比较复杂，因为界面逻辑是基于查询结果的。
+      // 简单做法：直接设置 reportDialogProducts 并打开预览对话框
+      // 稍微复杂做法：尝试还原查询状态（比较困难，因为查询条件可能丢失）
+      
+      // 我们采用直接打开预览对话框的方式
+      selectedProduct.value = products[0]
+      reportDialogProduct.value = products[0]
+      reportDialogProducts.value = products
+    } else {
+      // 单条模式
+      selectedProduct.value = products[0]
+      reportDialogProduct.value = products[0]
+      reportDialogProducts.value = [products[0]]
+    }
+    
+    // 恢复报告编号和日期
+    reportPreview.reportNo = row.ReportNo
+    reportPreview.date = row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : ''
+    
+    // 自动匹配模板
+    const customerId = row.CustomerID || products[0].customerId || ''
+    const matched = templateList.value.find(t => t.customerId === customerId && t.enabled)
+    selectedTemplateId.value = matched?.id || templateList.value[0]?.id
+    
+    // 打开对话框
+    showReportDialog.value = true
+    
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('解析报告数据失败')
+  }
+}
+
+/**
+ * 从历史记录导出报告
+ * 使用后端保存的 InspectionData 数据填充模板生成 Excel 报告
+ */
+async function handleExportHistoryReport(row) {
+  try {
+    // 解析产品信息
+    let products = []
+    if (typeof row.ProductInfo === 'string') {
+      products = JSON.parse(row.ProductInfo)
+    } else {
+      products = row.ProductInfo || []
+    }
+    
+    if (!products || products.length === 0) {
+      ElMessage.warning('该记录缺少产品信息，无法导出')
+      return
+    }
+    
+    // 解析检验数据
+    let inspectionData = {}
+    if (row.InspectionData) {
+      inspectionData = typeof row.InspectionData === 'string' 
+        ? JSON.parse(row.InspectionData) 
+        : row.InspectionData
+    }
+    
+    // 获取客户ID并匹配模板
+    const customerId = row.CustomerID || products[0]?.customerId || ''
+    const matched = templateList.value.find(t => t.customerId === customerId && t.enabled)
+    
+    if (!matched) {
+      ElMessage.warning(`未找到客户 ${customerId} 的可用模板，请先配置模板`)
+      return
+    }
+    
+    ElMessage.info('正在导出报告...')
+    
+    // 下载模板文件
+    let templateBuffer = null
+    try {
+      const resp = await api.get(`/shipment-report/templates/${matched.id}/download`, { responseType: 'arraybuffer' })
+      templateBuffer = resp
+    } catch (e) {
+      ElMessage.error('获取模板文件失败: ' + (e.message || ''))
+      return
+    }
+    
+    // 使用 ExcelJS 加载模板
+    const workbook = new ExcelJS.Workbook()
+    await workbook.xlsx.load(templateBuffer)
+    
+    // 获取模板映射配置
+    let mapping = null
+    try {
+      const resp = await api.get(`/shipment-report/templates/${matched.id}/mapping`)
+      mapping = resp?.data ?? resp
+    } catch (e) {
+      console.warn('获取映射配置失败，使用默认映射:', e)
+    }
+    
+    // 构建填充数据（从 InspectionData 中获取）
+    const tableData = inspectionData.tableData || []
+    
+    // 如果没有 tableData，从 products 构建
+    if (tableData.length === 0 && inspectionData.products) {
+      for (const key in inspectionData.products) {
+        const pd = inspectionData.products[key]
+        tableData.push({
+          序号: pd.index || tableData.length + 1,
+          客户料号: pd.productInfo?.cProductId || key,
+          产品名称: pd.productInfo?.product || '',
+          规格尺寸: pd.productInfo?.scale || '',
+          出货数量: pd.productInfo?.count || 0,
+          抽检数量: pd.productInfo?.sampleCount || 0,
+          实测尺寸: pd.measuredSize || '',
+          外观: pd.firstPieceCheck?.appearance || 'OK',
+          颜色: pd.firstPieceCheck?.color || 'OK',
+          图文: pd.firstPieceCheck?.graphics || 'OK',
+          字体: pd.firstPieceCheck?.font || 'OK',
+          啤切线: pd.firstPieceCheck?.dieLine || 'OK',
+          物料编号: pd.workOrderCheck?.materialNum || 'OK',
+          模切方式: pd.workOrderCheck?.dieCutStyle || 'OK',
+          包装方式: pd.workOrderCheck?.packingStyle || 'OK',
+          材质: pd.drawingCheck?.material || 'OK',
+          印刷内容: pd.drawingCheck?.printContent || 'OK',
+          结果判定: pd.result || '合格'
+        })
+      }
+    }
+    
+    const fillContext = {
+      // 报告信息
+      ReportNo: row.ReportNo,
+      报告编号: row.ReportNo,
+      ReportDate: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
+      日期: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
+      报告日期: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
+      
+      // 客户信息
+      CustomerID: customerId,
+      客户编码: customerId,
+      
+      // 工单信息
+      PNum: row.PNum || '',
+      工单号: row.PNum || '',
+      OrderNum: row.OrderNum || '',
+      订单号: row.OrderNum || '',
+      CPO: row.CPO || '',
+      
+      // 检验人员
+      Inspector: inspectionData.reportInfo?.inspector || row.CreatorName || '',
+      检验人员: inspectionData.reportInfo?.inspector || row.CreatorName || '',
+      检验员: inspectionData.reportInfo?.inspector || row.CreatorName || '',
+      InspectDate: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
+      检验日期: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
+      
+      // 表格数据
+      tableData: tableData
+    }
+    
+    // 填充模板 - 使用已有的 applyMappingFill 函数
+    if (mapping) {
+      console.log('使用映射配置填充模板')
+      applyMappingFill(workbook, mapping, fillContext)
+    } else {
+      // 无映射时，使用占位符方式填充
+      console.log('无映射配置，使用占位符方式填充')
+      const ws = workbook.worksheets[0]
+      
+      // 遍历所有单元格，替换 {{key}} 占位符
+      ws.eachRow((row, rowNum) => {
+        row.eachCell((cell, colNum) => {
+          if (cell.value && typeof cell.value === 'string') {
+            const newValue = cell.value.replace(/\{\{(\w+)\}\}/g, (match, key) => {
+              return fillContext[key] !== undefined ? fillContext[key] : match
+            })
+            if (newValue !== cell.value) {
+              cell.value = newValue
+            }
+          }
+        })
+      })
+      
+      // 尝试填充表格数据（查找表头行）
+      if (tableData.length > 0) {
+        const tableHeaders = ['序号', '客户料号', '产品名称', '规格尺寸', '出货数量']
+        let headerRowNum = null
+        
+        // 查找表头行
+        ws.eachRow((row, rowNum) => {
+          if (headerRowNum) return
+          let matchCount = 0
+          row.eachCell((cell) => {
+            const cellValue = String(cell.value || '').trim()
+            if (tableHeaders.some(h => cellValue.includes(h))) {
+              matchCount++
+            }
+          })
+          if (matchCount >= 2) {
+            headerRowNum = rowNum
+          }
+        })
+        
+        if (headerRowNum) {
+          // 获取列映射
+          const headerRow = ws.getRow(headerRowNum)
+          const colMap = {}
+          headerRow.eachCell((cell, colNum) => {
+            const header = String(cell.value || '').trim()
+            colMap[header] = colNum
+          })
+          
+          // 填充数据
+          tableData.forEach((item, idx) => {
+            const dataRow = ws.getRow(headerRowNum + 1 + idx)
+            
+            // 根据表头填充对应列
+            Object.keys(colMap).forEach(header => {
+              const colNum = colMap[header]
+              let value = null
+              
+              // 映射表头到数据字段
+              if (header.includes('序号')) value = item['序号'] || idx + 1
+              else if (header.includes('客户料号')) value = item['客户料号']
+              else if (header.includes('产品名称')) value = item['产品名称']
+              else if (header.includes('规格')) value = item['规格尺寸']
+              else if (header.includes('出货数量') || header.includes('数量')) value = item['出货数量']
+              else if (header.includes('抽检')) value = item['抽检数量']
+              else if (header.includes('实测')) value = item['实测尺寸']
+              else if (header.includes('外观')) value = item['外观']
+              else if (header.includes('颜色')) value = item['颜色']
+              else if (header.includes('图文')) value = item['图文']
+              else if (header.includes('字体')) value = item['字体']
+              else if (header.includes('啤切线')) value = item['啤切线']
+              else if (header.includes('物料编号')) value = item['物料编号']
+              else if (header.includes('模切方式')) value = item['模切方式']
+              else if (header.includes('包装方式')) value = item['包装方式']
+              else if (header.includes('材质')) value = item['材质']
+              else if (header.includes('印刷内容')) value = item['印刷内容']
+              else if (header.includes('结果') || header.includes('判定')) value = item['结果判定']
+              
+              if (value !== null && value !== undefined) {
+                dataRow.getCell(colNum).value = value
+              }
+            })
+          })
+        }
+      }
+    }
+    
+    // 设置列宽（与自动生成报告使用相同的逻辑）
+    const ws = workbook.worksheets[0]
+    const handler = CUSTOMER_HANDLERS[customerId]
+    
+    // 根据用户反馈的数据对比，ExcelJS 写入时列宽会变窄约 0.63
+    const WIDTH_COMPENSATION = 0.63
+    // Excel中的列宽单位是字符数，但实际渲染受到默认字体影响
+    // 这里添加一个全局放大系数 1.43
+    const GLOBAL_SCALE = 1.43
+
+    // 列宽来源优先级：1.映射配置中的columnWidths  2.客户处理器的硬编码columnWidths
+    let widthSource = null
+    let widthSourceName = ''
+    
+    // 优先使用映射配置中的列宽（模板映射编辑器中手动配置的）
+    if (mapping?.layout?.columnWidths && Array.isArray(mapping.layout.columnWidths) && mapping.layout.columnWidths.length > 0) {
+      widthSource = mapping.layout.columnWidths
+      widthSourceName = '映射配置'
+    }
+    // 其次使用客户处理器的硬编码列宽
+    else if (handler?.columnWidths && Array.isArray(handler.columnWidths)) {
+      widthSource = handler.columnWidths
+      widthSourceName = `客户${customerId}硬编码`
+    }
+
+    if (ws && widthSource) {
+      console.log(`使用${widthSourceName}列宽, 长度: ${widthSource.length}`)
+
+      widthSource.forEach((w, idx) => {
+        if (typeof w === 'number' && w > 0) {
+          try {
+            const col = ws.getColumn(idx + 1)
+            if (col) {
+              const finalWidth = (w * GLOBAL_SCALE) + WIDTH_COMPENSATION
+              col.width = finalWidth
+              // 关键修复：显式标记 customWidth，否则 Excel 可能会忽略该宽度
+              col.customWidth = true 
+              console.log(`列 ${idx + 1} 设置宽度: ${finalWidth} (原值: ${w})`)
+            }
+          } catch (e) { /* 忽略 */ }
+        }
+      })
+    } else {
+      console.log('未找到列宽配置，跳过列宽设置')
+    }
+
+    console.log('=== 列宽设置完成 ===')
+    
+    // 导出文件
+    const buffer = await workbook.xlsx.writeBuffer()
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `出货检验报告_${row.ReportNo}.xlsx`
+    link.click()
+    URL.revokeObjectURL(url)
+    
+    ElMessage.success('报告导出成功')
+    
+  } catch (e) {
+    console.error('导出报告失败:', e)
+    ElMessage.error('导出报告失败: ' + (e.message || '未知错误'))
+  }
+}
+
+/**
+ * 格式化日期为 yyyy-MM-dd HH:mm:ss 字符串
+ */
+function formatDateTime(date) {
+  if (!date) return '-'
+  const d = new Date(date)
+  if (isNaN(d.getTime())) return '-'
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
 }
 
 // 模板管理
@@ -1018,7 +2253,35 @@ function buildTemplateContext() {
       OrderCount: count,
       订单数: count,
       PCount: count,
-      成品数: count
+      成品数: count,
+
+      // 检验项目 - 默认值填充
+      Appearance: 'OK',
+      外观: 'OK',
+      Color: 'OK',
+      颜色: 'OK',
+      Graphics: 'OK',
+      图文: 'OK',
+      Font: 'OK',
+      字体: 'OK',
+      DieLine: 'OK',
+      啤切线: 'OK',
+      MaterialNumCheck: 'OK',
+      物料编号: 'OK',
+      DieCutStyle: 'OK',
+      模切方式: 'OK',
+      PackingStyle: 'OK',
+      包装方式: 'OK',
+      MaterialCheck: 'OK',
+      材质: 'OK',
+      PrintContent: 'OK',
+      印刷内容: 'OK',
+      Result: '合格',
+      结果判定: '合格',
+      
+      // 抽检数量 - 计算值
+      SampleCount: calculateSampleSize(count),
+      抽检数量: calculateSampleSize(count)
     }
     
     // 如果处理器有自定义字段函数，合并自定义字段
@@ -1866,82 +3129,86 @@ function generatePrintHtml(worksheet, ctx, columnWidths = null, tableStartRow = 
   const headerEndRow = tableStartRow - 1  // 表头结束行
   
   // 生成 HTML
-  let tableHtml = '<table>'
-  
-  // 生成列宽定义
-  tableHtml += '<colgroup>'
-  for (let i = 0; i < colCount; i++) {
-    tableHtml += `<col style="width: ${colWidths[i] || 60}px;">`
-  }
-  tableHtml += '</colgroup>'
-  
-  rows.forEach(row => {
-    tableHtml += `<tr style="height: ${row.height}px;">`
-    row.cells.forEach(cell => {
-      const attrs = []
-      if (cell.colspan > 1) attrs.push(`colspan="${cell.colspan}"`)
-      if (cell.rowspan > 1) attrs.push(`rowspan="${cell.rowspan}"`)
-      attrs.push(`style="${cell.style}"`)
-      tableHtml += `<td ${attrs.join(' ')}>${escapeHtml(String(cell.value))}</td>`
+    // 生成 HTML
+    let tableHtml = '<table>'
+    
+    // 生成列宽定义
+    tableHtml += '<colgroup>'
+    for (let i = 0; i < colCount; i++) {
+      tableHtml += `<col style="width: ${colWidths[i] || 60}px;">`
+    }
+    tableHtml += '</colgroup>'
+    
+    rows.forEach(row => {
+      tableHtml += `<tr style="height: ${row.height}px;">`
+      row.cells.forEach(cell => {
+        const attrs = []
+        if (cell.colspan > 1) attrs.push(`colspan="${cell.colspan}"`)
+        if (cell.rowspan > 1) attrs.push(`rowspan="${cell.rowspan}"`)
+        attrs.push(`style="${cell.style}"`)
+        tableHtml += `<td ${attrs.join(' ')}>${escapeHtml(String(cell.value))}</td>`
+      })
+      tableHtml += '</tr>'
     })
-    tableHtml += '</tr>'
-  })
-  
-  tableHtml += '</table>'
-  
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <title>出货检验报告</title>
-  <style>
-    @page {
-      size: A4 landscape;
-      margin: 5mm;
-    }
-    * {
-      margin: 0;
-      padding: 0;
-      box-sizing: border-box;
-    }
-    body {
-      font-family: "SimSun", "宋体", "Microsoft YaHei", sans-serif;
-      font-size: 9pt;
-      margin: 0;
-      padding: 3mm;
-      line-height: 1.2;
-    }
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      table-layout: fixed;
-    }
-    td {
-      padding: 2px 3px;
-      word-wrap: break-word;
-      overflow: hidden;
-      vertical-align: middle;
-      text-align: center;
-      font-size: 9pt;
-      /* 默认无边框，由单元格样式控制 */
-    }
-    @media print {
-      body { 
-        margin: 0; 
-        padding: 2mm; 
-        -webkit-print-color-adjust: exact;
-        print-color-adjust: exact;
+    
+    tableHtml += '</table>'
+    
+    // 如果是打印预览，需要包含完整 HTML 结构
+    if (!ctx) return tableHtml // 如果只是获取内容，直接返回 table HTML
+    
+    return `
+  <!DOCTYPE html>
+  <html>
+  <head>
+    <meta charset="UTF-8">
+    <title>出货检验报告</title>
+    <style>
+      @page {
+        size: A4 landscape;
+        margin: 5mm;
       }
-      table { page-break-inside: avoid; }
-    }
-  </style>
-</head>
-<body>
-  ${tableHtml}
-</body>
-</html>`
-}
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      body {
+        font-family: "SimSun", "宋体", "Microsoft YaHei", sans-serif;
+        font-size: 9pt;
+        margin: 0;
+        padding: 3mm;
+        line-height: 1.2;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        table-layout: fixed;
+      }
+      td {
+        padding: 2px 3px;
+        word-wrap: break-word;
+        overflow: hidden;
+        vertical-align: middle;
+        text-align: center;
+        font-size: 9pt;
+        /* 默认无边框，由单元格样式控制 */
+      }
+      @media print {
+        body { 
+          margin: 0; 
+          padding: 2mm; 
+          -webkit-print-color-adjust: exact;
+          print-color-adjust: exact;
+        }
+        table { page-break-inside: avoid; }
+      }
+    </style>
+  </head>
+  <body>
+    ${tableHtml}
+  </body>
+  </html>`
+  }
 
 /**
  * 将列字母转换为数字（A=1, B=2, ..., Z=26, AA=27...）
@@ -2104,18 +3371,10 @@ function getSelectedTemplate() {
  * 执行查询，根据工单/物料条件获取报告所需数据
  */
 async function handleSearch() {
-  // 验证查询条件
-  if (!searchForm.pNum && !searchForm.materialId && !searchForm.materialName && !searchForm.cpo) {
-    ElMessage.warning('请至少输入一个查询条件')
+  // 验证查询条件：工单号必填
+  if (!searchForm.pNum) {
+    ElMessage.warning('请输入工单号')
     return
-  }
-  
-  // 无工单号时，必须同时输入产品编号和CPO
-  if (!searchForm.pNum && (searchForm.materialId || searchForm.cpo)) {
-    if (!searchForm.materialId || !searchForm.cpo) {
-      ElMessage.warning('无工单号时，需同时输入产品编号和CPO进行查询')
-      return
-    }
   }
   
   loading.value = true
@@ -2123,11 +3382,19 @@ async function handleSearch() {
   selectedProduct.value = null
   try {
     const params = {}
-    if (searchForm.pNum) params.pNum = searchForm.pNum.trim()
+    if (searchForm.pNum) {
+      let pNum = searchForm.pNum.trim()
+      // 兼容无前缀GD查询：如果是8位数字（yymmdd+00），自动添加GD前缀
+      if (/^\d{8}$/.test(pNum)) {
+        pNum = 'GD' + pNum
+      }
+      params.pNum = pNum
+    }
     if (searchForm.materialId) params.materialId = searchForm.materialId.trim()
     if (searchForm.materialName) params.materialName = searchForm.materialName.trim()
     if (searchForm.cpo) params.cpo = searchForm.cpo.trim()
-    params.StartDate = searchForm.startDate || formatDateTime(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000))
+    if (searchForm.matchMonthRange) params.matchMonthRange = searchForm.matchMonthRange
+    params.StartDate = searchForm.startDate || formatDateTime(new Date(Date.now() - 180 * 24 * 60 * 60 * 1000))
     params.EndDate = searchForm.endDate || formatDateTime(new Date())
 
     const response = await api.get('/erp/shipment-report', { params })
@@ -2135,6 +3402,12 @@ async function handleSearch() {
 
     if (res.code !== undefined) {
       if (res.code === 0 && res.data) {
+        // 调试：打印后端返回的物料入库明细第一条数据，检查字段名
+        if (res.data.materialInList && res.data.materialInList.length > 0) {
+          console.log('ERP物料入库明细首条数据:', res.data.materialInList[0])
+        } else {
+          console.log('ERP物料入库明细为空')
+        }
         Object.assign(result, { workOrderInfo: res.data.workOrderInfo, materialList: res.data.materialList || [], materialInList: res.data.materialInList || [], productInfo: res.data.productInfo || [], isBatchResult: false })
       } else {
         ElMessage.error(res.message || '查询失败')
@@ -2157,19 +3430,13 @@ async function handleSearch() {
   }
 }
 
-/**
- * 格式化日期为 yyyy-MM-dd HH:mm:ss 字符串
- */
-function formatDateTime(date) {
-  const d = new Date(date)
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`
-}
+
 
 /**
  * 重置查询条件与结果
  */
 function handleReset() {
-  Object.assign(searchForm, { pNum: '', materialId: '', materialName: '', cpo: '', startDate: '', endDate: '' })
+  Object.assign(searchForm, { pNum: '', materialId: '', materialName: '', cpo: '', startDate: '', endDate: '', matchMonthRange: 1 })
   Object.assign(result, { workOrderInfo: null, materialList: [], materialInList: [], productInfo: [], isBatchResult: false })
   hasSearched.value = false
   selectedProduct.value = null
@@ -2396,10 +3663,18 @@ async function handleBatchSearch() {
  */
 function handleProductSelect(row) {
   selectedProduct.value = row
+  updateReportPreview()
+}
+
+/**
+ * 更新报告预览编号和日期
+ */
+function updateReportPreview() {
   const now = new Date()
   reportPreview.reportNo = `SR${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
   reportPreview.date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
 }
+
 
 /**
  * 设置产品行高亮样式
@@ -2448,6 +3723,134 @@ function handleBatchGenerateReport() {
 }
 
 /**
+ * 保存报告记录到数据库
+ * 保存生成报告时的完整数据，与报告文件中的内容一致：
+ * - 产品信息（包括规格、实测尺寸）
+ * - 检验数据（首件核对、工单核对、图纸核对）
+ * - 结果判定
+ * - 原材料信息
+ * - 工单信息
+ */
+async function saveReportRecord() {
+  try {
+    const products = reportDialogProducts.value && reportDialogProducts.value.length > 0 
+      ? reportDialogProducts.value 
+      : (selectedProduct.value ? [selectedProduct.value] : [])
+      
+    // 确保 reportPreview 已经生成
+    if (!reportPreview.reportNo) {
+      updateReportPreview()
+    }
+    
+    // 从产品信息中提取工单号、订单号、CPO（支持批量查询模式）
+    const firstProduct = products[0] || {}
+    const pNums = [...new Set(products.map(p => p.pNum).filter(Boolean))].join(',')
+    const orderNums = [...new Set(products.map(p => p.orderNum).filter(Boolean))].join(',')
+    const cpos = [...new Set(products.map(p => p.cpo).filter(Boolean))].join(',')
+    
+    const inspectedAt = new Date().toISOString()
+    
+    // 使用 buildTemplateContext 获取与报告文件一致的完整数据
+    const templateContext = buildTemplateContext()
+    
+    // 构造完整的检验数据
+    const inspectionData = {
+      // 报告级别信息
+      reportInfo: {
+        reportNo: templateContext.ReportNo || reportPreview.reportNo,
+        reportDate: templateContext.ReportDate || reportPreview.date,
+        customerID: templateContext.CustomerID || '',
+        inspector: templateContext.Inspector || '',
+        totalCount: templateContext.TotalCount || 0,
+        productCount: templateContext.ProductCount || 0
+      },
+      // 工单信息快照
+      workOrderInfo: result.workOrderInfo ? { ...result.workOrderInfo } : null,
+      // 按产品存储检验数据（使用 tableData 中的完整数据）
+      products: {},
+      // 原始 tableData（报告文件中的表格数据，用于完整还原）
+      tableData: templateContext.tableData || [],
+      // 全局原材料列表
+      materialList: result.materialList || [],
+      // 全局入库明细
+      materialInList: result.materialInList || [],
+      // 汇总信息
+      summary: {
+        totalProducts: products.length,
+        passedCount: products.length,
+        overallResult: '合格',
+        generatedAt: inspectedAt
+      }
+    }
+    
+    // 为每个产品构建独立的检验数据（从 tableData 提取）
+    if (templateContext.tableData && templateContext.tableData.length > 0) {
+      templateContext.tableData.forEach((rowData, index) => {
+        const productKey = rowData.CProductID || rowData.客户料号 || rowData.ProductID || `product_${index}`
+        
+        inspectionData.products[productKey] = {
+          // 序号
+          index: rowData.Index || rowData.序号 || (index + 1),
+          // 产品基本信息
+          productInfo: {
+            productId: rowData.ProductID || rowData.产品编码 || '',
+            cProductId: rowData.CProductID || rowData.客户料号 || '',
+            product: rowData.Product || rowData.产品名称 || rowData.品名 || '',
+            cProduct: rowData.CProduct || rowData.工厂订单号 || '',
+            scale: rowData.Scale || rowData.规格 || rowData.规格尺寸 || '',
+            count: rowData.Count || rowData.数量 || rowData.出货数量 || 0,
+            sampleCount: rowData.SampleCount || rowData.抽检数量 || 0
+          },
+          // 实测尺寸
+          measuredSize: rowData.MeasuredSize || rowData.实测尺寸 || rowData.实测 || '',
+          // 首件核对
+          firstPieceCheck: {
+            appearance: rowData.外观 || rowData.Appearance || '',
+            color: rowData.颜色 || rowData.Color || '',
+            graphics: rowData.图文 || rowData.Graphics || '',
+            font: rowData.字体 || rowData.Font || '',
+            dieLine: rowData.啤切线 || rowData.DieLine || ''
+          },
+          // 工单核对
+          workOrderCheck: {
+            materialNum: rowData.物料编号 || rowData.MaterialNumCheck || '',
+            dieCutStyle: rowData.模切方式 || rowData.DieCutStyle || '',
+            packingStyle: rowData.包装方式 || rowData.PackingStyle || ''
+          },
+          // 图纸核对
+          drawingCheck: {
+            material: rowData.材质 || rowData.MaterialCheck || '',
+            printContent: rowData.印刷内容 || rowData.PrintContent || ''
+          },
+          // 结果判定
+          result: rowData.结果判定 || rowData.Result || '合格',
+          // 检验时间
+          inspectedAt: inspectedAt
+        }
+      })
+    }
+
+    const payload = {
+      ReportNo: reportPreview.reportNo,
+      CustomerID: result.workOrderInfo?.CustomerID || firstProduct.customerId || '',
+      PNum: result.workOrderInfo?.PNum || pNums || '',
+      OrderNum: result.workOrderInfo?.OrderNum || orderNums || '',
+      CPO: result.workOrderInfo?.CPO || cpos || '',
+      ReportDate: reportPreview.date,
+      ProductInfo: JSON.stringify(products),
+      InspectionData: JSON.stringify(inspectionData),
+      Status: 'Generated'
+    }
+    
+    await api.post('/shipment-report', payload)
+    console.log('Report record saved:', payload)
+  } catch (e) {
+    console.error('Failed to save report record:', e)
+    ElMessage.warning('报告文件已生成，但保存记录失败: ' + (e.message || '未知错误'))
+  }
+}
+
+/**
  * 确认生成报告
  */
 async function confirmGenerateReport() {
@@ -2466,11 +3869,18 @@ async function confirmGenerateReport() {
     const useTemplate = !!(tpl?.id)
     console.log('生成报告，使用模板:', useTemplate, '模板ID:', tpl?.id, '产品数量:', reportDialogProducts.value.length)
     
+    // 先保存记录，再下载文件（或者并行，但最好确保记录保存了）
+    // 或者先下载文件，再保存记录。如果下载失败，记录就不保存了。
+    
     if (reportFormat.value === 'excel') {
-      useTemplate ? await exportFromTemplate(tpl) : handleExportReport()
+      useTemplate ? await exportFromTemplate(tpl) : await handleExportReport()
     } else {
       useTemplate ? await printFromTemplate(tpl) : handlePrintReport()
     }
+    
+    // 保存报告记录
+    await saveReportRecord()
+    
     ElMessage.success('报告生成成功')
     
     // 清空多选
@@ -2485,9 +3895,25 @@ async function confirmGenerateReport() {
 }
 
 /**
+ * 快速导出（预览卡片按钮）
+ */
+async function handleQuickExport() {
+  await handleExportReport()
+  await saveReportRecord()
+}
+
+/**
+ * 快速打印（预览卡片按钮）
+ */
+async function handleQuickPrint() {
+  handlePrintReport()
+  await saveReportRecord()
+}
+
+/**
  * 导出报告为Excel文件
  */
-function handleExportReport() {
+async function handleExportReport() {
   if (!selectedProduct.value || !result.workOrderInfo) {
     ElMessage.warning('请先选择产品')
     return
@@ -2495,7 +3921,7 @@ function handleExportReport() {
   const tpl = getSelectedTemplate()
   // 只要选择了模板（有id），就使用模板导出
   if (tpl?.id) {
-    exportFromTemplate(tpl)
+    await exportFromTemplate(tpl)
     return
   }
   try {
@@ -2776,24 +4202,28 @@ async function handleSaveTemplate() {
 
 onMounted(() => {
   fetchTemplates()
+  // 根据默认激活的标签加载数据
+  if (activeTab.value === 'history') {
+    fetchHistory()
+  }
 })
 </script>
 
 <style scoped>
-.shipment-report-page { padding: 20px; min-height: 100%; }
+.shipment-report-page { padding: 8px; height: 100%; overflow: hidden; display: flex; flex-direction: column; box-sizing: border-box; }
 
-.page-header { display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.95); border-radius: 16px; padding: 20px 30px; margin-bottom: 20px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); }
-.header-content { display: flex; align-items: center; gap: 20px; }
-.title-section { display: flex; align-items: center; gap: 12px; }
-.header-icon { font-size: 36px; color: #667eea; }
-.page-header h1 { font-size: 26px; font-weight: 700; color: #1a1a2e; margin: 0; }
-.subtitle { color: #64748b; font-size: 14px; margin: 0; }
+.page-header { display: flex; justify-content: space-between; align-items: center; background: rgba(255, 255, 255, 0.95); border-radius: 12px; padding: 8px 16px; margin-bottom: 4px; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1); flex-shrink: 0; }
+.header-content { display: flex; align-items: center; gap: 16px; }
+.title-section { display: flex; align-items: center; gap: 8px; }
+.header-icon { font-size: 24px; color: #667eea; }
+.page-header h1 { font-size: 18px; font-weight: 700; color: #1a1a2e; margin: 0; }
+.subtitle { color: #64748b; font-size: 13px; margin: 0; }
 
-.main-content { display: flex; gap: 20px; }
-.left-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 16px; }
-.right-panel { width: 420px; flex-shrink: 0; position: sticky; top: 20px; }
+.main-content { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
+.left-panel { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 12px; overflow-y: auto; padding-right: 4px; padding-bottom: 20px; }
+.right-panel { width: 420px; flex-shrink: 0; height: 100%; overflow-y: auto; padding-bottom: 20px; }
 
-.search-card, .result-card, .preview-card { background: rgba(255, 255, 255, 0.95); border-radius: 12px; border: none; }
+.search-card, .result-card, .preview-card { background: rgba(255, 255, 255, 0.95); border-radius: 12px; border: none; flex-shrink: 0; }
 :deep(.el-card__header) { padding: 12px 20px; border-bottom: 1px solid #f0f0f0; }
 .card-header { display: flex; align-items: center; gap: 8px; font-weight: 600; color: #334155; }
 .card-header .el-icon { font-size: 18px; color: #667eea; }
@@ -2833,14 +4263,24 @@ onMounted(() => {
 .signature-item { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .signature-line { display: inline-block; min-width: 60px; border-bottom: 1px solid #333; }
 
-.initial-hint { background: rgba(255, 255, 255, 0.95); border-radius: 12px; padding: 40px 20px; }
-.hint-text { text-align: left; color: #64748b; margin-top: 20px; padding: 20px; background: #f8fafc; border-radius: 12px; max-width: 400px; margin-left: auto; margin-right: auto; }
+.initial-hint { background: rgba(255, 255, 255, 0.95); border-radius: 12px; flex-shrink: 0; }
+.hint-header { display: flex; align-items: center; justify-content: center; gap: 8px; color: #909399; font-size: 14px; }
+.hint-title { color: #909399; }
+.hint-text { text-align: left; color: #64748b; margin-top: 12px; padding: 16px; background: #f8fafc; border-radius: 12px; max-width: 400px; margin-left: auto; margin-right: auto; }
 .hint-text p { margin: 0 0 12px 0; font-weight: 500; color: #334155; }
 .hint-text ul { margin: 0; padding-left: 20px; }
 .hint-text li { margin-bottom: 8px; line-height: 1.6; }
 .hint-text strong { color: #667eea; }
 
 .template-toolbar { margin-bottom: 16px; }
+
+.history-toolbar {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  padding-top: 16px;
+  padding-bottom: 12px;
+}
 
 /* 模板预览表格样式 */
 .mapping-preview {
@@ -2934,7 +4374,12 @@ onMounted(() => {
   font-size: 14px;
 }
 
-@media (max-width: 1200px) { .main-content { flex-direction: column; } .right-panel { width: 100%; } .preview-card { position: static; } }
+@media (max-width: 1200px) {
+  .main-content { flex-direction: column; overflow-y: auto; }
+  .left-panel, .right-panel { height: auto; overflow: visible; flex: none; }
+  .right-panel { width: 100%; }
+  .preview-card { position: static; }
+}
 @media (max-width: 768px) { .shipment-report-page { padding: 12px; } .page-header { flex-direction: column; gap: 16px; padding: 16px; } }
 
 /* 后台页面特定样式 */
@@ -2956,11 +4401,11 @@ onMounted(() => {
 
 .frontend-page .page-header {
   border-radius: 8px;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
 }
 
 .frontend-page .main-content {
-  height: calc(100vh - 200px); /* 减去头部和底部的大致高度 */
+  /* height: calc(100vh - 200px); 移除旧的高度计算 */
 }
 
 /* 移除旧的特定样式 */
@@ -2976,7 +4421,7 @@ onMounted(() => {
   background: #f8fafc;
   border-radius: 8px;
   padding: 16px;
-  height: 100%;
+  height: auto;
 }
 .section-header {
   display: flex;
@@ -3017,5 +4462,169 @@ onMounted(() => {
   color: #f56c6c;
   font-size: 12px;
   font-weight: 500;
+}
+
+/* Tab页面自适应布局样式 */
+.main-tabs {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* 强制 el-tabs 使用 column 方向的 flex 布局 */
+.main-tabs.el-tabs {
+  display: flex !important;
+  flex-direction: column !important;
+}
+
+/* 确保 header 在顶部，不被压缩 */
+.main-tabs :deep(.el-tabs__header) {
+  flex-shrink: 0 !important;
+  order: -1 !important; /* 强制排在最前面 */
+  margin-bottom: 0 !important;
+  background: #fff;
+  padding: 8px 16px 0 !important;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 1px solid #e4e7ed;
+}
+
+.main-tabs :deep(.el-tabs__nav-wrap) {
+  margin-bottom: 0;
+}
+
+.main-tabs :deep(.el-tabs__nav-wrap::after) {
+  display: none;
+}
+
+/* 内容区域填充剩余空间 */
+.main-tabs :deep(.el-tabs__content) {
+  flex: 1 !important;
+  overflow: hidden;
+  padding: 12px 16px;
+  background: #fff;
+  border-radius: 0 0 8px 8px;
+}
+
+.main-tabs :deep(.el-tab-pane) {
+  height: 100%;
+  overflow: hidden;
+}
+
+.generate-pane-content {
+  display: flex;
+  gap: 16px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.history-pane-content {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.history-card {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+.history-card :deep(.el-card__body) {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px 16px 16px;
+}
+
+.history-card :deep(.el-card__body) {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* 调整时间选择器标签大小 */
+.batch-search-form :deep(.el-form-item__label) {
+  font-size: 13px !important;
+}
+/* 调整时间选择器标签大小 */
+.batch-search-form :deep(.el-form-item__label) {
+  font-size: 13px !important;
+}
+/* 报告详情信息块样式 */
+.info-block {
+  text-align: center;
+  padding: 4px;
+  height: 100%;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+}
+.info-block .label {
+  font-size: 13px;
+  color: #606266;
+  margin-right: 8px;
+  margin-bottom: 0;
+  white-space: nowrap;
+}
+.info-block .value {
+  font-size: 14px;
+  color: #303133;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 自定义表格选中行高亮样式 */
+:deep(.el-table__body tr.current-row > td.el-table__cell) {
+  background-color: #409EFF !important;
+  color: #fff !important;
+}
+
+/* 保持选中行的hover样式一致 */
+:deep(.el-table__body tr.current-row:hover > td.el-table__cell) {
+  background-color: #66b1ff !important; /* 稍微亮一点的蓝色作为hover */
+}
+
+/* 选中行中的链接按钮颜色改为白色，确保可见性 */
+:deep(.el-table__body tr.current-row .el-button.is-link) {
+  color: #fff !important;
+}
+
+/* 适配移动端 */
+@media (max-width: 1200px) {
+  .generate-pane-content {
+    flex-direction: column;
+    overflow-y: auto;
+  }
+}
+
+/* 操作列按钮样式 */
+.action-buttons {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+  height: 100%;
+}
+
+.action-buttons .el-dropdown {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
+}
+
+:deep(.el-table .el-table__cell .action-buttons) {
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 </style>

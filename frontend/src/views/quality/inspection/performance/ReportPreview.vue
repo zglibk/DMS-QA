@@ -286,6 +286,8 @@
               <div class="footer-label" style="text-align: right;">审核/日期:</div>
               <div class="footer-value">{{ (report.AuditorName || report.Auditor || report.AuditedBy) ? (report.AuditorName || report.Auditor || report.AuditedBy) + ' / ' + (report.AuditDate ? formatDate(report.AuditDate) : '') : '' }}</div>
           </div>
+          
+          <slot></slot>
       </div>
   </div>
 </template>

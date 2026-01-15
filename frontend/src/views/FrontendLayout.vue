@@ -37,7 +37,7 @@ const currentYear = computed(() => new Date().getFullYear())
 }
 
 .header-wrapper {
-  height: 80px; /* 5rem to match ReusableHeader height */
+  height: 70px; /* 5rem to match ReusableHeader height */
   width: 100%;
 }
 

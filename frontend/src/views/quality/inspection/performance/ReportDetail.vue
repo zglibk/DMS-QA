@@ -7,10 +7,10 @@
         </div>
         <div class="header-right">
              <div class="actions-bar-top">
-                <el-button type="primary" :icon="DocumentAdd" @click="handleSaveItems" :loading="saving" :disabled="!isEditable || !userStore.hasPermission('quality:performance:edit')">保存草稿</el-button>
+                <el-button type="primary" :icon="DocumentAdd" @click="handleSaveItems" :loading="saving" :disabled="!isEditable || !userStore.hasPermission('quality:performance:edit')">{{ report.Status === 'Saved' ? '保存修改' : '保存草稿' }}</el-button>
                 <el-button type="info" plain :icon="Printer" @click="handlePreview" :disabled="!userStore.hasPermission('quality:performance:print')">报告预览/打印</el-button>
                 
-                <el-button type="warning" :icon="Promotion" v-if="report.Status === 'Draft' || report.Status === 'Rejected'" @click="handleSubmit" :disabled="!isEditable || !userStore.hasPermission('quality:performance:edit')">提交审核</el-button>
+                <el-button type="warning" :icon="Promotion" v-if="report.Status === 'Draft' || report.Status === 'Saved' || report.Status === 'Rejected'" @click="handleSubmit" :disabled="!isEditable || !userStore.hasPermission('quality:performance:edit')">提交审核</el-button>
                 <el-button type="success" :icon="Check" v-if="report.Status === 'Submitted'" @click="handleAudit" :disabled="!canAudit">审核通过</el-button>
                 <el-button type="warning" plain :icon="RefreshRight" v-if="canRecheck" @click="handleRecheck">复检</el-button>
              </div>
@@ -55,6 +55,7 @@ import { useRouter } from 'vue-router'
 import BasicInfoForm from './components/BasicInfoForm.vue'
 import TestItemsManager from './components/TestItemsManager.vue'
 import { getReport, updateReport, addReportItem, updateReportItem, deleteReportItem, getInstruments, createRecheckReport } from '@/api/performance'
+import { submitPerformanceReport, approvePerformanceReport, rejectPerformanceReport } from '@/api/inspection'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Close, Check, Promotion, Printer, DocumentAdd, RefreshRight } from '@element-plus/icons-vue'
 import dayjs from 'dayjs'
@@ -80,10 +81,14 @@ const itemsSnapshot = ref('')
 const isDirty = ref(false)
 
 const isEditable = computed(() => {
+    // 显式依赖 userStore.user 以确保响应式更新
+    const currentUser = userStore.user
     return checkPerformanceEditPermission(report.value)
 })
 
 const canAudit = computed(() => {
+    // 显式依赖 userStore.user 以确保响应式更新
+    const currentUser = userStore.user
     return checkPerformanceAuditPermission(report.value)
 })
 
@@ -193,9 +198,15 @@ const handleDeleteItem = async (item, index) => {
 }
 
 const handleSubmit = async () => {
+    // 检查是否有实验项目
+    if (!items.value || items.value.length === 0) {
+        ElMessage.warning('请先添加实验数据')
+        return
+    }
+
     try {
         await ElMessageBox.confirm(
-            '确定要提交此报告进行审核吗？提交后将无法继续编辑。',
+            '确定要提交此报告进行审核吗？提交后将发送待办事项给审核人。',
             '提交审核',
             {
                 confirmButtonText: '确定',
@@ -203,13 +214,14 @@ const handleSubmit = async () => {
                 type: 'warning'
             }
         )
-        await updateReport(report.value.ID, { Status: 'Submitted' })
-        ElMessage.success('已提交')
+        const res = await submitPerformanceReport(report.value.ID)
+        ElMessage.success(res.message || '已提交')
         fetchData()
         emit('refresh')
     } catch (e) {
         if (e !== 'cancel') {
             console.error(e)
+            ElMessage.error(e.response?.data?.message || '提交失败')
         }
     }
 }
@@ -255,45 +267,18 @@ const handleAudit = () => {
 const confirmAudit = async () => {
     auditLoading.value = true
     try {
-        const payload = { ...report.value }
+        const apiCall = auditForm.action === 'pass'
+            ? approvePerformanceReport(report.value.ID, auditForm.comment)
+            : rejectPerformanceReport(report.value.ID, auditForm.comment)
         
-        // Status
-        if (auditForm.action === 'pass') {
-            payload.Status = 'Audited'
-        } else {
-            payload.Status = 'Rejected' // Assuming Rejected status is supported or reuse Draft? Usually Rejected.
-            // If backend doesn't support Rejected, use Draft?
-            // Incoming inspection uses 'Rejected'. Let's assume Performance supports it too or update backend.
-            // Actually, performance usually just goes back to Draft or stays Submitted.
-            // Let's check backend... It updates 'Status'.
-            // If 'Rejected', creator can edit again (if we update isEditable logic).
-        }
-        
-        // Audit Info
-        payload.AuditedBy = userStore.user?.username || 'Admin'
-        // Use RealName from store for immediate display
-        payload.AuditorName = userStore.user?.RealName || userStore.user?.realName || userStore.user?.username || 'Admin'
-        payload.AuditDate = dayjs().format('YYYY-MM-DD')
-        
-        // Append comment if any
-        if (auditForm.comment) {
-            // Check if ReportRemark exists, if not, maybe store in a new field or append to existing text field?
-            // BasicInfoForm has no Remark field displayed by default, but DB might have it?
-            // PerformanceReports table: CreatedBy, UpdatedBy...
-            // Let's assume we can add to a 'Remarks' field if it exists, or just log it.
-            // Since we don't have explicit remark field in UI, maybe just log or ignore for now?
-            // Incoming inspection appends to ReportRemark.
-            // Let's try to append to 'Specification' or 'SampleModel' if no remark? No, bad idea.
-            // Let's just update status for now.
-        }
-
-        await updateReport(payload.ID, payload)
-        ElMessage.success('审核完成')
+        const res = await apiCall
+        ElMessage.success(res.message || '审核完成')
         auditDialogVisible.value = false
         fetchData()
         emit('refresh')
     } catch (e) {
         console.error(e)
+        ElMessage.error(e.response?.data?.message || '审核失败')
     } finally {
         auditLoading.value = false
     }
@@ -328,6 +313,18 @@ const openPrintPage = () => {
 }
 
 const handleClose = () => {
+    const doClose = () => {
+        emit('close')
+        // 如果是路由页面，需要手动回退或跳转
+        // 判断当前是否是独立的路由页面（而不是弹窗）
+        // 可以通过 route.name 判断，或者简单地尝试回退
+        // 这里简单处理：如果是在 PerformanceReportDetail 或 PerformanceReportEdit 路由下，则跳转回 Index
+        const currentRouteName = router.currentRoute.value.name
+        if (currentRouteName === 'PerformanceReportDetail' || currentRouteName === 'PerformanceReportEdit') {
+             router.push({ name: 'PerformanceReportIndex' })
+        }
+    }
+
     const isBasicInfoEditing = basicInfoRef.value?.isEdit
     if (isDirty.value || isBasicInfoEditing) {
         ElMessageBox.confirm(
@@ -335,10 +332,10 @@ const handleClose = () => {
             '提示',
             { confirmButtonText: '确定', cancelButtonText: '取消', type: 'warning' }
         ).then(() => {
-            emit('close')
+            doClose()
         }).catch(() => {})
     } else {
-        emit('close')
+        doClose()
     }
 }
 </script>

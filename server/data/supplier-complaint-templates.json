@@ -1,0 +1,132 @@
+[
+  {
+    "id": 1767690433763,
+    "templateName": "材料异常反馈单-通用模板",
+    "description": "",
+    "isDefault": true,
+    "enabled": true,
+    "createTime": "2026-01-06T09:07:13.763Z",
+    "updateTime": "2026-01-08T11:18:23.872Z",
+    "fileName": "材料投诉书-模板.xlsx",
+    "fileType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "filePath": "材料投诉书-模板_1767782254481.xlsx",
+    "fileUrl": "/files/supplier-complaint-templates/%E6%9D%90%E6%96%99%E6%8A%95%E8%AF%89%E4%B9%A6-%E6%A8%A1%E6%9D%BF_1767782254481.xlsx",
+    "mapping": {
+      "fields": [
+        {
+          "fieldName": "ComplaintNo",
+          "label": "投诉编号",
+          "cell": "J4"
+        },
+        {
+          "fieldName": "SupplierName",
+          "label": "供应商名称",
+          "cell": "B4"
+        },
+        {
+          "fieldName": "ComplaintDate",
+          "label": "投诉日期",
+          "cell": "I7"
+        },
+        {
+          "fieldName": "MaterialName",
+          "label": "物料名称",
+          "cell": "C5"
+        },
+        {
+          "fieldName": "MaterialCode",
+          "label": "物料编码",
+          "cell": "I5"
+        },
+        {
+          "fieldName": "MaterialSpec",
+          "label": "物料规格",
+          "cell": "C6"
+        },
+        {
+          "fieldName": "PurchaseOrderNo",
+          "label": "采购单号",
+          "cell": "F6"
+        },
+        {
+          "fieldName": "BatchNo",
+          "label": "批次号",
+          "cell": "C8"
+        },
+        {
+          "fieldName": "IncomingDate",
+          "label": "来料日期",
+          "cell": "I6"
+        },
+        {
+          "fieldName": "InspectionDate",
+          "label": "检验日期",
+          "cell": "F7"
+        },
+        {
+          "fieldName": "BatchQuantity",
+          "label": "批量数量",
+          "cell": "C7"
+        },
+        {
+          "fieldName": "SampleQuantity",
+          "label": "抽检数量",
+          "cell": "F8"
+        },
+        {
+          "fieldName": "DefectQuantity",
+          "label": "不良数量",
+          "cell": "I8"
+        },
+        {
+          "fieldName": "DefectRate",
+          "label": "不良率",
+          "cell": "K8"
+        },
+        {
+          "fieldName": "IQCResult",
+          "label": "IQC判定",
+          "cell": "C21"
+        },
+        {
+          "fieldName": "DefectCategory",
+          "label": "不良类别",
+          "cell": "C10"
+        },
+        {
+          "fieldName": "Description",
+          "label": "问题描述",
+          "cell": "C9"
+        },
+        {
+          "fieldName": "InspectorName",
+          "label": "检验员",
+          "cell": "H21"
+        },
+        {
+          "fieldName": "ApproverName",
+          "label": "审批人",
+          "cell": "K21"
+        },
+        {
+          "fieldName": "WorkOrderNo",
+          "label": "工单号",
+          "cell": "C8"
+        },
+        {
+          "fieldName": "AttachedImages",
+          "label": "异常图片",
+          "cell": "C11"
+        },
+        {
+          "fieldName": "ElectronicSeal",
+          "label": "电子印章",
+          "cell": "I21"
+        }
+      ],
+      "layout": {
+        "sheetIndex": 0
+      }
+    }
+  }
+]

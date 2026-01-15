@@ -320,6 +320,33 @@ const fetchUserMenus = async () => {
     const response = await apiService.get('/menus/user-menus')
     if (response.data.success) {
       menuList.value = response.data.data || []
+      
+      // 临时注入设备参数管理菜单（开发用）
+      const qualityMenu = menuList.value.find(m => m.Name === '质量管理' || m.Code === 'quality')
+      if (qualityMenu) {
+        if (!qualityMenu.children) qualityMenu.children = []
+        // 查找是否已存在设备参数管理菜单，避免重复
+        const existingParamMenu = qualityMenu.children.find(m => m.Name === '设备参数管理')
+        if (!existingParamMenu) {
+          qualityMenu.children.push({
+            ID: 'temp-dev-param',
+            Name: '设备参数管理',
+            Code: 'equipment-parameters',
+            Icon: 'Tools',
+            Type: 'directory', // 目录类型，不直接跳转
+            children: [
+              {
+                ID: 'temp-hp-indigo',
+                Name: 'HP Indigo 数码印刷机',
+                Code: 'hp-indigo',
+                Path: '/admin/quality/equipment-parameters/hp-indigo',
+                Icon: 'Printer',
+                Type: 'menu'
+              }
+            ]
+          })
+        }
+      }
     } else {
       throw new Error(response.data.message || '获取菜单数据失败')
     }

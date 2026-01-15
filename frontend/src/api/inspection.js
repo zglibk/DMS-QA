@@ -34,6 +34,13 @@ export function deleteInspectionItem(id) {
 
 // --- 来料检验报告 ---
 
+export function getIncomingFilterOptions() {
+  return request({
+    url: '/inspection/incoming/filter-options',
+    method: 'get'
+  })
+}
+
 export function getIncomingReports(params) {
   return request({
     url: '/inspection/incoming/list',
@@ -123,5 +130,115 @@ export function batchDeleteIncomingReports(ids) {
     url: '/inspection/incoming/batch-delete',
     method: 'post',
     data: { ids }
+  })
+}
+
+// --- 来料检验审核流程 ---
+
+export function submitIncomingReport(id) {
+  return request({
+    url: `/inspection/incoming/${id}/submit`,
+    method: 'post'
+  })
+}
+
+export function approveIncomingReport(id, remark) {
+  return request({
+    url: `/inspection/incoming/${id}/approve`,
+    method: 'post',
+    data: { remark }
+  })
+}
+
+export function rejectIncomingReport(id, remark) {
+  return request({
+    url: `/inspection/incoming/${id}/reject`,
+    method: 'post',
+    data: { remark }
+  })
+}
+
+export function getIncomingReportAuditLogs(id) {
+  return request({
+    url: `/inspection/incoming/${id}/audit-logs`,
+    method: 'get'
+  })
+}
+
+// --- 性能实验审核流程 ---
+
+export function submitPerformanceReport(id) {
+  return request({
+    url: `/inspection/performance/${id}/submit`,
+    method: 'post'
+  })
+}
+
+export function approvePerformanceReport(id, remark) {
+  return request({
+    url: `/inspection/performance/${id}/approve`,
+    method: 'post',
+    data: { remark }
+  })
+}
+
+export function rejectPerformanceReport(id, remark) {
+  return request({
+    url: `/inspection/performance/${id}/reject`,
+    method: 'post',
+    data: { remark }
+  })
+}
+
+export function revokePerformanceReport(id) {
+  return request({
+    url: `/inspection/performance/${id}/revoke`,
+    method: 'post'
+  })
+}
+
+export function getPerformanceReportAuditLogs(id) {
+  return request({
+    url: `/inspection/performance/${id}/audit-logs`,
+    method: 'get'
+  })
+}
+
+// --- 出货检验审核流程 ---
+
+export function submitShipmentReport(id) {
+  return request({
+    url: `/shipment-report/${id}/submit`,
+    method: 'post'
+  })
+}
+
+export function approveShipmentReport(id, remark) {
+  return request({
+    url: `/shipment-report/${id}/approve`,
+    method: 'post',
+    data: { remark }
+  })
+}
+
+export function rejectShipmentReport(id, remark) {
+  return request({
+    url: `/shipment-report/${id}/reject`,
+    method: 'post',
+    data: { remark }
+  })
+}
+
+export function revokeShipmentReport(id) {
+  return request({
+    url: `/shipment-report/${id}/revoke`,
+    method: 'post'
+  })
+}
+
+export function getShipmentReportAuditLogs(id) {
+  return request({
+    url: `/shipment-report/${id}/audit-logs`,
+    method: 'get'
   })
 }

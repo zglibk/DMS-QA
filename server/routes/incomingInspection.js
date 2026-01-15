@@ -403,8 +403,45 @@ router.get('/generate-report-no', authenticateToken, async (req, res) => {
 });
 
 // 获取报告列表
+// 获取筛选选项（供应商、创建人、品名等不重复值）
+router.get('/filter-options', authenticateToken, async (req, res) => {
+  try {
+    const result = await executeQuery(async (pool) => {
+      // 获取不重复的供应商
+      const suppliersResult = await pool.request().query(`
+        SELECT DISTINCT Supplier FROM IncomingInspectionReports WHERE Supplier IS NOT NULL AND Supplier != '' ORDER BY Supplier
+      `);
+      
+      // 获取不重复的创建人
+      const creatorsResult = await pool.request().query(`
+        SELECT DISTINCT r.CreatedBy, ISNULL(u.RealName, r.CreatedBy) as CreatorName
+        FROM IncomingInspectionReports r
+        LEFT JOIN [User] u ON r.CreatedBy = u.Username
+        WHERE r.CreatedBy IS NOT NULL AND r.CreatedBy != ''
+        ORDER BY CreatorName
+      `);
+      
+      // 获取不重复的品名
+      const productNamesResult = await pool.request().query(`
+        SELECT DISTINCT ProductName FROM IncomingInspectionReports WHERE ProductName IS NOT NULL AND ProductName != '' ORDER BY ProductName
+      `);
+      
+      return {
+        suppliers: suppliersResult.recordset.map(r => r.Supplier),
+        creators: creatorsResult.recordset.map(r => ({ value: r.CreatedBy, label: r.CreatorName })),
+        productNames: productNamesResult.recordset.map(r => r.ProductName)
+      };
+    });
+    
+    res.json({ success: true, data: result });
+  } catch (error) {
+    console.error('获取筛选选项失败:', error);
+    res.status(500).json({ success: false, message: '获取筛选选项失败' });
+  }
+});
+
 router.get('/list', authenticateToken, async (req, res) => {
-  const { page = 1, pageSize = 20, supplier, reportNo, startDate, endDate } = req.query;
+  const { page = 1, pageSize = 20, supplier, reportNo, startDate, endDate, status, result: reportResult, createdBy, productName, keyword } = req.query;
   const offset = (parseInt(page) - 1) * parseInt(pageSize);
   
   try {
@@ -412,21 +449,43 @@ router.get('/list', authenticateToken, async (req, res) => {
         let whereClause = 'WHERE 1=1';
         const inputs = [];
         
+        // 模糊搜索（品名、供应商）
+        if (keyword) {
+            whereClause += ` AND (r.ProductName LIKE @Keyword OR r.Supplier LIKE @Keyword)`;
+            inputs.push({ name: 'Keyword', type: sql.NVarChar, value: `%${keyword}%` });
+        }
+        
         if (supplier) {
-            whereClause += ` AND Supplier LIKE @Supplier`;
-            inputs.push({ name: 'Supplier', type: sql.NVarChar, value: `%${supplier}%` });
+            whereClause += ` AND r.Supplier = @Supplier`;
+            inputs.push({ name: 'Supplier', type: sql.NVarChar, value: supplier });
         }
         if (reportNo) {
-            whereClause += ` AND ReportNo LIKE @ReportNo`;
+            whereClause += ` AND r.ReportNo LIKE @ReportNo`;
             inputs.push({ name: 'ReportNo', type: sql.NVarChar, value: `%${reportNo}%` });
         }
         if (startDate) {
-            whereClause += ` AND InspectionDate >= @StartDate`;
+            whereClause += ` AND r.InspectionDate >= @StartDate`;
             inputs.push({ name: 'StartDate', type: sql.Date, value: startDate });
         }
         if (endDate) {
-             whereClause += ` AND InspectionDate <= @EndDate`;
+             whereClause += ` AND r.InspectionDate <= @EndDate`;
              inputs.push({ name: 'EndDate', type: sql.Date, value: endDate });
+        }
+        if (status) {
+            whereClause += ` AND r.Status = @Status`;
+            inputs.push({ name: 'Status', type: sql.NVarChar, value: status });
+        }
+        if (reportResult) {
+            whereClause += ` AND r.ReportResult = @ReportResult`;
+            inputs.push({ name: 'ReportResult', type: sql.NVarChar, value: reportResult });
+        }
+        if (createdBy) {
+            whereClause += ` AND r.CreatedBy = @CreatedBy`;
+            inputs.push({ name: 'CreatedBy', type: sql.NVarChar, value: createdBy });
+        }
+        if (productName) {
+            whereClause += ` AND r.ProductName = @ProductName`;
+            inputs.push({ name: 'ProductName', type: sql.NVarChar, value: productName });
         }
 
         const query = `
@@ -438,11 +497,11 @@ router.get('/list', authenticateToken, async (req, res) => {
                 FROM IncomingInspectionReports r
                 LEFT JOIN [User] u ON r.CreatedBy = u.Username
                 LEFT JOIN Positions p ON u.PositionID = p.ID
-                ${whereClause.replace(/AND Supplier/g, 'AND r.Supplier').replace(/AND ReportNo/g, 'AND r.ReportNo').replace(/AND InspectionDate/g, 'AND r.InspectionDate')}
+                ${whereClause}
             ) AS RowConstrainedResult WHERE RowNum > @Offset AND RowNum <= (@Offset + @PageSize)
         `;
         
-        const countQuery = `SELECT COUNT(*) AS Total FROM IncomingInspectionReports r ${whereClause.replace(/AND Supplier/g, 'AND r.Supplier').replace(/AND ReportNo/g, 'AND r.ReportNo').replace(/AND InspectionDate/g, 'AND r.InspectionDate')}`;
+        const countQuery = `SELECT COUNT(*) AS Total FROM IncomingInspectionReports r LEFT JOIN [User] u ON r.CreatedBy = u.Username ${whereClause}`;
 
         const request = pool.request();
         inputs.forEach(i => request.input(i.name, i.type, i.value));
@@ -1150,6 +1209,149 @@ router.post('/batch-delete', authenticateToken, async (req, res) => {
     } catch (error) {
         console.error('批量删除失败:', error);
         res.status(500).json({ success: false, message: error.message || '批量删除失败' });
+    }
+});
+
+// =====================================================
+// 审核流程API - 集成待办事项
+// =====================================================
+
+const auditService = require('../services/auditService');
+
+/**
+ * 提交审核
+ * POST /api/incoming-inspection/:id/submit
+ */
+router.post('/:id/submit', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const user = await auditService.getUserByUsername(await require('../db').getConnection(), req.user.username);
+        
+        if (!user) {
+            return res.status(400).json({ success: false, message: '用户信息获取失败' });
+        }
+        
+        const result = await executeQuery(async (pool) => {
+            return await auditService.submitForAudit({
+                pool,
+                tableName: 'IncomingInspectionReports',
+                businessNoField: 'ReportNo',
+                businessId: parseInt(id),
+                todoType: auditService.TODO_TYPES.INCOMING_INSPECTION,
+                businessType: auditService.BUSINESS_TYPES.INCOMING_INSPECTION,
+                titlePrefix: '来料检验报告',
+                userId: user.id,
+                userName: user.realName
+            });
+        });
+        
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    } catch (error) {
+        console.error('提交审核失败:', error);
+        res.status(500).json({ success: false, message: '提交审核失败', error: error.message });
+    }
+});
+
+/**
+ * 审核通过
+ * POST /api/incoming-inspection/:id/approve
+ */
+router.post('/:id/approve', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { remark } = req.body;
+        const user = await auditService.getUserByUsername(await require('../db').getConnection(), req.user.username);
+        
+        if (!user) {
+            return res.status(400).json({ success: false, message: '用户信息获取失败' });
+        }
+        
+        const result = await executeQuery(async (pool) => {
+            return await auditService.approveAudit({
+                pool,
+                tableName: 'IncomingInspectionReports',
+                businessNoField: 'ReportNo',
+                auditorField: 'Auditor',
+                auditDateField: 'AuditDate',
+                auditRemarkField: 'AuditRemark',
+                businessId: parseInt(id),
+                todoType: auditService.TODO_TYPES.INCOMING_INSPECTION,
+                businessType: auditService.BUSINESS_TYPES.INCOMING_INSPECTION,
+                userId: user.id,
+                userName: user.realName,
+                remark
+            });
+        });
+        
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    } catch (error) {
+        console.error('审核失败:', error);
+        res.status(500).json({ success: false, message: '审核失败', error: error.message });
+    }
+});
+
+/**
+ * 审核驳回
+ * POST /api/incoming-inspection/:id/reject
+ */
+router.post('/:id/reject', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { remark } = req.body;
+        const user = await auditService.getUserByUsername(await require('../db').getConnection(), req.user.username);
+        
+        if (!user) {
+            return res.status(400).json({ success: false, message: '用户信息获取失败' });
+        }
+        
+        const result = await executeQuery(async (pool) => {
+            return await auditService.rejectAudit({
+                pool,
+                tableName: 'IncomingInspectionReports',
+                businessNoField: 'ReportNo',
+                auditorField: 'Auditor',
+                auditDateField: 'AuditDate',
+                auditRemarkField: 'AuditRemark',
+                businessId: parseInt(id),
+                todoType: auditService.TODO_TYPES.INCOMING_INSPECTION,
+                businessType: auditService.BUSINESS_TYPES.INCOMING_INSPECTION,
+                userId: user.id,
+                userName: user.realName,
+                remark
+            });
+        });
+        
+        if (result.success) {
+            res.json(result);
+        } else {
+            res.status(400).json(result);
+        }
+    } catch (error) {
+        console.error('驳回失败:', error);
+        res.status(500).json({ success: false, message: '驳回失败', error: error.message });
+    }
+});
+
+/**
+ * 获取审核日志
+ * GET /api/incoming-inspection/:id/audit-logs
+ */
+router.get('/:id/audit-logs', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const logs = await auditService.getAuditLogs(auditService.BUSINESS_TYPES.INCOMING_INSPECTION, parseInt(id));
+        res.json({ success: true, data: logs });
+    } catch (error) {
+        console.error('获取审核日志失败:', error);
+        res.status(500).json({ success: false, message: '获取审核日志失败', error: error.message });
     }
 });
 

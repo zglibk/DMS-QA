@@ -64,18 +64,10 @@ const config = {
   }
 };
 
-/**
- * 动态配置缓存
- *
- * 目的：避免频繁查询数据库获取配置
- * 机制：内存缓存 + 时间过期
- */
+// 动态配置缓存变量
 let cachedDynamicConfig = null;  // 缓存的配置对象
 let configCacheTime = 0;         // 缓存时间戳
 const CONFIG_CACHE_DURATION = 60000; // 缓存有效期（1分钟）
-
-// 用于配置查询的独立连接池
-let configPool = null;
 
 /**
  * 获取动态数据库配置
@@ -103,22 +95,14 @@ async function getDynamicConfig() {
     return cachedDynamicConfig;
   }
 
+  let tempPool = null;
   try {
-    // 使用独立的配置连接池，避免与全局连接池冲突
-    if (!configPool || !configPool.connected) {
-      if (configPool) {
-        try {
-          await configPool.close();
-        } catch (closeErr) {
-          console.log('关闭配置连接池失败:', closeErr.message);
-        }
-      }
-      configPool = new sql.ConnectionPool(config);
-      await configPool.connect();
-    }
+    // 使用独立的临时连接池，避免与全局连接池冲突或并发问题
+    tempPool = new sql.ConnectionPool(config);
+    await tempPool.connect();
 
     // 查询当前有效的数据库配置
-    const result = await configPool.request()
+    const result = await tempPool.request()
       .query(`
         SELECT TOP 1
           Host, DatabaseName, DbUser, DbPassword,
@@ -179,6 +163,25 @@ async function getDynamicConfig() {
       return cachedDynamicConfig;
     }
     return config; // 出错时返回默认配置
+  } finally {
+    // 确保关闭临时连接池
+    if (tempPool) {
+      try {
+        // 只有在已连接的情况下才尝试关闭，避免 "Cannot close a pool while it is connecting"
+        if (tempPool.connected) {
+          await tempPool.close();
+        } else if (tempPool.connecting) {
+           // 如果正在连接中，通常不建议直接close，但为了防止泄漏，我们尝试捕获错误
+           // 或者我们可以不做任何事，让它自然消亡（因为是局部变量）
+           // 但 mssql pool 可能会保持 socket。
+           // 最佳实践：等待 connect 完成后再 close，但这比较复杂。
+           // 这里简单 try-catch
+           try { await tempPool.close(); } catch(e) {}
+        }
+      } catch (closeErr) {
+        console.log('关闭配置连接池失败:', closeErr.message);
+      }
+    }
   }
 }
 
@@ -229,7 +232,18 @@ async function getConnection() {
     }
 
     // 最终检查连接池状态
+    // 如果正在连接，等待它完成
+    if (globalPool && globalPool.connecting) {
+      // console.log('连接池正在建立连接，等待...');
+      let retries = 0;
+      while (globalPool.connecting && retries < 50) { // 最多等待5秒 (50 * 100ms)
+        await new Promise(resolve => setTimeout(resolve, 100));
+        retries++;
+      }
+    }
+
     if (!globalPool || !globalPool.connected) {
+      // 如果等待后仍未连接，则抛出错误
       throw new Error('连接池未正确连接');
     }
 

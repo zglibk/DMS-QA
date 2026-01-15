@@ -59,6 +59,8 @@ const shouldRefreshToken = (token) => {
 const refreshToken = async () => {
   try {
     // Use the api instance but the interceptor will skip refresh check for this URL
+    // 注意：api 实例已经配置了 baseURL: '/api'
+    // 所以这里请求路径应该是 '/auth/refresh-token'，最终会变成 '/api/auth/refresh-token'
     const response = await api.post('/auth/refresh-token', {}, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`

@@ -20,7 +20,6 @@ const { authenticateToken } = require('../middleware/auth');
  */
 router.get('/token', authenticateToken, async (req, res) => {
     try {
-        console.log('获取ERP token...');
         const token = await erpService.getToken();
         
         res.json({
@@ -53,8 +52,6 @@ router.get('/token', authenticateToken, async (req, res) => {
 router.get('/production', authenticateToken, async (req, res) => {
     try {
         const { startDate, endDate, productLine, batchNumber } = req.query;
-        
-        console.log('获取ERP生产数据:', { startDate, endDate, productLine, batchNumber });
         
         const filters = {};
         if (startDate) filters.startDate = startDate;
@@ -91,8 +88,6 @@ router.get('/production', authenticateToken, async (req, res) => {
 router.get('/delivery', authenticateToken, async (req, res) => {
     try {
         const { startDate, endDate, customerCode, deliveryStatus } = req.query;
-        
-        console.log('获取ERP交付数据:', { startDate, endDate, customerCode, deliveryStatus });
         
         const filters = {};
         if (startDate) filters.startDate = startDate;
@@ -247,8 +242,6 @@ router.get('/sync-status', authenticateToken, async (req, res) => {
 router.post('/auto-sync-config', authenticateToken, async (req, res) => {
     try {
         const { enabled, interval, syncTypes, timeRange } = req.body;
-        
-        console.log('配置自动同步:', { enabled, interval, syncTypes, timeRange });
         
         // 更新同步服务配置
         erpSyncService.updateConfig({
@@ -465,8 +458,6 @@ router.get('/stock/material', authenticateToken, async (req, res) => {
     try {
         const { StartDate, EndDate } = req.query;
         
-        console.log('获取ERP物料列表:', { StartDate, EndDate });
-        
         const filters = {};
         if (StartDate) filters.StartDate = StartDate;
         if (EndDate) filters.EndDate = EndDate;
@@ -499,8 +490,6 @@ router.get('/production/work-orders', authenticateToken, async (req, res) => {
     try {
         const { StartDate, EndDate } = req.query;
         
-        console.log('获取ERP工单列表:', { StartDate, EndDate });
-        
         const filters = {};
         if (StartDate) filters.StartDate = StartDate;
         if (EndDate) filters.EndDate = EndDate;
@@ -531,8 +520,6 @@ router.get('/production/work-orders', authenticateToken, async (req, res) => {
 router.get('/production/work-order/:pNum', authenticateToken, async (req, res) => {
     try {
         const { pNum } = req.params;
-        
-        console.log('获取ERP工单明细:', { pNum });
         
         if (!pNum) {
             return res.status(400).json({
@@ -569,8 +556,6 @@ router.get('/production/work-order/:pNum', authenticateToken, async (req, res) =
 router.get('/stock/material-in', authenticateToken, async (req, res) => {
     try {
         const { StartDate, EndDate } = req.query;
-        
-        console.log('获取ERP物料入库明细列表:', { StartDate, EndDate });
         
         const filters = {};
         if (StartDate) filters.StartDate = StartDate;
@@ -612,7 +597,7 @@ router.get('/stock/material-in', authenticateToken, async (req, res) => {
  */
 router.get('/shipment-report', authenticateToken, async (req, res) => {
     try {
-        const { pNum, materialId, materialName, cpo, batchQuery, StartDate, EndDate } = req.query;
+        const { pNum, materialId, materialName, cpo, batchQuery, StartDate, EndDate, matchMonthRange } = req.query;
         
         // 解析批量查询参数
         let batchQueryList = [];
@@ -625,16 +610,10 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
             }
         }
         
-        console.log('出货报告查询:', { 
-            pNum, materialId, materialName, cpo, 
-            batchQueryCount: batchQueryList.length,
-            StartDate, EndDate 
-        });
-        
-        // 构建时间范围（默认查询最近30天，批量查询时默认90天）
-        const defaultDays = batchQueryList.length > 0 ? 90 : 30;
-        const endDate = EndDate || new Date().toISOString().replace('T', ' ').slice(0, 19);
-        const startDate = StartDate || new Date(Date.now() - defaultDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19);
+        // 构建时间范围（默认查询最近90天，批量查询时默认90天）
+        const defaultDays = 90;
+        let endDate = EndDate || new Date().toISOString().replace('T', ' ').slice(0, 19);
+        let startDate = StartDate || new Date(Date.now() - defaultDays * 24 * 60 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19);
         
         const result = {
             workOrderInfo: null,      // 工单信息
@@ -650,6 +629,29 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                 if (workOrderDetail) {
                     // 处理返回数据格式
                     const orderData = workOrderDetail.data || workOrderDetail;
+                    
+                    // 如果没有指定时间范围，则使用工单的开单日期(InDate)前后N个月作为查询范围
+                    if (!StartDate && !EndDate && orderData.InDate) {
+                        try {
+                            const inDate = new Date(orderData.InDate);
+                            if (!isNaN(inDate.getTime())) {
+                                const range = parseInt(matchMonthRange) || 1; // 默认前后1个月
+
+                                // 前N个月
+                                const start = new Date(inDate);
+                                start.setMonth(start.getMonth() - range);
+                                startDate = start.toISOString().replace('T', ' ').slice(0, 19);
+                                
+                                // 后N个月
+                                const end = new Date(inDate);
+                                end.setMonth(end.getMonth() + range);
+                                endDate = end.toISOString().replace('T', ' ').slice(0, 19);
+                            }
+                        } catch (e) {
+                            console.log('解析工单日期失败，使用默认时间范围:', e.message);
+                        }
+                    }
+
                     result.workOrderInfo = {
                         PNum: orderData.PNum,
                         OrderNum: orderData.OrderNum,
@@ -709,8 +711,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
         // 无工单号时，通过产品编号+CPO从成品入库明细中查询
         if (!pNum && materialId && cpo) {
             try {
-                console.log('通过产品编号+CPO查询成品入库明细...');
-                
                 const productInData = await erpService.getProductInSumList({
                     StartDate: startDate,
                     EndDate: endDate
@@ -722,8 +722,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                 } else if (productInData && productInData.data && Array.isArray(productInData.data)) {
                     productInList = productInData.data;
                 }
-                
-                console.log(`成品入库明细总数: ${productInList.length}`);
                 
                 // 按产品编号和CPO过滤
                 const filteredProducts = productInList.filter(item => {
@@ -751,8 +749,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     
                     return match;
                 });
-                
-                console.log(`按条件过滤后产品数: ${filteredProducts.length}`);
                 
                 if (filteredProducts.length > 0) {
                     // 转换为产品信息格式
@@ -828,8 +824,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
         // 批量查询：多个CPO+产品编号组合
         if (batchQueryList.length > 0 && !pNum) {
             try {
-                console.log(`开始批量查询 ${batchQueryList.length} 个CPO+产品编号组合...`);
-                
                 // 同时查询成品入库明细和工单列表
                 const [productInData, workOrderData] = await Promise.all([
                     erpService.getProductInSumList({
@@ -855,8 +849,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                 } else if (workOrderData && workOrderData.data && Array.isArray(workOrderData.data)) {
                     workOrderList = workOrderData.data;
                 }
-                
-                console.log(`成品入库明细总数: ${productInList.length}, 工单列表总数: ${workOrderList.length}`);
                 
                 // 根据批量查询列表过滤
                 const filteredProducts = [];
@@ -913,8 +905,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     }
                 }
                 
-                console.log(`成品入库匹配: ${filteredProducts.length} 个, 未匹配: ${unmatchedItems.length} 个`);
-                
                 // 第二轮：对未匹配的项目，通过CPO找到工单号，再从工单明细中匹配
                 if (unmatchedItems.length > 0) {
                     // 收集未匹配项目的CPO对应的工单号
@@ -940,8 +930,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                             pNums.forEach(pNum => pNumsToQuery.add(pNum));
                         }
                     }
-                    
-                    console.log(`需要查询工单明细: ${pNumsToQuery.size} 个工单`);
                     
                     // 查询工单明细获取产品信息
                     const workOrderDetails = new Map();  // PNum -> 工单明细
@@ -1018,13 +1006,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     return !addedKeys.has(key);
                 });
                 
-                if (finalUnmatched.length > 0) {
-                    console.log(`批量查询：${finalUnmatched.length} 条最终未匹配:`, 
-                        finalUnmatched.map(r => `${r.cpo} + ${r.productId}`).join(', '));
-                }
-                
-                console.log(`批量查询最终匹配到 ${filteredProducts.length} 个产品（共 ${batchQueryList.length} 条查询）`);
-                
                 if (filteredProducts.length > 0) {
                     result.productInfo = filteredProducts;
                 }
@@ -1067,8 +1048,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     });
                 }
             });
-            
-            console.log(`已加载 ${materialMap.size} 条物料基础信息用于联合查询`);
         } catch (error) {
             console.log('获取物料列表失败:', error.message);
         }
@@ -1105,8 +1084,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     return match;
                 });
             }
-            
-            console.log(`物料入库明细初步过滤: ${allMaterialInList.length} 条`);
         } catch (error) {
             console.log('获取物料入库明细失败:', error.message);
         }
@@ -1181,50 +1158,63 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                 });
             }
             
-            console.log(`按物料编号/名称查询匹配到: ${filteredMaterials.length} 条物料`);
-            
             if (filteredMaterials.length > 0 && result.materialList.length === 0) {
                 result.materialList = filteredMaterials;
             }
         }
         
         // 根据物料信息列表精确过滤物料入库明细
-        // 支持通过物料编码或物料名称进行匹配
+        // 匹配规则：
+        // 1. 排除送货单号包含"盘点"或"导入"的记录
+        // 2. ID匹配 + 规格匹配
+        // 3. 名称匹配 + 规格匹配 (优先)
         if (result.materialList.length > 0 && allMaterialInList.length > 0) {
-            // 提取物料信息中的物料名称和物料编码集合（标准化处理）
-            const materialNameSet = new Set();
-            const materialIdSet = new Set();
-            result.materialList.forEach(m => {
-                if (m.name) {
-                    // 标准化物料名称：去除首尾空格
-                    materialNameSet.add(m.name.trim());
-                }
-                if (m.materialId) {
-                    // 标准化物料编码：去除首尾空格，转大写
-                    materialIdSet.add(m.materialId.trim().toUpperCase());
-                }
-            });
             
-            console.log(`物料信息名称集合: ${materialNameSet.size} 个, 编码集合: ${materialIdSet.size} 个`);
+            // 标准化字符串辅助函数：去除空格、统一符号、转小写
+            const normalizeStr = (str) => {
+                if (!str) return '';
+                return String(str).trim().toLowerCase()
+                    .replace(/\s+/g, '')      // 去除所有空格
+                    .replace(/＊/g, '*')      // 全角*转半角*
+                    .replace(/×/g, '*')       // ×转*
+                    .replace(/x/g, '*')       // x转*
+                    .replace(/（/g, '(')      // 全角括号转半角
+                    .replace(/）/g, ')');     // 全角括号转半角
+            };
+
+            // 预处理目标物料列表，生成标准化匹配键，避免在循环中重复计算
+            const targets = result.materialList.map(m => ({
+                original: m,
+                normId: normalizeStr(m.materialId),
+                normName: normalizeStr(m.name),
+                normSpec: normalizeStr(m.spec)
+            }));
             
-            // 过滤入库明细：物料名称或物料编码匹配，且排除送货单号为"盘点数据导入"的记录
+            // 过滤入库明细
             result.materialInList = allMaterialInList.filter(item => {
-                // 排除送货单号为"盘点数据导入"的记录
-                if (item.DlyNum && item.DlyNum.trim() === '盘点数据导入') return false;
+                const dlyNum = item.DlyNum || '';
+                // 1. 强制排除：如果入库记录的 送货单号 ( DlyNum ) 中，包含 "盘点"或"导入"关键字 ，直接丢弃
+                if (dlyNum.includes('盘点') || dlyNum.includes('导入')) return false;
                 
-                // 通过物料编码匹配
-                if (item.MaterialID) {
-                    const normalizedId = item.MaterialID.trim().toUpperCase();
-                    if (materialIdSet.has(normalizedId)) return true;
-                }
+                // 准备入库记录的对比数据(标准化)
+                const itemNormId = normalizeStr(item.MaterialID);
+                const itemNormName = normalizeStr(item.MName);
+                const itemNormSpec = normalizeStr(item.Scale);
                 
-                // 通过物料名称匹配
-                if (item.MName) {
-                    const itemName = item.MName.trim();
-                    if (materialNameSet.has(itemName)) return true;
-                }
-                
-                return false;
+                // 遍历工单物料列表进行匹配
+                return targets.some(t => {
+                    // 2. ID 匹配 + 规格
+                    if (t.normId && itemNormId === t.normId && itemNormSpec === t.normSpec) {
+                        return true;
+                    }
+                    
+                    // 3. 名称匹配 + 规格
+                    if (t.normName && itemNormName === t.normName && itemNormSpec === t.normSpec) {
+                        return true;
+                    }
+                    
+                    return false;
+                });
             }).map(item => {
                 // 从物料列表中获取型号和子物料类型
                 const normalizedId = item.MaterialID ? item.MaterialID.trim().toUpperCase() : '';
@@ -1247,13 +1237,12 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     lastUpdateDate: item.LstUpdateDate  // 最后修改日期
                 };
             });
-            
-            console.log(`物料入库明细匹配后: ${result.materialInList.length} 条`);
         } else if (allMaterialInList.length > 0 && result.materialList.length === 0) {
-            // 如果没有物料信息列表，则显示所有入库明细（按查询条件过滤后的，排除盘点数据导入）
+            // 如果没有物料信息列表，则显示所有入库明细（按查询条件过滤后的，排除含"盘点"或"导入"的记录）
             result.materialInList = allMaterialInList.filter(item => {
-                // 排除送货单号为"盘点数据导入"的记录
-                if (item.DlyNum && item.DlyNum.trim() === '盘点数据导入') return false;
+                const dlyNum = item.DlyNum || '';
+                // 排除送货单号包含"盘点"或"导入"的记录
+                if (dlyNum.includes('盘点') || dlyNum.includes('导入')) return false;
                 return true;
             }).map(item => {
                 const normalizedId = item.MaterialID ? item.MaterialID.trim().toUpperCase() : '';
@@ -1276,8 +1265,6 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     lastUpdateDate: item.LstUpdateDate
                 };
             });
-            
-            console.log(`物料入库明细(无物料信息时): ${result.materialInList.length} 条`);
         }
         
         res.json({

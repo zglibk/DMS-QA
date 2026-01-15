@@ -2,11 +2,103 @@
   <div class="supplier-complaints-container">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2 class="page-title">
-        <el-icon><Warning /></el-icon>
-        供应商投诉
-      </h2>
-      <p class="page-description">管理供应商材料投诉、处理流程、改善验证、索赔等相关业务</p>
+      <div class="header-content">
+        <div class="header-left">
+          <h2 class="page-title">
+            <el-icon><Warning /></el-icon>
+            供应商投诉
+          </h2>
+          <p class="page-description">管理供应商材料投诉、处理流程、改善验证、索赔等相关业务</p>
+        </div>
+        <div class="header-right">
+          <el-button type="primary" plain @click="handleBatchImport" :icon="UploadFilled">批量导入</el-button>
+          <el-button type="primary" @click="handleAdd" :icon="Plus">新增投诉</el-button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- 统计卡片 -->
+    <div class="statistics-section" v-if="showStatistics">
+      <el-row :gutter="20">
+        <el-col :xs="24" :sm="12" :md="8" :lg="4" :xl="4">
+          <el-card class="stat-card total">
+            <div class="stat-content">
+              <div class="stat-icon">
+                <el-icon><Histogram /></el-icon>
+              </div>
+              <div class="stat-info">
+                <div class="stat-number">{{ statistics.totalComplaints || 0 }}</div>
+                <div class="stat-label">总投诉数</div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :sm="12" :md="8" :lg="4" :xl="4">
+          <el-card class="stat-card completed">
+            <div class="stat-content">
+              <div class="stat-icon">
+                <el-icon><Timer /></el-icon>
+              </div>
+              <div class="stat-info">
+                <div class="stat-number">{{ statistics.timelyReplyCount || 0 }}</div>
+                <div class="stat-label">及时回复</div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :sm="12" :md="8" :lg="4" :xl="4">
+          <el-card class="stat-card processing">
+            <div class="stat-content">
+              <div class="stat-icon">
+                <el-icon><Warning /></el-icon>
+              </div>
+              <div class="stat-info">
+                <div class="stat-number">{{ statistics.overdueReplyCount || 0 }}</div>
+                <div class="stat-label">超期回复</div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :sm="12" :md="8" :lg="4" :xl="4">
+          <el-card class="stat-card pending">
+            <div class="stat-content">
+              <div class="stat-icon">
+                <el-icon><ChatDotSquare /></el-icon>
+              </div>
+              <div class="stat-info">
+                <div class="stat-number">{{ statistics.noReplyCount || 0 }}</div>
+                <div class="stat-label">未回复</div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :sm="12" :md="8" :lg="4" :xl="4">
+          <el-card class="stat-card amount amount-claim clickable" @click="handleAmountFilter('claim')">
+            <div class="stat-content">
+              <div class="stat-icon">
+                <el-icon><Money /></el-icon>
+              </div>
+              <div class="stat-info">
+                <div class="stat-number amount-text">¥{{ formatNumber(statistics.totalClaimAmount) }}</div>
+                <div class="stat-label">质量罚款</div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+        <el-col :xs="24" :sm="12" :md="8" :lg="4" :xl="4">
+          <el-card class="stat-card amount amount-actual clickable" @click="handleAmountFilter('actual')">
+            <div class="stat-content">
+              <div class="stat-icon">
+                <el-icon><Wallet /></el-icon>
+              </div>
+              <div class="stat-info">
+                <div class="stat-number amount-text">¥{{ formatNumber(statistics.totalActualClaim) }}</div>
+                <div class="stat-label">实际金额</div>
+              </div>
+            </div>
+          </el-card>
+        </el-col>
+      </el-row>
     </div>
 
     <!-- 搜索和操作区域 -->
@@ -18,6 +110,7 @@
               v-model="searchForm.complaintNo" 
               placeholder="请输入投诉编号" 
               clearable
+              @change="handleSearch"
             />
           </el-form-item>
           <el-form-item label="供应商名称">
@@ -25,6 +118,7 @@
               v-model="searchForm.supplierName" 
               placeholder="请输入供应商名称" 
               clearable
+              @change="handleSearch"
             />
           </el-form-item>
           <el-form-item label="投诉类型">
@@ -32,13 +126,14 @@
               v-model="searchForm.complaintType" 
               placeholder="请选择投诉类型" 
               clearable
+              @change="handleSearch"
             >
-              <el-option label="质量问题" value="质量问题" />
-              <el-option label="交货延迟" value="交货延迟" />
-              <el-option label="规格不符" value="规格不符" />
-              <el-option label="包装破损" value="包装破损" />
-              <el-option label="服务问题" value="服务问题" />
-              <el-option label="其他" value="其他" />
+              <el-option label="质量问题" value="quality_issue" />
+              <el-option label="交期延误" value="delivery_delay" />
+              <el-option label="服务问题" value="service_issue" />
+              <el-option label="包装问题" value="packaging_issue" />
+              <el-option label="数量问题" value="quantity_issue" />
+              <el-option label="其他" value="other" />
             </el-select>
           </el-form-item>
           <el-form-item label="不良类别">
@@ -47,7 +142,6 @@
               placeholder="请选择不良类别" 
               clearable
               filterable
-              allow-create
               @change="handleCategoryChange"
             >
               <el-option 
@@ -65,6 +159,7 @@
               clearable
               filterable
               allow-create
+              @change="handleSearch"
             >
               <el-option 
                 v-for="item in currentDefectItemOptions" 
@@ -79,6 +174,7 @@
               v-model="searchForm.materialCode" 
               placeholder="请输入物料编码" 
               clearable
+              @change="handleSearch"
             />
           </el-form-item>
           <el-form-item label="采购单号">
@@ -86,6 +182,7 @@
               v-model="searchForm.purchaseOrderNo" 
               placeholder="请输入采购单号" 
               clearable
+              @change="handleSearch"
             />
           </el-form-item>
           <el-form-item label="客户编号">
@@ -93,6 +190,7 @@
               v-model="searchForm.customerCode" 
               placeholder="请输入客户编号" 
               clearable
+              @change="handleSearch"
             />
           </el-form-item>
           <el-form-item label="工单号">
@@ -100,6 +198,7 @@
               v-model="searchForm.workOrderNo" 
               placeholder="请输入工单号" 
               clearable
+              @change="handleSearch"
             />
           </el-form-item>
           <el-form-item label="处理状态">
@@ -107,6 +206,7 @@
               v-model="searchForm.processStatus" 
               placeholder="请选择处理状态" 
               clearable
+              @change="handleSearch"
             >
               <el-option label="待处理" value="pending" />
               <el-option label="处理中" value="processing" />
@@ -123,98 +223,15 @@
               end-placeholder="结束日期"
               format="YYYY-MM-DD"
               value-format="YYYY-MM-DD"
+              @change="handleSearch"
             />
           </el-form-item>
           <el-form-item class="search-btn">
             <el-button type="primary" @click="handleSearch" :icon="Search">搜索</el-button>
-            <el-button @click="handleReset" :icon="Refresh">重置</el-button>
+            <el-button type="danger" plain @click="handleReset" :icon="Refresh">重置</el-button>
           </el-form-item>
         </el-form>
       </el-card>
-    </div>
-
-    <!-- 统计卡片 -->
-    <div class="statistics-section" v-if="showStatistics">
-      <el-row :gutter="20">
-        <el-col :span="4">
-          <el-card class="stat-card pending">
-            <div class="stat-content">
-              <div class="stat-icon">
-                <el-icon><Clock /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ statistics.pendingCount || 0 }}</div>
-                <div class="stat-label">待处理</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :span="4">
-          <el-card class="stat-card processing">
-            <div class="stat-content">
-              <div class="stat-icon">
-                <el-icon><Loading /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ statistics.processingCount || 0 }}</div>
-                <div class="stat-label">处理中</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :span="4">
-          <el-card class="stat-card completed">
-            <div class="stat-content">
-              <div class="stat-icon">
-                <el-icon><CircleCheck /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ statistics.completedCount || 0 }}</div>
-                <div class="stat-label">已完成</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :span="4">
-          <el-card class="stat-card total">
-            <div class="stat-content">
-              <div class="stat-icon">
-                <el-icon><Histogram /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ statistics.totalComplaints || 0 }}</div>
-                <div class="stat-label">总投诉数</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :span="4">
-          <el-card class="stat-card amount clickable" @click="handleAmountFilter('claim')">
-            <div class="stat-content">
-              <div class="stat-icon">
-                <el-icon><Money /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number amount-text">¥{{ formatNumber(statistics.totalClaimAmount) }}</div>
-                <div class="stat-label">质量罚款</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-        <el-col :span="4">
-          <el-card class="stat-card amount clickable" @click="handleAmountFilter('actual')">
-            <div class="stat-content">
-              <div class="stat-icon">
-                <el-icon><Wallet /></el-icon>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number amount-text">¥{{ formatNumber(statistics.totalActualClaim) }}</div>
-                <div class="stat-label">实际金额</div>
-              </div>
-            </div>
-          </el-card>
-        </el-col>
-      </el-row>
     </div>
 
     <!-- 筛选状态提示 -->
@@ -233,15 +250,14 @@
     <div class="table-section">
       <div class="table-header">
         <div class="action-buttons">
-          <el-button type="primary" @click="handleAdd" :icon="Plus">新增投诉</el-button>
-          <el-button type="info" @click="importDialogVisible = true" :icon="Upload">批量导入</el-button>
-          <el-button type="success" @click="handleExport" :icon="Download">导出数据</el-button>
-          <el-button type="warning" @click="handleGenerateComplaintReport" :icon="Document" :disabled="selectedRows.length === 0 || !canGenerateReport">生成投诉书</el-button>
+          <el-button type="success" @click="handleExport" :icon="Download">导出清单</el-button>    
+          <el-button color="#626aef" :dark="isDark" @click="handleGenerateComplaintReport" :icon="Document" :disabled="selectedRows.length === 0 || !canGenerateReport">导出 Excel 报告</el-button>                
           <el-button type="danger" @click="handleBatchDelete" :icon="Delete" :disabled="selectedRows.length === 0">批量删除</el-button>
           <el-button type="danger" plain @click="handlePhysicalDelete" :icon="Delete" v-if="canPhysicalDelete">彻底删除</el-button>
         </div>
-        <div style="margin-left: auto;">
+        <div style="margin-left: auto; display: flex; gap: 10px;">
           <el-button @click="columnSettingsVisible = true" :icon="Setting">列设置</el-button>
+          <el-button type="primary" plain @click="router.push('/admin/supplier/complaints/templates')" :icon="List">模板管理</el-button>
         </div>
       </div>
       <el-table 
@@ -255,7 +271,8 @@
           :cell-style="getCellStyle"
           @selection-change="handleSelectionChange"
         >
-          <el-table-column type="selection" width="55" />
+          <el-table-column type="selection" width="55" align="center" fixed="left" />
+          <el-table-column type="index" label="序号" width="60" align="center" fixed="left" />
           
           <el-table-column v-for="col in visibleColumns" :key="col.prop" v-bind="col">
             <template #default="{ row }">
@@ -266,13 +283,16 @@
                 {{ formatDate(row[col.prop]) }}
               </div>
               <div v-else-if="col.prop === 'ComplaintType'">
-                <el-tag :type="getComplaintTypeColor(row[col.prop])">{{ row[col.prop] }}</el-tag>
+                <el-tag :type="getComplaintTypeColor(row[col.prop])">{{ getComplaintTypeText(row[col.prop]) }}</el-tag>
               </div>
               <div v-else-if="col.prop === 'UrgencyLevel'">
                 <el-tag :type="getUrgencyColor(row[col.prop])">{{ getUrgencyText(row[col.prop]) }}</el-tag>
               </div>
               <div v-else-if="col.prop === 'ProcessStatus'">
                 <el-tag :type="getStatusColor(row[col.prop])">{{ getStatusText(row[col.prop]) }}</el-tag>
+              </div>
+              <div v-else-if="col.prop === 'AuditStatus'">
+                <el-tag :type="getAuditStatusColor(row[col.prop])">{{ getAuditStatusText(row[col.prop]) }}</el-tag>
               </div>
               <div v-else-if="col.prop === 'IQCResult'">
                 <el-tag :type="getIQCResultColor(row[col.prop])">{{ row[col.prop] }}</el-tag>
@@ -297,12 +317,36 @@
             </template>
           </el-table-column>
 
-          <el-table-column label="操作" width="220" fixed="right">
+          <el-table-column label="操作" width="180" fixed="right">
             <template #default="{ row }">
               <div class="action-buttons">
-                <el-button type="primary" size="small" @click="handleView(row)" :icon="View">查看</el-button>
-                <el-button type="warning" size="small" @click="handleEdit(row)" :icon="Edit">编辑</el-button>
-                <el-button type="danger" size="small" @click="handleDelete(row)" :icon="Delete">删除</el-button>
+                <el-button link type="primary" size="small" @click="handleView(row)">查看</el-button>
+                <el-button link type="primary" size="small" @click="handleEdit(row)" :disabled="!canEditComplaint(row)">编辑</el-button>
+                <el-dropdown trigger="click" @command="(cmd) => handleComplaintCommand(cmd, row)">
+                  <el-button link type="primary" size="small">更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="submit" :disabled="!canSubmitComplaint(row)">
+                        <el-icon color="#909399"><Upload /></el-icon> 提交审核
+                      </el-dropdown-item>
+                      <el-dropdown-item command="revoke" :disabled="!canRevokeComplaint(row)">
+                        <el-icon color="#e6a23c"><RefreshLeft /></el-icon> 撤回
+                      </el-dropdown-item>
+                      <el-dropdown-item command="approve" :disabled="!canAuditComplaint(row)">
+                        <el-icon color="#67c23a"><Check /></el-icon> 审核通过
+                      </el-dropdown-item>
+                      <el-dropdown-item command="reject" :disabled="!canAuditComplaint(row)">
+                        <el-icon color="#f56c6c"><Close /></el-icon> 审核驳回
+                      </el-dropdown-item>
+                      <el-dropdown-item command="print" divided :disabled="row.AuditStatus !== 'approved'">
+                        <el-icon color="#409eff"><Printer /></el-icon> 打印
+                      </el-dropdown-item>
+                      <el-dropdown-item command="delete" :disabled="!canDeleteComplaint(row)">
+                        <el-icon color="#f56c6c"><Delete /></el-icon> 删除
+                      </el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </div>
             </template>
           </el-table-column>
@@ -356,12 +400,18 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 style="width: 100%"
+                :teleported="false"
               />
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="投诉类型" prop="ComplaintType">
-              <el-select v-model="formData.ComplaintType" placeholder="请选择投诉类型" style="width: 100%">
+              <el-select 
+                v-model="formData.ComplaintType" 
+                placeholder="请选择投诉类型" 
+                style="width: 100%"
+                :teleported="false"
+              >
                 <el-option label="质量问题" value="quality_issue" />
                 <el-option label="交期延误" value="delivery_delay" />
                 <el-option label="服务问题" value="service_issue" />
@@ -376,7 +426,12 @@
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="紧急程度" prop="UrgencyLevel">
-              <el-select v-model="formData.UrgencyLevel" placeholder="请选择紧急程度" style="width: 100%">
+              <el-select 
+                v-model="formData.UrgencyLevel" 
+                placeholder="请选择紧急程度" 
+                style="width: 100%"
+                :teleported="false"
+              >
                 <el-option label="低" value="low" />
                 <el-option label="中" value="medium" />
                 <el-option label="高" value="high" />
@@ -403,7 +458,12 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="处理状态" prop="ProcessStatus">
-              <el-select v-model="formData.ProcessStatus" placeholder="请选择处理状态" style="width: 100%">
+              <el-select 
+                v-model="formData.ProcessStatus" 
+                placeholder="请选择处理状态" 
+                style="width: 100%"
+                :teleported="false"
+              >
                 <el-option label="待处理" value="pending" />
                 <el-option label="处理中" value="processing" />
                 <el-option label="已完成" value="completed" />
@@ -427,6 +487,7 @@
                 allow-create
                 default-first-option
                 style="width: 100%"
+                :teleported="false"
               >
                 <el-option
                   v-for="supplier in supplierList"
@@ -444,7 +505,12 @@
           </el-col>
           <el-col :span="5">
             <el-form-item label="材料单位">
-              <el-select v-model="formData.MaterialUnit" placeholder="请选择材料单位" style="width: 100%">
+              <el-select 
+                v-model="formData.MaterialUnit" 
+                placeholder="请选择材料单位" 
+                style="width: 100%"
+                :teleported="false"
+              >
                 <el-option label="个" value="个" />
                 <el-option label="件" value="件" />
                 <el-option label="套" value="套" />
@@ -513,7 +579,12 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="产品单位">
-              <el-select v-model="formData.ProductUnit" placeholder="请选择产品单位" style="width: 100%">
+              <el-select 
+                v-model="formData.ProductUnit" 
+                placeholder="请选择产品单位" 
+                style="width: 100%"
+                :teleported="false"
+              >
                 <el-option label="个" value="个" />
                 <el-option label="件" value="件" />
                 <el-option label="套" value="套" />
@@ -558,6 +629,7 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 style="width: 100%"
+                :teleported="false"
               />
             </el-form-item>
           </el-col>
@@ -570,6 +642,7 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 style="width: 100%"
+                :teleported="false"
               />
             </el-form-item>
           </el-col>
@@ -582,6 +655,7 @@
                 format="YYYY-MM-DD"
                 value-format="YYYY-MM-DD"
                 style="width: 100%"
+                :teleported="false"
               />
             </el-form-item>
           </el-col>
@@ -610,7 +684,12 @@
           </el-col>
           <el-col :span="8">
             <el-form-item label="IQC判定">
-              <el-select v-model="formData.IQCResult" placeholder="请选择IQC判定" style="width: 100%">
+              <el-select 
+                v-model="formData.IQCResult" 
+                placeholder="请选择IQC判定" 
+                style="width: 100%"
+                :teleported="false"
+              >
                 <el-option label="合格" value="合格" />
                 <el-option label="不合格" value="不合格" />
                 <el-option label="特采" value="特采" />
@@ -624,17 +703,58 @@
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="检验员">
-              <el-input v-model="formData.Inspector" placeholder="请输入检验员姓名" />
+              <el-select 
+                v-model="formData.Inspector" 
+                placeholder="请选择检验员" 
+                style="width: 100%"
+                filterable
+                :teleported="false"
+              >
+                <el-option 
+                  v-for="person in personList" 
+                  :key="person.value" 
+                  :label="person.label" 
+                  :value="person.value" 
+                />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="QA">
-              <el-input v-model="formData.QA" placeholder="请输入QA负责人" />
+              <el-select 
+                v-model="formData.QA" 
+                placeholder="请选择QA负责人" 
+                style="width: 100%"
+                filterable
+                :teleported="false"
+              >
+                <el-option 
+                  v-for="person in personList" 
+                  :key="person.value" 
+                  :label="person.label" 
+                  :value="person.value" 
+                />
+              </el-select>
             </el-form-item>
           </el-col>
           <el-col :span="8">
             <el-form-item label="反馈单位">
-              <el-input v-model="formData.FeedbackUnit" placeholder="请输入反馈单位" />
+              <el-select 
+                v-model="formData.FeedbackUnit" 
+                placeholder="请选择反馈单位" 
+                style="width: 100%"
+                filterable
+                allow-create
+                default-first-option
+                :teleported="false"
+              >
+                <el-option 
+                  v-for="dept in departmentList" 
+                  :key="dept.ID" 
+                  :label="dept.Name" 
+                  :value="dept.Name" 
+                />
+              </el-select>
             </el-form-item>
           </el-col>
         </el-row>
@@ -646,14 +766,19 @@
         <el-row :gutter="20">
           <el-col :span="8">
             <el-form-item label="不良类别">
-              <el-select v-model="formData.DefectCategory" placeholder="请选择不良类别" style="width: 100%">
-                <el-option label="外观不良" value="外观不良" />
-                <el-option label="尺寸不良" value="尺寸不良" />
-                <el-option label="功能不良" value="功能不良" />
-                <el-option label="性能不良" value="性能不良" />
-                <el-option label="包装不良" value="包装不良" />
-                <el-option label="标识不良" value="标识不良" />
-                <el-option label="其他" value="其他" />
+              <el-select 
+                v-model="formData.DefectCategory" 
+                placeholder="请选择不良类别" 
+                style="width: 100%"
+                filterable
+                :teleported="false"
+              >
+                <el-option 
+                  v-for="item in defectCategoryOptions" 
+                  :key="item" 
+                  :label="item" 
+                  :value="item" 
+                />
               </el-select>
             </el-form-item>
           </el-col>
@@ -691,14 +816,6 @@
                 v-model="formData.WorkOrderNo" 
                 placeholder="请输入使用工单，多个用逗号分隔" 
               />
-            </el-form-item>
-          </el-col>
-        </el-row>
-        
-        <el-row :gutter="20">
-          <el-col :span="24">
-            <el-form-item label="附图">
-              <el-input v-model="formData.AttachedImages" placeholder="请输入附图说明或路径" />
             </el-form-item>
           </el-col>
         </el-row>
@@ -1005,6 +1122,35 @@
               placeholder="供应商的回复内容"
             />
           </el-form-item>
+          
+          <el-row :gutter="20">
+            <el-col :span="12">
+              <el-form-item label="完成日期">
+                <el-date-picker 
+                  v-model="formData.CompletedDate" 
+                  type="date" 
+                  placeholder="选择完成日期"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                  :teleported="false"
+                />
+              </el-form-item>
+            </el-col>
+            <el-col :span="12">
+              <el-form-item label="关闭日期">
+                <el-date-picker 
+                  v-model="formData.ClosedDate" 
+                  type="date" 
+                  placeholder="选择关闭日期"
+                  format="YYYY-MM-DD"
+                  value-format="YYYY-MM-DD"
+                  style="width: 100%"
+                  :teleported="false"
+                />
+              </el-form-item>
+            </el-col>
+          </el-row>
         </div>
         
         <!-- 备注信息 - 移动到最底部 -->
@@ -1038,10 +1184,11 @@
     >
       <div class="complaint-detail" v-if="viewData">
         <el-descriptions :column="3" border>
+          <!-- 基本信息 -->
           <el-descriptions-item label="投诉编号">{{ viewData.ComplaintNo }}</el-descriptions-item>
           <el-descriptions-item label="投诉日期">{{ formatDate(viewData.ComplaintDate) }}</el-descriptions-item>
           <el-descriptions-item label="投诉类型">
-            <el-tag :type="getComplaintTypeColor(viewData.ComplaintType)">{{ viewData.ComplaintType }}</el-tag>
+            <el-tag :type="getComplaintTypeColor(viewData.ComplaintType)">{{ getComplaintTypeText(viewData.ComplaintType) }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="紧急程度">
             <el-tag :type="getUrgencyColor(viewData.UrgencyLevel)">{{ getUrgencyText(viewData.UrgencyLevel) }}</el-tag>
@@ -1050,24 +1197,30 @@
             <el-tag :type="getStatusColor(viewData.ProcessStatus)">{{ getStatusText(viewData.ProcessStatus) }}</el-tag>
           </el-descriptions-item>
           <el-descriptions-item label="发起人">{{ viewData.InitiatedBy || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="创建人">{{ viewData.CreatedByName || viewData.CreatedBy || '-' }}</el-descriptions-item>
           
-          <el-descriptions-item label="供应商名称">{{ viewData.SupplierName }}</el-descriptions-item>
-          <el-descriptions-item label="材料编号">{{ viewData.MaterialCode || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="材料单位">{{ viewData.MaterialUnit || '-' }}</el-descriptions-item>
+          <!-- 供应商与物料 -->
+          <el-descriptions-item label="供应商名称" :span="2">{{ viewData.SupplierName }}</el-descriptions-item>
           <el-descriptions-item label="材料名称" :span="2">{{ viewData.MaterialName }}</el-descriptions-item>
+          <el-descriptions-item label="材料编号">{{ viewData.MaterialCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="材料规格">{{ viewData.MaterialSpecification || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="材料单位">{{ viewData.MaterialUnit || '-' }}</el-descriptions-item>
           
+          <!-- 订单信息 -->
+          <el-descriptions-item label="采购单号">{{ viewData.PurchaseOrderNo || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="使用工单">{{ viewData.WorkOrderNo || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="CPO">{{ viewData.CPO || '-' }}</el-descriptions-item>
           <el-descriptions-item label="客户编号">{{ viewData.CustomerCode || '-' }}</el-descriptions-item>
           <el-descriptions-item label="产品编号">{{ viewData.ProductCode || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="CPO">{{ viewData.CPO || '-' }}</el-descriptions-item>
           <el-descriptions-item label="产品数量">{{ formatNumber(viewData.ProductQuantity) || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="不合格数">{{ formatNumber(viewData.DefectQuantity) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="数量单位">{{ viewData.ProductUnit || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="批量数量">{{ formatNumber(viewData.BatchQuantity) || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="抽检数量">{{ formatNumber(viewData.SampleQuantity) || '-' }}</el-descriptions-item>
+          
+          <!-- 检验信息 -->
           <el-descriptions-item label="来料日期">{{ formatDate(viewData.IncomingDate) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="检验日期">{{ formatDate(viewData.InspectionDate) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="回复日期">{{ formatDate(viewData.ReplyDate) || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="批量数量">{{ formatNumber(viewData.BatchQuantity) || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="抽检数量">{{ formatNumber(viewData.SampleQuantity) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="IQC判定">
             <el-tag v-if="viewData.IQCResult" :type="getIQCResultColor(viewData.IQCResult)">{{ viewData.IQCResult }}</el-tag>
             <span v-else>-</span>
@@ -1076,20 +1229,24 @@
           <el-descriptions-item label="QA">{{ viewData.QA || '-' }}</el-descriptions-item>
           <el-descriptions-item label="反馈单位">{{ viewData.FeedbackUnit || '-' }}</el-descriptions-item>
           
+          <!-- 不良信息 -->
           <el-descriptions-item label="不良类别">{{ viewData.DefectCategory || '-' }}</el-descriptions-item>
           <el-descriptions-item label="不良项">{{ viewData.DefectItem || '-' }}</el-descriptions-item>
           <el-descriptions-item label="投诉书">{{ viewData.ComplaintDocument || '-' }}</el-descriptions-item>
-          
-          <el-descriptions-item label="采购单号">{{ viewData.PurchaseOrderNo || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="使用工单">{{ viewData.WorkOrderNo || '-' }}</el-descriptions-item>
-          <el-descriptions-item label="附图">{{ viewData.AttachedImages || '-' }}</el-descriptions-item>
-          
+          <el-descriptions-item label="不合格数">{{ formatNumber(viewData.DefectQuantity) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="问题数量">{{ formatNumber(viewData.Quantity) }}</el-descriptions-item>
+          
+          <!-- 金额信息 -->
           <el-descriptions-item label="单价">¥{{ formatNumber(viewData.UnitPrice) }}</el-descriptions-item>
           <el-descriptions-item label="总金额">¥{{ formatNumber(viewData.TotalAmount) }}</el-descriptions-item>
           <el-descriptions-item label="索赔金额">{{ formatNumber(viewData.ClaimAmount) || '-' }}</el-descriptions-item>
           <el-descriptions-item label="实际索赔">{{ formatNumber(viewData.ActualClaim) || '-' }}</el-descriptions-item>
+          
+          <!-- 时间线 -->
           <el-descriptions-item label="创建时间">{{ formatDateTime(viewData.CreatedAt) }}</el-descriptions-item>
+          <el-descriptions-item label="更新时间">{{ formatDateTime(viewData.UpdatedAt) }}</el-descriptions-item>
+          <el-descriptions-item label="完成日期">{{ formatDate(viewData.CompletedDate) || '-' }}</el-descriptions-item>
+          <el-descriptions-item label="关闭日期">{{ formatDate(viewData.ClosedDate) || '-' }}</el-descriptions-item>
         </el-descriptions>
         
         <!-- 问题描述区域 - 左右分栏布局 -->
@@ -1137,7 +1294,6 @@
                     <div class="image-error">
                       <el-icon><Picture /></el-icon>
                       <p>图片加载失败</p>
-                      <p class="image-path" :title="viewData.AttachedImages">{{ viewData.AttachedImages }}</p>
                       <el-button 
                         size="small" 
                         type="primary" 
@@ -1152,12 +1308,6 @@
                 
                 <!-- 图片信息显示 -->
                 <div class="image-info">
-                  <div class="image-url-info">
-                    <span class="info-label">图片路径：</span>
-                    <span class="info-value" :title="getAdaptedImageUrl(viewData.AttachedImages)">
-                      {{ getAdaptedImageUrl(viewData.AttachedImages) }}
-                    </span>
-                  </div>
                   <div class="environment-info">
                     <span class="info-label">当前环境：</span>
                     <el-tag :type="isProductionEnvironment() ? 'success' : 'warning'" size="small">
@@ -1326,12 +1476,17 @@
         </el-upload>
       </div>
       <template #footer>
-        <span class="dialog-footer">
-          <el-button @click="importDialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleImport" :loading="importLoading">
-            开始导入
+        <div class="dialog-footer" style="display: flex; justify-content: space-between; align-items: center;">
+          <el-button type="success" link @click="downloadTemplate">
+            <el-icon><Download /></el-icon> 下载模板
           </el-button>
-        </span>
+          <div>
+            <el-button @click="importDialogVisible = false">取消</el-button>
+            <el-button type="primary" @click="handleImport" :loading="importLoading">
+              开始导入
+            </el-button>
+          </div>
+        </div>
       </template>
     </el-dialog>
     <!-- 列设置对话框 -->
@@ -1358,6 +1513,160 @@
         </span>
       </template>
     </el-dialog>
+
+    <!-- 选择模板生成投诉书对话框 -->
+    <el-dialog
+      v-model="generateDialogVisible"
+      title="生成投诉书"
+      width="780px"
+      :close-on-click-modal="false"
+    >
+      <div class="generate-dialog-content">
+        <el-alert 
+          title="已选择投诉记录" 
+          :description="`共 ${selectedRows.length} 条记录将生成投诉书`"
+          type="info" 
+          :closable="false"
+          show-icon
+          style="margin-bottom: 20px;"
+        />
+        
+        <el-row :gutter="24" class="generate-main-row">
+          <!-- 左侧：模板选择 -->
+          <el-col :span="templateHasSealField ? 13 : 24" class="generate-col">
+            <div class="section-title">选择模板</div>
+            <el-select 
+              v-model="selectedTemplateId" 
+              placeholder="请选择投诉书模板" 
+              style="width: 100%;"
+              :loading="templateListLoading"
+              @change="handleTemplateChange"
+            >
+              <el-option
+                v-for="tpl in enabledTemplates"
+                :key="tpl.id"
+                :label="tpl.templateName"
+                :value="tpl.id"
+              >
+                <div class="template-option">
+                  <span>{{ tpl.templateName }}</span>
+                  <el-tag v-if="tpl.isDefault" type="success" size="small" style="margin-left: 8px;">默认</el-tag>
+                  <el-tag v-if="!tpl.mapping || !tpl.mapping.fields || tpl.mapping.fields.length === 0" type="warning" size="small" style="margin-left: 8px;">未配置</el-tag>
+                </div>
+              </el-option>
+            </el-select>
+            
+            <div class="template-info" :class="{ 'template-info-empty': !selectedTemplateInfo }">
+              <template v-if="selectedTemplateInfo">
+                <p><strong>描述：</strong>{{ selectedTemplateInfo.description || '无' }}</p>
+                <p><strong>映射字段：</strong>{{ selectedTemplateInfo.mapping?.fields?.length || 0 }} 个</p>
+                <p><strong>更新时间：</strong>{{ formatTemplateTime(selectedTemplateInfo.updateTime) }}</p>
+              </template>
+              <template v-else>
+                <p class="placeholder-text">请选择模板查看详情</p>
+              </template>
+            </div>
+          </el-col>
+          
+          <!-- 右侧：印章选择（当模板包含印章字段时显示） -->
+          <el-col v-if="templateHasSealField" :span="11" class="generate-col">
+            <div class="section-title">
+              <span class="required-mark">*</span> 电子印章
+            </div>
+            <el-select 
+              v-model="selectedSealId" 
+              placeholder="请选择电子印章" 
+              style="width: 100%;"
+              :loading="sealListLoading"
+            >
+              <el-option
+                v-for="seal in availableSeals"
+                :key="seal.ID"
+                :label="seal.SealName"
+                :value="seal.ID"
+              >
+                <div class="seal-option">
+                  <el-image 
+                    v-if="seal.ImageUrl"
+                    :src="getAdaptedSealUrl(seal.ImageUrl)"
+                    style="width: 24px; height: 24px; margin-right: 8px; vertical-align: middle;"
+                    fit="contain"
+                  />
+                  <span>{{ seal.SealName }}</span>
+                </div>
+              </el-option>
+            </el-select>
+            
+            <!-- 印章尺寸设置 -->
+            <div class="seal-size-setting">
+              <el-radio-group v-model="sealSizeMode" size="small">
+                <el-radio value="original">原始尺寸</el-radio>
+                <el-radio value="custom">自定义</el-radio>
+              </el-radio-group>
+              <div v-if="sealSizeMode === 'custom'" class="seal-size-inputs">
+                <el-input-number 
+                  v-model="sealWidth" 
+                  :min="0.5" 
+                  :max="10" 
+                  :step="0.1" 
+                  :precision="1"
+                  size="small"
+                  controls-position="right"
+                  style="width: 80px;"
+                />
+                <span class="size-separator">×</span>
+                <el-input-number 
+                  v-model="sealHeight" 
+                  :min="0.5" 
+                  :max="10" 
+                  :step="0.1"
+                  :precision="1"
+                  size="small"
+                  controls-position="right"
+                  style="width: 80px;"
+                />
+                <span class="size-unit">cm</span>
+              </div>
+            </div>
+            
+            <div class="seal-preview">
+              <template v-if="selectedSealInfo">
+                <el-image 
+                  :src="getAdaptedSealUrl(selectedSealInfo.ImageUrl)"
+                  class="seal-image"
+                  fit="contain"
+                  :preview-src-list="[getAdaptedSealUrl(selectedSealInfo.ImageUrl)]"
+                  preview-teleported
+                />
+                <p class="seal-name">{{ selectedSealInfo.SealName }}</p>
+              </template>
+              <template v-else>
+                <el-icon :size="36" color="#dcdfe6"><Picture /></el-icon>
+                <p class="seal-name placeholder-text">请选择印章</p>
+              </template>
+            </div>
+          </el-col>
+        </el-row>
+
+        <div class="generate-actions">
+          <el-button type="primary" link @click="openTemplateManager" size="small">
+            <el-icon><Setting /></el-icon> 管理模板
+          </el-button>
+        </div>
+      </div>
+      
+      <template #footer>
+        <el-button @click="generateDialogVisible = false">取消</el-button>
+        <el-button 
+          type="primary" 
+          @click="executeGenerateReport" 
+          :loading="generateLoading"
+          :disabled="!selectedTemplateId || !canGenerate || (templateHasSealField && !selectedSealId)"
+        >
+          导出Excel报告
+        </el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -1368,14 +1677,119 @@ import {
   Search, Refresh, Plus, Download, DataAnalysis,
   View, Edit, Delete, Warning, Clock, Loading,
   CircleCheck, Histogram, Document, Upload, UploadFilled,
-  Setting, ArrowUp, ArrowDown, Picture
+  Setting, ArrowUp, ArrowDown, Picture, Printer, Check, Close, RefreshLeft
 } from '@element-plus/icons-vue'
 import api from '@/services/api'
 import { useUserStore } from '@/store/user'
+import { useRouter } from 'vue-router'
 import ImgPreview from '@/components/ImgPreview.vue'
 
 // 用户store
 const userStore = useUserStore()
+
+// 当前用户ID
+const currentUserId = computed(() => userStore.userInfo?.id || userStore.userId)
+
+// 判断是否为投诉创建人
+const isComplaintCreator = (row) => {
+  if (!row) return false
+  const currentUser = userStore.user
+  if (!currentUser) return false
+  
+  // 比较用户ID
+  if (row.CreatedBy && currentUserId.value && row.CreatedBy === currentUserId.value) {
+    return true
+  }
+  
+  // 比较用户名
+  const createdByUsername = (row.CreatedByUsername || '').toLowerCase()
+  const currentUsername = (currentUser.username || '').toLowerCase()
+  if (createdByUsername && currentUsername && createdByUsername === currentUsername) {
+    return true
+  }
+  
+  return false
+}
+
+// 判断是否为部门主管（可以审核）
+const isComplaintDeptLeader = (row) => {
+  const user = userStore.user
+  if (!user) return false
+  
+  // admin 可以审核
+  if (userStore.isAdmin) return true
+  
+  // 同部门的主管/经理
+  if (user.departmentId && row.CreatorDepartmentID && 
+      Number(user.departmentId) === Number(row.CreatorDepartmentID)) {
+    const posName = (user.positionName || '').toLowerCase()
+    const leaderKeywords = ['主管', '经理', '部长', '总监']
+    if (leaderKeywords.some(k => posName.includes(k))) {
+      return true
+    }
+    if (user.positionLevel === 5) { // 管理岗
+      return true
+    }
+  }
+  
+  return false
+}
+
+// 权限判断方法
+const canEditComplaint = (row) => {
+  if (!row) return false
+  const allowedStatus = ['draft', 'rejected']
+  return allowedStatus.includes(row.AuditStatus) && isComplaintCreator(row)
+}
+
+const canSubmitComplaint = (row) => {
+  if (!row) return false
+  const allowedStatus = ['draft', 'rejected']
+  return allowedStatus.includes(row.AuditStatus) && isComplaintCreator(row)
+}
+
+const canRevokeComplaint = (row) => {
+  if (!row) return false
+  return row.AuditStatus === 'pending' && isComplaintCreator(row)
+}
+
+const canAuditComplaint = (row) => {
+  if (!row) return false
+  if (row.AuditStatus !== 'pending') return false
+  if (isComplaintCreator(row)) return false // 不能审核自己的
+  return isComplaintDeptLeader(row)
+}
+
+const canDeleteComplaint = (row) => {
+  if (!row) return false
+  if (userStore.isAdmin) return true
+  const allowedStatus = ['draft', 'rejected']
+  return allowedStatus.includes(row.AuditStatus) && isComplaintCreator(row)
+}
+
+// 下拉菜单命令处理
+const handleComplaintCommand = (command, row) => {
+  switch (command) {
+    case 'submit':
+      handleSubmitAudit(row)
+      break
+    case 'revoke':
+      handleRevokeAudit(row)
+      break
+    case 'approve':
+      handleApproveAudit(row)
+      break
+    case 'reject':
+      handleRejectAudit(row)
+      break
+    case 'print':
+      handlePrint(row)
+      break
+    case 'delete':
+      handleDelete(row)
+      break
+  }
+}
 
 // 权限检查
 const canGenerateReport = computed(() => {
@@ -1404,7 +1818,168 @@ const showStatistics = ref(true)
 const statistics = ref({})
 const supplierList = ref([])
 const personList = ref([]) // 人员列表
-const defectCategoryOptions = ref([]) // 移除硬编码，完全基于数据库
+const defectCategoryList = ref([]) // 不良类别列表
+
+// 投诉书模板管理相关
+const router = useRouter()
+const generateDialogVisible = ref(false)
+const generateLoading = ref(false)
+const templateListLoading = ref(false)
+const templateList = ref([])
+const selectedTemplateId = ref(null)
+
+// 启用的模板列表
+const enabledTemplates = computed(() => {
+  return templateList.value.filter(t => t.enabled)
+})
+
+// 选中的模板信息
+const selectedTemplateInfo = computed(() => {
+  if (!selectedTemplateId.value) return null
+  return templateList.value.find(t => t.id === selectedTemplateId.value)
+})
+
+// 是否可以生成（模板已配置映射）
+const canGenerate = computed(() => {
+  if (!selectedTemplateInfo.value) return false
+  return selectedTemplateInfo.value.mapping && 
+         selectedTemplateInfo.value.mapping.fields && 
+         selectedTemplateInfo.value.mapping.fields.length > 0
+})
+
+// 电子印章相关
+const sealListLoading = ref(false)
+const availableSeals = ref([])
+const selectedSealId = ref(null)
+const sealSizeMode = ref('custom') // 'original' 或 'custom'
+const sealWidth = ref(3.8) // 默认宽度 cm
+const sealHeight = ref(3.8) // 默认高度 cm
+
+// 模板是否包含印章字段
+const templateHasSealField = computed(() => {
+  if (!selectedTemplateInfo.value?.mapping?.fields) return false
+  return selectedTemplateInfo.value.mapping.fields.some(f => f.fieldName === 'ElectronicSeal')
+})
+
+// 选中的印章信息
+const selectedSealInfo = computed(() => {
+  if (!selectedSealId.value) return null
+  return availableSeals.value.find(s => s.ID === selectedSealId.value)
+})
+
+// 获取适配的印章URL
+const getAdaptedSealUrl = (imagePath) => {
+  if (!imagePath) return ''
+  if (imagePath.startsWith('blob:') || imagePath.startsWith('data:')) return imagePath
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath
+  
+  // 将 /uploads/seals/ 转换为 /files/seals/
+  let adaptedPath = imagePath.replace(/^\/uploads\//, '/files/')
+  
+  // 开发环境使用代理，生产环境使用文件服务器
+  if (import.meta.env.DEV) {
+    return adaptedPath
+  } else {
+    return `http://${window.location.hostname}:8080${adaptedPath}`
+  }
+}
+
+// 加载电子印章列表
+const loadSealList = async () => {
+  sealListLoading.value = true
+  try {
+    const response = await api.get('/electronic-seals')
+    // 兼容两种返回格式：直接数组或 { code: 0, data: [...] }
+    let seals = []
+    if (Array.isArray(response.data)) {
+      seals = response.data
+    } else if (response.data?.code === 0 && Array.isArray(response.data.data)) {
+      seals = response.data.data
+    }
+    
+    // 只显示启用的印章（API已经过滤了IsActive=1，这里再确保一下）
+    availableSeals.value = seals.filter(s => s.IsActive !== false && s.IsActive !== 0)
+    
+    // 默认选中印章
+    if (availableSeals.value.length > 0 && !selectedSealId.value) {
+      // 优先选择数据库中标记为默认的印章
+      const defaultSeal = availableSeals.value.find(s => s.IsDefault)
+      if (defaultSeal) {
+        selectedSealId.value = defaultSeal.ID
+      } else {
+        // 如果没有标记默认，则选择"品质部门章-腾佳"或第一个
+        const fallbackSeal = availableSeals.value.find(s => s.SealName === '品质部门章-腾佳')
+        selectedSealId.value = fallbackSeal ? fallbackSeal.ID : availableSeals.value[0].ID
+      }
+    }
+  } catch (err) {
+    console.error('加载印章列表失败:', err)
+    ElMessage.error('加载印章列表失败')
+  } finally {
+    sealListLoading.value = false
+  }
+}
+
+// 模板变化时检查是否需要加载印章
+const handleTemplateChange = (templateId) => {
+  selectedSealId.value = null
+  if (templateId) {
+    const tpl = templateList.value.find(t => t.id === templateId)
+    if (tpl?.mapping?.fields?.some(f => f.fieldName === 'ElectronicSeal')) {
+      loadSealList()
+    }
+  }
+}
+
+// 格式化模板时间
+const formatTemplateTime = (timeStr) => {
+  if (!timeStr) return '-'
+  return new Date(timeStr).toLocaleString('zh-CN')
+}
+
+// 加载模板列表
+const loadTemplateList = async () => {
+  templateListLoading.value = true
+  try {
+    const res = await api.get('/supplier-complaint-templates')
+    if (res.data.code === 0) {
+      templateList.value = res.data.data || []
+      // 自动选择默认模板
+      const defaultTpl = templateList.value.find(t => t.isDefault && t.enabled)
+      if (defaultTpl) {
+        selectedTemplateId.value = defaultTpl.id
+      } else if (enabledTemplates.value.length > 0) {
+        selectedTemplateId.value = enabledTemplates.value[0].id
+      }
+    }
+  } catch (error) {
+    console.error('加载模板列表失败:', error)
+  } finally {
+    templateListLoading.value = false
+  }
+}
+
+// 打开模板管理（跳转到路由页面）
+const openTemplateManager = () => {
+  generateDialogVisible.value = false
+  router.push('/admin/supplier/complaints/templates')
+}
+
+/**
+ * 加载不良类别列表
+ */
+const loadDefectCategories = async () => {
+  try {
+    const response = await api.get('/defective/categories')
+    if (response.data.code === 200) {
+      defectCategoryList.value = response.data.data
+    }
+  } catch (error) {
+    console.error('加载不良类别列表失败:', error)
+    // 如果加载失败，保留默认的空数组，或者可以提供一些默认值
+  }
+}
+const defectCategoryOptions = ref(['外观', '卫生', '规格尺寸', '物理性能', '环保要求', '虫害防控', '其它']) // 硬编码选项
 const allDefectRelations = ref([]) // 存储所有类别与项的关系
 const currentDefectItemOptions = computed(() => {
   if (!searchForm.defectCategory) {
@@ -1454,6 +2029,7 @@ const columns = reactive([
   { prop: 'Quantity', label: '问题数量', width: '100', visible: false, align: 'center', showOverflowTooltip: true },
   { prop: 'TotalAmount', label: '涉及金额', width: '120', visible: false, align: 'center', showOverflowTooltip: true },
   { prop: 'ProcessStatus', label: '处理状态', width: '100', visible: false, showOverflowTooltip: true, align: 'center' },
+  { prop: 'AuditStatus', label: '状态', width: '100', visible: true, showOverflowTooltip: true, align: 'center' },
   { prop: 'InitiatedBy', label: '发起人', width: '100', visible: false, showOverflowTooltip: true, align: 'center' },
   { prop: 'MaterialUnit', label: '材料单位', width: '80', visible: false, showOverflowTooltip: true, align: 'center' },
   { prop: 'InspectionDate', label: '检验日期', width: '120', visible: false, align: 'center', showOverflowTooltip: true },
@@ -1556,6 +2132,8 @@ const formData = reactive({
   FollowUpActions: '',
   PreventiveMeasures: '',
   SupplierResponse: '',
+  CompletedDate: '',
+  ClosedDate: '',
   imageFileList: [] // 添加图片文件列表属性
 })
 
@@ -1584,8 +2162,42 @@ const dialogTitle = computed(() => {
   return isEdit.value ? '编辑投诉' : '新增投诉'
 })
 
+const departmentList = ref([]) // 部门列表
+
+/**
+ * 加载部门列表
+ */
+const loadDepartmentList = async () => {
+  try {
+    const response = await api.get('/departments')
+    if (response.data.success) {
+      departmentList.value = response.data.data
+    }
+  } catch (error) {
+    console.error('加载部门列表失败:', error)
+  }
+}
+
 // 生命周期
 onMounted(async () => {
+  // 初始化日期范围：当年1月1日到当前日期
+  const now = new Date()
+  const startOfYear = new Date(now.getFullYear(), 0, 1)
+  const today = new Date()
+  
+  // 格式化为 YYYY-MM-DD
+  const formatDate = (date) => {
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+  
+  searchForm.dateRange = [
+    formatDate(startOfYear),
+    formatDate(today)
+  ]
+
   // 确保用户信息已加载
   if (!userStore.user?.id) {
     try {
@@ -1599,6 +2211,8 @@ onMounted(async () => {
   loadData()
   loadSuppliers()
   loadPersonList() // 加载人员列表
+  loadDefectCategories() // 加载不良类别列表
+  loadDepartmentList() // 加载部门列表
   loadStatistics()
   loadDistinctValues() // 加载不重复的不良类别和不良项
   
@@ -1779,6 +2393,39 @@ const loadSuppliers = async () => {
  */
 const loadPersonList = async () => {
   try {
+    // 尝试使用 ReworkManagement.vue 中的方式，从 options 接口获取人员列表
+    // 这个接口返回的数据更完整，包含了部门信息，且是 Rework 模块已经验证可用的
+    const optionsResponse = await api.get('/rework/options')
+    
+    if (optionsResponse.data.success && optionsResponse.data.data && optionsResponse.data.data.persons) {
+      const persons = optionsResponse.data.data.persons
+      
+      personList.value = persons
+        .filter(person => {
+          // 获取部门名称，兼容不同字段名
+          const dept = person.Department || person.DepartmentName || person.department || ''
+          // 过滤条件：部门包含"品质"或"质量"
+          return dept && (dept.includes('品质') || dept.includes('质量'))
+        })
+        .map(person => {
+          const name = person.Name || person.name
+          const dept = person.Department || person.DepartmentName || person.department || ''
+          
+          return {
+            value: name,
+            label: dept ? `${name}（${dept}）` : name,
+            name: name,
+            department: dept
+          }
+        })
+      
+      console.log('通过 /rework/options 加载人员列表成功:', personList.value.length)
+      return // 如果成功加载，直接返回
+    }
+    
+    // 如果上面的方法失败，回退到原有的 /person/list 接口
+    console.warn('无法从 /rework/options 获取人员列表，回退到 /person/list')
+    
     const response = await api.get('/person/list', {
       params: {
         page: 1,
@@ -1786,14 +2433,43 @@ const loadPersonList = async () => {
         includeInactive: false // 只获取在职人员
       }
     })
+    
+    // 处理不同的后端返回结构
+    // 结构1: { success: true, data: [...], pagination: {...} }
+    // 结构2: { success: true, data: { list: [...], ... } } (假设情况)
+    let listData = []
+    
     if (response.data.success) {
+      if (Array.isArray(response.data.data)) {
+        listData = response.data.data
+      } else if (response.data.data && Array.isArray(response.data.data.list)) {
+        listData = response.data.data.list
+      }
+      
       // 格式化人员数据为 "姓名（部门）" 格式
-      personList.value = response.data.data.map(person => ({
-        value: person.Name,
-        label: `${person.Name}（${person.DepartmentName}）`,
-        name: person.Name,
-        department: person.DepartmentName
-      }))
+      // 兼容 ReworkManagement.vue 中的数据结构
+      // 同时进行二次过滤，只加载品质部的人员
+      personList.value = listData
+        .filter(person => {
+          // 获取部门名称，兼容不同字段名
+          const dept = person.Department || person.DepartmentName || person.department || ''
+          // 过滤条件：部门包含"品质"或"质量"
+          return dept && (dept.includes('品质') || dept.includes('质量'))
+        })
+        .map(person => {
+          // ReworkManagement 中使用的是 { Name: 'xxx', Department: 'xxx' } 结构
+          // Person.js 中返回的是 { Name: 'xxx', DepartmentName: 'xxx' } 结构
+          // 这里做兼容处理
+          const name = person.Name || person.name
+          const dept = person.Department || person.DepartmentName || person.department || ''
+          
+          return {
+            value: name,
+            label: dept ? `${name}（${dept}）` : name,
+            name: name,
+            department: dept
+          }
+        })
     }
   } catch (error) {
     console.error('加载人员列表失败:', error)
@@ -1815,6 +2491,7 @@ const handleCategoryChange = () => {
       searchForm.defectItem = ''
     }
   }
+  handleSearch()
 }
 
 /**
@@ -1827,13 +2504,13 @@ const loadDistinctValues = async () => {
       // 后端直接返回了 {DefectCategory, DefectItem} 的数组
       allDefectRelations.value = response.data.data
       
-      // 提取所有非空类别
-      const categoriesFromDB = new Set(
+      // 提取所有非空类别 (不再覆盖 defectCategoryOptions，因为已改为硬编码)
+      /* const categoriesFromDB = new Set(
         allDefectRelations.value
           .map(item => item.DefectCategory)
           .filter(c => c && c.trim() !== '')
       )
-      defectCategoryOptions.value = Array.from(categoriesFromDB).sort()
+      defectCategoryOptions.value = Array.from(categoriesFromDB).sort() */
     }
   } catch (error) {
     console.error('加载选项数据失败:', error)
@@ -1845,7 +2522,13 @@ const loadDistinctValues = async () => {
  */
 const loadStatistics = async () => {
   try {
-    const response = await api.get('/supplier-complaints/statistics/overview')
+    const params = {}
+    if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+      params.startDate = searchForm.dateRange[0]
+      params.endDate = searchForm.dateRange[1]
+    }
+    
+    const response = await api.get('/supplier-complaints/statistics/overview', { params })
     if (response.data.success) {
       statistics.value = response.data.data
     }
@@ -1860,18 +2543,31 @@ const loadStatistics = async () => {
 const handleSearch = () => {
   pagination.currentPage = 1
   loadData()
+  loadStatistics() // 刷新统计数据
 }
 
 /**
  * 重置搜索
  */
 const handleReset = () => {
+  // 重置日期范围为当年1月1日到当前日期
+  const now = new Date()
+  const startOfYear = new Date(now.getFullYear(), 0, 1)
+  const today = new Date()
+  
+  const formatDate = (date) => {
+    const year = date.getFullYear()
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    return `${year}-${month}-${day}`
+  }
+
   Object.assign(searchForm, {
     complaintNo: '',
     supplierName: '',
     complaintType: '',
     processStatus: '',
-    dateRange: [],
+    dateRange: [formatDate(startOfYear), formatDate(today)],
     materialCode: '',
     purchaseOrderNo: '',
     defectCategory: '',
@@ -1889,6 +2585,12 @@ const handleAdd = async () => {
   try {
     isEdit.value = false
     resetFormData()
+    
+    // 打开对话框时重新加载人员列表，确保数据最新且不为空
+    // 如果之前加载失败，这里会重试
+    if (personList.value.length === 0) {
+      loadPersonList()
+    }
     
     // 预生成投诉编号
     const response = await api.get('/supplier-complaints/generate-complaint-no')
@@ -1912,6 +2614,10 @@ const handleAdd = async () => {
 const handleEdit = (row) => {
   isEdit.value = true
   
+  // 编辑时也检查人员列表是否加载
+  if (personList.value.length === 0) {
+    loadPersonList()
+  }
   // 直接复制所有字段，API返回的字段名与formData字段名一致
   Object.assign(formData, row)
   
@@ -1930,6 +2636,12 @@ const handleEdit = (row) => {
   }
   if (row.ReplyDate) {
     formData.ReplyDate = new Date(row.ReplyDate).toISOString().split('T')[0]
+  }
+  if (row.CompletedDate) {
+    formData.CompletedDate = new Date(row.CompletedDate).toISOString().split('T')[0]
+  }
+  if (row.ClosedDate) {
+    formData.ClosedDate = new Date(row.ClosedDate).toISOString().split('T')[0]
   }
   
   // 处理图片回显 - 支持开发和生产环境
@@ -1964,11 +2676,37 @@ const handleEdit = (row) => {
 }
 
 /**
+ * 打印预览
+ */
+const handlePrint = (row) => {
+  if (!row || !row.ID) {
+    ElMessage.warning('无效的记录ID')
+    return
+  }
+  const routeUrl = router.resolve({
+    path: `/print/supplier-complaint/${row.ID}`
+  })
+  window.open(routeUrl.href, '_blank')
+}
+
+/**
  * 查看详情
  */
-const handleView = (row) => {
-  viewData.value = row
-  viewDialogVisible.value = true
+const handleView = async (row) => {
+  try {
+    // 先显示当前行数据
+    viewData.value = row
+    viewDialogVisible.value = true
+    
+    // 调用接口获取完整详情（包含关联表字段如CreatedByName）
+    const response = await api.get(`/supplier-complaints/${row.ID}`)
+    if (response.data.success) {
+      viewData.value = response.data.data
+    }
+  } catch (error) {
+    console.error('获取投诉详情失败:', error)
+    // 失败时不影响基本显示，仅打印错误
+  }
 }
 
 /**
@@ -2006,6 +2744,142 @@ const handleDelete = async (row) => {
     if (error !== 'cancel') {
       console.error('删除失败:', error)
       ElMessage.error('删除失败')
+    }
+  }
+}
+
+// =====================================================
+// 审核流程相关函数
+// =====================================================
+
+/**
+ * 提交审核
+ */
+const handleSubmitAudit = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要提交投诉记录 "${row.ComplaintNo}" 进行审核吗？`,
+      '提交审核',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info'
+      }
+    )
+    
+    const response = await api.post(`/supplier-complaints/${row.ID}/submit`)
+    
+    if (response.success) {
+      ElMessage.success(response.message || '已提交审核')
+      loadData()
+    } else {
+      ElMessage.error(response.message || '提交失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('提交审核失败:', error)
+      ElMessage.error('提交审核失败')
+    }
+  }
+}
+
+/**
+ * 撤回审核
+ */
+const handleRevokeAudit = async (row) => {
+  try {
+    await ElMessageBox.confirm(
+      `确定要撤回投诉记录 "${row.ComplaintNo}" 的审核申请吗？`,
+      '撤回审核',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    const response = await api.post(`/supplier-complaints/${row.ID}/revoke`)
+    
+    if (response.success) {
+      ElMessage.success('已撤回')
+      loadData()
+    } else {
+      ElMessage.error(response.message || '撤回失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('撤回失败:', error)
+      ElMessage.error('撤回失败')
+    }
+  }
+}
+
+/**
+ * 审核通过
+ */
+const handleApproveAudit = async (row) => {
+  try {
+    const { value: remark } = await ElMessageBox.prompt(
+      '请输入审核意见（可选）',
+      `审核通过 - ${row.ComplaintNo}`,
+      {
+        confirmButtonText: '确定通过',
+        cancelButtonText: '取消',
+        inputPlaceholder: '请输入审核意见',
+        type: 'success'
+      }
+    )
+    
+    const response = await api.post(`/supplier-complaints/${row.ID}/approve`, { remark })
+    
+    if (response.success) {
+      ElMessage.success('审核通过')
+      loadData()
+    } else {
+      ElMessage.error(response.message || '审核失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('审核失败:', error)
+      ElMessage.error('审核失败')
+    }
+  }
+}
+
+/**
+ * 审核驳回
+ */
+const handleRejectAudit = async (row) => {
+  try {
+    const { value: remark } = await ElMessageBox.prompt(
+      '请输入驳回原因',
+      `审核驳回 - ${row.ComplaintNo}`,
+      {
+        confirmButtonText: '确定驳回',
+        cancelButtonText: '取消',
+        inputPlaceholder: '请输入驳回原因（必填）',
+        inputValidator: (value) => {
+          if (!value || !value.trim()) {
+            return '请输入驳回原因'
+          }
+          return true
+        },
+        type: 'warning'
+      }
+    )
+    
+    const response = await api.post(`/supplier-complaints/${row.ID}/reject`, { remark })
+    
+    if (response.success) {
+      ElMessage.success('已驳回')
+      loadData()
+    } else {
+      ElMessage.error(response.message || '驳回失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('驳回失败:', error)
+      ElMessage.error('驳回失败')
     }
   }
 }
@@ -2217,6 +3091,51 @@ const resetExportFields = () => {
 }
 
 /**
+ * 下载导入模板
+ */
+const downloadTemplate = async () => {
+  try {
+    await ElMessageBox.confirm(
+      '确定要下载供应商投诉导入模板吗？',
+      '提示',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'info',
+      }
+    )
+
+    console.log('开始下载模板...')
+    const response = await api.get('/supplier-complaints/template', {
+      responseType: 'blob'
+    })
+    
+    console.log('模板下载请求成功，开始处理文件...')
+    
+    // 创建Blob对象
+    const blob = new Blob([response.data], { 
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' 
+    })
+    
+    // 创建下载链接
+    const link = document.createElement('a')
+    link.href = window.URL.createObjectURL(blob)
+    link.download = '供应商投诉导入模板.xlsx'
+    link.click()
+    
+    // 释放URL对象
+    window.URL.revokeObjectURL(link.href)
+    console.log('模板下载完成')
+    ElMessage.success('模板下载成功')
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('下载模板失败:', error)
+      ElMessage.error('下载模板失败')
+    }
+  }
+}
+
+/**
  * 批量删除
  */
 const handleBatchDelete = async () => {
@@ -2331,7 +3250,7 @@ const handlePhysicalDelete = async () => {
 }
 
 /**
- * 生成投诉书
+ * 生成投诉书 - 打开选择模板对话框
  */
 const handleGenerateComplaintReport = async () => {
   // 权限检查
@@ -2345,59 +3264,149 @@ const handleGenerateComplaintReport = async () => {
     return
   }
 
+  // 加载模板列表
+  await loadTemplateList()
+  
+  // 检查是否有可用模板
+  if (enabledTemplates.value.length === 0) {
+    ElMessage.warning('暂无可用模板，请先上传并配置模板')
+    templateManagerVisible.value = true
+    return
+  }
+  
+  // 重置印章选择
+  selectedSealId.value = null
+  
+  // 如果默认选中的模板包含印章字段，预先加载印章列表
+  if (selectedTemplateId.value) {
+    const tpl = templateList.value.find(t => t.id === selectedTemplateId.value)
+    if (tpl?.mapping?.fields?.some(f => f.fieldName === 'ElectronicSeal')) {
+      loadSealList()
+    }
+  }
+  
+  // 打开选择模板对话框
+  generateDialogVisible.value = true
+}
+
+/**
+ * 执行生成投诉书
+ */
+const executeGenerateReport = async () => {
+  if (!selectedTemplateId.value) {
+    ElMessage.warning('请选择模板')
+    return
+  }
+  
+  if (!canGenerate.value) {
+    ElMessage.warning('所选模板尚未配置字段映射，请先配置')
+    return
+  }
+  
+  // 检查印章
+  if (templateHasSealField.value && !selectedSealId.value) {
+    ElMessage.warning('所选模板包含电子印章，请选择印章')
+    return
+  }
+  
+  generateLoading.value = true
+  
   try {
-    await ElMessageBox.confirm(
-      `确定要为选中的 ${selectedRows.value.length} 条记录生成投诉书吗？`,
-      '生成投诉书确认',
-      {
-        confirmButtonText: '确定生成',
-        cancelButtonText: '取消',
-        type: 'info'
+    // 准备投诉记录数据
+    const recordsData = selectedRows.value.map(row => ({
+      ...row,
+      // 确保日期格式正确
+      ComplaintDate: row.ComplaintDate,
+      IncomingDate: row.IncomingDate,
+      InspectionDate: row.InspectionDate,
+      ReplyDate: row.ReplyDate,
+      // 显式传递 Inspector 字段
+      Inspector: row.Inspector,
+      // 显式传递图片字段
+      AttachedImages: row.AttachedImages
+    }))
+    
+    // 构建请求数据
+    const requestData = {
+      data: recordsData
+    }
+    
+    // 如果模板包含印章字段，添加印章ID和尺寸设置
+    if (templateHasSealField.value && selectedSealId.value) {
+      requestData.sealId = selectedSealId.value
+      requestData.sealSize = {
+        mode: sealSizeMode.value,
+        width: sealWidth.value,  // cm
+        height: sealHeight.value // cm
       }
-    )
-
-    const loadingInstance = ElLoading.service({
-      lock: true,
-      text: '正在生成投诉书，请稍候...',
-      background: 'rgba(0, 0, 0, 0.7)'
+    }
+    
+    const response = await api.post(`/supplier-complaint-templates/${selectedTemplateId.value}/generate`, requestData, {
+      responseType: 'blob'
     })
-
-    try {
-      const ids = selectedRows.value.map(row => row.ID)
-      const response = await api.post('/supplier-complaints/generate-report', {
-        ids: ids
-      }, {
-        responseType: 'blob'
-      })
-
-      // 创建下载链接
-      const blob = new Blob([response.data], {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      })
-      const url = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = url
-      
-      // 生成文件名
-      const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
-      link.download = `供应商投诉书_${timestamp}.xlsx`
-      
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(url)
-
-      ElMessage.success('投诉书生成成功')
-    } catch (error) {
-      console.error('生成投诉书失败:', error)
-      ElMessage.error('生成投诉书失败，请重试')
-    } finally {
-      loadingInstance.close()
+    
+    // 创建下载链接
+    const blob = new Blob([response.data], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    
+    // 生成文件名
+    const timestamp = new Date().toISOString().slice(0, 19).replace(/[:-]/g, '')
+    let fileName = `供应商投诉书_${timestamp}.xlsx`
+    
+    // 尝试从响应头获取文件名
+    const contentDisposition = response.headers['content-disposition']
+    if (contentDisposition) {
+      // 解析 filename*=UTF-8''EncodedName 格式
+      const utf8Match = contentDisposition.match(/filename\*=UTF-8''(.+)/i)
+      if (utf8Match) {
+        fileName = decodeURIComponent(utf8Match[1])
+      } else {
+        // 解析 filename="Name" 格式
+        const quoteMatch = contentDisposition.match(/filename="(.+)"/i)
+        if (quoteMatch) {
+          fileName = quoteMatch[1]
+        } else {
+          // 解析 filename=Name 格式
+          const normalMatch = contentDisposition.match(/filename=(.+)/i)
+          if (normalMatch) {
+            fileName = normalMatch[1]
+          }
+        }
+      }
     }
+    
+    link.download = fileName
+    
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success('投诉书生成成功')
+    generateDialogVisible.value = false
   } catch (error) {
-    if (error !== 'cancel') {
-      console.error('生成投诉书失败:', error)
+    console.error('生成投诉书失败:', error)
+    // 检查是否是JSON错误响应
+    if (error.response && error.response.data instanceof Blob) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const errorData = JSON.parse(reader.result)
+          ElMessage.error(errorData.message || '生成投诉书失败')
+        } catch {
+          ElMessage.error('生成投诉书失败，请重试')
+        }
+      }
+      reader.readAsText(error.response.data)
+    } else {
+      ElMessage.error('生成投诉书失败，请重试')
     }
+  } finally {
+    generateLoading.value = false
   }
 }
 
@@ -2525,12 +3534,39 @@ const handleSubmit = async () => {
       ElMessage.success(isEdit.value ? '更新成功' : '创建成功')
       dialogVisible.value = false
       loadData()
+      loadStatistics() // 刷新统计数据
     } else {
       ElMessage.error(response.data.message || '操作失败')
     }
   } catch (error) {
     console.error('提交失败:', error)
-    ElMessage.error('操作失败')
+    // 检查是否是表单验证错误
+    // Element Plus validate 失败时会抛出对象(字段错误信息)
+    if (typeof error === 'object' && Object.keys(error).length > 0 && !error.response && !error.message) {
+      // 提取所有字段的错误信息
+      const errorMessages = []
+      for (const key in error) {
+        if (error[key] && error[key][0] && error[key][0].message) {
+          errorMessages.push(error[key][0].message)
+        }
+      }
+      
+      // 去重并显示前3条错误，避免弹窗太大
+      const uniqueMessages = [...new Set(errorMessages)]
+      const displayMessages = uniqueMessages.slice(0, 3)
+      const moreCount = uniqueMessages.length - 3
+      
+      let msg = `请完善以下信息: ${displayMessages.join(', ')}`
+      if (moreCount > 0) {
+        msg += ` 等${moreCount}项`
+      }
+      
+      ElMessage.warning(msg)
+    } else {
+      // 处理 API 错误或其他错误
+      const errorMsg = error.response?.data?.message || error.message || '操作失败'
+      ElMessage.error(errorMsg)
+    }
   } finally {
     submitLoading.value = false
   }
@@ -2609,7 +3645,9 @@ const resetFormData = () => {
     ReturnAmount: 0,
     FollowUpActions: '',
     PreventiveMeasures: '',
-    SupplierResponse: ''
+    SupplierResponse: '',
+    CompletedDate: '',
+    ClosedDate: ''
   })
 }
 
@@ -2643,6 +3681,9 @@ const formatNumber = (number) => {
  * 获取投诉类型颜色
  */
 const getComplaintTypeColor = (type) => {
+  // 如果是英文代码，先转换为中文，再获取颜色
+  const typeText = getComplaintTypeText(type)
+  
   const colorMap = {
     '质量问题': 'danger',
     '交货延迟': 'warning',
@@ -2651,7 +3692,22 @@ const getComplaintTypeColor = (type) => {
     '服务问题': 'warning',
     '其他': 'info'
   }
-  return colorMap[type] || 'info'
+  return colorMap[typeText] || colorMap[type] || 'info'
+}
+
+/**
+ * 获取投诉类型文本（英文转中文）
+ */
+const getComplaintTypeText = (type) => {
+  const textMap = {
+    'quality_issue': '质量问题',
+    'delivery_delay': '交货延迟',
+    'spec_mismatch': '规格不符',
+    'package_damage': '包装破损',
+    'service_issue': '服务问题',
+    'other': '其他'
+  }
+  return textMap[type] || type
 }
 
 /**
@@ -2702,6 +3758,32 @@ const getStatusText = (status) => {
     'closed': '已关闭'
   }
   return textMap[status] || '未知状态'
+}
+
+/**
+ * 获取审核状态颜色
+ */
+const getAuditStatusColor = (status) => {
+  const colorMap = {
+    'draft': 'info',
+    'pending': 'warning',
+    'approved': 'success',
+    'rejected': 'danger'
+  }
+  return colorMap[status] || 'info'
+}
+
+/**
+ * 获取审核状态文本
+ */
+const getAuditStatusText = (status) => {
+  const textMap = {
+    'draft': '草稿',
+    'pending': '待审核',
+    'approved': '已审核',
+    'rejected': '已驳回'
+  }
+  return textMap[status] || '未知'
 }
 
 /**
@@ -3197,12 +4279,72 @@ const handleImport = async () => {
   margin-top: 0 !important;
 }
 
+/* 统计卡片布局优化 */
+.statistics-section .el-col {
+  margin-bottom: 20px;
+}
+.statistics-section .el-col:last-child {
+  margin-bottom: 0;
+}
+/* 在大屏幕下不需要底部边距，因为是一行显示 */
+@media (min-width: 1200px) {
+  .statistics-section .el-col {
+    margin-bottom: 0;
+  }
+}
+/* 页面标题 */
 .page-header {
-  margin-bottom: 10px;
+  margin-bottom: 20px;
   padding: 20px 8px;
   background: white;
   border-radius: 8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap; /* 允许换行 */
+  gap: 16px; /* 增加间距 */
+}
+
+.header-left {
+  flex: 1;
+  min-width: 280px; /* 最小宽度，防止过度挤压 */
+}
+
+.header-right {
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+  flex-shrink: 0; /* 防止按钮被压缩 */
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .header-content {
+    flex-direction: column; /* 小屏幕垂直排列 */
+    align-items: stretch; /* 宽度拉伸 */
+  }
+
+  .header-right {
+    margin-top: 10px;
+    justify-content: flex-start; /* 按钮左对齐 */
+    width: 100%;
+  }
+  
+  .header-right .el-button {
+    flex: 1; /* 按钮在小屏幕下均分宽度，或者保持原样视情况而定 */
+  }
+
+  .page-title {
+    font-size: 20px; /* 稍微调小标题 */
+  }
+  
+  .page-description {
+    font-size: 13px;
+  }
 }
 
 .page-title {
@@ -3344,20 +4486,23 @@ const handleImport = async () => {
 }
 
 .statistics-section {
-  margin-bottom: 8px;
+  margin-bottom: 20px;
   flex-shrink: 0;
 }
 
+/* 统计卡片通用样式 */
 .stat-card {
   border-radius: 8px;
   transition: all 0.3s ease;
   height: auto;
   min-height: 80px;
+  border: none;
+  color: #fff; /* 文字默认为白色 */
 }
 
 .stat-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
 }
 
 .stat-content {
@@ -3375,6 +4520,8 @@ const handleImport = async () => {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
+  background-color: rgba(255, 255, 255, 0.2); /* 半透明白色背景 */
+  color: #fff;
 }
 
 .stat-info {
@@ -3386,47 +4533,47 @@ const handleImport = async () => {
   font-weight: bold;
   line-height: 1;
   margin-bottom: 4px;
+  color: #fff;
 }
 
 .stat-label {
   font-size: 14px;
-  color: #666;
+  color: rgba(255, 255, 255, 0.9); /* 略微透明的白色 */
 }
 
-.stat-card.pending .stat-icon {
-  background-color: #fdf6ec;
-  color: #e6a23c;
+/* 各状态卡片颜色 */
+/* 未回复 - Warning (橙色) */
+.stat-card.pending {
+  background-color: #e6a23c;
 }
 
-.stat-card.pending .stat-number {
-  color: #e6a23c;
+/* 超期回复 - Danger (红色) */
+.stat-card.processing {
+  background-color: #f56c6c;
 }
 
-.stat-card.processing .stat-icon {
-  background-color: #ecf5ff;
-  color: #409eff;
+/* 及时回复 - Success (绿色) */
+.stat-card.completed {
+  background-color: #67c23a;
 }
 
-.stat-card.processing .stat-number {
-  color: #409eff;
+/* 总投诉数 - Primary (蓝色) */
+.stat-card.total {
+  background-color: #409eff;
 }
 
-.stat-card.completed .stat-icon {
-  background-color: #f0f9ff;
-  color: #67c23a;
+/* 质量罚款 - Info (灰色或青色，此处用青色区分) */
+.stat-card.amount {
+  background-color: #909399; /* 默认灰色 */
 }
 
-.stat-card.completed .stat-number {
-  color: #67c23a;
+/* 特定金额卡片颜色 */
+.stat-card.amount-claim { /* 质量罚款 - 使用 Info 颜色 */
+  background-color: #909399; 
 }
 
-.stat-card.total .stat-icon {
-  background-color: #f4f4f5;
-  color: #909399;
-}
-
-.stat-card.total .stat-number {
-  color: #303133;
+.stat-card.amount-actual { /* 实际金额 - 使用 Purple 颜色 */
+  background-color: #626aef;
 }
 
 /* 表格区域样式 - 参考岗位管理页面的处理方式 */
@@ -3495,7 +4642,7 @@ const handleImport = async () => {
 
 .amount-text {
   font-weight: 600;
-  color: #f56c6c;
+  color: #fff !important; /* 强制使用白色 */
 }
 
 .dialog-footer {
@@ -3507,7 +4654,7 @@ const handleImport = async () => {
 /* 操作列按钮样式 - 禁止换行 */
 .supplier-complaints-container .el-table .action-buttons {
   display: flex;
-  gap: 4px;
+  gap: 2px; /* 减小间距 */
   justify-content: center;
   flex-wrap: nowrap;
   white-space: nowrap;
@@ -3520,7 +4667,7 @@ const handleImport = async () => {
   white-space: nowrap;
   flex-shrink: 0;
   font-size: 12px;
-  padding: 4px 6px;
+  padding: 2px 4px; /* 减小内边距 */
 }
 
 /* 确保操作列单元格不换行 */
@@ -4154,5 +5301,153 @@ const handleImport = async () => {
 .clickable:hover {
   transform: translateY(-5px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+/* 生成投诉书对话框样式 */
+.generate-dialog-content {
+  padding: 0 10px;
+}
+
+.generate-main-row {
+  min-height: 200px;
+}
+
+.generate-col {
+  display: flex;
+  flex-direction: column;
+}
+
+.section-title {
+  font-size: 14px;
+  font-weight: 500;
+  color: #303133;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+}
+
+.section-title .required-mark {
+  color: #f56c6c;
+  margin-right: 4px;
+}
+
+.template-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.template-info {
+  background: #f5f7fa;
+  padding: 14px 16px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #606266;
+  margin-top: 12px;
+  flex: 1;
+  min-height: 90px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.template-info-empty {
+  justify-content: center;
+  align-items: center;
+}
+
+.template-info p {
+  margin: 4px 0;
+}
+
+.placeholder-text {
+  color: #c0c4cc;
+  font-size: 13px;
+}
+
+.generate-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid #ebeef5;
+}
+
+.seal-option {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+.seal-size-setting {
+  margin-top: 12px;
+  padding: 12px;
+  background: #f5f7fa;
+  border-radius: 4px;
+}
+
+.seal-size-setting .el-radio-group {
+  display: flex;
+  gap: 16px;
+}
+
+.seal-size-inputs {
+  display: flex;
+  align-items: center;
+  margin-top: 10px;
+  gap: 8px;
+}
+
+.seal-size-inputs .size-separator {
+  color: #909399;
+  font-size: 14px;
+}
+
+.seal-size-inputs .size-unit {
+  color: #909399;
+  font-size: 13px;
+  margin-left: 4px;
+}
+
+.seal-preview {
+  background: #fafafa;
+  padding: 15px;
+  border-radius: 6px;
+  margin-top: 12px;
+  text-align: center;
+  border: 1px dashed #dcdfe6;
+  height: 120px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+}
+
+.seal-preview .seal-image {
+  width: 80px;
+  height: 80px;
+}
+
+.seal-preview .seal-name {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 8px;
+  margin-bottom: 0;
+}
+
+/* 操作列按钮样式 */
+.action-buttons {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+  height: 100%;
+}
+
+.action-buttons .el-dropdown {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
 }
 </style>

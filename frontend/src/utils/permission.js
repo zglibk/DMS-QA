@@ -36,10 +36,17 @@ export const checkPerformanceAuditPermission = (report) => {
  */
 export const checkPerformanceEditPermission = (report) => {
     const userStore = useUserStore()
-    if (!report) return false
+    if (!report || !userStore.user) return false
     
-    const isCreator = report.CreatedBy === userStore.user.username
-    // Only creator can edit when Draft or Rejected
+    const createdBy = (report.CreatedBy || '').toLowerCase()
+    const currentUsername = (userStore.user.username || '').toLowerCase()
+    const creatorName = (report.CreatorName || '').toLowerCase()
+    const currentRealName = (userStore.user.realName || userStore.user.RealName || '').toLowerCase()
+    
+    const isCreator = (createdBy && currentUsername && createdBy === currentUsername) ||
+                      (creatorName && currentRealName && creatorName === currentRealName)
+    
+    // Only creator can edit when Draft, Saved or Rejected
     // Admin might be able to edit? Usually no, admin audits.
-    return (report.Status === 'Draft' || report.Status === 'Rejected') && isCreator
+    return (report.Status === 'Draft' || report.Status === 'Saved' || report.Status === 'Rejected' || !report.Status) && isCreator
 }

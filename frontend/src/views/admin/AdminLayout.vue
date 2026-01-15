@@ -330,6 +330,10 @@ onUnmounted(() => {
   height: 4rem;
   box-sizing: border-box;
   border-bottom: 1px solid #2c333a;
+  position: sticky;
+  top: 0;
+  background: #232a32;
+  z-index: 101;
 }
 .logo-img {
   width: 2.25rem;
@@ -549,7 +553,7 @@ onUnmounted(() => {
   background: #fafbfc;
   /* 修复高度计算，头部实际高度为4rem（64px） */
   height: calc(100vh - 4rem);
-  padding: 0;
+  padding: 20px;
   overflow-y: auto;
   overflow-x: hidden;
 }
@@ -1202,7 +1206,7 @@ onUnmounted(() => {
   background: #fafbfc;
   /* 修复高度计算，头部实际高度为4rem（64px） */
   height: calc(100vh - 4rem);
-  padding: 1.5rem;
+  padding: 20px;
   overflow-y: auto;
   overflow-x: hidden;
 }

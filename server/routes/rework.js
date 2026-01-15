@@ -330,12 +330,7 @@ router.get('/options', async (req, res) => {
     const defaultOptions = {
       workshops: ['车间一', '车间二', '车间三', '装配车间', '包装车间'],
       departments: ['生产部', '质量部', '技术部', '设备部', '仓储部'],
-      persons: [
-        { Name: '张三', Department: '生产部' },
-        { Name: '李四', Department: '质量部' },
-        { Name: '王五', Department: '技术部' },
-        { Name: '赵六', Department: '设备部' }
-      ],
+      persons: [],
       defectiveCategories: ['外观不良', '尺寸不良', '功能不良', '材料不良', '工艺不良'],
       reworkStatuses: ['进行中', '已完成', '已取消'],
       approvalStatuses: ['待审批', '已审批', '已拒绝'],
@@ -370,13 +365,13 @@ router.get('/options', async (req, res) => {
     }
     
     try {
-      // 尝试获取人员列表（包含所有人员，不限制IsActive状态）
+      // 尝试获取人员列表（只获取在职人员，IsActive=1）
       const personResult = await pool.request().query(`
         SELECT p.Name, ISNULL(d.Name, '未分配') as Department, p.IsActive
         FROM Person p 
         LEFT JOIN Department d ON p.DepartmentID = d.ID 
-        WHERE p.Name IS NOT NULL
-        ORDER BY p.IsActive DESC, p.Name
+        WHERE p.Name IS NOT NULL AND p.IsActive = 1
+        ORDER BY p.Name
       `);
       if (personResult.recordset.length > 0) {
         options.persons = personResult.recordset;

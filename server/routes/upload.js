@@ -236,10 +236,31 @@ const customPathAttachmentStorage = multer.diskStorage({
 // 文件过滤器 - 网站图片
 const fileFilter = (req, file, cb) => {
   // 检查文件类型
-  if (file.mimetype.startsWith('image/')) {
+  // 允许图片、PDF、Office文档和CAD文件
+  const allowedMimeTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/dxf',
+    'image/vnd.dwg',
+    'image/vnd.dxf'
+  ];
+  
+  const allowedExts = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.dwg', '.dxf', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.svg'];
+  const ext = path.extname(file.originalname).toLowerCase();
+
+  if (file.mimetype.startsWith('image/') || allowedMimeTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
     cb(null, true);
   } else {
-    cb(new Error('只允许上传图片文件'), false);
+    // 记录被拒绝的文件信息以便调试
+    console.log('文件类型被拒绝:', {
+      filename: file.originalname,
+      mimetype: file.mimetype,
+      ext: ext
+    });
+    cb(new Error('不支持的文件类型: ' + ext), false);
   }
 };
 
@@ -254,7 +275,7 @@ const upload = multer({
   storage: storage,
   fileFilter: fileFilter,
   limits: {
-    fileSize: 5 * 1024 * 1024, // 5MB限制
+    fileSize: 50 * 1024 * 1024, // 50MB限制 (提高限制以支持大图纸)
   }
 });
 

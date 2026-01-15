@@ -59,13 +59,24 @@ const shouldRefreshToken = (token) => {
  */
 const refreshToken = async () => {
   try {
-    const response = await axios.post('/api/auth/refresh-token', {}, {
+    // 使用 api 实例而不是原生 axios
+    // api 实例已配置 baseURL: '/api'，所以这里只需写 '/auth/refresh-token'
+    const response = await api.post('/auth/refresh-token', {}, {
       headers: {
         Authorization: `Bearer ${localStorage.getItem('token')}`
       }
     })
     
-    if (response.data.success && response.data.token) {
+    // api 实例的响应拦截器可能已经处理了 data 层级，直接返回了 response.data
+    // 所以这里根据拦截器的行为，response 可能已经是数据对象，或者是包含 data 的响应对象
+    // 查看 api 拦截器，它返回的是 response，没有解包 data
+    // 所以这里仍然使用 response.data
+    if (response.data && response.data.success && response.data.data && response.data.data.token) {
+      const newToken = response.data.data.token
+      localStorage.setItem('token', newToken)
+      return newToken
+    } else if (response.data && response.data.success && response.data.token) {
+      // 兼容直接返回 token 的情况
       const newToken = response.data.token
       localStorage.setItem('token', newToken)
       return newToken
@@ -174,6 +185,11 @@ const api = axios.create({
 // 请求拦截器
 api.interceptors.request.use(
   async config => {
+    // 排除刷新token接口本身，防止死循环
+    if (config.url && config.url.includes('/auth/refresh-token')) {
+      return config
+    }
+
     // 从localStorage获取token
     let token = localStorage.getItem('token')
     

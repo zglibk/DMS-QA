@@ -1,543 +1,693 @@
 <template>
-  <div class="performance-wrapper">
-    <!-- Page Header -->
-    <div class="page-header" style="margin-bottom: 20px; display: flex; align-items: center; cursor: pointer;" @click="handleBackToHome">
+  <div class="app-container">
+    <!-- 页面标题 -->
+    <div class="page-header" style="margin-bottom: 20px; display: flex; align-items: center;">
       <el-icon :size="24" color="#409EFF" style="margin-right: 10px;"><Platform /></el-icon>
       <span style="font-size: 20px; font-weight: 600; color: #303133;">性能实验报告</span>
     </div>
 
-    <div class="performance-inspection-container">
-      <div class="left-panel">
-        <div style="padding: 10px; border-bottom: 1px solid #eee;">
-             <el-button link :icon="ArrowLeft" @click="handleBackToHome" class="back-home-btn">
-                 返回首页
-             </el-button>
-        </div>
-        <div style="flex: 1; overflow-y: auto;">
-            <ReportList ref="reportListRef" @select="handleSelect" />
-        </div>
-      </div>
-      <div class="right-panel">
-        <ReportDetail 
-          v-if="selectedId" 
-          :report-id="selectedId" 
-          :key="selectedId + '-' + detailKey"
-          @refresh="handleRefreshList" 
-          @close="handleCloseDetail"
-        />
-        <div v-else class="empty-state" v-loading="loading">
-          <div class="dashboard-container" v-if="!loading" style="width: 100%; padding: 20px;">
-              <!-- Statistics Cards -->
-              <el-row :gutter="20" style="margin-bottom: 20px;">
-                  <el-col :span="6">
-                      <el-card shadow="hover" class="stat-card blue-card">
-                          <template #header>
-                              <div class="card-header">
-                                  <span><el-icon class="card-icon"><Document /></el-icon> 总报告数</span>
-                                  <el-tag type="primary" size="small" effect="plain">Total</el-tag>
-                              </div>
-                          </template>
-                          <div class="stat-value text-blue">{{ dashboardStats.total }}</div>
-                      </el-card>
-                  </el-col>
-                  <el-col :span="6">
-                      <el-card shadow="hover" class="stat-card orange-card">
-                          <template #header>
-                              <div class="card-header">
-                                  <span><el-icon class="card-icon"><Timer /></el-icon> 待审核</span>
-                                  <el-tag type="warning" size="small" effect="plain">Pending</el-tag>
-                              </div>
-                          </template>
-                          <div class="stat-value text-warning">{{ dashboardStats.pending }}</div>
-                      </el-card>
-                  </el-col>
-                   <el-col :span="12">
-                      <el-card shadow="hover" class="stat-card quick-actions-card">
-                           <template #header>
-                              <div class="card-header">
-                                  <span><el-icon class="card-icon"><DataLine /></el-icon> 快捷操作</span>
-                              </div>
-                          </template>
-                          <div class="quick-actions">
-                              <el-button type="primary" :icon="Plus" @click="handleCreateReport" plain>新建报告</el-button>
-                              <el-button type="success" :icon="Check" @click="handleBatchAudit" plain :disabled="!canBatchAudit">报告审核</el-button>
-                              <el-button type="info" :icon="Refresh" @click="handleRefreshList" plain>刷新列表</el-button>
-                              <el-button type="danger" :icon="CircleClose" :disabled="selectedRows.length === 0" @click="handleBatchDelete" plain>批量删除</el-button>
-                          </div>
-                      </el-card>
-                  </el-col>
-              </el-row>
-
-              <!-- Recent Reports Table -->
-              <el-card shadow="hover" class="list-card">
-                  <template #header>
-                      <div class="card-header">
-                          <span><el-icon class="card-icon"><List /></el-icon> 最近更新</span>
-                          <el-button link type="primary" :icon="Refresh" @click="handleRefreshList">刷新</el-button>
-                      </div>
-                  </template>
-                  <el-table 
-                      :data="recentReports" 
-                      style="width: 100%" 
-                      stripe 
-                      border
-                      header-cell-class-name="table-header-center" 
-                      cell-class-name="table-cell-center" 
-                      @selection-change="handleSelectionChange"
-                  >
-                      <el-table-column type="selection" width="55" align="center" />
-                      <el-table-column type="index" label="序号" width="60" align="center" />
-                      <el-table-column prop="ReportNo" label="报告编号" min-width="180" align="center" show-overflow-tooltip />
-                      <el-table-column prop="SampleName" label="样品名称" min-width="200" align="left" header-align="center" show-overflow-tooltip />
-                      <el-table-column prop="CreatorName" label="创建人" width="120" align="center" show-overflow-tooltip>
-                          <template #default="{ row }">
-                              {{ row.CreatorName || row.CreatedBy }}
-                          </template>
-                      </el-table-column>
-                      <el-table-column label="状态" width="100" align="center">
-                          <template #default="{ row }">
-                              <el-tag :type="getStatusType(row.Status)" size="small">{{ getStatusText(row.Status || 'Draft') }}</el-tag>
-                          </template>
-                      </el-table-column>
-                      <el-table-column label="创建时间" width="180" align="center" show-overflow-tooltip>
-                          <template #default="{ row }">
-                              {{ formatDate(row.CreatedAt) }}
-                          </template>
-                      </el-table-column>
-                      <el-table-column label="操作" width="200" fixed="right" align="center">
-                          <template #default="{ row }">
-                              <el-button link type="primary" size="small" :icon="View" @click="handleSelect(row.ID)">查看</el-button>
-                              <el-button link type="primary" size="small" :icon="Edit" @click="handleEdit(row)" :disabled="!checkPerformanceEditPermission(row)">编辑</el-button>
-                              <el-button link type="danger" size="small" :icon="Delete" @click="handleDelete(row)">删除</el-button>
-                          </template>
-                      </el-table-column>
-                  </el-table>
-                  
-                  <div class="pagination-container" style="margin-top: 15px; display: flex; justify-content: flex-end;">
-                      <el-pagination
-                          v-model:current-page="currentPage"
-                          v-model:page-size="pageSize"
-                          :page-sizes="[5, 10, 20, 50]"
-                          layout="total, sizes, prev, pager, next, jumper"
-                          :total="total"
-                          @size-change="handleSizeChange"
-                          @current-change="handleCurrentChange"
-                      />
-                  </div>
-              </el-card>
+    <!-- 统计卡片 + 快捷操作 -->
+    <el-row :gutter="16" style="margin-bottom: 20px;">
+      <el-col :xs="24" :sm="12" :md="8" :lg="6" :xl="6">
+        <el-card shadow="never" class="stat-card blue-card">
+          <div class="stat-content">
+            <div class="stat-icon blue-icon">
+              <el-icon :size="36"><Document /></el-icon>
+            </div>
+            <div class="stat-info">
+              <div class="stat-label">总报告数</div>
+              <div class="stat-value">{{ dashboardStats.total }}</div>
+            </div>
           </div>
-        </div>
-      </div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="12" :md="8" :lg="6" :xl="6">
+        <el-card shadow="never" class="stat-card orange-card">
+          <div class="stat-content">
+            <div class="stat-icon orange-icon">
+              <el-icon :size="36"><Timer /></el-icon>
+            </div>
+            <div class="stat-info">
+              <div class="stat-label">待审核</div>
+              <div class="stat-value">{{ dashboardStats.pending }}</div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+      <el-col :xs="24" :sm="24" :md="8" :lg="12" :xl="12">
+        <el-card shadow="never" class="stat-card action-card">
+          <div class="stat-content action-content">
+            <div class="stat-icon green-icon">
+              <el-icon :size="36"><DataLine /></el-icon>
+            </div>
+            <div class="stat-info" style="flex: 1;">
+              <div class="stat-label">快捷操作</div>
+              <div class="quick-actions">
+                <el-button type="primary" :icon="Plus" @click="handleCreate" size="default">新建报告</el-button>
+                <el-button :icon="Refresh" @click="fetchTableData" size="default">刷新列表</el-button>
+                <el-button type="danger" :icon="Delete" :disabled="selectedRows.length === 0" @click="handleBatchDelete" size="default">批量删除</el-button>
+              </div>
+            </div>
+          </div>
+        </el-card>
+      </el-col>
+    </el-row>
+
+    <!-- 搜索条件 -->
+    <div class="filter-container">
+      <el-input v-model="listQuery.keyword" placeholder="报告编号/样品名称" style="width: 200px;" class="filter-item" clearable @keyup.enter="handleFilter" />
+      <el-select v-model="listQuery.status" placeholder="状态" style="width: 120px;" class="filter-item" clearable>
+        <el-option label="草稿" value="Draft" />
+        <el-option label="待审核" value="Submitted" />
+        <el-option label="已通过" value="Approved" />
+        <el-option label="已审核" value="Audited" />
+        <el-option label="已驳回" value="Rejected" />
+      </el-select>
+      <el-date-picker v-model="listQuery.startDate" type="date" placeholder="开始日期" style="width: 150px;" class="filter-item" value-format="YYYY-MM-DD" />
+      <el-date-picker v-model="listQuery.endDate" type="date" placeholder="结束日期" style="width: 150px;" class="filter-item" value-format="YYYY-MM-DD" />
+      <el-button class="filter-item" type="primary" :icon="Search" @click="handleFilter">搜索</el-button>
+      <el-button class="filter-item" :icon="Refresh" @click="handleReset">重置</el-button>
     </div>
+
+    <!-- 数据列表 -->
+    <el-table 
+      v-loading="loading" 
+      :data="tableData" 
+      border 
+      fit 
+      highlight-current-row 
+      stripe
+      style="width: 100%;"
+      :header-cell-style="{ background: '#f5f7fa', color: '#606266', fontWeight: 'bold' }"
+      @selection-change="handleSelectionChange"
+    >
+      <el-table-column type="selection" width="45" align="center" />
+      <el-table-column label="序号" type="index" width="55" align="center" />
+      <el-table-column label="报告编号" prop="ReportNo" width="170" align="center" show-overflow-tooltip />
+      <el-table-column label="样品名称" prop="SampleName" min-width="180" align="left" header-align="center" show-overflow-tooltip />
+      <el-table-column label="测试日期" prop="TestDate" width="110" align="center">
+        <template #default="{ row }">{{ formatDate(row.TestDate) }}</template>
+      </el-table-column>
+      <el-table-column label="创建人" width="80" align="center">
+        <template #default="{ row }">{{ row.CreatorName || row.CreatedBy }}</template>
+      </el-table-column>
+      <el-table-column label="状态" width="90" align="center">
+        <template #default="{ row }">
+          <el-tag :type="getStatusType(row.Status)" size="small">{{ getStatusText(row.Status || 'Draft') }}</el-tag>
+        </template>
+      </el-table-column>
+      <el-table-column label="创建时间" width="160" align="center">
+        <template #default="{ row }">{{ formatDateTime(row.CreatedAt) }}</template>
+      </el-table-column>
+      <el-table-column label="操作" width="180" align="center" fixed="right">
+        <template #default="{ row }">
+          <div class="action-buttons">
+            <el-button link type="primary" size="small" @click="handleView(row)">查看</el-button>
+            <el-button link type="primary" size="small" @click="handleEdit(row)" :disabled="!canEdit(row)">编辑</el-button>
+            <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, row)">
+              <el-button link type="primary" size="small">更多<el-icon class="el-icon--right"><ArrowDown /></el-icon></el-button>
+              <template #dropdown>
+                <el-dropdown-menu>
+                  <el-dropdown-item command="submit" :disabled="!canSubmit(row)">
+                    <el-icon color="#67c23a"><Promotion /></el-icon> 提交审核
+                  </el-dropdown-item>
+                  <el-dropdown-item command="revoke" :disabled="!canRevoke(row)">
+                    <el-icon color="#e6a23c"><RefreshLeft /></el-icon> 撤回
+                  </el-dropdown-item>
+                  <el-dropdown-item command="audit" :disabled="!canAudit(row)">
+                    <el-icon color="#67c23a"><Check /></el-icon> 审核
+                  </el-dropdown-item>
+                  <el-dropdown-item command="print" divided>
+                    <el-icon color="#909399"><Printer /></el-icon> 打印
+                  </el-dropdown-item>
+                  <el-dropdown-item command="delete" :disabled="row.Status === 'Submitted'">
+                    <el-icon color="#f56c6c"><Delete /></el-icon> 删除
+                  </el-dropdown-item>
+                </el-dropdown-menu>
+              </template>
+            </el-dropdown>
+          </div>
+        </template>
+      </el-table-column>
+    </el-table>
+
+    <!-- 分页 -->
+    <div style="margin-top: 20px; display: flex; justify-content: center;">
+      <el-pagination
+        v-show="total > 0"
+        :total="total"
+        v-model:current-page="listQuery.page"
+        v-model:page-size="listQuery.pageSize"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        @size-change="fetchTableData"
+        @current-change="fetchTableData"
+      />
+    </div>
+
+    <!-- 新建报告对话框 -->
+    <el-dialog v-model="createDialogVisible" title="新建性能实验报告" width="500px">
+      <el-form :model="createForm" label-width="100px">
+        <el-form-item label="报告编号">
+          <el-input v-model="createForm.ReportNo" placeholder="自动生成" disabled />
+        </el-form-item>
+        <el-form-item label="测试日期">
+          <el-date-picker v-model="createForm.TestDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
+        </el-form-item>
+        <el-form-item label="样品名称">
+          <el-input v-model="createForm.SampleName" placeholder="请输入样品名称" />
+        </el-form-item>
+        <el-form-item label="客户编号">
+          <el-input v-model="createForm.CustomerCode" placeholder="请输入客户编号" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="createDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmCreate" :loading="createLoading">确定</el-button>
+      </template>
+    </el-dialog>
+
+    <!-- 审核对话框 -->
+    <el-dialog v-model="auditDialogVisible" title="审核性能实验报告" width="400px">
+      <el-form>
+        <el-form-item label="审核结果">
+          <el-radio-group v-model="auditForm.action">
+            <el-radio label="pass">通过</el-radio>
+            <el-radio label="reject">驳回</el-radio>
+          </el-radio-group>
+        </el-form-item>
+        <el-form-item label="审核意见">
+          <el-input type="textarea" v-model="auditForm.comment" :placeholder="auditForm.action === 'reject' ? '请输入驳回原因（必填）' : '请输入审核意见（选填）'" :rows="3" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="auditDialogVisible = false">取消</el-button>
+        <el-button type="primary" @click="confirmAudit" :loading="auditLoading" :disabled="auditForm.action === 'reject' && !auditForm.comment">确定</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
-import ReportList from './ReportList.vue'
-import ReportDetail from './ReportDetail.vue'
-import { Platform, Document, Edit, Printer, Plus, DataLine, List, Timer, CircleCheck, CircleClose, View, Delete, Refresh, ArrowLeft, Check } from '@element-plus/icons-vue'
-import { getReports, deleteReport, updateReport } from '@/api/performance'
-import { getDashboardSummary } from '@/api/inspectionDashboard'
+import { ref, reactive, onMounted, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import { Platform, Document, Edit, Plus, DataLine, Timer, View, Delete, Refresh, Check, Promotion, Search, List, ArrowDown, RefreshLeft, Printer } from '@element-plus/icons-vue'
+import { getReports, deleteReport, createReport } from '@/api/performance'
+import { submitPerformanceReport, approvePerformanceReport, rejectPerformanceReport, revokePerformanceReport } from '@/api/inspection'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
-import { checkPerformanceAuditPermission, checkPerformanceEditPermission } from '@/utils/permission'
+import dayjs from 'dayjs'
 
+const router = useRouter()
 const userStore = useUserStore()
-const selectedId = ref(null)
-const detailKey = ref(0)
-const reportListRef = ref(null)
+
+// 列表数据
 const loading = ref(false)
-
-// Pagination State
-const currentPage = ref(1)
-const pageSize = ref(5)
+const tableData = ref([])
 const total = ref(0)
-
-// Dashboard Data
-const dashboardStats = ref({
-    total: 0,
-    pending: 0,
-    passed: 0,
-    rejected: 0
-})
-const recentReports = ref([])
-const dashboardLoading = ref(false)
-
-const fetchTableData = async () => {
-    try {
-        const res = await getReports({
-            page: currentPage.value,
-            pageSize: pageSize.value
-        })
-        if (res.data) {
-            recentReports.value = res.data
-            total.value = res.total
-            dashboardStats.value.total = res.total
-        }
-    } catch(e) {
-        console.error(e)
-    }
-}
-
-const fetchDashboardData = async () => {
-    dashboardLoading.value = true
-    try {
-        // Fetch Stats
-        const summaryRes = await getDashboardSummary()
-        if (summaryRes.data) {
-            dashboardStats.value.pending = summaryRes.data.perfPending || 0
-        }
-
-        // Fetch Table Data
-        await fetchTableData()
-    } catch (e) {
-        console.error(e)
-    } finally {
-        dashboardLoading.value = false
-    }
-}
-
-const handleSizeChange = (val) => {
-    pageSize.value = val
-    currentPage.value = 1
-    fetchTableData()
-}
-
-const handleCurrentChange = (val) => {
-    currentPage.value = val
-    fetchTableData()
-}
-
-onMounted(() => {
-    fetchDashboardData()
-})
-
 const selectedRows = ref([])
 
-const handleSelectionChange = (val) => {
-    selectedRows.value = val
-}
-
-const canBatchAudit = computed(() => {
-    // 1. Must select at least one row
-    if (selectedRows.value.length === 0) return false
-    
-    // 2. Check every row using the centralized permission logic
-    return selectedRows.value.every(row => checkPerformanceAuditPermission(row))
+// 查询条件
+const listQuery = reactive({
+  page: 1,
+  pageSize: 10,
+  keyword: '',
+  status: '',
+  startDate: '',
+  endDate: ''
 })
 
-const handleBatchAudit = () => {
-    if (selectedRows.value.length === 0) return
-    ElMessageBox.confirm(
-        `确定要批量审核通过这 ${selectedRows.value.length} 条报告吗？`,
-        '审核确认',
-        {
-            confirmButtonText: '通过',
-            cancelButtonText: '取消',
-            type: 'success',
-        }
-    )
-    .then(async () => {
-        try {
-            for (const row of selectedRows.value) {
-                await updateReport(row.ID, { 
-                    Status: 'Audited',
-                    Auditor: userStore.user.username 
-                })
-            }
-            ElMessage.success('批量审核成功')
-            fetchTableData()
-            handleRefreshList()
-            selectedRows.value = [] // clear selection
-        } catch (e) {
-            console.error(e)
-            ElMessage.error('批量审核过程中发生错误')
-        }
-    })
-    .catch(() => {})
-}
+// 统计数据
+const dashboardStats = ref({
+  total: 0,
+  pending: 0
+})
 
-const handleBatchDelete = () => {
-    if (selectedRows.value.length === 0) return
-    ElMessageBox.confirm(
-        `确定要批量删除这 ${selectedRows.value.length} 条报告吗？此操作不可恢复。`,
-        '警告',
-        {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning',
-        }
-    )
-    .then(async () => {
-        try {
-            // Sequential deletion (or backend could support batch delete API)
-            // For now, loop delete
-            for (const row of selectedRows.value) {
-                await deleteReport(row.ID)
-            }
-            ElMessage.success('批量删除成功')
-            // Refresh table data instead of full dashboard
-            fetchTableData()
-            // Optional: refresh left list if needed
-            handleRefreshList()
-            selectedRows.value = [] // clear selection
-        } catch (e) {
-            console.error(e)
-            ElMessage.error('批量删除过程中发生错误')
-        }
-    })
-    .catch(() => {})
-}
+// 新建对话框
+const createDialogVisible = ref(false)
+const createLoading = ref(false)
+const createForm = reactive({
+  ReportNo: '',
+  TestDate: dayjs().format('YYYY-MM-DD'),
+  SampleName: '',
+  CustomerCode: ''
+})
 
-const handleSelect = (id) => {
-  if (selectedId.value === id) {
-      detailKey.value++ // Force refresh if clicking same ID (e.g. withdraw action)
-  }
-  selectedId.value = id
-  if (id) {
-    loading.value = true
-    // Simulate loading or wait for child to mount
-    // Actually ReportDetail handles its own loading, but we need to show loading while component mounts
-    setTimeout(() => { loading.value = false }, 300)
+// 审核对话框
+const auditDialogVisible = ref(false)
+const auditLoading = ref(false)
+const auditRow = ref(null)
+const auditForm = reactive({
+  action: 'pass',
+  comment: ''
+})
+
+// 获取列表数据
+const fetchTableData = async () => {
+  loading.value = true
+  try {
+    const res = await getReports({
+      page: listQuery.page,
+      pageSize: listQuery.pageSize,
+      keyword: listQuery.keyword,
+      status: listQuery.status,
+      startDate: listQuery.startDate,
+      endDate: listQuery.endDate
+    })
+    tableData.value = res.data || []
+    total.value = res.total || 0
+    
+    // 更新统计
+    dashboardStats.value.total = total.value
+    dashboardStats.value.pending = tableData.value.filter(r => r.Status === 'Submitted').length
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('获取数据失败')
+  } finally {
+    loading.value = false
   }
 }
 
+// 搜索
+const handleFilter = () => {
+  listQuery.page = 1
+  fetchTableData()
+}
+
+// 重置
+const handleReset = () => {
+  listQuery.keyword = ''
+  listQuery.status = ''
+  listQuery.startDate = ''
+  listQuery.endDate = ''
+  listQuery.page = 1
+  fetchTableData()
+}
+
+// 选择变化
+const handleSelectionChange = (rows) => {
+  selectedRows.value = rows
+}
+
+// 判断是否为创建人
+const isCreator = (row) => {
+  if (!row || !userStore.user) return false
+  const createdBy = (row.CreatedBy || '').toLowerCase()
+  const currentUsername = (userStore.user.username || '').toLowerCase()
+  const creatorName = (row.CreatorName || '').toLowerCase()
+  const currentRealName = (userStore.user.realName || userStore.user.RealName || '').toLowerCase()
+  
+  return (createdBy && currentUsername && createdBy === currentUsername) ||
+         (creatorName && currentRealName && creatorName === currentRealName)
+}
+
+// 权限判断方法
+const canEdit = (row) => {
+  if (!row) return false
+  const allowedStatus = ['Draft', 'Saved', 'Rejected', '', null, undefined]
+  return allowedStatus.includes(row.Status) && isCreator(row)
+}
+
+const canSubmit = (row) => {
+  if (!row) return false
+  const allowedStatus = ['Draft', 'Saved', 'Rejected', '', null, undefined]
+  return allowedStatus.includes(row.Status) && isCreator(row)
+}
+
+const canRevoke = (row) => {
+  if (!row) return false
+  return row.Status === 'Submitted' && isCreator(row)
+}
+
+const canAudit = (row) => {
+  if (!row) return false
+  return row.Status === 'Submitted' && !isCreator(row)
+}
+
+// 新建报告
+const handleCreate = () => {
+  createForm.ReportNo = ''
+  createForm.TestDate = dayjs().format('YYYY-MM-DD')
+  createForm.SampleName = ''
+  createForm.CustomerCode = ''
+  createDialogVisible.value = true
+}
+
+const confirmCreate = async () => {
+  if (!createForm.SampleName) {
+    ElMessage.warning('请输入样品名称')
+    return
+  }
+  createLoading.value = true
+  try {
+    const res = await createReport(createForm)
+    ElMessage.success('创建成功')
+    createDialogVisible.value = false
+    // 创建成功后直接跳转到编辑页面
+    if (res.id) {
+      router.push({ name: 'PerformanceReportEdit', params: { id: res.id } })
+    } else {
+      fetchTableData()
+    }
+  } catch (e) {
+    console.error(e)
+    ElMessage.error('创建失败')
+  } finally {
+    createLoading.value = false
+  }
+}
+
+// 查看详情
+const handleView = (row) => {
+  router.push({ name: 'PerformanceReportDetail', params: { id: row.ID } })
+}
+
+// 编辑
 const handleEdit = (row) => {
-    handleSelect(row.ID)
+  router.push({ name: 'PerformanceReportEdit', params: { id: row.ID } })
 }
 
+// 提交审核
+const handleSubmit = async (row) => {
+  try {
+    await ElMessageBox.confirm('确定要提交此报告进行审核吗？', '提交审核', { type: 'warning' })
+    const res = await submitPerformanceReport(row.ID)
+    ElMessage.success(res.message || '已提交审核')
+    fetchTableData()
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error(e)
+      ElMessage.error(e.response?.data?.message || '提交失败')
+    }
+  }
+}
+
+// 撤回
+const handleRevoke = async (row) => {
+  try {
+    await ElMessageBox.confirm('确定要撤回此报告的审核申请吗？', '撤回审核', { type: 'warning' })
+    const res = await revokePerformanceReport(row.ID)
+    ElMessage.success(res.message || '已撤回')
+    fetchTableData()
+  } catch (e) {
+    if (e !== 'cancel') {
+      console.error(e)
+      ElMessage.error(e.response?.data?.message || '撤回失败')
+    }
+  }
+}
+
+// 审核
+const handleAudit = (row) => {
+  auditRow.value = row
+  auditForm.action = 'pass'
+  auditForm.comment = ''
+  auditDialogVisible.value = true
+}
+
+const confirmAudit = async () => {
+  if (!auditRow.value) return
+  
+  auditLoading.value = true
+  try {
+    const apiCall = auditForm.action === 'pass'
+      ? approvePerformanceReport(auditRow.value.ID, auditForm.comment)
+      : rejectPerformanceReport(auditRow.value.ID, auditForm.comment)
+    
+    const res = await apiCall
+    ElMessage.success(res.message || '审核完成')
+    auditDialogVisible.value = false
+    fetchTableData()
+  } catch (e) {
+    console.error(e)
+    ElMessage.error(e.response?.data?.message || '审核失败')
+  } finally {
+    auditLoading.value = false
+  }
+}
+
+const handlePrint = (row) => {
+    const routeData = router.resolve({
+        name: 'PerformanceReportPrintPreview',
+        params: { id: row.ID }
+    })
+    window.open(routeData.href, '_blank')
+}
+
+// 删除
 const handleDelete = (row) => {
-    ElMessageBox.confirm(
-        '确定要删除该报告吗？此操作不可恢复。',
-        '警告',
-        {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning',
-        }
-    )
+  ElMessageBox.confirm('确定要删除该报告吗？此操作不可恢复。', '警告', { type: 'warning' })
     .then(async () => {
-        try {
-            await deleteReport(row.ID)
-            ElMessage.success('删除成功')
-            fetchTableData()
-            handleRefreshList()
-        } catch (e) {
-            console.error(e)
-            ElMessage.error('删除失败')
-        }
+      try {
+        await deleteReport(row.ID)
+        ElMessage.success('删除成功')
+        fetchTableData()
+      } catch (e) {
+        console.error(e)
+        ElMessage.error('删除失败')
+      }
     })
     .catch(() => {})
 }
 
-const handleRefreshList = () => {
-    if (reportListRef.value) {
-        reportListRef.value.fetchList()
-    }
+// 下拉菜单命令处理
+const handleCommand = (command, row) => {
+  switch (command) {
+    case 'submit':
+      handleSubmit(row)
+      break
+    case 'revoke':
+      handleRevoke(row)
+      break
+    case 'audit':
+      handleAudit(row)
+      break
+    case 'print':
+      handlePrint(row)
+      break
+    case 'delete':
+      handleDelete(row)
+      break
+  }
 }
 
-const handleCreateReport = () => {
-    reportListRef.value?.handleCreate()
+// 批量删除
+const handleBatchDelete = () => {
+  if (selectedRows.value.length === 0) {
+    ElMessage.warning('请先选择要删除的报告')
+    return
+  }
+  
+  const hasSubmitted = selectedRows.value.some(r => r.Status === 'Submitted')
+  if (hasSubmitted) {
+    ElMessage.warning('待审核状态的报告不能删除')
+    return
+  }
+  
+  ElMessageBox.confirm(`确定要删除选中的 ${selectedRows.value.length} 条报告吗？`, '警告', { type: 'warning' })
+    .then(async () => {
+      try {
+        for (const row of selectedRows.value) {
+          await deleteReport(row.ID)
+        }
+        ElMessage.success('批量删除成功')
+        fetchTableData()
+      } catch (e) {
+        console.error(e)
+        ElMessage.error('批量删除失败')
+      }
+    })
+    .catch(() => {})
 }
 
-const handleCloseDetail = () => {
-    selectedId.value = null
-    reportListRef.value?.selectItem(null)
-}
-
-const handleBackToHome = () => {
-    handleCloseDetail()
-    // Optional: Refresh dashboard data when returning home
-    fetchDashboardData()
-}
-
-/**
- * 格式化日期时间
- * @param {string} date - 日期字符串
- * @returns {string} 格式化后的日期时间
- */
+// 格式化日期
 const formatDate = (date) => {
-    if (!date) return '-'
-    return new Date(date).toLocaleString()
+  if (!date) return '-'
+  return dayjs(date).format('YYYY-MM-DD')
 }
 
-/**
- * 获取状态对应的标签类型
- * @param {string} status - 状态值
- * @returns {string} Element Plus Tag Type
- */
+const formatDateTime = (date) => {
+  if (!date) return '-'
+  return dayjs(date).format('YYYY-MM-DD HH:mm:ss')
+}
+
+// 状态相关
 const getStatusType = (status) => {
-    const map = {
-        'Draft': 'info',
-        'Submitted': 'warning',
-        'Audited': 'success',
-        'Rejected': 'danger'
-    }
-    return map[status] || 'info'
+  const map = {
+    'Draft': 'info',
+    'Saved': 'info',
+    'Submitted': 'warning',
+    'Audited': 'success',
+    'Approved': 'success',
+    'Rejected': 'danger'
+  }
+  return map[status] || 'info'
 }
 
-/**
- * 获取状态对应的显示文本
- * @param {string} status - 状态值
- * @returns {string} 显示文本
- */
 const getStatusText = (status) => {
-    const map = {
-        'Draft': '草稿',
-        'Submitted': '待审核',
-        'Audited': '已审核',
-        'Rejected': '已驳回'
-    }
-    return map[status] || status
+  const map = {
+    'Draft': '草稿',
+    'Saved': '草稿',
+    'Submitted': '待审核',
+    'Audited': '已审核',
+    'Approved': '已审核',
+    'Rejected': '已驳回',
+    'Generated': '待审核'
+  }
+  return map[status] || status || '草稿'
 }
+
+// 初始化
+onMounted(() => {
+  fetchTableData()
+})
 </script>
 
 <style scoped>
-.performance-wrapper {
-    /* 
-       Calculate height: 100vh - Header(80px) - MainPaddingTop(24px) - MainPaddingBottom(24px) - Footer(45px) = 173px
-       Let's use 180px to be safe.
-    */
-    height: calc(100vh - 180px); 
-    display: flex;
-    flex-direction: column;
-    overflow: hidden; /* Prevent body scroll */
-}
-
-.performance-inspection-container {
-  flex: 1; /* Take remaining height */
+.filter-container {
   display: flex;
-  background: transparent;
-  padding: 0;
+  flex-wrap: wrap;
   gap: 10px;
-  box-sizing: border-box;
-  position: relative;
-  overflow: hidden; /* Prevent container scroll */
-  align-items: stretch; /* Stretch children to full height */
-}
-.left-panel {
-  width: 380px;
-  background: white;
+  align-items: center;
+  margin-bottom: 15px;
+  padding: 15px;
+  background: #fff;
   border-radius: 4px;
-  display: flex;
-  flex-direction: column;
-  box-shadow: none;
-  border: 1px solid #e4e7ed;
-  /* position: sticky; Remove sticky */
-  /* top: 20px; */
-  height: 100%; /* Full height */
-}
-.right-panel {
-  flex: 1;
-  background: white;
-  overflow-y: auto; /* Independent scroll */
-  display: flex;
-  flex-direction: column;
-  border-radius: 4px;
-  padding: 0;
-  box-shadow: none;
-  border: 1px solid #e4e7ed;
-  height: 100%; /* Full height */
-}
-.empty-state {
-    display: flex;
-    justify-content: center;
-    align-items: flex-start; 
-    height: 100%;
-    color: #606266;
-    overflow-y: auto; 
+  border: 1px solid #ebeef5;
 }
 
-/* Dashboard Styles */
+.filter-item {
+  margin-right: 0;
+}
+
+/* 统计卡片样式 - 经典纯色填充 */
 .stat-card {
-    border: none;
-    border-radius: 8px;
-    transition: all 0.3s;
-    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1); /* Always show shadow */
-    height: 100%; /* Ensure equal height */
-    display: flex;
-    flex-direction: column;
-}
-.stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 16px 0 rgba(64, 158, 255, 0.2); /* Change shadow color on hover */
-}
-.blue-card :deep(.el-card__header) {
-    background: linear-gradient(to right, #ecf5ff, #ffffff);
-}
-.orange-card :deep(.el-card__header) {
-    background: linear-gradient(to right, #fdf6ec, #ffffff);
-}
-.quick-actions-card:hover {
-     box-shadow: 0 4px 16px 0 rgba(103, 194, 58, 0.2);
+  border-radius: 8px;
+  height: 100%;
+  margin-bottom: 16px;
+  border: none;
 }
 
-.stat-card :deep(.el-card__header) {
-    padding: 12px 20px;
-    border-bottom: 1px solid #ebeef5;
-}
 .stat-card :deep(.el-card__body) {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-}
-.card-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    font-size: 15px;
-    font-weight: 500;
-    color: #606266;
-}
-.card-icon {
-    margin-right: 6px;
-    vertical-align: middle;
-    font-size: 16px;
-}
-.stat-value {
-    font-size: 32px;
-    font-weight: bold;
-    color: #303133;
-    text-align: center;
-    padding: 15px 0;
-}
-.text-blue {
-    color: #409EFF;
-}
-.text-warning {
-    color: #e6a23c;
-}
-.quick-actions {
-    display: flex;
-    gap: 15px;
-    justify-content: flex-start; /* Align left */
-    padding: 15px 10px;
-}
-.list-card {
-    border: none;
-    border-radius: 8px;
-    margin-top: 10px;
-    box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1); /* Always show shadow */
-    transition: all 0.3s;
-}
-.list-card:hover {
-     box-shadow: 0 4px 16px 0 rgba(0, 0, 0, 0.15); /* Slightly darker shadow on hover */
-}
-.list-card :deep(.el-card__header) {
-    padding: 12px 20px;
-    background: #fafafa;
+  padding: 20px;
 }
 
-.back-home-btn {
-    width: 100%;
-    justify-content: flex-start;
-    color: #606266;
-    font-size: 14px;
-    transition: color 0.3s;
+.stat-content {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
-.back-home-btn:hover {
-    color: #409EFF;
+
+.stat-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.blue-icon {
+  background: #409EFF;
+  color: #fff;
+}
+
+.orange-icon {
+  background: #E6A23C;
+  color: #fff;
+}
+
+.green-icon {
+  background: #67C23A;
+  color: #fff;
+}
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #909399;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #303133;
+}
+
+.blue-card {
+  background: linear-gradient(135deg, #ecf5ff 0%, #f5f9ff 100%);
+}
+
+.orange-card {
+  background: linear-gradient(135deg, #fdf6ec 0%, #fef9f3 100%);
+}
+
+.action-card {
+  background: linear-gradient(135deg, #f0f9eb 0%, #f6fbf3 100%);
+}
+
+.action-content {
+  width: 100%;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+/* 响应式调整 */
+@media screen and (max-width: 768px) {
+  .stat-icon {
+    width: 50px;
+    height: 50px;
+  }
+  .stat-value {
+    font-size: 24px;
+  }
+  .quick-actions {
+    flex-direction: column;
+    width: 100%;
+  }
+  .quick-actions .el-button {
+    width: 100%;
+  }
+}
+
+/* 表格样式 */
+:deep(.el-table) {
+  border-radius: 4px;
+}
+
+:deep(.el-table th.el-table__cell) {
+  background-color: #f5f7fa !important;
+  color: #606266;
+  font-weight: bold;
+}
+
+:deep(.el-table .el-table__row--striped td.el-table__cell) {
+  background-color: #fafafa;
+}
+
+/* 操作列按钮样式 */
+.action-buttons {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px;
+  height: 100%;
+}
+
+.action-buttons .el-dropdown {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 4px;
 }
 </style>
