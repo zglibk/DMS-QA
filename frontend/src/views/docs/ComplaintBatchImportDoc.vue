@@ -145,6 +145,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useUserStore } from '@/store/user'
 import apiService from '@/services/apiService.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { getFileServerPrefix, buildFileUrl } from '@/utils/fileServerConfig'
 
 const router = useRouter()
 
@@ -198,18 +199,9 @@ const isDev = computed(() => {
 
 /**
  * 计算文件服务基础地址（用于拼接附件访问路径）
- * - 开发环境：使用空字符串，让 Vite 代理处理 /files 路径
- * - 生产环境：Nginx 在8080端口提供 /files 静态文件服务
+ * 使用统一的文件服务配置
  */
-const fileServerBase = computed(() => {
-  if (isDev.value) {
-    return ''
-  }
-  // 生产环境：Nginx 在8080端口提供 /files 静态文件服务
-  const protocol = window.location.protocol;
-  const hostname = window.location.hostname;
-  return `${protocol}//${hostname}:8080`;
-})
+const fileServerBase = computed(() => getFileServerPrefix())
 
 /**
  * 将内部图片数据转换为 el-upload 期望的格式
@@ -363,24 +355,22 @@ function buildCustomPath(idx) {
  * @param {Object} imageInfo - 图片信息对象，包含 url, relativePath 等字段
  * @returns {string} 完整的图片访问URL
  */
-function buildImageUrl(imageInfo) {
-  // 1. 如果后端返回了完整的 url（以 /files 开头）
-  if (imageInfo.url && imageInfo.url.startsWith('/files')) {
-    return isDev.value ? imageInfo.url : `${fileServerBase.value}${imageInfo.url}`
-  }
-  
-  // 2. 如果后端返回了完整的 http/https URL，直接使用
+function buildImageUrlLocal(imageInfo) {
+  // 1. 如果后端返回了完整的 http/https URL，直接使用
   if (imageInfo.url && (imageInfo.url.startsWith('http://') || imageInfo.url.startsWith('https://'))) {
     return imageInfo.url
+  }
+  
+  // 2. 如果后端返回了 /files 开头的路径
+  if (imageInfo.url && imageInfo.url.startsWith('/files')) {
+    return buildFileUrl(imageInfo.url)
   }
   
   // 3. 根据 relativePath 构建路径
   const rel = (imageInfo.relativePath || imageInfo.url || '').replace(/\\/g, '/')
   // 移除可能的 attachments/ 前缀
   const cleanPath = rel.replace(/^attachments[\\\/]?/, '')
-  const staticUrl = `/files/attachments/${cleanPath}`
-  
-  return isDev.value ? staticUrl : `${fileServerBase.value}${staticUrl}`
+  return buildFileUrl(`/files/attachments/${cleanPath}`)
 }
 
 /**
@@ -399,7 +389,7 @@ async function loadPersistedStepImages() {
           // 转换为 el-upload 标准格式，并兼容 url/relativePath
           const images = list.map(item => ({
             name: item.filename, // el-upload: name
-            url: buildImageUrl(item), // el-upload: url
+            url: buildImageUrlLocal(item), // el-upload: url
             status: 'success', // el-upload: status
             // 保留原始数据，用于预览和删除
             relativePath: item.relativePath,

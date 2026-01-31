@@ -34,7 +34,7 @@
     <!-- 统计概览 -->
     <div class="statistics-overview">
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="stat-card total">
             <div class="stat-icon">
               <el-icon><Files /></el-icon>
@@ -48,7 +48,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="stat-card completion">
             <div class="stat-icon">
               <el-icon><CircleCheck /></el-icon>
@@ -62,7 +62,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="stat-card efficiency">
             <div class="stat-icon">
               <el-icon><TrendCharts /></el-icon>
@@ -76,7 +76,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="stat-card overdue">
             <div class="stat-icon">
               <el-icon><Warning /></el-icon>
@@ -951,6 +951,10 @@ onMounted(async () => {
 
 /* 统计概览样式 */
 .statistics-overview {
+  margin-bottom: 20px;
+}
+
+.statistics-overview .el-col {
   margin-bottom: 20px;
 }
 

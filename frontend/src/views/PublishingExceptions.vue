@@ -718,6 +718,7 @@ import ImagePreview from '@/components/ImagePreview.vue'
 import apiService from '@/services/apiService'
 import { useUserStore } from '@/store/user'
 import * as echarts from 'echarts'
+import { buildFileUrl } from '@/utils/fileServerConfig'
 
 // 用户信息
 const userStore = useUserStore()
@@ -2135,19 +2136,8 @@ const beforeUpload = (file) => {
 const getImageUrl = (imagePath, preventCache = false) => {
   if (!imagePath) return ''
   
-  // 根据当前页面的hostname判断环境
-  const hostname = window.location.hostname
-  const protocol = window.location.protocol
-  
-  // 构建图片URL
-  let url
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    // 开发环境：使用Vite代理
-    url = `/files/site-images/publishing-exception/${imagePath}`
-  } else {
-    // 生产环境：使用Nginx文件服务器端口8080
-    url = `${protocol}//${hostname}:8080/files/site-images/publishing-exception/${imagePath}`
-  }
+  // 使用统一的文件服务配置构建URL
+  let url = buildFileUrl(`/files/site-images/publishing-exception/${imagePath}`)
   
   // 只在需要防止缓存时添加时间戳参数
   if (preventCache) {

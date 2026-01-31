@@ -155,7 +155,7 @@
     <!-- 统计卡片 -->
     <div class="stats-section">
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card">
             <div class="stats-content">
               <div class="stats-icon total-records">
@@ -169,7 +169,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card">
             <div class="stats-content">
               <div class="stats-icon improving">
@@ -182,7 +182,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card">
             <div class="stats-content">
               <div class="stats-icon returned">
@@ -195,7 +195,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card">
             <div class="stats-content">
               <div class="stats-icon total">
@@ -1789,6 +1789,10 @@ const getSourceLabel = (sourceType) => {
 }
 
 .stats-section {
+  margin-bottom: 20px;
+}
+
+.stats-section .el-col {
   margin-bottom: 20px;
 }
 

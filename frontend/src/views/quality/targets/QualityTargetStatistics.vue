@@ -11,10 +11,11 @@
           <el-icon margin-right="5px"><ArrowLeft /></el-icon>
           返回
         </el-button>
-        <h2 class="page-title">{{ targetInfo.QualityTarget }} - 统计数据</h2>
+        <h2 class="page-title">{{ targetInfo.ID ? targetInfo.QualityTarget + ' - 统计数据' : '质量目标统计分析' }}</h2>
       </div>
       <div class="header-right">
         <el-button 
+          v-if="targetInfo.ID"
           type="primary" 
           @click="showAddDialog"
           
@@ -28,7 +29,7 @@
     <!-- 统计概览卡片 -->
     <div class="overview-cards">
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="overview-card total-targets" @click="filterByStatus('')">
             <div class="card-icon">
               <el-icon><Aim /></el-icon>
@@ -39,7 +40,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="overview-card achievement-rate" @click="filterByStatus('')">
             <div class="card-icon">
               <el-icon><TrendCharts /></el-icon>
@@ -50,7 +51,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="overview-card achieved-targets" @click="filterByStatus('达成')">
             <div class="card-icon">
               <el-icon><SuccessFilled /></el-icon>
@@ -61,7 +62,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="overview-card pending-targets" @click="filterByStatus('未达成')">
             <div class="card-icon">
               <el-icon><WarningFilled /></el-icon>
@@ -266,22 +267,23 @@
         border
         style="width: 100%"
       >
-        <el-table-column prop="QualityTarget" label="质量目标" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="TargetCategory" label="目标分类" min-width="120" align="center">
+        <el-table-column type="index" label="序号" width="60" align="center" :index="indexMethod" />
+        <el-table-column prop="QualityTarget" label="质量目标" min-width="180" show-overflow-tooltip header-align="center" />
+        <el-table-column prop="TargetCategory" label="目标分类" width="100" align="center">
           <template #default="{ row }">
             <el-tag :type="getCategoryTagType(row.TargetCategory)">{{ row.TargetCategory }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="AssessmentUnit" label="考核单位" min-width="150" align="center" />
-        <el-table-column prop="ResponsiblePerson" label="责任人" min-width="100" align="center" />
-        <el-table-column prop="TargetValue" label="目标值" min-width="100" align="center" />
-        <el-table-column prop="ActualValue" label="实际值" min-width="100" align="center">
+        <el-table-column prop="AssessmentUnit" label="考核单位" min-width="110" align="center" show-overflow-tooltip />
+        <el-table-column prop="ResponsiblePerson" label="责任人" min-width="140" align="center" show-overflow-tooltip />
+        <el-table-column prop="TargetValue" label="目标值" width="90" align="center" show-overflow-tooltip />
+        <el-table-column prop="ActualValue" label="实际值" width="80" align="center" show-overflow-tooltip>
           <template #default="{ row }">
             <span v-if="row.ActualValue !== null">{{ row.ActualValue }}</span>
             <span v-else class="no-data">-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="AchievementRate" label="达成率" min-width="100" align="center">
+        <el-table-column prop="AchievementRate" label="达成率" width="80" align="center">
           <template #default="{ row }">
             <span v-if="row.AchievementRate !== null" :class="getAchievementClass(row.AchievementRate)">
               {{ row.AchievementRate }}%
@@ -289,15 +291,15 @@
             <span v-else class="no-data">-</span>
           </template>
         </el-table-column>
-        <el-table-column prop="AchievementStatus" label="达成状态" min-width="120" align="center">
+        <el-table-column prop="AchievementStatus" label="达成状态" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusType(row.AchievementStatus)" size="small">
               {{ row.AchievementStatus || '无数据' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="StatisticsFrequency" label="统计频率" min-width="100" align="center" />
-        <el-table-column label="操作" min-width="180" align="center" fixed="right">
+        <el-table-column prop="StatisticsFrequency" label="统计频率" width="100" align="center" />
+        <el-table-column label="操作" width="190" align="center" fixed="right">
           <template #default="{ row }">
             <el-button 
               type="info" 
@@ -713,6 +715,16 @@ export default {
     window.removeEventListener('resize', this.handleResize)
   },
   methods: {
+    /**
+     * 自定义序号生成方法
+     * @param {number} index - 当前行的索引（从0开始）
+     * @returns {number} 全局序号
+     */
+    indexMethod(index) {
+      const { page, pageSize } = this.pagination
+      return (page - 1) * pageSize + index + 1
+    },
+
     /**
      * 解析字符串中的数字值
      * @param {string|number} value - 要解析的值，可能包含符号和百分号
@@ -2256,7 +2268,11 @@ export default {
 }
 
 .overview-cards {
-  margin-bottom: 16px;
+  margin-bottom: 0;
+}
+
+.overview-cards .el-col {
+  margin-bottom: 20px;
 }
 
 .overview-card {

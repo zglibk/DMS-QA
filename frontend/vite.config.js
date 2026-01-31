@@ -11,6 +11,14 @@ export default defineConfig({
       '@': resolve(__dirname, 'src'),
     }
   },
+  // Monaco Editor 和 WangEditor 优化配置
+  optimizeDeps: {
+    include: [
+      'monaco-editor',
+      '@wangeditor/editor',
+      '@wangeditor/editor-for-vue'
+    ]
+  },
   server: {
     port: 5173,
     host: '0.0.0.0',
@@ -37,6 +45,17 @@ export default defineConfig({
   },
   build: {
     outDir: 'dist',
-    assetsDir: 'assets'
+    assetsDir: 'assets',
+    // Monaco Editor 需要较大的chunk
+    chunkSizeWarningLimit: 2000,
+    rollupOptions: {
+      output: {
+        // 将Monaco Editor和WangEditor单独打包
+        manualChunks: {
+          'monaco-editor': ['monaco-editor'],
+          'wangeditor': ['@wangeditor/editor', '@wangeditor/editor-for-vue']
+        }
+      }
+    }
   }
 })

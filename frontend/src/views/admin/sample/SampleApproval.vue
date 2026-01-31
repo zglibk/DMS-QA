@@ -56,7 +56,7 @@
 
     <!-- 统计卡片 -->
     <el-row :gutter="16" class="stats-cards">
-      <el-col :span="6">
+      <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
         <div class="stat-card total-card">
           <div class="stat-card-content">
             <div class="stat-icon-wrapper">
@@ -73,7 +73,7 @@
           </div>
         </div>
       </el-col>
-      <el-col :span="6">
+      <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
         <div class="stat-card signed-card">
           <div class="stat-card-content">
             <div class="stat-icon-wrapper">
@@ -90,7 +90,7 @@
           </div>
         </div>
       </el-col>
-      <el-col :span="6">
+      <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
         <div class="stat-card unsigned-card">
           <div class="stat-card-content">
             <div class="stat-icon-wrapper">
@@ -107,7 +107,7 @@
           </div>
         </div>
       </el-col>
-      <el-col :span="6">
+      <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
         <div class="stat-card cancelled-card">
           <div class="stat-card-content">
             <div class="stat-icon-wrapper">
@@ -337,6 +337,7 @@
   v-model="dialogVisible"
   width="44%"
   :before-close="handleDialogClose"
+  :close-on-click-modal="false"
   append-to-body
   :lock-scroll="true"
 >
@@ -2434,6 +2435,10 @@ onMounted(async () => {
 
 .stats-cards {
   margin-bottom: 24px;
+}
+
+.stats-cards .el-col {
+  margin-bottom: 20px;
 }
 
 .stat-card {

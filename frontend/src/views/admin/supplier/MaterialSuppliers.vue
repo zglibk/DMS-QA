@@ -67,27 +67,29 @@
         stripe
         border
         style="width: 100%"
+        :header-cell-style="headerCellStyle"
+        :cell-style="cellStyle"
       >
-        <el-table-column prop="supplierCode" label="供应商编码" width="120" />
-        <el-table-column prop="supplierName" label="供应商名称" width="180" />
-        <el-table-column prop="materialType" label="主要材料类型" width="120">
+        <el-table-column prop="supplierCode" label="供应商编码" min-width="90" align="center" />
+        <el-table-column prop="supplierName" label="供应商名称" min-width="180" align="left" show-overflow-tooltip />
+        <el-table-column prop="materialType" label="材料类型" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getMaterialTypeTagType(row.materialType)">
               {{ getMaterialTypeLabel(row.materialType) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="qualityLevel" label="质量等级" width="100">
+        <el-table-column prop="qualityLevel" label="质量等级" min-width="70" align="center">
           <template #default="{ row }">
             <el-tag :type="getQualityLevelTagType(row.qualityLevel)">
               {{ row.qualityLevel }}级
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="certifications" label="认证资质" width="150" show-overflow-tooltip />
-        <el-table-column prop="monthlyCapacity" label="月产能" width="100" />
-        <el-table-column prop="leadTime" label="交期(天)" width="80" />
-        <el-table-column prop="priceLevel" label="价格水平" width="100">
+        <el-table-column prop="certifications" label="认证资质" min-width="130" align="center" show-overflow-tooltip />
+        <el-table-column prop="monthlyCapacity" label="月产能" min-width="70" align="center" />
+        <el-table-column prop="leadTime" label="交期(天)" min-width="70" align="center" />
+        <el-table-column prop="priceLevel" label="价格水平" min-width="140" align="center">
           <template #default="{ row }">
             <el-rate
               v-model="row.priceLevel"
@@ -98,24 +100,26 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="status" label="状态" min-width="70" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row.status)">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" min-width="180" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)" :disabled="!hasEditPermission">
-              编辑
-            </el-button>
-            <el-button type="info" size="small" @click="handleViewMaterials(row)" :disabled="!hasViewMaterialsPermission">
-              材料清单
-            </el-button>
-            <el-button type="warning" size="small" @click="handleQualityCheck(row)" :disabled="!hasQualityCheckPermission">
-              质检记录
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleEdit(row)" :disabled="!hasEditPermission">
+                编辑
+              </el-button>
+              <el-button type="info" size="small" @click="handleViewMaterials(row)" :disabled="!hasViewMaterialsPermission">
+                材料清单
+              </el-button>
+              <el-button type="warning" size="small" @click="handleQualityCheck(row)" :disabled="!hasQualityCheckPermission">
+                质检记录
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -250,11 +254,31 @@ import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
 
-// 权限控制
-const hasAddPermission = computed(() => userStore.hasActionPermission('supplier:material:add'))
-const hasEditPermission = computed(() => userStore.hasActionPermission('supplier:material:edit'))
-const hasViewMaterialsPermission = computed(() => userStore.hasActionPermission('supplier:material:view_materials'))
-const hasQualityCheckPermission = computed(() => userStore.hasActionPermission('supplier:material:quality_check'))
+// 权限控制 - 使用页面级权限，有查看权限即可使用相关功能
+const hasAddPermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (userStore.hasRole('admin') || userStore.hasRole('系统管理员')) return true
+  return userStore.hasActionPermission('supplier:material:view') || 
+         userStore.hasActionPermission('supplier:material:add')
+})
+const hasEditPermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (userStore.hasRole('admin') || userStore.hasRole('系统管理员')) return true
+  return userStore.hasActionPermission('supplier:material:view') || 
+         userStore.hasActionPermission('supplier:material:edit')
+})
+const hasViewMaterialsPermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (userStore.hasRole('admin') || userStore.hasRole('系统管理员')) return true
+  return userStore.hasActionPermission('supplier:material:view') || 
+         userStore.hasActionPermission('supplier:material:view_materials')
+})
+const hasQualityCheckPermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (userStore.hasRole('admin') || userStore.hasRole('系统管理员')) return true
+  return userStore.hasActionPermission('supplier:material:view') || 
+         userStore.hasActionPermission('supplier:material:quality_check')
+})
 
 /**
  * 响应式数据定义
@@ -264,6 +288,30 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const isEdit = ref(false)
 const formRef = ref()
+
+/**
+ * 表格单元格样式
+ */
+/**
+ * 表格表头单元格样式 - 禁止换行
+ */
+const headerCellStyle = () => {
+  return { 
+    textAlign: 'center',
+    whiteSpace: 'nowrap'
+  }
+}
+
+/**
+ * 表格单元格样式
+ */
+const cellStyle = ({ column }) => {
+  // 供应商名称列左对齐，其他列居中
+  if (column.property === 'supplierName') {
+    return { textAlign: 'left' }
+  }
+  return { textAlign: 'center', verticalAlign: 'middle' }
+}
 
 // 搜索表单
 const searchForm = reactive({
@@ -574,6 +622,18 @@ onMounted(() => {
 .pagination-section {
   margin-top: 20px;
   text-align: right;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  padding: 5px 10px;
 }
 
 .dialog-footer {

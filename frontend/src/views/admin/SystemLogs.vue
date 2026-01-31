@@ -101,7 +101,7 @@
     <!-- 统计信息 -->
     <div class="stats-section">
       <el-row :gutter="30">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card stats-card-primary">
             <div class="stats-item">
               <div class="stats-icon">
@@ -114,7 +114,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card stats-card-danger">
             <div class="stats-item">
               <div class="stats-icon">
@@ -127,7 +127,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card stats-card-warning">
             <div class="stats-item">
               <div class="stats-icon">
@@ -140,7 +140,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card stats-card-success">
             <div class="stats-item">
               <div class="stats-icon">
@@ -1359,6 +1359,10 @@ export default {
   margin-bottom: 20px;
 }
 
+.stats-section .el-col {
+  margin-bottom: 20px;
+}
+
 .stats-card {
   position: relative;
   overflow: hidden;
@@ -1763,13 +1767,29 @@ export default {
   }
   
   .stats-card {
-    height: 72px;
+    height: auto;
+    min-height: 80px;
   }
   
   .stats-item {
     padding: 10px 12px;
-    gap: 10px;
-    min-height: 52px;
+    gap: 8px;
+    min-height: 60px;
+  }
+
+  .stats-icon {
+    width: 42px;
+    height: 42px;
+    font-size: 20px;
+  }
+
+  .stats-value {
+    font-size: 22px;
+    margin-bottom: 2px;
+  }
+
+  .stats-label {
+    font-size: 12px;
   }
 }
 
@@ -1779,13 +1799,29 @@ export default {
   }
   
   .stats-card {
-    height: 68px;
+    height: auto;
+    min-height: 70px;
   }
   
   .stats-item {
     padding: 8px 10px;
-    gap: 8px;
-    min-height: 48px;
+    gap: 6px;
+    min-height: 50px;
+  }
+
+  .stats-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+  }
+
+  .stats-value {
+    font-size: 18px;
+    margin-bottom: 0;
+  }
+
+  .stats-label {
+    font-size: 11px;
   }
 }
 

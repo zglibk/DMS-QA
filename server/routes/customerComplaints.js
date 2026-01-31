@@ -880,9 +880,9 @@ router.get('/cost-statistics', async (req, res) => {
           periodFormatPublishing = "CAST(YEAR(registration_date) AS VARCHAR) + '-Q' + CAST(DATEPART(QUARTER, registration_date) AS VARCHAR)";
           break;
         case 'year':
-          periodFormat = "YEAR(Date)";
-          periodFormatRework = "YEAR(ReworkDate)";
-          periodFormatPublishing = "YEAR(registration_date)";
+          periodFormat = "CAST(YEAR(Date) AS VARCHAR)";
+          periodFormatRework = "CAST(YEAR(ReworkDate) AS VARCHAR)";
+          periodFormatPublishing = "CAST(YEAR(registration_date) AS VARCHAR)";
           break;
         default:
           periodFormat = "CONVERT(VARCHAR(7), Date, 120)";
@@ -1451,7 +1451,7 @@ router.get('/cost-statistics/export', async (req, res) => {
           periodFormat = "CAST(YEAR(Date) AS VARCHAR) + '-Q' + CAST(DATEPART(QUARTER, Date) AS VARCHAR)";
           break;
         case 'year':
-          periodFormat = "YEAR(Date)";
+          periodFormat = "CAST(YEAR(Date) AS VARCHAR)";
           break;
         default:
           periodFormat = "CONVERT(VARCHAR(7), Date, 120)";

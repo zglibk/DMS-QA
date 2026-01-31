@@ -116,58 +116,70 @@
         stripe
         border
         style="width: 100%"
+        :header-cell-style="headerCellStyle"
+        :cell-style="cellStyle"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="reportCode" label="报告编号" width="120" />
-        <el-table-column prop="supplierName" label="供应商" min-width="120" />
-        <el-table-column prop="auditType" label="审核类型" width="100">
+        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column prop="reportCode" label="报告编号" min-width="100" align="center" />
+        <el-table-column prop="supplierName" label="供应商" min-width="140" align="left" show-overflow-tooltip />
+        <el-table-column prop="auditType" label="审核类型" min-width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="getAuditTypeTagType(row.auditType)">{{ row.auditType }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="auditDate" label="审核日期" width="100" />
-        <el-table-column prop="auditor" label="审核员" width="100" />
-        <el-table-column prop="overallScore" label="总体评分" width="100">
+        <el-table-column prop="auditDate" label="审核日期" min-width="90" align="center" />
+        <el-table-column prop="auditor" label="审核员" min-width="80" align="center" />
+        <el-table-column prop="overallScore" label="总体评分" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getScoreTagType(row.overallScore)">{{ row.overallScore }}分</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="nonConformityCount" label="不符合项" width="100">
+        <el-table-column prop="nonConformityCount" label="不符合项" min-width="80" align="center">
           <template #default="{ row }">
             <el-badge :value="row.nonConformityCount" :type="row.nonConformityCount > 0 ? 'danger' : 'success'">
               <span>{{ row.nonConformityCount }}</span>
             </el-badge>
           </template>
         </el-table-column>
-        <el-table-column prop="correctionStatus" label="整改状态" width="100">
+        <el-table-column prop="correctionStatus" label="整改状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getCorrectionStatusTagType(row.correctionStatus)">{{ getCorrectionStatusText(row.correctionStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="报告状态" width="100">
+        <el-table-column prop="status" label="报告状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row.status)">{{ getStatusText(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="120" />
-        <el-table-column label="操作" width="250" fixed="right">
+        <el-table-column label="操作" min-width="180" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleView(row)">
-              查看
-            </el-button>
-            <el-button type="warning" size="small" @click="handleEdit(row)">
-              编辑
-            </el-button>
-            <el-button type="info" size="small" @click="handleNonConformities(row)">
-              不符合项
-            </el-button>
-            <el-button type="success" size="small" @click="handleCorrections(row)" v-if="row.nonConformityCount > 0">
-              整改跟踪
-            </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">
-              删除
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleView(row)">
+                查看
+              </el-button>
+              <el-button type="info" size="small" @click="handleNonConformities(row)">
+                不符合项
+              </el-button>
+              <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, row)">
+                <el-button type="default" size="small">
+                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="edit">
+                      <el-icon><Edit /></el-icon> 编辑
+                    </el-dropdown-item>
+                    <el-dropdown-item command="corrections" :disabled="!(row.nonConformityCount > 0)">
+                      <el-icon><Finished /></el-icon> 整改跟踪
+                    </el-dropdown-item>
+                    <el-dropdown-item command="delete" divided>
+                      <el-icon color="#f56c6c"><Delete /></el-icon> 删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -431,7 +443,11 @@ import {
   Files,
   Warning,
   Clock,
-  Check
+  Check,
+  ArrowDown,
+  Edit,
+  Delete,
+  Finished
 } from '@element-plus/icons-vue'
 
 // 响应式数据
@@ -443,6 +459,27 @@ const nonConformityDialogVisible = ref(false)
 const correctionDialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref()
+
+/**
+ * 表格表头单元格样式 - 禁止换行
+ */
+const headerCellStyle = () => {
+  return { 
+    textAlign: 'center',
+    whiteSpace: 'nowrap'
+  }
+}
+
+/**
+ * 表格单元格样式
+ */
+const cellStyle = ({ column }) => {
+  // 供应商列左对齐，其他列居中
+  if (column.property === 'supplierName') {
+    return { textAlign: 'left' }
+  }
+  return { textAlign: 'center', verticalAlign: 'middle' }
+}
 
 // 统计数据
 const stats = reactive({
@@ -679,6 +716,26 @@ const handleAdd = () => {
   isEdit.value = false
   resetForm()
   dialogVisible.value = true
+}
+
+/**
+ * 编辑
+ */
+/**
+ * 处理下拉菜单命令
+ */
+const handleCommand = (command, row) => {
+  switch (command) {
+    case 'edit':
+      handleEdit(row)
+      break
+    case 'corrections':
+      handleCorrections(row)
+      break
+    case 'delete':
+      handleDelete(row)
+      break
+  }
 }
 
 /**
@@ -1064,6 +1121,18 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: 20px;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  padding: 5px 10px;
 }
 
 .non-conformity-header {

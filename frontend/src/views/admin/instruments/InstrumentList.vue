@@ -437,7 +437,7 @@
  * 4. 分页显示
  */
 
-import { ref, reactive, computed, onMounted, inject } from 'vue'
+import { ref, reactive, computed, onMounted, inject, nextTick } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { 
@@ -1064,8 +1064,27 @@ function handleSearch() {
  * 新增仪器
  */
 async function handleAdd() {
+  // 首先关闭对话框（如果已打开）
+  dialogVisible.value = false
+  
+  // 等待下一个tick确保对话框完全关闭
+  await nextTick()
+  
   isEdit.value = false
-  resetForm()
+  
+  // 完全重置表单数据
+  Object.keys(instrumentForm).forEach(key => {
+    if (key === 'Status') {
+      instrumentForm[key] = '正常'
+    } else if (key === 'InstrumentID' || key === 'CategoryID' || key === 'ResponsiblePerson' || key === 'PurchasePrice') {
+      instrumentForm[key] = null
+    } else {
+      instrumentForm[key] = ''
+    }
+  })
+  
+  // 重置表单验证状态
+  formRef.value?.resetFields()
   
   // 重置管理编号前缀为null，避免默认触发生成
   managementCodePrefix.value = null

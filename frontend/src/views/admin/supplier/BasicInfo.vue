@@ -194,11 +194,30 @@ import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
 
-// 权限控制
-const hasAddPermission = computed(() => userStore.hasActionPermission('supplier:basic:add'))
-const hasEditPermission = computed(() => userStore.hasActionPermission('supplier:basic:edit'))
-const hasDeletePermission = computed(() => userStore.hasActionPermission('supplier:basic:delete'))
-const hasViewPermission = computed(() => userStore.hasActionPermission('supplier:basic:view'))
+// 权限控制 - 使用页面级权限，有查看权限即可使用相关功能
+const hasAddPermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (userStore.hasRole('admin') || userStore.hasRole('系统管理员')) return true
+  return userStore.hasActionPermission('supplier:basic:view') || 
+         userStore.hasActionPermission('supplier:basic:add')
+})
+const hasEditPermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (userStore.hasRole('admin') || userStore.hasRole('系统管理员')) return true
+  return userStore.hasActionPermission('supplier:basic:view') || 
+         userStore.hasActionPermission('supplier:basic:edit')
+})
+const hasDeletePermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (userStore.hasRole('admin') || userStore.hasRole('系统管理员')) return true
+  return userStore.hasActionPermission('supplier:basic:view') || 
+         userStore.hasActionPermission('supplier:basic:delete')
+})
+const hasViewPermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (userStore.hasRole('admin') || userStore.hasRole('系统管理员')) return true
+  return userStore.hasActionPermission('supplier:basic:view')
+})
 
 /**
  * 响应式数据定义

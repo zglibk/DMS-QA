@@ -515,12 +515,27 @@ const logFormRules = {
   Content: [{ required: true, message: '请输入工作内容', trigger: 'blur' }]
 }
 
-// 权限检查
+// 权限检查 - 使用页面级权限，有查看权限即可使用相关功能
 const hasAdminRole = computed(() => userStore.hasRole('admin') || userStore.hasRole('系统管理员'))
-const hasCreatePermission = computed(() => userStore.hasActionPermission('work-plan:log:create'))
-const hasEditPermission = computed(() => userStore.hasActionPermission('work-plan:log:edit'))
-const hasDeletePermission = computed(() => userStore.hasActionPermission('work-plan:log:delete'))
-const currentUserId = computed(() => userStore.user?.ID)
+const hasCreatePermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (hasAdminRole.value) return true
+  return userStore.hasActionPermission('work-plan:logs:view') || 
+         userStore.hasActionPermission('work-plan:log:create')
+})
+const hasEditPermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (hasAdminRole.value) return true
+  return userStore.hasActionPermission('work-plan:logs:view') || 
+         userStore.hasActionPermission('work-plan:log:edit')
+})
+const hasDeletePermission = computed(() => {
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  if (hasAdminRole.value) return true
+  return userStore.hasActionPermission('work-plan:logs:view') || 
+         userStore.hasActionPermission('work-plan:log:delete')
+})
+const currentUserId = computed(() => userStore.user?.id || userStore.user?.ID)
 
 /**
  * 检查是否可以编辑指定日志

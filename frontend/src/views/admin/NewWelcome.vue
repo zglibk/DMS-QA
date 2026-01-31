@@ -54,10 +54,30 @@
       <div class="dashboard-left">
         <!-- 数据概览卡片 -->
         <div class="overview-section">
-          <h2 class="section-title">
-            <el-icon><DataBoard /></el-icon>
-            年度数据概览
-          </h2>
+          <div class="section-header">
+            <h2 class="section-title">
+              <el-icon><DataBoard /></el-icon>
+              {{ selectedYear }}年度数据概览
+            </h2>
+            <div class="year-selector">
+              <el-button-group>
+                <el-button 
+                  :type="selectedYear === lastYear ? 'primary' : 'default'" 
+                  size="small"
+                  @click="handleYearChange(lastYear)"
+                >
+                  {{ lastYear }}年
+                </el-button>
+                <el-button 
+                  :type="selectedYear === currentYear ? 'primary' : 'default'" 
+                  size="small"
+                  @click="handleYearChange(currentYear)"
+                >
+                  {{ currentYear }}年
+                </el-button>
+              </el-button-group>
+            </div>
+          </div>
           <div class="overview-grid">
             <!-- 加载状态 -->
             <template v-if="overviewLoading">
@@ -674,6 +694,21 @@ const todayStats = ref({
   taskCount: 23,
   alertCount: 5
 })
+
+// 选中的年份
+const currentYear = String(new Date().getFullYear())
+const lastYear = String(new Date().getFullYear() - 1)
+const selectedYear = ref(currentYear)
+
+/**
+ * 切换年份
+ * @param {string} year - 年份字符串
+ */
+const handleYearChange = (year) => {
+  if (selectedYear.value === year) return
+  selectedYear.value = year
+  fetchOverviewData()
+}
 
 // 数据概览加载状态
 const overviewLoading = ref(true)
@@ -1366,12 +1401,22 @@ const fetchOverviewData = async () => {
     overviewLoading.value = true
     
     // 获取质量指标汇总数据
-    const qualityResponse = await api.get('/quality-metrics/summary')
+    const qualityResponse = await api.get('/quality-metrics/summary', {
+      params: { year: selectedYear.value }
+    })
     
     // 获取质量成本统计数据
-    const costResponse = await api.get('/customer-complaints/cost-statistics')
+    const startDate = `${selectedYear.value}-01-01`
+    const endDate = `${selectedYear.value}-12-31`
+    const costResponse = await api.get('/customer-complaints/cost-statistics', {
+      params: { 
+        startDate, 
+        endDate,
+        dimension: 'year' // 按年统计
+      }
+    })
     
-    // 获取客诉数据
+    // 获取客诉数据 (general stats might not need year, but we focus on qualityData)
     const complaintResponse = await api.get('/dashboard/stats')
     
     // 由于 utils/api.js 的响应拦截器返回 response.data，所以直接访问 response.success
@@ -1962,6 +2007,17 @@ defineExpose({
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
 }
 
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.section-header .section-title {
+  margin-bottom: 0;
+}
+
 .section-title {
   display: flex;
   align-items: center;
@@ -1970,6 +2026,11 @@ defineExpose({
   font-size: 18px;
   font-weight: 600;
   color: #303133;
+}
+
+.year-selector {
+  display: flex;
+  align-items: center;
 }
 
 /* 卡片标题样式 */

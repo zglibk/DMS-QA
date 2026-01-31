@@ -3,7 +3,7 @@
     <!-- 顶部统计卡片 -->
     <div class="top-stats">
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="stat-card stat-card-blue">
             <div class="stat-icon">
               <el-icon><TrendCharts /></el-icon>
@@ -14,7 +14,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="stat-card stat-card-red">
             <div class="stat-icon">
               <el-icon><TrendCharts /></el-icon>
@@ -25,7 +25,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="stat-card stat-card-orange">
             <div class="stat-icon">
               <el-icon><TrendCharts /></el-icon>
@@ -36,7 +36,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="stat-card stat-card-green">
             <div class="stat-icon">
               <el-icon><TrendCharts /></el-icon>
@@ -2424,6 +2424,10 @@ onUnmounted(() => {
 
 /* 顶部统计卡片样式 */
 .top-stats {
+  margin-bottom: 0;
+}
+
+.top-stats .el-col {
   margin-bottom: 20px;
 }
 

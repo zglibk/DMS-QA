@@ -1683,27 +1683,37 @@ import api from '@/services/api'
 import { useUserStore } from '@/store/user'
 import { useRouter } from 'vue-router'
 import ImgPreview from '@/components/ImgPreview.vue'
+import { buildFileUrl } from '@/utils/fileServerConfig'
 
 // 用户store
 const userStore = useUserStore()
 
-// 当前用户ID
-const currentUserId = computed(() => userStore.userInfo?.id || userStore.userId)
+// 当前用户ID - 兼容多种字段名
+const currentUserId = computed(() => {
+  const user = userStore.user
+  return user?.id || user?.ID || user?.userId || null
+})
 
 // 判断是否为投诉创建人
 const isComplaintCreator = (row) => {
   if (!row) return false
+  
+  // admin用户可以操作所有投诉
+  if (userStore.isAdmin) return true
+  
   const currentUser = userStore.user
   if (!currentUser) return false
   
-  // 比较用户ID
-  if (row.CreatedBy && currentUserId.value && row.CreatedBy === currentUserId.value) {
+  // 比较用户ID（兼容不同字段名和类型）
+  const rowCreatedBy = Number(row.CreatedBy)
+  const userId = Number(currentUserId.value)
+  if (rowCreatedBy && userId && rowCreatedBy === userId) {
     return true
   }
   
   // 比较用户名
   const createdByUsername = (row.CreatedByUsername || '').toLowerCase()
-  const currentUsername = (currentUser.username || '').toLowerCase()
+  const currentUsername = (currentUser.username || currentUser.Username || '').toLowerCase()
   if (createdByUsername && currentUsername && createdByUsername === currentUsername) {
     return true
   }
@@ -1867,7 +1877,7 @@ const selectedSealInfo = computed(() => {
   return availableSeals.value.find(s => s.ID === selectedSealId.value)
 })
 
-// 获取适配的印章URL
+// 获取适配的印章URL（使用统一的文件服务配置）
 const getAdaptedSealUrl = (imagePath) => {
   if (!imagePath) return ''
   if (imagePath.startsWith('blob:') || imagePath.startsWith('data:')) return imagePath
@@ -1876,12 +1886,7 @@ const getAdaptedSealUrl = (imagePath) => {
   // 将 /uploads/seals/ 转换为 /files/seals/
   let adaptedPath = imagePath.replace(/^\/uploads\//, '/files/')
   
-  // 开发环境使用代理，生产环境使用文件服务器
-  if (import.meta.env.DEV) {
-    return adaptedPath
-  } else {
-    return `http://${window.location.hostname}:8080${adaptedPath}`
-  }
+  return buildFileUrl(adaptedPath)
 }
 
 // 加载电子印章列表
@@ -2756,6 +2761,14 @@ const handleDelete = async (row) => {
  * 提交审核
  */
 const handleSubmitAudit = async (row) => {
+  // 前端状态检查
+  const allowedStatus = ['draft', 'rejected']
+  if (!allowedStatus.includes(row.AuditStatus)) {
+    const statusText = getAuditStatusText(row.AuditStatus)
+    ElMessage.warning(`当前状态为"${statusText}"，无需提交审核`)
+    return
+  }
+  
   try {
     await ElMessageBox.confirm(
       `确定要提交投诉记录 "${row.ComplaintNo}" 进行审核吗？`,
@@ -2778,7 +2791,9 @@ const handleSubmitAudit = async (row) => {
   } catch (error) {
     if (error !== 'cancel') {
       console.error('提交审核失败:', error)
-      ElMessage.error('提交审核失败')
+      // 显示后端返回的具体错误信息
+      const errorMsg = error.response?.data?.message || '提交审核失败'
+      ElMessage.error(errorMsg)
     }
   }
 }
@@ -4154,20 +4169,11 @@ const getAdaptedImageUrl = (imagePath, preventCache = false) => {
     return imagePath
   }
   
-  // 根据当前页面的hostname判断环境
-  const hostname = window.location.hostname
-  const protocol = window.location.protocol
+  // 确保路径以/files/开头
+  const cleanPath = imagePath.startsWith('/files/') ? imagePath : `/files/${imagePath.replace(/^\/+/, '')}`
   
-  // 构建图片URL
-  let url
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    // 开发环境：使用Vite代理，确保路径以/files/开头
-    url = imagePath.startsWith('/files/') ? imagePath : `/files/${imagePath.replace(/^\/+/, '')}`
-  } else {
-    // 生产环境：使用Nginx文件服务器，文件访问需要通过8080端口
-    const cleanPath = imagePath.startsWith('/files/') ? imagePath : `/files/${imagePath.replace(/^\/+/, '')}`
-    url = `${protocol}//${hostname}:8080${cleanPath}`
-  }
+  // 使用统一的文件服务配置构建URL
+  let url = buildFileUrl(cleanPath)
   
   // 只在需要防止缓存时添加时间戳参数
   if (preventCache) {

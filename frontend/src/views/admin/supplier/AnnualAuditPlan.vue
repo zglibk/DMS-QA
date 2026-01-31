@@ -118,20 +118,22 @@
         stripe
         border
         style="width: 100%"
+        :header-cell-style="headerCellStyle"
+        :cell-style="cellStyle"
         @selection-change="handleSelectionChange"
       >
-        <el-table-column type="selection" width="55" />
-        <el-table-column prop="planCode" label="计划编号" width="120" />
-        <el-table-column prop="planName" label="计划名称" min-width="150" />
-        <el-table-column prop="year" label="年份" width="80" />
-        <el-table-column prop="supplierName" label="供应商" min-width="120" />
-        <el-table-column prop="auditType" label="审核类型" width="100">
+        <el-table-column type="selection" width="55" align="center" />
+        <el-table-column prop="planCode" label="计划编号" min-width="100" align="center" />
+        <el-table-column prop="planName" label="计划名称" min-width="140" align="left" show-overflow-tooltip />
+        <el-table-column prop="year" label="年份" min-width="60" align="center" />
+        <el-table-column prop="supplierName" label="供应商" min-width="140" align="left" show-overflow-tooltip />
+        <el-table-column prop="auditType" label="审核类型" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getAuditTypeTagType(row.auditType)">{{ row.auditType }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="plannedDate" label="计划日期" width="100" />
-        <el-table-column prop="auditors" label="审核员" width="150">
+        <el-table-column prop="plannedDate" label="计划日期" min-width="90" align="center" />
+        <el-table-column prop="auditors" label="审核员" min-width="120" align="center">
           <template #default="{ row }">
             <span v-if="Array.isArray(row.auditors)">
               <el-tag 
@@ -146,35 +148,41 @@
             <span v-else>{{ row.auditors || row.auditor }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="status" label="状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row.status)">{{ getStatusText(row.status) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="progress" label="进度" width="120">
+        <el-table-column prop="progress" label="进度" min-width="100" align="center">
           <template #default="{ row }">
             <el-progress :percentage="row.progress" :status="getProgressStatus(row.progress)" />
           </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="120" />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column label="操作" min-width="180" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleView(row)">
-              <el-icon><View /></el-icon>
-              查看
-            </el-button>
-            <el-button type="warning" size="small" @click="handleEdit(row)">
-              <el-icon><Edit /></el-icon>
-              编辑
-            </el-button>
-            <el-button type="success" size="small" @click="handleExecute(row)" v-if="row.status === 'pending'">
-              <el-icon><VideoPlay /></el-icon>
-              执行
-            </el-button>
-            <el-button type="danger" size="small" @click="handleDelete(row)">
-              <el-icon><Delete /></el-icon>
-              删除
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleView(row)">
+                查看
+              </el-button>
+              <el-button type="success" size="small" @click="handleExecute(row)" :disabled="row.status !== 'pending'">
+                执行
+              </el-button>
+              <el-dropdown trigger="click" @command="(cmd) => handleCommand(cmd, row)">
+                <el-button type="info" size="small">
+                  更多<el-icon class="el-icon--right"><ArrowDown /></el-icon>
+                </el-button>
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="edit">
+                      <el-icon><Edit /></el-icon> 编辑
+                    </el-dropdown-item>
+                    <el-dropdown-item command="delete">
+                      <el-icon color="#f56c6c"><Delete /></el-icon> 删除
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -380,7 +388,8 @@ import {
   View,
   Edit,
   Delete,
-  VideoPlay
+  VideoPlay,
+  ArrowDown
 } from '@element-plus/icons-vue'
 
 // 响应式数据
@@ -390,6 +399,27 @@ const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
 const isEdit = ref(false)
 const formRef = ref()
+
+/**
+ * 表格表头单元格样式 - 禁止换行
+ */
+const headerCellStyle = () => {
+  return { 
+    textAlign: 'center',
+    whiteSpace: 'nowrap'
+  }
+}
+
+/**
+ * 表格单元格样式
+ */
+const cellStyle = ({ column }) => {
+  // 计划名称和供应商列左对齐，其他列居中
+  if (column.property === 'planName' || column.property === 'supplierName') {
+    return { textAlign: 'left' }
+  }
+  return { textAlign: 'center', verticalAlign: 'middle' }
+}
 
 // 统计数据
 const stats = reactive({
@@ -586,6 +616,20 @@ const handleAdd = () => {
   isEdit.value = false
   resetForm()
   dialogVisible.value = true
+}
+
+/**
+ * 处理下拉菜单命令
+ */
+const handleCommand = (command, row) => {
+  switch (command) {
+    case 'edit':
+      handleEdit(row)
+      break
+    case 'delete':
+      handleDelete(row)
+      break
+  }
 }
 
 /**
@@ -865,6 +909,18 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   margin-top: 20px;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  padding: 5px 10px;
 }
 
 .mt-4 {

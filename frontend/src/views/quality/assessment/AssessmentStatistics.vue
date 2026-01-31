@@ -63,7 +63,7 @@
     <!-- 关键指标卡片 -->
     <div class="metrics-section">
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="metric-card total">
             <div class="metric-content">
               <div class="metric-icon">
@@ -81,7 +81,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="metric-card amount">
             <div class="metric-content">
               <div class="metric-icon">
@@ -99,7 +99,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="metric-card returned">
             <div class="metric-content">
               <div class="metric-icon">
@@ -117,7 +117,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="metric-card rate">
             <div class="metric-content">
               <div class="metric-icon">
@@ -1579,6 +1579,10 @@
 }
 
 .metrics-section {
+  margin-bottom: 20px;
+}
+
+.metrics-section .el-col {
   margin-bottom: 20px;
 }
 

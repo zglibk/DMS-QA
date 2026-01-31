@@ -2,7 +2,10 @@
   <div class="quality-targets-container">
     <!-- 页面标题 -->
     <div class="page-header">
-      <h2>质量目标管理</h2>
+      <h2>
+        <el-icon style="margin-right: 8px; vertical-align: bottom; color: #409EFF;"><Aim /></el-icon>
+        质量目标管理
+      </h2>
       <p class="page-description">质量目标录入、统计分析、达成情况跟踪管理</p>
     </div>
 
@@ -16,6 +19,8 @@
               placeholder="请输入目标名称"
               clearable
               style="width: 200px"
+              @change="handleSearch"
+              @clear="handleSearch"
             />
           </el-form-item>
           <el-form-item label="目标分类">
@@ -24,6 +29,8 @@
               placeholder="请选择分类"
               clearable
               style="width: 150px"
+              @change="handleSearch"
+              @clear="handleSearch"
             >
               <el-option
                 v-for="item in categoryOptions"
@@ -33,13 +40,38 @@
               />
             </el-select>
           </el-form-item>
-          <el-form-item label="考核年度">
+          <el-form-item label="目标年度">
             <el-date-picker
               v-model="searchForm.year"
               type="year"
               placeholder="选择年度"
               style="width: 120px"
+              value-format="YYYY"
+              @change="handleSearch"
             />
+          </el-form-item>
+          <el-form-item label="责任人">
+            <el-input
+              v-model="searchForm.responsiblePerson"
+              placeholder="请输入责任人"
+              clearable
+              style="width: 150px"
+              @change="handleSearch"
+            />
+          </el-form-item>
+          <el-form-item label="统计频次">
+            <el-select
+              v-model="searchForm.statisticsFrequency"
+              placeholder="请选择"
+              clearable
+              style="width: 120px"
+              @change="handleSearch"
+            >
+              <el-option label="每月" value="每月" />
+              <el-option label="每季度" value="每季度" />
+              <el-option label="每半年" value="每半年" />
+              <el-option label="每年" value="每年" />
+            </el-select>
           </el-form-item>
           <el-form-item label="状态">
             <el-select
@@ -47,6 +79,8 @@
               placeholder="请选择状态"
               clearable
               style="width: 120px"
+              @change="handleSearch"
+              @clear="handleSearch"
             >
               <el-option label="进行中" value="active" />
               <el-option label="已完成" value="completed" />
@@ -55,11 +89,11 @@
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="handleSearch">
-              <el-icon><Search /></el-icon>
+              <el-icon style="margin-right: 5px"><Search /></el-icon>
               搜索
             </el-button>
             <el-button @click="handleReset">
-              <el-icon><Refresh /></el-icon>
+              <el-icon style="margin-right: 5px"><Refresh /></el-icon>
               重置
             </el-button>
           </el-form-item>
@@ -72,21 +106,25 @@
       <el-row :gutter="10">
         <el-col :span="12">
           <el-button type="primary" @click="handleAdd">
-            <el-icon><Plus /></el-icon>
+            <el-icon style="margin-right: 5px"><Plus /></el-icon>
             新增目标
           </el-button>
           <el-button type="danger" @click="handleBatchDelete" :disabled="!selectedRows.length">
-            <el-icon><Delete /></el-icon>
+            <el-icon style="margin-right: 5px"><Delete /></el-icon>
             批量删除
           </el-button>
           <el-button type="success" @click="handleExport">
-            <el-icon><Download /></el-icon>
+            <el-icon style="margin-right: 5px"><Download /></el-icon>
             导出数据
+          </el-button>
+          <el-button type="warning" @click="handleImportFromHistory">
+            <el-icon style="margin-right: 5px"><CopyDocument /></el-icon>
+            复制年度目标
           </el-button>
         </el-col>
         <el-col :span="12" style="text-align: right">
           <el-button type="info" @click="goToAnalysis">
-            <el-icon><DataAnalysis /></el-icon>
+            <el-icon style="margin-right: 5px"><DataAnalysis /></el-icon>
             统计分析
           </el-button>
         </el-col>
@@ -104,36 +142,45 @@
         style="width: 100%; table-layout: auto;"
       >
         <el-table-column type="selection" width="55" align="center" header-align="center" />
-        <el-table-column prop="TargetYear" label="目标年度" width="90" align="center" header-align="center" />
-        <el-table-column prop="QualityTarget" label="目标名称" min-width="200" show-overflow-tooltip header-align="center" />
-        <el-table-column prop="TargetCategory" label="目标分类" min-width="120" align="center" header-align="center">
+        <el-table-column prop="TargetYear" label="目标年度" width="100" align="center" header-align="center" />
+        <el-table-column prop="AssessmentUnit" label="考核部门" width="120" show-overflow-tooltip align="center" header-align="center" />
+        <el-table-column prop="QualityTarget" label="质量目标" min-width="120" header-align="center">
           <template #default="{ row }">
-            <el-tag :type="getCategoryTagType(row.TargetCategory)">{{ getCategoryLabel(row.TargetCategory) }}</el-tag>
+            <el-tooltip :content="row.QualityTarget" placement="top" :show-after="500" popper-class="multiline-tooltip">
+              <div class="text-ellipsis">{{ row.QualityTarget }}</div>
+            </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column prop="TargetValue" label="目标值" min-width="100" align="center" header-align="center" />
-        <el-table-column prop="AssessmentUnit" label="考核单位" min-width="120" show-overflow-tooltip align="center" header-align="center" />
-        <el-table-column prop="ResponsiblePerson" label="责任人" min-width="100" align="center" header-align="center" />
-        <el-table-column prop="CreatedAt" label="创建时间" min-width="160" align="center" header-align="center">
+        <el-table-column prop="CalculationFormula" label="计算公式" min-width="150" header-align="center">
           <template #default="{ row }">
-            {{ formatDate(row.CreatedAt) }}
+            <el-tooltip :content="row.CalculationFormula" placement="top" :show-after="500" popper-class="multiline-tooltip">
+              <div class="text-ellipsis">{{ row.CalculationFormula }}</div>
+            </el-tooltip>
           </template>
         </el-table-column>
-        <el-table-column prop="StatisticsFrequency" label="统计频率" min-width="100" align="center" header-align="center" />
-        <el-table-column prop="Description" label="描述" min-width="200" show-overflow-tooltip header-align="center" />
-        <el-table-column label="操作" min-width="180" fixed="right" align="center" header-align="center">
+        <el-table-column prop="TargetValue" label="目标值" width="100" align="center" header-align="center" />
+        <el-table-column prop="Measures" label="保证达标的措施" min-width="200" header-align="center">
+          <template #default="{ row }">
+            <el-tooltip :content="row.Measures" placement="top" :show-after="500" popper-class="multiline-tooltip">
+              <div class="text-ellipsis">{{ row.Measures }}</div>
+            </el-tooltip>
+          </template>
+        </el-table-column>
+        <el-table-column prop="ResponsiblePerson" label="责任人" width="120" show-overflow-tooltip align="center" header-align="center" />
+        <el-table-column prop="StatisticsFrequency" label="统计频次" width="100" align="center" header-align="center" />
+        <el-table-column label="操作" width="220" fixed="right" align="center" header-align="center">
           <template #default="{ row }">
             <div class="action-buttons">
+              <el-button type="info" size="small" @click="handleDetail(row)">
+                <el-icon style="margin-right: 4px"><View /></el-icon>
+                详情
+              </el-button>
               <el-button type="primary" size="small" @click="handleEdit(row)">
-                <el-icon><Edit /></el-icon>
+                <el-icon style="margin-right: 4px"><Edit /></el-icon>
                 编辑
               </el-button>
-              <el-button type="info" size="small" @click="handleViewStatistics(row)">
-                <el-icon><DataAnalysis /></el-icon>
-                统计
-              </el-button>
               <el-button type="danger" size="small" @click="handleDelete(row)">
-                <el-icon><Delete /></el-icon>
+                <el-icon style="margin-right: 4px"><Delete /></el-icon>
                 删除
               </el-button>
             </div>
@@ -146,25 +193,107 @@
         <el-pagination
           v-model:current-page="pagination.currentPage"
           v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
+          :page-sizes="[5, 10, 20, 50, 100]"
           :total="pagination.total"
           layout="total, sizes, prev, pager, next, jumper"
         />
       </div>
     </div>
 
+    <!-- 导入往年目标对话框 -->
+    <el-dialog
+      v-model="importDialogVisible"
+      title="从往年导入年度目标"
+      width="800px"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
+    >
+      <div class="import-dialog-content">
+        <!-- 筛选区域 -->
+        <div class="import-filter">
+          <el-form :inline="true" size="default">
+            <el-form-item label="来源年份">
+              <el-date-picker
+                v-model="importForm.sourceYear"
+                type="year"
+                placeholder="选择来源年份"
+                value-format="YYYY"
+                style="width: 130px"
+                @change="handleSourceYearChange"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-icon style="margin: 0 5px; color: #909399;"><DArrowRight /></el-icon>
+            </el-form-item>
+            <el-form-item label="目标年份">
+              <el-date-picker
+                v-model="importForm.targetYear"
+                type="year"
+                placeholder="选择目标年份"
+                value-format="YYYY"
+                style="width: 130px"
+              />
+            </el-form-item>
+            <el-form-item>
+              <el-button type="primary" @click="loadSourceTargets">
+                <el-icon style="margin-right: 5px"><Search /></el-icon> 查询
+              </el-button>
+            </el-form-item>
+          </el-form>
+        </div>
+
+        <!-- 来源数据表格 -->
+        <el-table
+          v-loading="importLoading"
+          :data="sourceTargets"
+          border
+          height="400"
+          @selection-change="handleImportSelectionChange"
+          style="width: 100%"
+        >
+          <el-table-column type="selection" width="50" align="center" />
+          <el-table-column prop="AssessmentUnit" label="考核部门" width="100" show-overflow-tooltip />
+          <el-table-column prop="QualityTarget" label="质量目标" min-width="120" show-overflow-tooltip />
+          <el-table-column prop="TargetValue" label="目标值" width="90" align="center" show-overflow-tooltip />
+          <el-table-column prop="ResponsiblePerson" label="责任人" width="140" align="center" show-overflow-tooltip />
+          <el-table-column prop="StatisticsFrequency" label="频次" width="70" align="center" />
+        </el-table>
+        
+        <div class="import-summary" style="margin-top: 10px; color: #606266;">
+          已选择: <span style="color: #409EFF; font-weight: bold;">{{ selectedImportRows.length }}</span> 条记录
+        </div>
+      </div>
+
+      <template #footer>
+        <span class="dialog-footer">
+          <el-button @click="importDialogVisible = false">取消</el-button>
+          <el-button 
+            type="primary" 
+            @click="handleConfirmImport" 
+            :loading="confirmImportLoading"
+            :disabled="selectedImportRows.length === 0"
+          >
+            确认导入
+          </el-button>
+        </span>
+      </template>
+    </el-dialog>
+
     <!-- 新增/编辑对话框 -->
     <el-dialog
       v-model="dialogVisible"
       :title="dialogTitle"
-      width="700px"
+      width="850px"
       :before-close="handleDialogClose"
+      :close-on-click-modal="false"
+      :close-on-press-escape="false"
     >
       <el-form
         ref="formRef"
         :model="formData"
         :rules="formRules"
         label-width="120px"
+        :disabled="isDetail"
       >
         <el-row :gutter="20">
           <el-col :span="12">
@@ -228,10 +357,28 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-row :gutter="20" v-if="!isCompanyTarget">
+          <el-col :span="24">
+            <el-form-item label="计算公式" prop="calculationFormula">
+              <el-input
+                v-model="formData.calculationFormula"
+                type="textarea"
+                :rows="2"
+                placeholder="请输入计算公式"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="考核单位" prop="assessmentUnit">
-              <el-select v-model="formData.assessmentUnit" placeholder="请选择考核单位" style="width: 100%" filterable>
+              <el-select 
+                v-model="formData.assessmentUnit" 
+                placeholder="请选择考核单位" 
+                style="width: 100%" 
+                filterable
+                :disabled="isCompanyTarget"
+              >
                 <el-option
                   v-for="item in assessmentUnitOptions"
                   :key="item"
@@ -254,6 +401,18 @@
             </el-form-item>
           </el-col>
         </el-row>
+        <el-row :gutter="20" v-if="!isCompanyTarget">
+          <el-col :span="24">
+            <el-form-item label="保证措施" prop="measures">
+              <el-input
+                v-model="formData.measures"
+                type="textarea"
+                :rows="4"
+                placeholder="请输入保证达标的措施（多条请换行）"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="状态" prop="status">
@@ -264,17 +423,16 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="12">
+          <el-col :span="12" v-if="!isCompanyTarget">
             <el-form-item label="统计频率" prop="statisticsFrequency">
               <el-select v-model="formData.statisticsFrequency" placeholder="请选择统计频率" style="width: 100%">
-                <el-option label="月度" value="monthly" />
-                <el-option label="季度" value="quarterly" />
-                <el-option label="半年度" value="semi-annual" />
-                <el-option label="年度" value="annual" />
+                <el-option label="每月" value="每月" />
+                <el-option label="每季度" value="每季度" />
+                <el-option label="每半年" value="每半年" />
+                <el-option label="每年" value="每年" />
               </el-select>
             </el-form-item>
           </el-col>
-
         </el-row>
         <el-form-item label="目标描述" prop="description">
           <el-input
@@ -295,8 +453,8 @@
       </el-form>
       <template #footer>
         <span class="dialog-footer">
-          <el-button @click="handleDialogClose">取消</el-button>
-          <el-button type="primary" @click="handleSubmit" :loading="submitLoading">
+          <el-button @click="handleDialogClose">{{ isDetail ? '关闭' : '取消' }}</el-button>
+          <el-button v-if="!isDetail" type="primary" @click="handleSubmit" :loading="submitLoading">
             确定
           </el-button>
         </span>
@@ -317,7 +475,11 @@ import {
   Download,
   DataAnalysis,
   ArrowDown,
-  Edit
+  Edit,
+  View,
+  CopyDocument,
+  DArrowRight,
+  Aim
 } from '@element-plus/icons-vue'
 import * as qualityTargetsApi from '@/services/qualityTargetsApi'
 
@@ -329,6 +491,17 @@ const loading = ref(false)
 const submitLoading = ref(false)
 const dialogVisible = ref(false)
 
+// 导入相关响应式数据
+const importDialogVisible = ref(false)
+const importLoading = ref(false)
+const confirmImportLoading = ref(false)
+const sourceTargets = ref([])
+const selectedImportRows = ref([])
+const importForm = reactive({
+  sourceYear: '',
+  targetYear: ''
+})
+
 const selectedRows = ref([])
 const targetValueInput = ref()
 const tableData = ref([])
@@ -338,14 +511,16 @@ const formRef = ref()
 const searchForm = reactive({
   targetName: '',
   category: '',
-  year: null,
-  status: ''
+  year: String(new Date().getFullYear()),
+  status: '',
+  responsiblePerson: '',
+  statisticsFrequency: ''
 })
 
 // 分页数据
 const pagination = reactive({
   currentPage: 1,
-  pageSize: 20,
+  pageSize: 5,
   total: 0
 })
 
@@ -360,7 +535,8 @@ const formData = reactive({
   year: null,
   status: 'active',
   statisticsFrequency: '',
-
+  calculationFormula: '',
+  measures: '',
   description: '',
   remarks: ''
 })
@@ -413,8 +589,35 @@ const formRules = {
 
 // 计算属性
 const dialogTitle = computed(() => {
+  if (isDetail.value) return '质量目标详情'
   return formData.ID ? '编辑质量目标' : '新增质量目标'
 })
+
+// 判断是否为公司级目标
+const isCompanyTarget = computed(() => {
+  return formData.category === '公司'
+})
+
+// 监听目标分类变化，处理公司级目标的特殊逻辑
+watch(() => formData.category, (newVal) => {
+  if (newVal === '公司') {
+    // 自动填充公司级目标的默认值
+    formData.assessmentUnit = '公司'
+    formData.responsiblePerson = '总经理'
+    formData.statisticsFrequency = '每年'
+    
+    // 确保选项列表中存在这些默认值，否则下拉框可能无法正确显示
+    if (!assessmentUnitOptions.value.includes('公司')) {
+      assessmentUnitOptions.value.push('公司')
+    }
+    if (!responsiblePersonOptions.value.includes('总经理')) {
+      responsiblePersonOptions.value.push('总经理')
+    }
+  }
+})
+
+// 详情模式标志
+const isDetail = ref(false)
 
 // 方法定义
 
@@ -531,7 +734,12 @@ const loadTableData = async () => {
     
     // 处理年度参数
     if (params.year) {
-      params.year = new Date(params.year).getFullYear()
+      // 如果是字符串且为4位年份，直接使用
+      if (typeof params.year === 'string' && /^\d{4}$/.test(params.year)) {
+        params.year = parseInt(params.year)
+      } else {
+        params.year = new Date(params.year).getFullYear()
+      }
     }
     
     console.log('API请求参数:', params);
@@ -539,22 +747,56 @@ const loadTableData = async () => {
     console.log('API响应:', response);
     
     // Axios响应对象的数据在response.data中
-        const responseData = response.data;
-        console.log('响应数据:', responseData);
+    const responseData = response.data;
+    console.log('响应数据:', responseData);
+    
+    // 检查响应格式
+    let records = [];
+    let total = 0;
+
+    if (responseData) {
+      // 尝试解析数据列表
+      if (responseData.data && (responseData.data.records || responseData.data.list || responseData.data.rows)) {
+        // 标准结构: data.records/list/rows
+        const data = responseData.data;
+        records = data.records || data.list || data.rows || [];
         
-        // 检查响应格式 - API返回格式为 {success: true, data: {records: [...], total: number}}
-        if (responseData && responseData.success && responseData.data) {
-          const data = responseData.data;
-          console.log('记录:', data.records);
-          console.log('总数:', data.total);
-          
-          tableData.value = data.records || [];
-          pagination.total = data.total || 0;
+        // 尝试从不同位置获取 total
+        if (data.pagination && data.pagination.total !== undefined) {
+           total = data.pagination.total;
         } else {
-          console.error('API响应格式不正确:', responseData);
-          tableData.value = [];
-          pagination.total = 0;
+           total = data.total !== undefined ? data.total : (data.count !== undefined ? data.count : 0);
         }
+      } else if (responseData.rows || responseData.list) {
+        // 扁平结构: rows/list 在根节点
+        records = responseData.rows || responseData.list || [];
+        total = responseData.total !== undefined ? responseData.total : (responseData.count !== undefined ? responseData.count : 0);
+      } else if (Array.isArray(responseData.data)) {
+        // data 直接是数组
+        records = responseData.data;
+        total = responseData.total || records.length;
+      }
+      
+      // 如果上述方式都没获取到 total，但获取到了 records，且 total 为 0，尝试使用 records 长度（非分页场景）
+      if (total === 0 && records.length > 0) {
+        // 只有当看起来不是分页数据时才这样做，或者后端确实没返回 total
+        // 这里为了保险，如果 total 是 0，至少显示当前页数量，但这在分页时是不对的
+        // 还是优先相信 API 返回的 total。如果 API 返回 0，那就是 0。
+        // 但是用户说“总显示为0，与实际不符”，说明 API 可能返回了 total 字段但我们没取到，或者字段名不对。
+        // 上面的逻辑已经覆盖了 total/count。
+        
+        // 还有一种情况: responseData.data.pageInfo.total
+        if (responseData.data && responseData.data.pageInfo) {
+           total = responseData.data.pageInfo.total || 0;
+           if (records.length === 0) records = responseData.data.pageInfo.list || [];
+        }
+      }
+    }
+
+    console.log('解析结果 - 记录数:', records.length, '总数:', total);
+    
+    tableData.value = records || [];
+    pagination.total = Number(total) || 0;
   } catch (error) {
     console.error('加载数据失败:', error)
     ElMessage.error('加载数据失败')
@@ -621,8 +863,10 @@ const handleReset = () => {
   Object.assign(searchForm, {
     targetName: '',
     category: '',
-    year: null,
-    status: ''
+    year: String(new Date().getFullYear()),
+    status: '',
+    responsiblePerson: '',
+    statisticsFrequency: ''
   })
   handleSearch()
 }
@@ -631,6 +875,7 @@ const handleReset = () => {
  * 新增处理
  */
 const handleAdd = () => {
+  isDetail.value = false
   resetFormData()
   loadOptions() // 加载选项数据
   dialogVisible.value = true
@@ -640,6 +885,7 @@ const handleAdd = () => {
  * 编辑处理
  */
 const handleEdit = (row) => {
+  isDetail.value = false
   // 重置表单数据
   resetFormData()
   // 映射后端字段到前端表单字段
@@ -653,6 +899,8 @@ const handleEdit = (row) => {
     year: row.TargetYear ? new Date(row.TargetYear, 0) : null,
     status: row.Status === true ? 'active' : (row.Status === false ? 'inactive' : (row.Status || 'active')),
     statisticsFrequency: row.StatisticsFrequency || '',
+    calculationFormula: row.CalculationFormula || '',
+    measures: row.Measures || '',
     description: row.Description || '',
     remarks: row.Remarks || ''
   })
@@ -661,6 +909,31 @@ const handleEdit = (row) => {
     '映射后表单数据': formData
   })
   loadOptions() // 加载选项数据
+  dialogVisible.value = true
+}
+
+/**
+ * 详情处理
+ */
+const handleDetail = (row) => {
+  isDetail.value = true
+  resetFormData()
+  Object.assign(formData, {
+    ID: row.ID,
+    targetName: row.QualityTarget || '',
+    category: row.TargetCategory || '',
+    targetValue: row.TargetValue || '',
+    assessmentUnit: row.AssessmentUnit || '',
+    responsiblePerson: row.ResponsiblePerson || '',
+    year: row.TargetYear ? new Date(row.TargetYear, 0) : null,
+    status: row.Status === true ? 'active' : (row.Status === false ? 'inactive' : (row.Status || 'active')),
+    statisticsFrequency: row.StatisticsFrequency || '',
+    calculationFormula: row.CalculationFormula || '',
+    measures: row.Measures || '',
+    description: row.Description || '',
+    remarks: row.Remarks || ''
+  })
+  loadOptions()
   dialogVisible.value = true
 }
 
@@ -719,6 +992,140 @@ const handleBatchDelete = async () => {
 }
 
 /**
+ * 打开导入对话框
+ */
+const handleImportFromHistory = () => {
+  const currentYear = new Date().getFullYear()
+  importForm.sourceYear = String(currentYear - 1)
+  importForm.targetYear = String(currentYear)
+  sourceTargets.value = []
+  selectedImportRows.value = []
+  importDialogVisible.value = true
+  
+  // 自动加载默认来源年份的数据
+  loadSourceTargets()
+}
+
+/**
+ * 加载来源年份目标数据
+ */
+const loadSourceTargets = async () => {
+  if (!importForm.sourceYear) {
+    ElMessage.warning('请选择来源年份')
+    return
+  }
+  
+  try {
+    importLoading.value = true
+    const params = {
+      year: parseInt(importForm.sourceYear),
+      page: 1,
+      size: 1000 // 获取所有数据，不分页
+    }
+    
+    const response = await qualityTargetsApi.getQualityTargets(params)
+    const responseData = response.data
+    
+    let records = []
+    if (responseData) {
+      if (responseData.data && (responseData.data.records || responseData.data.list)) {
+        records = responseData.data.records || responseData.data.list || []
+      } else if (Array.isArray(responseData.data)) {
+        records = responseData.data
+      }
+    }
+    
+    sourceTargets.value = records
+  } catch (error) {
+    console.error('加载来源数据失败:', error)
+    ElMessage.error('加载来源数据失败')
+  } finally {
+    importLoading.value = false
+  }
+}
+
+/**
+ * 来源年份变更处理
+ */
+const handleSourceYearChange = () => {
+  if (importForm.sourceYear) {
+    loadSourceTargets()
+  }
+}
+
+/**
+ * 导入表格选择变更
+ */
+const handleImportSelectionChange = (selection) => {
+  selectedImportRows.value = selection
+}
+
+/**
+ * 确认导入
+ */
+const handleConfirmImport = async () => {
+  if (selectedImportRows.value.length === 0) {
+    ElMessage.warning('请至少选择一条记录')
+    return
+  }
+  
+  if (!importForm.targetYear) {
+    ElMessage.warning('请选择目标年份')
+    return
+  }
+  
+  try {
+    await ElMessageBox.confirm(
+      `确定将选中的 ${selectedImportRows.value.length} 条记录复制到 ${importForm.targetYear} 年吗？`,
+      '导入确认',
+      {
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        type: 'warning'
+      }
+    )
+    
+    confirmImportLoading.value = true
+    const ids = selectedImportRows.value.map(row => row.ID)
+    
+    const result = await qualityTargetsApi.copyQualityTargets({
+      ids,
+      targetYear: parseInt(importForm.targetYear)
+    })
+    
+    if (result.data && result.data.success) {
+      ElMessage.success(result.data.message || '导入成功')
+      importDialogVisible.value = false
+      // 如果当前搜索年份是导入的目标年份，则刷新列表；否则提示用户切换
+      if (parseInt(searchForm.year) === parseInt(importForm.targetYear)) {
+        loadTableData()
+      } else {
+        ElMessageBox.alert(
+          `导入成功！已切换至 ${importForm.targetYear} 年查看数据。`,
+          '提示',
+          {
+            confirmButtonText: '确定',
+            callback: () => {
+              searchForm.year = importForm.targetYear
+              loadTableData()
+            }
+          }
+        )
+      }
+    } else {
+      throw new Error(result.data?.message || '导入失败')
+    }
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('导入失败:', error)
+      ElMessage.error(error.message || '导入失败')
+    }
+  } finally {
+    confirmImportLoading.value = false
+  }
+}
+
+/**
  * 导出处理
  */
 const handleExport = async () => {
@@ -728,11 +1135,54 @@ const handleExport = async () => {
       params.year = new Date(params.year).getFullYear()
     }
     
-    await qualityTargetsApi.exportQualityTargets(params)
+    const response = await qualityTargetsApi.exportQualityTargets(params)
+    
+    // 检查响应内容
+    if (!response || !response.data) {
+       ElMessage.warning('导出数据为空')
+       return
+    }
+
+    // 创建blob链接进行下载
+    const blob = new Blob([response.data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    const link = document.createElement('a')
+    link.href = window.URL.createObjectURL(blob)
+    
+    // 从Content-Disposition获取文件名
+    const contentDisposition = response.headers['content-disposition']
+    let fileName = `质量目标数据_${new Date().getFullYear()}.xlsx`
+    if (contentDisposition) {
+      const fileNameMatch = contentDisposition.match(/filename="?([^"]+)"?/)
+      if (fileNameMatch && fileNameMatch.length === 2) {
+        fileName = decodeURIComponent(fileNameMatch[1])
+      }
+    }
+    
+    link.download = fileName
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(link.href)
+    
     ElMessage.success('导出成功')
   } catch (error) {
     console.error('导出失败:', error)
-    ElMessage.error('导出失败')
+    
+    // 如果是Blob类型的错误响应，尝试读取错误信息
+    if (error.response && error.response.data instanceof Blob) {
+      const reader = new FileReader()
+      reader.onload = () => {
+        try {
+          const errorData = JSON.parse(reader.result)
+          ElMessage.error(errorData.message || '导出失败')
+        } catch (e) {
+          ElMessage.error('导出失败')
+        }
+      }
+      reader.readAsText(error.response.data)
+    } else {
+      ElMessage.error(error.message || '导出失败')
+    }
   }
 }
 
@@ -740,7 +1190,7 @@ const handleExport = async () => {
  * 跳转到统计分析页面
  */
 const goToAnalysis = () => {
-  router.push('/admin/quality/targets/1/statistics')
+  router.push('/admin/quality/targets/analysis')
 }
 
 /**
@@ -794,8 +1244,12 @@ const handleSubmit = async () => {
       assessmentUnit: '考核单位',
       responsiblePerson: '责任人',
       year: '考核年度',
-      status: '状态',
-      statisticsFrequency: '统计频率'
+      status: '状态'
+    }
+
+    // 只有非公司级目标才校验统计频率
+    if (!isCompanyTarget.value) {
+      requiredFields.statisticsFrequency = '统计频率'
     }
     
     const emptyFields = []
@@ -881,6 +1335,8 @@ const resetFormData = () => {
     year: null,
     status: 'active',
     statisticsFrequency: '',
+    calculationFormula: '',
+    measures: '',
     weight: 100,
     description: '',
     remarks: ''
@@ -942,7 +1398,8 @@ onMounted(() => {
 
 .pagination-section {
   margin-top: 20px;
-  text-align: right;
+  display: flex;
+  justify-content: center;
 }
 
 .dialog-footer {
@@ -966,7 +1423,7 @@ onMounted(() => {
 }
 
 :deep(.el-pagination) {
-  justify-content: flex-end;
+  justify-content: center;
 }
 
 /* 符号下拉按钮样式 */
@@ -976,6 +1433,21 @@ onMounted(() => {
   background: #ffffff !important;
   color: #606266 !important;
   transition: all 0.3s ease !important;
+}
+
+/* 强制单行显示 */
+:deep(.el-table .cell) {
+  white-space: nowrap;
+}
+
+/* Tooltip 自定义样式移至下方全局样式 */
+
+/* 文本省略样式 */
+.text-ellipsis {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  width: 100%;
 }
 
 .symbol-dropdown-btn:hover {
@@ -1003,4 +1475,14 @@ onMounted(() => {
   font-size: 12px;
 }
 
+</style>
+
+<style>
+/* 全局样式，用于 Tooltip */
+.multiline-tooltip {
+  max-width: 400px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  line-height: 1.5;
+}
 </style>

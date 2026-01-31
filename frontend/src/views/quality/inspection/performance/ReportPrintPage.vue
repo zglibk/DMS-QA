@@ -102,6 +102,7 @@ import { useRoute } from 'vue-router'
 import { getReport, getInstruments } from '@/api/performance'
 import ReportPreview from './ReportPreview.vue'
 import DraggableSeal from '@/components/DraggableSeal.vue'
+import { buildFileUrl } from '@/utils/fileServerConfig'
 import { getElectronicSeals } from '@/api/system'
 import { CircleCloseFilled, Printer, Lock, Unlock } from '@element-plus/icons-vue'
 
@@ -168,15 +169,7 @@ const getAdaptedSealUrl = (url) => {
         cleanPath = '/' + cleanPath
     }
     
-    const hostname = window.location.hostname
-    const protocol = window.location.protocol
-    
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-        return cleanPath
-    } else {
-        // Production: use port 8080 for file server
-        return `${protocol}//${hostname}:8080${cleanPath}`
-    }
+    return buildFileUrl(cleanPath)
 }
 
 const preloadImageAsBase64 = (url) => {

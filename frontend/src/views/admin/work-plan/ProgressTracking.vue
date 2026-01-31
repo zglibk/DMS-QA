@@ -69,7 +69,7 @@
     <!-- 进度概览 -->
     <div class="progress-overview">
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="overview-card total">
             <div class="card-icon">
               <el-icon><Files /></el-icon>
@@ -80,7 +80,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="overview-card in-progress">
             <div class="card-icon">
               <el-icon><Loading /></el-icon>
@@ -91,7 +91,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="overview-card overdue">
             <div class="card-icon">
               <el-icon><Warning /></el-icon>
@@ -102,7 +102,7 @@
             </div>
           </div>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <div class="overview-card completed">
             <div class="card-icon">
               <el-icon><CircleCheck /></el-icon>
@@ -1497,6 +1497,10 @@ watch([() => filterForm.status, () => filterForm.priority, () => filterForm.assi
 .progress-overview {
   margin-bottom: 20px;
   flex-shrink: 0;
+}
+
+.progress-overview .el-col {
+  margin-bottom: 20px;
 }
 
 .overview-card {

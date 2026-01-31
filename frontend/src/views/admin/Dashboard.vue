@@ -1203,12 +1203,14 @@ onBeforeUnmount(() => {
 
 .stat-card-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 20px;
   margin-bottom: 20px;
 }
 
 .stat-card {
-  flex: 1;
+  flex: 1 1 22%;
+  min-width: 240px;
   background: #fff;
   border-radius: 12px;
   box-shadow: 0 2px 12px 0 rgba(0,0,0,0.06);

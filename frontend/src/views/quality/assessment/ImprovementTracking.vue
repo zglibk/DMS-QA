@@ -69,7 +69,7 @@
     <!-- 改善期概览 -->
     <div class="overview-section">
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="overview-card in-progress">
             <div class="card-content">
               <div class="card-icon">
@@ -82,7 +82,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="overview-card expiring">
             <div class="card-content">
               <div class="card-icon">
@@ -95,7 +95,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="overview-card eligible">
             <div class="card-content">
               <div class="card-icon">
@@ -108,7 +108,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="overview-card returned">
             <div class="card-content">
               <div class="card-icon">
@@ -792,6 +792,10 @@ const handleDepartmentChange = (value) => {
 }
 
 .overview-section {
+  margin-bottom: 20px;
+}
+
+.overview-section .el-col {
   margin-bottom: 20px;
 }
 

@@ -419,9 +419,21 @@ const router = useRouter()
 // 用户状态管理
 const userStore = useUserStore()
 
-// 权限检查
-const hasCreatePlanPermission = computed(() => userStore.hasActionPermission('work-plan:plan:create'))
-const hasCreateLogPermission = computed(() => userStore.hasActionPermission('work-plan:log:create'))
+// 权限检查 - 使用页面级权限，有查看权限即可使用新建功能
+const hasCreatePlanPermission = computed(() => {
+  // admin用户或有work-plan相关权限都可以
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  return userStore.hasActionPermission('work-plan:plans:view') || 
+         userStore.hasActionPermission('work-plan:dashboard:view') ||
+         userStore.hasActionPermission('work-plan:plan:create')
+})
+const hasCreateLogPermission = computed(() => {
+  // admin用户或有work-plan相关权限都可以
+  if (userStore.user?.username === 'admin' || userStore.user?.Username === 'admin') return true
+  return userStore.hasActionPermission('work-plan:logs:view') || 
+         userStore.hasActionPermission('work-plan:dashboard:view') ||
+         userStore.hasActionPermission('work-plan:log:create')
+})
 
 // 响应式数据
 const dashboardData = ref({})

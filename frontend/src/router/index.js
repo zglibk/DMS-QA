@@ -135,6 +135,12 @@ const routes = [
     component: () => import('../views/admin/supplier/ComplaintPrintPreview.vue'),
     meta: { title: '供应商投诉打印预览', requiresAuth: true }
   },
+  {
+    path: '/print/shipment/:id',
+    name: 'ShipmentReportPrintPreview',
+    component: () => import('../views/admin/inspection/ShipmentPrintPreview.vue'),
+    meta: { title: '出货检验报告打印预览', requiresAuth: true }
+  },
 
   // 管理后台路由（嵌套路由结构）
   {
@@ -274,6 +280,12 @@ const routes = [
         path: 'quality/targets',
         component: () => import('../views/quality/targets/QualityTargets.vue'), // 质量目标管理页面
         meta: { title: '目标管理', requiresAuth: true }
+      },
+      
+      {
+        path: 'quality/targets/analysis',
+        component: () => import('../views/quality/targets/QualityTargetStatistics.vue'),
+        meta: { title: '质量目标统计分析', requiresAuth: true }
       },
 
       {
@@ -503,6 +515,13 @@ const routes = [
         path: 'development/structure-components',
         component: () => import('../views/development/StructureComponents.vue'), // 结构组件页面
         meta: { requiresAuth: true }
+      },
+      // ERP接口文档
+      {
+        path: 'dev/erp-api-doc',
+        name: 'ErpApiDoc',
+        component: () => import('../views/admin/dev/ErpApiDoc.vue'),
+        meta: { title: 'ERP接口文档', requiresAuth: true }
       },
       {
         path: 'supplier/list',

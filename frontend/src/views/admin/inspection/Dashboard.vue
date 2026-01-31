@@ -31,7 +31,7 @@
       <el-col :span="17">
         <!-- Stats Cards -->
         <el-row :gutter="30" class="stats-row">
-            <el-col :span="6">
+            <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
                 <el-card shadow="hover" class="stat-card pending" @click="currentTab = 'todo'">
                     <div class="stat-card-body">
                         <div class="stat-left">
@@ -44,7 +44,7 @@
                     </div>
                 </el-card>
             </el-col>
-            <el-col :span="6">
+            <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
                 <el-card shadow="hover" class="stat-card draft" @click="currentTab = 'draft'">
                     <div class="stat-card-body">
                         <div class="stat-left">
@@ -57,7 +57,7 @@
                     </div>
                 </el-card>
             </el-col>
-            <el-col :span="6">
+            <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
                 <el-card shadow="hover" class="stat-card today">
                     <div class="stat-card-body">
                         <div class="stat-left">
@@ -70,7 +70,7 @@
                     </div>
                 </el-card>
             </el-col>
-            <el-col :span="6">
+            <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
                 <el-card shadow="hover" class="stat-card ng" @click="currentTab = 'ng'">
                     <div class="stat-card-body">
                         <div class="stat-left">
@@ -719,6 +719,10 @@ onUnmounted(() => {
 }
 
 .stats-row {
+    margin-bottom: 0;
+}
+
+.stats-row .el-col {
     margin-bottom: 20px;
 }
 

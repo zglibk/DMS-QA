@@ -238,11 +238,13 @@
                 <el-table-column type="selection" width="45" align="center" />
                 <el-table-column type="index" label="序号" width="60" align="center" />
                 <el-table-column prop="cpo" label="CPO" width="120" align="center" show-overflow-tooltip />
+                <el-table-column prop="apoid" label="采购单号" width="110" align="center" show-overflow-tooltip />
                 <el-table-column prop="cProductId" label="客户料号" min-width="140" align="center" show-overflow-tooltip />
                 <el-table-column prop="product" label="产品名称" min-width="180" header-align="center" show-overflow-tooltip />
                 <el-table-column prop="cProduct" label="工厂订单号" min-width="120" align="center" show-overflow-tooltip />
                 <el-table-column prop="orderCount" label="订单数" width="80" align="center" />
                 <el-table-column prop="pCount" label="成品数" width="80" align="center" />
+                <el-table-column prop="calUnit" label="单位" width="70" align="center" />
                 <el-table-column label="操作" width="120" align="center" fixed="right">
                   <template #default="{ row }">
                     <el-button :disabled="!userStore.hasPermission('shipment:report:export')" type="primary" size="small" @click.stop="handleGenerateReport(row)">
@@ -1036,7 +1038,7 @@ function handleShipmentCommand(command, row) {
       handleAuditShipment(row)
       break
     case 'print':
-      handleExportHistoryReport(row)
+      handlePrintPreview(row)
       break
     case 'delete':
       handleDeleteHistory(row)
@@ -1569,6 +1571,21 @@ function handleViewHistory(row) {
     console.error(e)
     ElMessage.error('解析报告数据失败')
   }
+}
+
+/**
+ * 打印预览 - 跳转到HTML报告预览页面
+ * @param {Object} row 报告记录
+ */
+function handlePrintPreview(row) {
+  if (!row || !row.ID) {
+    ElMessage.warning('报告数据无效')
+    return
+  }
+  
+  // 在新标签页打开打印预览页面
+  const url = router.resolve(`/print/shipment/${row.ID}`).href
+  window.open(url, '_blank')
 }
 
 /**

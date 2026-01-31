@@ -5,6 +5,7 @@
   1. 作为整个应用的根容器
   2. 通过router-view渲染当前路由对应的组件
   3. 设置全局响应式字体大小
+  4. 包含全局登录过期对话框
 
   设计理念：
   - 保持简洁，只负责路由渲染
@@ -13,6 +14,8 @@
 <template>
   <!-- 路由视图容器，渲染当前路由匹配的组件 -->
   <router-view />
+  <!-- 全局登录过期对话框 -->
+  <LoginExpiredDialog ref="loginExpiredDialogRef" />
 </template>
 
 <script setup>
@@ -20,8 +23,30 @@
  * 根组件脚本
  *
  * 使用Vue 3组合式API的setup语法糖
- * 当前无需额外逻辑，保持简洁
  */
+import { ref, onMounted, onUnmounted } from 'vue'
+import LoginExpiredDialog from '@/components/common/LoginExpiredDialog.vue'
+
+const loginExpiredDialogRef = ref(null)
+
+/**
+ * 处理显示登录过期对话框的事件
+ */
+const handleShowLoginExpired = () => {
+  if (loginExpiredDialogRef.value) {
+    loginExpiredDialogRef.value.show()
+  }
+}
+
+onMounted(() => {
+  // 监听全局事件
+  window.addEventListener('show-login-expired', handleShowLoginExpired)
+})
+
+onUnmounted(() => {
+  // 移除事件监听
+  window.removeEventListener('show-login-expired', handleShowLoginExpired)
+})
 </script>
 
 <style>

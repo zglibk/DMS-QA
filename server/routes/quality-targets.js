@@ -14,6 +14,8 @@ const { authenticateToken, checkPermission } = require('../middleware/auth');
 const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
+const ExcelJS = require('exceljs');
+const { estimateTextLines } = require('../utils/textUtils');
 
 /**
  * 解析目标值字符串，提取比较符号和数值
@@ -278,7 +280,7 @@ router.get('/', async (req, res) => {
     }
     
     if (year) {
-      whereConditions.push('YEAR(qt.CreatedAt) = @year');
+      whereConditions.push('qt.TargetYear = @year');
       queryParams.push({ name: 'year', type: sql.Int, value: parseInt(year) });
     }
     
@@ -424,6 +426,513 @@ router.get('/options', async (req, res) => {
 });
 
 /**
+ * 导出质量目标数据
+ * GET /api/quality-targets/export
+ */
+router.get('/export', async (req, res) => {
+  try {
+    const {
+      category = '',
+      assessmentUnit = '',
+      responsiblePerson = '',
+      year = new Date().getFullYear(),
+      targetName = '',
+      keyword = '',
+      statisticsFrequency = ''
+    } = req.query;
+    
+    const pool = await getConnection();
+    
+    // 构建查询条件
+    let whereConditions = ['qt.IsDeleted = 0'];
+    let queryParams = [];
+    
+    // 处理关键词搜索 (支持 targetName 或 keyword 参数)
+    const searchKeyword = targetName || keyword;
+    if (searchKeyword) {
+      whereConditions.push('(qt.QualityTarget LIKE @keyword OR qt.CalculationFormula LIKE @keyword OR qt.Measures LIKE @keyword)');
+      queryParams.push({ name: 'keyword', type: sql.NVarChar(100), value: `%${searchKeyword}%` });
+    }
+    
+    if (category) {
+      whereConditions.push('qt.TargetCategory = @category');
+      queryParams.push({ name: 'category', type: sql.NVarChar(50), value: category });
+    }
+    
+    if (assessmentUnit) {
+      whereConditions.push('qt.AssessmentUnit = @assessmentUnit');
+      queryParams.push({ name: 'assessmentUnit', type: sql.NVarChar(100), value: assessmentUnit });
+    }
+    
+    if (responsiblePerson) {
+      whereConditions.push('qt.ResponsiblePerson = @responsiblePerson');
+      queryParams.push({ name: 'responsiblePerson', type: sql.NVarChar(50), value: responsiblePerson });
+    }
+    
+    if (statisticsFrequency) {
+      whereConditions.push('qt.StatisticsFrequency = @statisticsFrequency');
+      queryParams.push({ name: 'statisticsFrequency', type: sql.NVarChar(20), value: statisticsFrequency });
+    }
+    
+    if (year) {
+      whereConditions.push('qt.TargetYear = @year');
+      queryParams.push({ name: 'year', type: sql.Int, value: parseInt(year) });
+    }
+    
+    const whereClause = whereConditions.join(' AND ');
+    
+    const query = `
+      SELECT 
+        qt.TargetCategory,
+        qt.AssessmentUnit,
+        qt.QualityTarget,
+        qt.CalculationFormula,
+        qt.TargetValue,
+        qt.Measures,
+        qt.ResponsiblePerson,
+        qt.StatisticsFrequency,
+        qt.Description,
+        qt.CreatedAt,
+        qt.CreatedBy
+      FROM QualityTargets qt
+      WHERE ${whereClause}
+      ORDER BY 
+        CASE WHEN qt.TargetCategory = '公司' THEN 0 ELSE 1 END,
+        qt.AssessmentUnit, 
+        qt.ID
+    `;
+    
+    const request = pool.request();
+    queryParams.forEach(param => {
+      request.input(param.name, param.type, param.value);
+    });
+    
+    const result = await request.query(query);
+    const records = result.recordset;
+
+    if (records.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: '没有找到符合条件的数据'
+      });
+    }
+
+    // 分离总目标和部门目标
+    const companyTargets = records.filter(r => r.TargetCategory === '公司');
+    const departmentTargets = records.filter(r => r.TargetCategory !== '公司');
+
+    // 计算生效日期：取该年度最早创建的目标的日期，并推迟一周（7天）作为生效日期
+    let effectiveDate = `${year}-01-08`; // 默认值（假设1月1日创建，推迟7天）
+    if (records.length > 0) {
+      // 找到最早的 CreatedAt
+      const earliestDate = records.reduce((min, p) => {
+         const pDate = new Date(p.CreatedAt);
+         return pDate < min ? pDate : min;
+      }, new Date(records[0].CreatedAt));
+      
+      // 找到最早的记录 (逻辑修正：确保是按CreatedAt排序后的第一条)
+      // 为了稳妥，我们手动对records按CreatedAt进行一次排序，取第一条
+      const sortedRecords = [...records].sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
+      const earliestRecord = sortedRecords[0];
+      
+      // 推迟7天作为生效日期
+      const targetDate = new Date(earliestRecord.CreatedAt);
+      targetDate.setDate(targetDate.getDate() + 7);
+      
+      // 格式化为 YYYY-MM-DD
+      const y = targetDate.getFullYear();
+      const m = String(targetDate.getMonth() + 1).padStart(2, '0');
+      const d = String(targetDate.getDate()).padStart(2, '0');
+      effectiveDate = `${y}-${m}-${d}`;
+    }
+
+    // 计算编制信息：取该年度最早创建的目标的创建人和创建日期
+    let makerName = req.user?.username || '系统管理员';
+    let makerDate = new Date().toISOString().slice(0, 10);
+    
+    if (records.length > 0) {
+      // 找到最早的记录 (逻辑修正：确保是按CreatedAt排序后的第一条)
+      // 使用上面已经排序好的结果
+      const sortedRecords = [...records].sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
+      const earliestRecord = sortedRecords[0];
+      
+      // 优先使用数据库中的 CreatedBy，如果为空则回退默认值
+      // 注意：数据库字段可能是 null 或 空字符串
+      if (earliestRecord.CreatedBy && earliestRecord.CreatedBy.trim() !== '') {
+          makerName = earliestRecord.CreatedBy;
+      }
+      
+      const eDate = new Date(earliestRecord.CreatedAt);
+      makerDate = eDate.toISOString().slice(0, 10);
+    }
+
+    // 使用ExcelJS生成Excel文件
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('质量目标');
+
+    // 设置页面边距 (单位：英寸，0.3英寸约等于0.76厘米，0.5英寸约等于1.27厘米)
+    // 用户期望页边距：左0.5厘米，右0.3厘米
+    // 换算为英寸：0.5cm ≈ 0.2inch, 0.3cm ≈ 0.12inch
+    worksheet.pageSetup.margins = {
+      left: 0.2, right: 0.12,
+      top: 0.4, bottom: 0.4,
+      header: 0.3, footer: 0.3
+    };
+    
+    // 设置列 (A-J列)
+    // A: 部门名称, B: 质量目标, C+D: 计算公式, E: 目标值, F+G+H: 保证达标的措施, I: 责任人, J: 统计频次
+    // 用户期望列宽: A=5.5, B=9.25, C=5.75, D=11.38, E=5, F=13.5, G=11, H=12, I=8.38, J=9.88
+    // ExcelJS设置值需补偿偏差(+0.63): A=6.13, B=9.88, C=6.38, D=12.01, E=5.63, F=14.13, G=11.63, H=12.63, I=9.01, J=10.51
+    worksheet.columns = [
+      { key: 'AssessmentUnit', width: 6.13 },       // A 部门名称
+      { key: 'QualityTarget', width: 9.88 },        // B 质量目标
+      { key: 'CalculationFormula', width: 6.38 },   // C 计算公式 (合并起始)
+      { key: 'FormulaPlaceholder', width: 12.01 },  // D (合并)
+      { key: 'TargetValue', width: 5.63 },          // E 目标值
+      { key: 'Measures', width: 14.13 },            // F 措施 (合并起始)
+      { key: 'MeasuresPlaceholder1', width: 11.63 },// G (合并)
+      { key: 'MeasuresPlaceholder2', width: 12.63 },// H (合并)
+      { key: 'ResponsiblePerson', width: 9.01 },    // I 责任人
+      { key: 'StatisticsFrequency', width: 10.51 }  // J 统计频次
+    ];
+    
+    // 全局默认字体
+    worksheet.eachRow(row => {
+      row.font = { name: '宋体', size: 10 };
+    });
+
+    // ==========================================
+    // 1. 设置复杂表头 (Row 1 & Row 2)
+    // ==========================================
+    
+    // 设置行高
+    worksheet.getRow(1).height = 24.75;
+    worksheet.getRow(2).height = 36;
+    worksheet.getRow(3).height = 4.5; // 空白间隔行
+
+    // ---------------- Row 1 ----------------
+    // A1:F1 合并 -> "珠海腾佳印务有限公司"
+    worksheet.mergeCells('A1:F1');
+    const cellA1 = worksheet.getCell('A1');
+    cellA1.value = '珠海腾佳印务有限公司';
+    cellA1.font = { name: '宋体', size: 11 };
+    cellA1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // G1 -> "文件编号"
+    const cellG1 = worksheet.getCell('G1');
+    cellG1.value = '文件编号';
+    cellG1.font = { name: '宋体', size: 11, bold: true };
+    cellG1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // H1 -> "WI-XZ-01"
+    const cellH1 = worksheet.getCell('H1');
+    cellH1.value = 'WI-XZ-01';
+    cellH1.font = { name: '宋体', size: 11 };
+    cellH1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // I1 -> "版本"
+    const cellI1 = worksheet.getCell('I1');
+    cellI1.value = '版本';
+    cellI1.font = { name: '宋体', size: 11, bold: true };
+    cellI1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // J1 -> "B/0"
+    const cellJ1 = worksheet.getCell('J1');
+    cellJ1.value = 'B/0';
+    cellJ1.font = { name: '宋体', size: 11 };
+    cellJ1.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // ---------------- Row 2 ----------------
+    // A2 -> "标题"
+    const cellA2 = worksheet.getCell('A2');
+    cellA2.value = '标题';
+    cellA2.font = { name: '宋体', size: 11, bold: true };
+    cellA2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // B2:F2 合并 -> "公司及各部门质量目标"
+    worksheet.mergeCells('B2:F2');
+    const cellB2 = worksheet.getCell('B2');
+    cellB2.value = '公司及各部门质量目标';
+    cellB2.font = { name: '宋体', size: 16, bold: true };
+    cellB2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // G2 -> "页      码"
+    const cellG2 = worksheet.getCell('G2');
+    cellG2.value = '页    码';
+    cellG2.font = { name: '宋体', size: 11, bold: true };
+    cellG2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // H2 -> "第1页,共1页"
+    const cellH2 = worksheet.getCell('H2');
+    cellH2.value = '第1页,共1页';
+    cellH2.font = { name: '宋体', size: 11 };
+    cellH2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // I2 -> "生效日期"
+    const cellI2 = worksheet.getCell('I2');
+    cellI2.value = '生效日期';
+    cellI2.font = { name: '宋体', size: 11, bold: true };
+    cellI2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // J2 -> "（空）" (实际内容应为生效日期值，或者留空等待填写，此处根据需求设为空或具体日期)
+    // 根据"J1 (空)"的描述，可能是指J2填空内容，这里填入具体的生效日期
+    const cellJ2 = worksheet.getCell('J2');
+    cellJ2.value = effectiveDate; 
+    cellJ2.font = { name: '宋体', size: 11 };
+    cellJ2.alignment = { horizontal: 'center', vertical: 'middle' };
+
+    // 为表头区域添加边框 (A1:J2)
+    for (let r = 1; r <= 2; r++) {
+      const row = worksheet.getRow(r);
+      for (let c = 1; c <= 10; c++) {
+        const cell = row.getCell(c);
+        // 如果不是合并单元格的一部分（或者合并单元格的主单元格），添加边框
+        // ExcelJS会自动处理合并单元格的边框，只要给主单元格设置即可
+        if (cell.isMerged && cell.address !== cell.master.address) continue;
+        
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+      }
+    }
+
+
+    // 4. 总目标行 (合并 A4:J4)
+    let totalTargetText = '总目标：\n';
+    companyTargets.forEach((t, index) => {
+        totalTargetText += `${index + 1}、${t.QualityTarget}${t.TargetValue}；  `;
+    });
+    if (companyTargets.length === 0) {
+      totalTargetText += '（暂无设定）';
+    }
+
+    worksheet.mergeCells('A4:J4');
+    const totalTargetCell = worksheet.getCell('A4');
+    totalTargetCell.value = totalTargetText;
+    totalTargetCell.alignment = { wrapText: true, vertical: 'top', horizontal: 'left' };
+    totalTargetCell.font = { name: '宋体', size: 11 };
+    totalTargetCell.border = {
+      top: { style: 'thin' },
+      left: { style: 'thin' },
+      bottom: { style: 'thin' },
+      right: { style: 'thin' }
+    };
+    worksheet.getRow(4).height = 39.75; // 更新为39.75
+
+    // 5. 表头行 (从第5行开始)
+    const headerRow = worksheet.getRow(5);
+    headerRow.values = ['部门名称', '质量目标', '计算公式', '', '目标值', '保证达标的措施', '', '', '责任人', '统计频次'];
+    // 合并表头单元格
+    worksheet.mergeCells('C5:D5'); // 计算公式
+    worksheet.mergeCells('F5:H5'); // 保证达标的措施
+    
+    headerRow.height = 40;
+    headerRow.eachCell((cell) => {
+      cell.font = { name: '黑体', bold: true, color: { argb: 'FFFFFFFF' }, size: 11 };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'FF000080' } // 深蓝色背景
+      };
+      cell.border = {
+        top: { style: 'thin' },
+        left: { style: 'thin' },
+        bottom: { style: 'thin' },
+        right: { style: 'thin' }
+      };
+      // 优化：表头自动换行
+      cell.alignment = { vertical: 'middle', horizontal: 'center', wrapText: true };
+    });
+
+    // 6. 数据行 (从第6行开始)
+    let currentRowIndex = 6;
+    let unitStartRow = 6;
+    let personStartRow = 6;
+    
+    if (departmentTargets.length > 0) {
+        departmentTargets.forEach((record, index) => {
+            // 处理责任人名称：去除括号及其中内容
+            const rawPerson = record.ResponsiblePerson || '';
+            const cleanPerson = rawPerson.replace(/[\(\（].*?[\)\）]/g, '').trim();
+
+            const row = worksheet.addRow([
+                record.AssessmentUnit,        // A
+                record.QualityTarget,         // B
+                record.CalculationFormula || '', // C
+                '',                           // D (merged with C)
+                record.TargetValue,           // E
+                record.Measures || '',        // F
+                '',                           // G (merged with F)
+                '',                           // H (merged with F)
+                cleanPerson,                  // I
+                record.StatisticsFrequency    // J
+            ]);
+            
+            // 合并当前行的单元格
+            worksheet.mergeCells(`C${currentRowIndex}:D${currentRowIndex}`); // 计算公式
+            worksheet.mergeCells(`F${currentRowIndex}:H${currentRowIndex}`); // 措施
+            
+            // 设置数据行样式
+            row.eachCell((cell) => {
+                cell.font = { name: '宋体', size: 10 };
+                cell.alignment = { vertical: 'middle', wrapText: true, horizontal: 'center' };
+                cell.border = {
+                    top: { style: 'thin' },
+                    left: { style: 'thin' },
+                    bottom: { style: 'thin' },
+                    right: { style: 'thin' }
+                };
+            });
+
+            // 强制设置合并单元格的对齐方式 (左对齐)
+            // C列 (计算公式)
+            const formulaCell = worksheet.getCell(`C${currentRowIndex}`);
+            formulaCell.alignment = { vertical: 'middle', wrapText: true, horizontal: 'left' };
+            
+            // F列 (保证达标的措施)
+            const measuresCell = worksheet.getCell(`F${currentRowIndex}`);
+            measuresCell.alignment = { vertical: 'middle', wrapText: true, horizontal: 'left' };
+            
+            // 自动计算行高
+            let maxLines = 1;
+
+            // 根据新的列宽调整估算参数 (近似值)
+            // A=5.5, B=9.25, C+D=5.75+11.38=17.13, E=5, F+G+H=13.5+11+12=36.5, I=8.38
+            // 稍微放宽宽度参数，避免临界值导致多算一行
+            maxLines = Math.max(maxLines, estimateTextLines(record.AssessmentUnit, 6));
+            maxLines = Math.max(maxLines, estimateTextLines(record.QualityTarget, 10));
+            // 放宽计算公式和措施的宽度估算，防止过度换行
+            maxLines = Math.max(maxLines, estimateTextLines((record.CalculationFormula || '').trim(), 20)); 
+            maxLines = Math.max(maxLines, estimateTextLines((record.Measures || '').trim(), 42)); 
+            maxLines = Math.max(maxLines, estimateTextLines(cleanPerson, 9));
+
+            // 优化行高计算：10号字体单行约13.5，减少空距
+            // 进一步压缩行高公式：单行20，多行时每行12+2padding
+            // 调整：稍微增加一点padding，解决空距过小的问题
+            row.height = Math.max(22, maxLines * 12.5 + 4);
+
+            // 合并逻辑判断 (纵向合并)
+            const isLastRow = index === departmentTargets.length - 1;
+            let shouldMergeUnit = isLastRow;
+            let shouldMergePerson = isLastRow;
+
+            if (!isLastRow) {
+                const nextRecord = departmentTargets[index + 1];
+                const nextUnit = nextRecord.AssessmentUnit;
+                const nextRawPerson = nextRecord.ResponsiblePerson || '';
+                const nextCleanPerson = nextRawPerson.replace(/[\(\（].*?[\)\）]/g, '').trim();
+
+                if (nextUnit !== record.AssessmentUnit) {
+                    shouldMergeUnit = true;
+                    // 部门变了，责任人合并组也必须结束（即使名字一样，也不跨部门合并）
+                    shouldMergePerson = true;
+                } else {
+                    // 部门没变，检查责任人是否变了
+                    if (nextCleanPerson !== cleanPerson) {
+                        shouldMergePerson = true;
+                    }
+                }
+            }
+
+            // 执行部门列合并 (A列)
+            if (shouldMergeUnit) {
+                if (currentRowIndex > unitStartRow) {
+                    worksheet.mergeCells(`A${unitStartRow}:A${currentRowIndex}`);
+                }
+                unitStartRow = currentRowIndex + 1;
+            }
+
+            // 执行责任人列合并 (I列 - 原F列)
+            if (shouldMergePerson) {
+                if (currentRowIndex > personStartRow) {
+                    worksheet.mergeCells(`I${personStartRow}:I${currentRowIndex}`);
+                }
+                personStartRow = currentRowIndex + 1;
+            }
+
+            currentRowIndex++;
+        });
+    }
+
+    // 6. 页脚签名行
+    const footerRowIndex = currentRowIndex + 1; // 增加一行间隔，美观
+    const footerRow = worksheet.getRow(footerRowIndex);
+    footerRow.height = 30;
+
+    // B列: 编制/日期：
+    const makerLabelCell = worksheet.getCell(`B${footerRowIndex}`);
+    makerLabelCell.value = '编制/日期：';
+    makerLabelCell.alignment = { vertical: 'middle', horizontal: 'right' };
+    makerLabelCell.font = { name: '宋体', size: 11, bold: true };
+
+    // C列: 创建人
+    const makerNameCell = worksheet.getCell(`C${footerRowIndex}`);
+    makerNameCell.value = makerName;
+    makerNameCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    makerNameCell.font = { name: '宋体', size: 11 };
+    // 添加下划线边框
+    makerNameCell.border = { bottom: { style: 'thin' } };
+
+    // D列: 创建日期
+    const makerDateCell = worksheet.getCell(`D${footerRowIndex}`);
+    makerDateCell.value = makerDate;
+    makerDateCell.alignment = { vertical: 'middle', horizontal: 'center' };
+    makerDateCell.font = { name: '宋体', size: 11 };
+    // 添加下划线边框
+    makerDateCell.border = { bottom: { style: 'thin' } };
+
+    // F列: 审核/日期：
+    const checkerLabelCell = worksheet.getCell(`F${footerRowIndex}`);
+    checkerLabelCell.value = '审核/日期：';
+    checkerLabelCell.alignment = { vertical: 'middle', horizontal: 'right' };
+    checkerLabelCell.font = { name: '宋体', size: 11, bold: true };
+
+    // G列: 审核签字位 (预留)
+    const checkerSignCell = worksheet.getCell(`G${footerRowIndex}`);
+    checkerSignCell.border = { bottom: { style: 'thin' } };
+
+    // H列: 批准/日期：
+    const approverLabelCell = worksheet.getCell(`H${footerRowIndex}`);
+    approverLabelCell.value = '批准/日期：';
+    approverLabelCell.alignment = { vertical: 'middle', horizontal: 'right' };
+    approverLabelCell.font = { name: '宋体', size: 11, bold: true };
+
+    // I列+J列: 批准签字位 (预留，合并)
+    worksheet.mergeCells(`I${footerRowIndex}:J${footerRowIndex}`);
+    const approverSignCell = worksheet.getCell(`I${footerRowIndex}`);
+    approverSignCell.border = { bottom: { style: 'thin' } };
+
+    // 发送响应
+    const now = new Date();
+    const yearStr = String(now.getFullYear()).slice(-2);
+    const monthStr = String(now.getMonth() + 1).padStart(2, '0');
+    const dayStr = String(now.getDate()).padStart(2, '0');
+    const hourStr = String(now.getHours()).padStart(2, '0');
+    const minuteStr = String(now.getMinutes()).padStart(2, '0');
+    const secondStr = String(now.getSeconds()).padStart(2, '0');
+    const timestamp = `${yearStr}${monthStr}${dayStr}${hourStr}${minuteStr}${secondStr}`;
+
+    const filename = `${year}年质量目标表-${timestamp}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+    
+    await workbook.xlsx.write(res);
+    res.end();
+    
+  } catch (error) {
+    console.error('导出质量目标数据失败:', error);
+    res.status(500).json({
+      success: false,
+      message: '导出质量目标数据失败',
+      error: error.message
+    });
+  }
+});
+
+/**
  * 获取单个质量目标详情
  * GET /api/quality-targets/:id
  */
@@ -506,6 +1015,15 @@ router.post('/', async (req, res) => {
         message: '请填写所有必填字段'
       });
     }
+
+    // 验证统计频次
+    const allowedFrequencies = ['每月', '每季度', '每半年', '每年'];
+    if (!allowedFrequencies.includes(statisticsFrequency)) {
+      return res.status(400).json({
+        success: false,
+        message: '统计频次无效，必须为：每月、每季度、每半年、每年'
+      });
+    }
     
     const pool = await getConnection();
     
@@ -536,8 +1054,11 @@ router.post('/', async (req, res) => {
     request.input('responsiblePerson', sql.NVarChar(50), responsiblePerson);
     request.input('statisticsFrequency', sql.NVarChar(20), statisticsFrequency);
     request.input('description', sql.NVarChar(500), description || '');
-    request.input('createdBy', sql.NVarChar(50), req.user?.username || 'system');
-    request.input('updatedBy', sql.NVarChar(50), req.user?.username || 'system');
+    
+    // 优先使用用户的真实姓名，如果没有则使用用户名
+    const creatorName = req.user?.name || req.user?.username || 'system';
+    request.input('createdBy', sql.NVarChar(50), creatorName);
+    request.input('updatedBy', sql.NVarChar(50), creatorName);
     
     const result = await request.query(query);
     const newId = result.recordset[0].newId;
@@ -585,6 +1106,15 @@ router.put('/:id', async (req, res) => {
         message: '请填写所有必填字段'
       });
     }
+
+    // 验证统计频次
+    const allowedFrequencies = ['每月', '每季度', '每半年', '每年'];
+    if (!allowedFrequencies.includes(statisticsFrequency)) {
+      return res.status(400).json({
+        success: false,
+        message: '统计频次无效，必须为：每月、每季度、每半年、每年'
+      });
+    }
     
     const pool = await getConnection();
     
@@ -630,7 +1160,10 @@ router.put('/:id', async (req, res) => {
     request.input('responsiblePerson', sql.NVarChar(50), responsiblePerson);
     request.input('statisticsFrequency', sql.NVarChar(20), statisticsFrequency);
     request.input('description', sql.NVarChar(500), description || '');
-    request.input('updatedBy', sql.NVarChar(50), req.user?.username || 'system');
+    
+    // 优先使用用户的真实姓名，如果没有则使用用户名
+    const updaterName = req.user?.name || req.user?.username || 'system';
+    request.input('updatedBy', sql.NVarChar(50), updaterName);
     
     await request.query(updateQuery);
     
@@ -682,7 +1215,10 @@ router.delete('/:id', async (req, res) => {
     
     const request = pool.request();
     request.input('id', sql.Int, id);
-    request.input('updatedBy', sql.NVarChar(50), req.user?.username || 'system');
+    
+    // 优先使用用户的真实姓名
+    const deleterName = req.user?.name || req.user?.username || 'system';
+    request.input('updatedBy', sql.NVarChar(50), deleterName);
     
     await request.query(deleteQuery);
     
@@ -731,7 +1267,10 @@ router.post('/batch-delete', async (req, res) => {
     `;
     
     const request = pool.request();
-    request.input('updatedBy', sql.NVarChar(50), req.user?.username || 'system');
+    
+    // 优先使用用户的真实姓名
+    const deleterName = req.user?.name || req.user?.username || 'system';
+    request.input('updatedBy', sql.NVarChar(50), deleterName);
     
     ids.forEach((id, index) => {
       request.input(`id${index}`, sql.Int, id);
@@ -779,7 +1318,7 @@ router.get('/statistics/overview', async (req, res) => {
         COUNT(DISTINCT ResponsiblePerson) as personCount
       FROM QualityTargets
       WHERE IsDeleted = 0
-        AND YEAR(CreatedAt) = @year
+        AND TargetYear = @year
     `;
     
     const request = pool.request();
@@ -827,7 +1366,7 @@ router.get('/statistics/category', async (req, res) => {
         CAST(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER() AS DECIMAL(5,2)) as percentage
       FROM QualityTargets
       WHERE IsDeleted = 0
-        AND YEAR(CreatedAt) = @year
+        AND TargetYear = @year
       GROUP BY TargetCategory
       ORDER BY count DESC
     `;
@@ -1297,114 +1836,7 @@ router.put('/statistics/:id', async (req, res) => {
 // 数据导出功能
 // =====================================================
 
-/**
- * 导出质量目标数据
- * GET /api/quality-targets/export
- */
-router.get('/export', async (req, res) => {
-  try {
-    const {
-      category = '',
-      assessmentUnit = '',
-      responsiblePerson = '',
-      year = new Date().getFullYear()
-    } = req.query;
-    
-    const pool = await getConnection();
-    
-    // 构建查询条件
-    let whereConditions = ['qt.IsDeleted = 0'];
-    let queryParams = [];
-    
-    if (category) {
-      whereConditions.push('qt.Category = @category');
-      queryParams.push({ name: 'category', type: sql.NVarChar(50), value: category });
-    }
-    
-    if (assessmentUnit) {
-      whereConditions.push('qt.AssessmentUnit = @assessmentUnit');
-      queryParams.push({ name: 'assessmentUnit', type: sql.NVarChar(100), value: assessmentUnit });
-    }
-    
-    if (responsiblePerson) {
-      whereConditions.push('qt.ResponsiblePerson = @responsiblePerson');
-      queryParams.push({ name: 'responsiblePerson', type: sql.NVarChar(50), value: responsiblePerson });
-    }
-    
-    if (year) {
-      whereConditions.push('YEAR(qt.CreatedAt) = @year');
-      queryParams.push({ name: 'year', type: sql.Int, value: parseInt(year) });
-    }
-    
-    const whereClause = whereConditions.join(' AND ');
-    
-    const query = `
-      SELECT 
-        qt.TargetCategory as '目标分类',
-        qt.AssessmentUnit as '考核单位',
-        qt.QualityTarget as '质量目标',
-        qt.CalculationFormula as '计算公式',
-        qt.TargetValue as '目标值',
-        qt.Measures as '措施',
-        qt.ResponsiblePerson as '责任人',
-        qt.StatisticsFrequency as '统计频次',
-        qt.Remarks as '备注',
-        FORMAT(qt.CreatedAt, 'yyyy-MM-dd HH:mm:ss') as '创建时间',
-        qt.CreatedBy as '创建人'
-      FROM QualityTargets qt
-      WHERE ${whereClause}
-      ORDER BY qt.TargetCategory, qt.CreatedAt DESC
-    `;
-    
-    const request = pool.request();
-    queryParams.forEach(param => {
-      request.input(param.name, param.type, param.value);
-    });
-    
-    const result = await request.query(query);
-    
-    // 设置响应头
-    const filename = `质量目标数据_${new Date().toISOString().slice(0, 10)}.csv`;
-    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
-    
-    // 生成CSV内容
-    const records = result.recordset;
-    if (records.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '没有找到符合条件的数据'
-      });
-    }
-    
-    // CSV头部（BOM + 列名）
-    const headers = Object.keys(records[0]);
-    let csvContent = '\uFEFF' + headers.join(',') + '\n';
-    
-    // CSV数据行
-    records.forEach(record => {
-      const row = headers.map(header => {
-        const value = record[header] || '';
-        // 处理包含逗号或引号的值
-        if (typeof value === 'string' && (value.includes(',') || value.includes('"') || value.includes('\n'))) {
-          return `"${value.replace(/"/g, '""')}"`;
-        }
-        return value;
-      });
-      csvContent += row.join(',') + '\n';
-    });
-    
-    res.send(csvContent);
-    
-  } catch (error) {
-    console.error('导出质量目标数据失败:', error);
-    res.status(500).json({
-      success: false,
-      message: '导出质量目标数据失败',
-      error: error.message
-    });
-  }
-});
+
 
 // =====================================================
 // 辅助功能 API
@@ -1808,6 +2240,67 @@ router.get('/statistics/category-by-targets', async (req, res) => {
       message: '获取目标分类统计数据失败',
       error: error.message
     });
+  }
+});
+
+// 批量复制年度目标
+router.post('/copy', authenticateToken, async (req, res) => {
+  try {
+    const { ids, targetYear } = req.body;
+    
+    if (!ids || !Array.isArray(ids) || ids.length === 0) {
+      return res.status(400).json({ success: false, message: '请选择要复制的目标' });
+    }
+    
+    if (!targetYear) {
+      return res.status(400).json({ success: false, message: '请指定目标年份' });
+    }
+    
+    const pool = await getConnection();
+    
+    // 不使用显式事务，直接执行，避免复杂的事务状态管理
+    try {
+      const request = new sql.Request(pool);
+      
+      // 优先使用用户的真实姓名
+      const creatorName = req.user?.name || req.user?.username || 'system';
+      
+      // 生成 ID 列表参数
+      ids.forEach((id, index) => {
+        request.input(`id${index}`, sql.Int, id);
+      });
+      
+      request.input('targetYear', sql.Int, targetYear);
+      request.input('createdBy', sql.NVarChar(50), creatorName);
+      
+      const idParams = ids.map((_, index) => `@id${index}`).join(',');
+      
+      const query = `
+        INSERT INTO QualityTargets (
+          TargetYear, TargetCategory, AssessmentUnit, QualityTarget, 
+          CalculationFormula, TargetValue, Measures, ResponsiblePerson, 
+          StatisticsFrequency, Status, Description, 
+          IsDeleted, CreatedAt, CreatedBy, UpdatedAt, UpdatedBy
+        )
+        SELECT 
+          @targetYear, TargetCategory, AssessmentUnit, QualityTarget, 
+          CalculationFormula, TargetValue, Measures, ResponsiblePerson, 
+          StatisticsFrequency, 1, Description, 
+          0, GETDATE(), @createdBy, GETDATE(), @createdBy
+        FROM QualityTargets
+        WHERE ID IN (${idParams})
+      `;
+      
+      await request.query(query);
+      
+      res.json({ success: true, message: `成功复制 ${ids.length} 条目标到 ${targetYear} 年` });
+      
+    } catch (err) {
+      throw err;
+    }
+  } catch (error) {
+    console.error('复制年度目标失败:', error);
+    res.status(500).json({ success: false, message: '复制年度目标失败: ' + error.message });
   }
 });
 

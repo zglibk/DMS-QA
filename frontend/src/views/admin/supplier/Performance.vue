@@ -9,7 +9,7 @@
     <!-- 统计卡片 -->
     <div class="stats-section">
       <el-row :gutter="20">
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card">
             <div class="stats-content">
               <div class="stats-icon delivery">
@@ -22,7 +22,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card">
             <div class="stats-content">
               <div class="stats-icon quality">
@@ -35,7 +35,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card">
             <div class="stats-content">
               <div class="stats-icon service">
@@ -48,7 +48,7 @@
             </div>
           </el-card>
         </el-col>
-        <el-col :span="6">
+        <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
           <el-card class="stats-card">
             <div class="stats-content">
               <div class="stats-icon cost">
@@ -127,10 +127,12 @@
         stripe
         border
         style="width: 100%"
+        :header-cell-style="headerCellStyle"
+        :cell-style="cellStyle"
       >
-        <el-table-column prop="supplierName" label="供应商名称" width="180" />
-        <el-table-column prop="evaluationPeriod" label="评估周期" width="120" />
-        <el-table-column prop="deliveryRate" label="交付及时率" width="120">
+        <el-table-column prop="supplierName" label="供应商名称" min-width="160" align="left" show-overflow-tooltip />
+        <el-table-column prop="evaluationPeriod" label="评估周期" min-width="100" align="center" />
+        <el-table-column prop="deliveryRate" label="交付及时率" min-width="120" align="center">
           <template #default="{ row }">
             <div class="progress-cell">
               <el-progress
@@ -141,7 +143,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="qualityRate" label="质量合格率" width="120">
+        <el-table-column prop="qualityRate" label="质量合格率" min-width="120" align="center">
           <template #default="{ row }">
             <div class="progress-cell">
               <el-progress
@@ -152,7 +154,7 @@
             </div>
           </template>
         </el-table-column>
-        <el-table-column prop="serviceScore" label="服务评分" width="100">
+        <el-table-column prop="serviceScore" label="服务评分" min-width="130" align="center">
           <template #default="{ row }">
             <el-rate
               v-model="row.serviceScore"
@@ -163,7 +165,7 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="costScore" label="成本控制" width="100">
+        <el-table-column prop="costScore" label="成本控制" min-width="130" align="center">
           <template #default="{ row }">
             <el-rate
               v-model="row.costScore"
@@ -174,30 +176,32 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="overallScore" label="综合评分" width="100">
+        <el-table-column prop="overallScore" label="综合评分" min-width="80" align="center">
           <template #default="{ row }">
             <span :class="getScoreClass(row.overallScore)">{{ row.overallScore }}</span>
           </template>
         </el-table-column>
-        <el-table-column prop="performanceLevel" label="绩效等级" width="100">
+        <el-table-column prop="performanceLevel" label="绩效等级" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getPerformanceLevelTagType(row.performanceLevel)">
               {{ getPerformanceLevelLabel(row.performanceLevel) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="improvementSuggestions" label="改进建议" min-width="200" show-overflow-tooltip />
-        <el-table-column label="操作" width="200" fixed="right">
+        <el-table-column prop="improvementSuggestions" label="改进建议" min-width="150" align="center" show-overflow-tooltip />
+        <el-table-column label="操作" min-width="180" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">
-              编辑
-            </el-button>
-            <el-button type="info" size="small" @click="handleViewTrend(row)">
-              趋势图
-            </el-button>
-            <el-button type="warning" size="small" @click="handleViewReport(row)">
-              报告
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleEdit(row)">
+                编辑
+              </el-button>
+              <el-button type="info" size="small" @click="handleViewTrend(row)">
+                趋势图
+              </el-button>
+              <el-button type="warning" size="small" @click="handleViewReport(row)">
+                报告
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -344,6 +348,27 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const isEdit = ref(false)
 const formRef = ref()
+
+/**
+ * 表格表头单元格样式 - 禁止换行
+ */
+const headerCellStyle = () => {
+  return { 
+    textAlign: 'center',
+    whiteSpace: 'nowrap'
+  }
+}
+
+/**
+ * 表格单元格样式
+ */
+const cellStyle = ({ column }) => {
+  // 供应商名称列左对齐，其他列居中
+  if (column.property === 'supplierName') {
+    return { textAlign: 'left' }
+  }
+  return { textAlign: 'center', verticalAlign: 'middle' }
+}
 
 // 整体统计数据
 const overallStats = reactive({
@@ -634,6 +659,10 @@ onMounted(() => {
 }
 
 .stats-section {
+  margin-bottom: 0;
+}
+
+.stats-section .el-col {
   margin-bottom: 20px;
 }
 
@@ -711,6 +740,18 @@ onMounted(() => {
 .pagination-section {
   margin-top: 20px;
   text-align: right;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  padding: 5px 10px;
 }
 
 .dialog-footer {

@@ -518,6 +518,18 @@ export const breadcrumbConfig = {
     icon: 'Cpu'
   },
 
+  // 二次开发 - Dev
+  '/admin/dev': {
+    title: '二次开发',
+    icon: 'SetUp'
+  },
+
+  // ERP接口文档
+  '/admin/dev/erp-api-doc': {
+    title: 'ERP接口文档',
+    icon: 'Document'
+  },
+
   // 仪器管理
   '/admin/instruments': {
     title: '仪器管理',
@@ -831,7 +843,12 @@ function generateDefaultTitle(segment) {
     // 检验报告相关
     'shipment-report': '出货检验报告',
     'inspection-report': '检验报告',
-    'template-mapping': '模板映射'
+    'template-mapping': '模板映射',
+    // 二次开发相关
+    'dev': '二次开发',
+    'development': '二次开发',
+    'erp-api-doc': 'ERP接口文档',
+    'api-doc': '接口文档'
   }
   
   return titleMap[segment] || segment.replace(/-/g, ' ').replace(/\b\w/g, l => l.toUpperCase())

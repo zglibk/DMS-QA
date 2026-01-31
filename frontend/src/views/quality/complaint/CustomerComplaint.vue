@@ -1242,6 +1242,8 @@ import { Plus, Search, Refresh, Upload, Delete, Download, Close, Check, User, Do
 import apiService from '@/services/apiService'
 import { useUserStore } from '@/store/user'
 import api from '@/utils/api'
+// 导入文件服务器配置工具
+import { getFileServerPrefix, buildFileUrl } from '@/utils/fileServerConfig'
 
 /**
  * 客户投诉记录管理组件
@@ -1735,9 +1737,14 @@ const handleEdit = async (row) => {
     const hasValidUrl = file.url || file.accessUrl || file.filename
     return hasValidKeys && hasValidUrl
   }).map((file, index) => {
+    // 使用buildFileUrl处理文件URL，自动适配生产/开发环境
+    let fileUrl = file.url || file.accessUrl
+    if (!fileUrl && file.filename) {
+      fileUrl = buildFileUrl(`/files/customer-complaint/${file.filename}`)
+    }
     return {
       name: file.name || file.originalName || `attachment_${index + 1}`,
-      url: file.url || file.accessUrl || (file.filename ? `/files/customer-complaint/${file.filename}` : ''),
+      url: fileUrl || '',
       uid: file.id || Date.now() + index,
       status: 'success',
       // 保留原始数据
@@ -2161,40 +2168,39 @@ const getImageUrl = (image, preventCache = false) => {
   
   // 处理el-upload组件中的文件对象
   if (image.url && !image.accessUrl && !image.filename) {
-    // 这是el-upload组件中的文件对象，直接使用url
-    return preventCache ? `${image.url}?t=${Date.now()}` : image.url
+    // 这是el-upload组件中的文件对象
+    let url = image.url
+    // 如果是相对路径，使用buildFileUrl处理
+    if (url.startsWith('/files/')) {
+      url = buildFileUrl(url)
+    }
+    return preventCache ? `${url}?t=${Date.now()}` : url
   }
   
   // 新格式：优先使用accessUrl（已经是完整URL）
   if (image.accessUrl) {
-    return preventCache ? `${image.accessUrl}?t=${Date.now()}` : image.accessUrl
+    let url = image.accessUrl
+    // 如果是相对路径，使用buildFileUrl处理
+    if (url.startsWith('/files/')) {
+      url = buildFileUrl(url)
+    }
+    return preventCache ? `${url}?t=${Date.now()}` : url
   }
   
-  // 旧格式：使用url（已经是完整URL）
-  if (image.url && (image.url.startsWith('http') || image.url.startsWith('/files/'))) {
-    return preventCache ? `${image.url}?t=${Date.now()}` : image.url
+  // 旧格式：使用url
+  if (image.url) {
+    let url = image.url
+    // 如果是相对路径，使用buildFileUrl处理
+    if (url.startsWith('/files/')) {
+      url = buildFileUrl(url)
+    }
+    return preventCache ? `${url}?t=${Date.now()}` : url
   }
   
-  // 如果有filename，根据环境构建URL路径
+  // 如果有filename，使用buildFileUrl构建URL
   if (image.filename) {
-    const hostname = window.location.hostname
-    const protocol = window.location.protocol
-    
-    let url
-    if (hostname === 'localhost' || hostname === '127.0.0.1') {
-      // 开发环境：使用Vite代理
-      url = `/files/customer-complaint/${image.filename}`
-    } else {
-      // 生产环境：使用Nginx文件服务器端口8080
-      url = `${protocol}//${hostname}:8080/files/customer-complaint/${image.filename}`
-    }
-    
-    // 只在需要防止缓存时添加时间戳参数
-    if (preventCache) {
-      url += `?t=${Date.now()}`
-    }
-    
-    return url
+    const url = buildFileUrl(`/files/customer-complaint/${image.filename}`)
+    return preventCache ? `${url}?t=${Date.now()}` : url
   }
   
   // 如果都没有，返回空字符串

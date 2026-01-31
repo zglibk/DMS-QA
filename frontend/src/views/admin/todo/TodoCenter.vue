@@ -2,7 +2,7 @@
   <div class="todo-center">
     <!-- 顶部统计卡片 -->
     <el-row :gutter="16" class="stats-row">
-      <el-col :xs="12" :sm="6">
+      <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
         <div class="stat-card-wrapper stat-pending" :class="{ active: filterStatus === 'pending' && filterIsRead === '' }">
           <div class="rotating-border"></div>
           <el-card class="stat-card" shadow="hover" @click="filterByStatus('pending')">
@@ -18,7 +18,7 @@
           </el-card>
         </div>
       </el-col>
-      <el-col :xs="12" :sm="6">
+      <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
         <div class="stat-card-wrapper stat-unread" :class="{ active: filterIsRead === 'false' }">
           <div class="rotating-border"></div>
           <el-card class="stat-card" shadow="hover" @click="filterByUnread">
@@ -34,7 +34,7 @@
           </el-card>
         </div>
       </el-col>
-      <el-col :xs="12" :sm="6">
+      <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
         <div class="stat-card-wrapper stat-completed" :class="{ active: filterStatus === 'completed' && filterIsRead === '' }">
           <div class="rotating-border"></div>
           <el-card class="stat-card" shadow="hover" @click="filterByStatus('completed')">
@@ -50,7 +50,7 @@
           </el-card>
         </div>
       </el-col>
-      <el-col :xs="12" :sm="6">
+      <el-col :xs="24" :sm="12" :md="12" :lg="6" :xl="6">
         <div class="stat-card-wrapper stat-total" :class="{ active: filterStatus === '' && filterIsRead === '' }">
           <div class="rotating-border"></div>
           <el-card class="stat-card" shadow="hover" @click="filterByStatus('')">
@@ -550,6 +550,10 @@ onMounted(() => {
 }
 
 .stats-row {
+  margin-bottom: 0;
+}
+
+.stats-row .el-col {
   margin-bottom: 20px;
 }
 

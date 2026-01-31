@@ -529,31 +529,114 @@ router.post('/manual-sync', authenticateToken, async (req, res) => {
 });
 
 /**
- * 清理同步日志
- * DELETE /api/erp-config/sync-logs/cleanup
+ * 批量删除同步日志
+ * DELETE /api/erp-config/sync-logs/batch
  * 请求体:
- * - days: 保留天数，默认30天
+ * - ids: 要删除的日志ID数组
  */
-router.delete('/sync-logs/cleanup', authenticateToken, async (req, res) => {
+router.delete('/sync-logs/batch', authenticateToken, async (req, res) => {
     try {
-        const { days = 30 } = req.body;
+        const { ids } = req.body;
         
-        const deleteQuery = `
-            DELETE FROM erp_sync_logs 
-            WHERE created_at < DATEADD(day, -@days, GETDATE())
-        `;
+        if (!ids || !Array.isArray(ids) || ids.length === 0) {
+            return res.status(400).json({
+                success: false,
+                message: '请提供要删除的日志ID',
+                data: null
+            });
+        }
+        
+        // 构建IN查询的参数
+        const idPlaceholders = ids.map((_, index) => `@id${index}`).join(',');
+        const deleteQuery = `DELETE FROM erp_sync_logs WHERE id IN (${idPlaceholders})`;
         
         const result = await executeQuery(async (pool) => {
-            return await pool.request()
-                .input('days', sql.Int, days)
-                .query(deleteQuery);
+            const request = pool.request();
+            ids.forEach((id, index) => {
+                request.input(`id${index}`, sql.Int, id);
+            });
+            return await request.query(deleteQuery);
         });
+        
+        const deletedCount = result.rowsAffected[0] || 0;
         
         res.json({
             success: true,
-            message: `已清理${days}天前的同步日志`,
+            message: `成功删除${deletedCount}条日志记录`,
             data: {
-                deletedCount: result.rowsAffected[0] || 0
+                deletedCount: deletedCount
+            }
+        });
+    } catch (error) {
+        console.error('批量删除同步日志失败:', error);
+        res.status(500).json({
+            success: false,
+            message: `批量删除同步日志失败: ${error.message}`,
+            data: null
+        });
+    }
+});
+
+/**
+ * 清理同步日志（支持条件过滤）
+ * DELETE /api/erp-config/sync-logs/cleanup
+ * 请求体:
+ * - sync_type: 同步类型（可选）
+ * - status: 状态（可选）
+ * - start_time: 开始时间（可选）
+ * - end_time: 结束时间（可选）
+ */
+router.delete('/sync-logs/cleanup', authenticateToken, async (req, res) => {
+    try {
+        const { sync_type, status, start_time, end_time } = req.body;
+        
+        // 构建动态WHERE条件
+        const conditions = [];
+        const params = {};
+        
+        if (sync_type) {
+            conditions.push('sync_type = @sync_type');
+            params.sync_type = sync_type;
+        }
+        
+        if (status) {
+            conditions.push('status = @status');
+            params.status = status;
+        }
+        
+        if (start_time) {
+            conditions.push('created_at >= @start_time');
+            params.start_time = start_time;
+        }
+        
+        if (end_time) {
+            conditions.push('created_at <= @end_time');
+            params.end_time = end_time;
+        }
+        
+        const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+        const deleteQuery = `DELETE FROM erp_sync_logs ${whereClause}`;
+        
+        const result = await executeQuery(async (pool) => {
+            const request = pool.request();
+            Object.entries(params).forEach(([key, value]) => {
+                if (key === 'start_time' || key === 'end_time') {
+                    request.input(key, sql.DateTime, value);
+                } else {
+                    request.input(key, sql.NVarChar, value);
+                }
+            });
+            return await request.query(deleteQuery);
+        });
+        
+        const deletedCount = result.rowsAffected[0] || 0;
+        const conditionDesc = conditions.length > 0 ? '符合条件的' : '所有';
+        
+        res.json({
+            success: true,
+            message: `已清理${conditionDesc}同步日志，共删除${deletedCount}条记录`,
+            data: {
+                deletedCount: deletedCount
             }
         });
     } catch (error) {

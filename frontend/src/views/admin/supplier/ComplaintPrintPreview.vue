@@ -312,6 +312,7 @@ import { ElMessage, ElLoading } from 'element-plus'
 import { Printer, Close, Lock, Unlock } from '@element-plus/icons-vue'
 import { useSiteConfig } from '@/composables/useSiteConfig'
 import DraggableSeal from '@/components/DraggableSeal.vue'
+import { buildFileUrl } from '@/utils/fileServerConfig'
 
 const route = useRoute()
 const data = ref({})
@@ -369,40 +370,21 @@ const updateSealPosition = (pos) => {
     sealPosition.value = pos
 }
 
-// 获取适配的印章URL
+// 获取适配的印章URL（使用统一的文件服务配置）
 const getAdaptedSealUrl = (imagePath) => {
   if (!imagePath) return ''
   if (imagePath.startsWith('blob:') || imagePath.startsWith('data:')) return imagePath
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath
   
-  // 根据当前页面的hostname判断环境
-  const hostname = window.location.hostname
-  const protocol = window.location.protocol
-  
-  // 构建图片URL - 印章存储路径是 /uploads/seals/
-  let url
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    // 开发环境：使用Vite代理
-    // /uploads/seals/ -> /files/seals/
-    if (imagePath.startsWith('/uploads/')) {
-      url = imagePath.replace('/uploads/', '/files/')
-    } else if (imagePath.startsWith('/files/')) {
-      url = imagePath
-    } else {
-      url = `/files/seals/${imagePath.replace(/^\/+/, '')}`
-    }
-  } else {
-    // 生产环境：使用8080端口的文件服务器
-    let cleanPath = imagePath
-    if (cleanPath.startsWith('/uploads/')) {
-      cleanPath = cleanPath.replace('/uploads/', '/files/')
-    } else if (!cleanPath.startsWith('/files/')) {
-      cleanPath = `/files/seals/${cleanPath.replace(/^\/+/, '')}`
-    }
-    url = `${protocol}//${hostname}:8080${cleanPath}`
+  // 处理路径：/uploads/seals/ -> /files/seals/
+  let cleanPath = imagePath
+  if (cleanPath.startsWith('/uploads/')) {
+    cleanPath = cleanPath.replace('/uploads/', '/files/')
+  } else if (!cleanPath.startsWith('/files/')) {
+    cleanPath = `/files/seals/${cleanPath.replace(/^\/+/, '')}`
   }
   
-  return url
+  return buildFileUrl(cleanPath)
 }
 
 // 加载印章列表

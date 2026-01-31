@@ -67,18 +67,20 @@
         stripe
         border
         style="width: 100%"
+        :header-cell-style="headerCellStyle"
+        :cell-style="cellStyle"
       >
-        <el-table-column prop="supplierCode" label="供应商编码" width="120" />
-        <el-table-column prop="supplierName" label="供应商名称" width="200" />
-        <el-table-column prop="equipmentType" label="主要设备类型" width="120">
+        <el-table-column prop="supplierCode" label="供应商编码" min-width="90" align="center" />
+        <el-table-column prop="supplierName" label="供应商名称" min-width="180" align="left" show-overflow-tooltip />
+        <el-table-column prop="equipmentType" label="设备类型" min-width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="getEquipmentTypeTagType(row.equipmentType)">
               {{ getEquipmentTypeLabel(row.equipmentType) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="brands" label="代理品牌" width="150" show-overflow-tooltip />
-        <el-table-column prop="serviceLevel" label="服务等级" width="100">
+        <el-table-column prop="brands" label="代理品牌" min-width="120" align="center" show-overflow-tooltip />
+        <el-table-column prop="serviceLevel" label="服务等级" min-width="140" align="center">
           <template #default="{ row }">
             <el-rate
               v-model="row.serviceLevel"
@@ -89,35 +91,37 @@
             />
           </template>
         </el-table-column>
-        <el-table-column prop="responseTime" label="响应时间" width="100">
+        <el-table-column prop="responseTime" label="响应时间" min-width="80" align="center">
           <template #default="{ row }">
             {{ row.responseTime }}小时
           </template>
         </el-table-column>
-        <el-table-column prop="warrantyPeriod" label="保修期" width="100">
+        <el-table-column prop="warrantyPeriod" label="保修期" min-width="70" align="center">
           <template #default="{ row }">
             {{ row.warrantyPeriod }}年
           </template>
         </el-table-column>
-        <el-table-column prop="lastServiceDate" label="最近服务" width="120" />
-        <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="lastServiceDate" label="最近服务" min-width="100" align="center" />
+        <el-table-column prop="status" label="状态" min-width="80" align="center">
           <template #default="{ row }">
             <el-tag :type="getStatusTagType(row.status)">
               {{ getStatusLabel(row.status) }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column label="操作" min-width="180" fixed="right" align="center">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleEdit(row)">
-              编辑
-            </el-button>
-            <el-button type="info" size="small" @click="handleViewEquipments(row)">
-              设备清单
-            </el-button>
-            <el-button type="warning" size="small" @click="handleServiceRecord(row)">
-              服务记录
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleEdit(row)">
+                编辑
+              </el-button>
+              <el-button type="info" size="small" @click="handleViewEquipments(row)">
+                设备清单
+              </el-button>
+              <el-button type="warning" size="small" @click="handleServiceRecord(row)">
+                服务记录
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -259,6 +263,27 @@ const dialogVisible = ref(false)
 const dialogTitle = ref('')
 const isEdit = ref(false)
 const formRef = ref()
+
+/**
+ * 表格表头单元格样式 - 禁止换行
+ */
+const headerCellStyle = () => {
+  return { 
+    textAlign: 'center',
+    whiteSpace: 'nowrap'
+  }
+}
+
+/**
+ * 表格单元格样式
+ */
+const cellStyle = ({ column }) => {
+  // 供应商名称列左对齐，其他列居中
+  if (column.property === 'supplierName') {
+    return { textAlign: 'left' }
+  }
+  return { textAlign: 'center', verticalAlign: 'middle' }
+}
 
 // 搜索表单
 const searchForm = reactive({
@@ -562,6 +587,18 @@ onMounted(() => {
 .pagination-section {
   margin-top: 20px;
   text-align: right;
+}
+
+.action-buttons {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+.action-buttons .el-button {
+  margin: 0;
+  padding: 5px 10px;
 }
 
 .dialog-footer {

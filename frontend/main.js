@@ -36,6 +36,8 @@ import axios from 'axios'
 import { ElMessage } from 'element-plus'
 // 导入网站配置管理组合式函数
 import { useSiteConfig } from './src/composables/useSiteConfig.js'
+// 导入文件服务器配置工具
+import { initFileServerConfig } from './src/utils/fileServerConfig.js'
 // 导入Iconify图标组件
 import { Icon } from '@iconify/vue'
 // 导入Element Plus图标
@@ -117,7 +119,11 @@ const initApp = async () => {
     const { loadSiteConfig } = useSiteConfig();
     await loadSiteConfig();
     
-    // 4. 在开发环境下添加用户状态全局监听器
+    // 4. 初始化文件服务器配置（预加载，供后续使用）
+    await initFileServerConfig();
+    console.log('✅ 文件服务器配置已加载');
+    
+    // 5. 在开发环境下添加用户状态全局监听器
     if (process.env.NODE_ENV === 'development') {
       try {
         const { useUserStore } = await import('./src/store/user.js');

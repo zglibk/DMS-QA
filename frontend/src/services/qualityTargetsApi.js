@@ -102,6 +102,15 @@ export const exportQualityTargets = (params) => {
 }
 
 /**
+ * 批量复制质量目标
+ * @param {Object} data - 复制参数 { ids: [], targetYear: number }
+ * @returns {Promise} API响应
+ */
+export const copyQualityTargets = (data) => {
+  return api.post('/quality-targets/copy', data)
+}
+
+/**
  * 获取质量目标统计概览
  * @param {Object} params - 查询参数
  * @param {number} params.year - 年度

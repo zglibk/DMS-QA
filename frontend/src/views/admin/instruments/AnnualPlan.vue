@@ -1242,6 +1242,18 @@ onMounted(() => {
   margin-bottom: 16px;
 }
 
+@media (max-width: 1200px) {
+  .statistics-section {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .statistics-section {
+    grid-template-columns: 1fr;
+  }
+}
+
 .stat-card {
   display: flex;
   align-items: center;

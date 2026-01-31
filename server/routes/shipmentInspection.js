@@ -199,6 +199,32 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
+// Get Single Report by ID
+router.get('/:id', authenticateToken, async (req, res) => {
+    try {
+        const { id } = req.params;
+        const result = await executeQuery(async (pool) => {
+            return await pool.request()
+                .input('ID', sql.Int, id)
+                .query(`
+                    SELECT r.*, u.RealName as CreatorName
+                    FROM ShipmentReports r
+                    LEFT JOIN [User] u ON r.CreatedBy = u.Username
+                    WHERE r.ID = @ID
+                `);
+        });
+        
+        if (!result.recordset || result.recordset.length === 0) {
+            return res.status(404).json({ success: false, message: '报告不存在' });
+        }
+        
+        res.json({ success: true, data: result.recordset[0] });
+    } catch (e) {
+        console.error('获取出货报告失败:', e);
+        res.status(500).json({ success: false, message: '获取报告失败' });
+    }
+});
+
 // Delete Report
 router.delete('/:id', authenticateToken, async (req, res) => {
     try {

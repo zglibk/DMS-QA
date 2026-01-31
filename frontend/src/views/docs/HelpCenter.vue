@@ -226,6 +226,7 @@ import { useUserStore } from '@/store/user'
 import apiService from '@/services/apiService.js'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import AppLayout from '@/components/common/AppLayout.vue'
+import { getFileServerPrefix, buildFileUrl } from '@/utils/fileServerConfig'
 import { 
   Tools, 
   Document, 
@@ -738,20 +739,9 @@ const initialIndex = ref(0)
 
 /**
  * 计算文件服务器基础地址
- * - 开发环境：使用空字符串，让 Vite 代理处理 /files 路径
- * - 生产环境：使用 8080 端口的文件服务器
+ * 使用统一的文件服务配置
  */
-const fileServerBase = (() => {
-  // 在生产环境中，根据主机名动态构建基础URL
-  if (import.meta.env.PROD) {
-    const protocol = window.location.protocol;
-    const hostname = window.location.hostname;
-    // 假设文件服务器与应用部署在同一服务器，但端口不同
-    return `${protocol}//${hostname}:8080`;
-  }
-  // 在开发环境中，返回空字符串，依赖Vite的代理
-  return '';
-})();
+const fileServerBase = getFileServerPrefix();
 
 /**
  * 将内部图片数据转换为 el-upload 期望的格式
@@ -791,17 +781,15 @@ function buildImageUrl(imageInfo) {
     return imageUrl
   }
 
-  // 2. 如果是 /files/ 开头的路径（通常是开发环境代理或生产环境 nginx 转发）
+  // 2. 如果是 /files/ 开头的路径，使用统一的文件服务配置
   if (imageUrl.startsWith('/files')) {
-    return import.meta.env.PROD ? `${fileServerBase}${imageUrl}` : imageUrl
+    return buildFileUrl(imageUrl)
   }
 
   // 3. 处理相对路径（例如：complaints/xxx.png）
   // 移除可能的 attachments/ 前缀并统一斜杠
   const cleanPath = imageUrl.replace(/\\/g, '/').replace(/^attachments[\\\/]?/, '')
-  const staticUrl = `/files/attachments/${cleanPath}`
-
-  return import.meta.env.PROD ? `${fileServerBase}${staticUrl}` : staticUrl
+  return buildFileUrl(`/files/attachments/${cleanPath}`)
 }
 
 /**

@@ -144,9 +144,9 @@
                 <el-icon><Refresh /></el-icon>
                 <span style="margin-left: 4px;">刷新日志</span>
               </el-button>
-              <el-button type="warning" @click="handleClearLogs" :disabled="!canClearLogs">
+              <el-button type="danger" @click="handleDeleteLogs" :disabled="!canClearLogs || logList.length === 0">
                 <el-icon><Delete /></el-icon>
-                <span style="margin-left: 4px;">清理日志</span>
+                <span style="margin-left: 4px;">{{ selectedLogs.length > 0 ? `删除选中 (${selectedLogs.length})` : '清理当前结果' }}</span>
               </el-button>
             </div>
           </div>
@@ -202,45 +202,46 @@
           stripe
           border
           style="width: 100%"
+          @selection-change="handleLogSelectionChange"
         >
-          <el-table-column prop="sync_type" label="同步类型" width="120">
+          <el-table-column type="selection" width="55" align="center" />
+          <el-table-column prop="sync_type" label="同步类型" width="120" align="center">
             <template #default="{ row }">
               <el-tag :type="getSyncTypeTagType(row.sync_type)">{{ getSyncTypeText(row.sync_type) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="status" label="状态" width="100">
+          <el-table-column prop="status" label="状态" width="100" align="center">
             <template #default="{ row }">
               <el-tag :type="getStatusTagType(row.status)">{{ getStatusText(row.status) }}</el-tag>
             </template>
           </el-table-column>
-          <el-table-column prop="records_count" label="记录数" width="100" />
-          <el-table-column prop="start_time" label="开始时间" width="180">
+          <el-table-column prop="records_count" label="记录数" width="100" align="center" />
+          <el-table-column prop="start_time" label="开始时间" width="180" align="center">
             <template #default="{ row }">
               {{ formatDateTime(row.start_time) }}
             </template>
           </el-table-column>
-          <el-table-column prop="end_time" label="结束时间" width="180">
+          <el-table-column prop="end_time" label="结束时间" width="180" align="center">
             <template #default="{ row }">
               {{ formatDateTime(row.end_time) }}
             </template>
           </el-table-column>
-          <el-table-column prop="duration" label="耗时(秒)" width="100" />
+          <el-table-column prop="duration" label="耗时(秒)" width="100" align="center" />
           <el-table-column prop="error_message" label="错误信息" min-width="200" show-overflow-tooltip />
-          <el-table-column label="操作" width="120" fixed="right">
+          <el-table-column label="操作" width="150" fixed="right" align="center">
             <template #default="{ row }">
-              <el-button type="primary" size="small" @click="handleViewLogDetail(row)">
-                <el-icon><View /></el-icon>
-                <span style="margin-left: 4px;">详情</span>
+              <el-button type="primary" size="small" link @click="handleViewLogDetail(row)">
+                详情
               </el-button>
               <el-button 
                 v-if="row.status === 'failed'"
                 type="warning" 
-                size="small" 
+                size="small"
+                link
                 @click="handleRetrySync(row)"
                 :disabled="!canSync"
               >
-                <el-icon><Refresh /></el-icon>
-                <span style="margin-left: 4px;">重试</span>
+                重试
               </el-button>
             </template>
           </el-table-column>
@@ -444,16 +445,42 @@ export default {
     
     // 同步日志相关数据
     const logList = ref([])
+    const selectedLogs = ref([])  // 选中的日志记录
     const logPagination = reactive({
       page: 1,
       size: 20,
       total: 0
     })
     
+    /**
+     * 获取默认时间范围（最近30天）
+     */
+    const getDefaultDateRange = () => {
+      const end = new Date()
+      const start = new Date()
+      start.setDate(start.getDate() - 30)
+      
+      const formatDate = (date) => {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day} 00:00:00`
+      }
+      
+      const formatEndDate = (date) => {
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        return `${year}-${month}-${day} 23:59:59`
+      }
+      
+      return [formatDate(start), formatEndDate(end)]
+    }
+    
     const logSearchForm = reactive({
       sync_type: '',
       status: '',
-      dateRange: []
+      dateRange: getDefaultDateRange()
     })
     
     // 日志详情
@@ -611,7 +638,8 @@ export default {
     const resetLogSearch = () => {
       logSearchForm.sync_type = ''
       logSearchForm.status = ''
-      logSearchForm.dateRange = []
+      logSearchForm.dateRange = getDefaultDateRange()
+      logPagination.page = 1
       loadSyncLogs()
     }
     
@@ -720,32 +748,99 @@ export default {
     }
     
     /**
-     * 处理清理日志
+     * 处理日志选择变化
      */
-    const handleClearLogs = async () => {
-      try {
-        await ElMessageBox.confirm(
-          '确定要清理所有同步日志吗？此操作不可恢复。',
-          '确认清理',
-          {
-            confirmButtonText: '确定',
-            cancelButtonText: '取消',
-            type: 'warning'
+    const handleLogSelectionChange = (selection) => {
+      selectedLogs.value = selection
+    }
+    
+    /**
+     * 处理删除日志（智能判断：有选中删选中，无选中删当前查询结果）
+     */
+    const handleDeleteLogs = async () => {
+      const hasSelection = selectedLogs.value.length > 0
+      
+      if (hasSelection) {
+        // 删除选中的记录
+        try {
+          await ElMessageBox.confirm(
+            `确定要删除选中的 ${selectedLogs.value.length} 条日志吗？此操作不可恢复。`,
+            '确认删除',
+            {
+              confirmButtonText: '确定',
+              cancelButtonText: '取消',
+              type: 'warning'
+            }
+          )
+          
+          const ids = selectedLogs.value.map(log => log.id)
+          const response = await api.delete('/api/erp-config/sync-logs/batch', {
+            data: { ids }
+          })
+          
+          if (response.data.success) {
+            const deletedCount = response.data.data?.deletedCount || ids.length
+            ElMessage.success(`删除成功，共删除${deletedCount}条记录`)
+            selectedLogs.value = []
+            loadSyncLogs()
+          } else {
+            ElMessage.error(response.data.message || '删除失败')
           }
-        )
-        
-        const response = await api.delete('/api/erp-config/sync-logs')
-        
-        if (response.data.success) {
-          ElMessage.success('日志清理成功')
-          loadSyncLogs()
-        } else {
-          ElMessage.error(response.data.message || '清理失败')
+        } catch (error) {
+          if (error !== 'cancel') {
+            console.error('删除日志失败:', error)
+            ElMessage.error('删除失败')
+          }
         }
-      } catch (error) {
-        if (error !== 'cancel') {
-          console.error('清理日志失败:', error)
-          ElMessage.error('清理失败')
+      } else {
+        // 清理当前查询条件的所有记录
+        const conditions = []
+        if (logSearchForm.sync_type) {
+          conditions.push(`同步类型: ${getSyncTypeText(logSearchForm.sync_type)}`)
+        }
+        if (logSearchForm.status) {
+          conditions.push(`状态: ${getStatusText(logSearchForm.status)}`)
+        }
+        // 时间范围始终显示（因为有默认值）
+        if (logSearchForm.dateRange && logSearchForm.dateRange.length === 2) {
+          conditions.push(`时间范围: ${logSearchForm.dateRange[0]} 至 ${logSearchForm.dateRange[1]}`)
+        }
+        
+        const conditionText = `当前筛选条件：\n${conditions.join('\n')}\n\n`
+        
+        try {
+          await ElMessageBox.confirm(
+            `${conditionText}确定要清理符合条件的 ${logPagination.total} 条日志吗？此操作不可恢复。`,
+            '确认清理',
+            {
+              confirmButtonText: '确定',
+              cancelButtonText: '取消',
+              type: 'warning'
+            }
+          )
+          
+          // 始终传递时间范围参数
+          const response = await api.delete('/api/erp-config/sync-logs/cleanup', {
+            data: { 
+              sync_type: logSearchForm.sync_type || null,
+              status: logSearchForm.status || null,
+              start_time: logSearchForm.dateRange[0],
+              end_time: logSearchForm.dateRange[1]
+            }
+          })
+          
+          if (response.data.success) {
+            const deletedCount = response.data.data?.deletedCount || 0
+            ElMessage.success(response.data.message || `日志清理成功，共删除${deletedCount}条记录`)
+            loadSyncLogs()
+          } else {
+            ElMessage.error(response.data.message || '清理失败')
+          }
+        } catch (error) {
+          if (error !== 'cancel') {
+            console.error('清理日志失败:', error)
+            ElMessage.error('清理失败')
+          }
         }
       }
     }
@@ -854,6 +949,7 @@ export default {
       
       // 同步日志
       logList,
+      selectedLogs,
       logPagination,
       logSearchForm,
       logDetailDialogVisible,
@@ -885,7 +981,8 @@ export default {
       handleSaveConfig,
       resetConfigForm,
       handleManualSync,
-      handleClearLogs,
+      handleLogSelectionChange,
+      handleDeleteLogs,
       handleViewLogDetail,
       handleRetrySync,
       handleSyncData,

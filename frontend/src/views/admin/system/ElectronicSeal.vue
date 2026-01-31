@@ -289,6 +289,7 @@ import { ref, reactive, toRefs, onMounted, computed, watch, nextTick, onUnmounte
 import { ElMessage, ElMessageBox } from 'element-plus';
 import { Plus, UploadFilled, ZoomIn, Delete, RefreshLeft, RefreshRight, Star } from '@element-plus/icons-vue';
 import api from '@/services/api';
+import { buildFileUrl } from '@/utils/fileServerConfig';
 
 // 简单实现 getToken
 const getToken = () => localStorage.getItem('token');
@@ -303,7 +304,7 @@ const title = ref('');
 const tableRef = ref(null);
 const selectedRows = ref([]);
 
-// 获取适配的图片URL（与其他模块保持一致）
+// 获取适配的图片URL（使用统一的文件服务配置）
 const getAdaptedImageUrl = (imagePath, preventCache = false) => {
   if (!imagePath) return '';
   
@@ -317,10 +318,6 @@ const getAdaptedImageUrl = (imagePath, preventCache = false) => {
     return imagePath;
   }
   
-  // 根据当前页面的hostname判断环境
-  const hostname = window.location.hostname;
-  const protocol = window.location.protocol;
-  
   // 处理路径：将 /uploads/seals/ 转换为 /files/seals/
   let cleanPath = imagePath;
   if (cleanPath.startsWith('/uploads/seals/')) {
@@ -330,15 +327,8 @@ const getAdaptedImageUrl = (imagePath, preventCache = false) => {
     cleanPath = `/files/seals/${cleanPath.replace(/^\/+/, '')}`;
   }
   
-  // 构建图片URL
-  let url;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    // 开发环境：使用Vite代理
-    url = cleanPath;
-  } else {
-    // 生产环境：使用Nginx文件服务器
-    url = `${protocol}//${hostname}:8080${cleanPath}`;
-  }
+  // 使用统一的文件服务配置构建URL
+  let url = buildFileUrl(cleanPath);
   
   // 只在需要防止缓存时添加时间戳参数
   if (preventCache) {

@@ -658,6 +658,7 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                         CPO: orderData.CPO,              // CPO
                         Product: orderData.Product,
                         CustomerID: orderData.CustomerID,
+                        Customer: orderData.Customer,     // 客户名称
                         InDate: orderData.InDate,        // 开单日期
                         DeliveryDate: orderData.DeliveryDate,
                         Sales: orderData.Sales,
@@ -697,7 +698,9 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                             product: p.Product,
                             cProduct: p.CProduct,
                             cpo: orderData.CPO || '',  // 从工单信息获取CPO
+                            apoid: p.APOID || '',      // 采购单号
                             scale: p.Scale,
+                            calUnit: p.CalUnit || '',  // 单位
                             orderCount: p.OrderCount,
                             pCount: p.PCount
                         }));
@@ -758,10 +761,13 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                         product: p.Product || '',
                         cProduct: p.CProduct || '',
                         cpo: p.CPO || '',
+                        apoid: p.APOID || '',      // 采购单号
                         scale: p.Scale || '',
+                        calUnit: p.CalUnit || '',  // 单位
                         orderCount: p.OrderCount || 0,
                         pCount: p.PCount || p.InCount || 0,
                         customerId: p.CustomerID || '',
+                        customer: p.Customer || '', // 客户名称
                         orderNum: p.OrderNum || '',
                         pNum: p.PNum || '',
                         inDate: p.InDate || ''
@@ -780,6 +786,7 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                                     CPO: orderData.CPO,
                                     Product: orderData.Product,
                                     CustomerID: orderData.CustomerID,
+                                    Customer: orderData.Customer,     // 客户名称
                                     InDate: orderData.InDate,
                                     DeliveryDate: orderData.DeliveryDate,
                                     Sales: orderData.Sales,
@@ -886,10 +893,13 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                                     product: item.Product || '',
                                     cProduct: item.CProduct || '',
                                     cpo: item.CPO || '',
+                                    apoid: item.APOID || '',      // 采购单号
                                     scale: item.Scale || '',
+                                    calUnit: item.CalUnit || '',  // 单位
                                     orderCount: item.OrderCount || 0,
                                     pCount: item.PCount || item.InCount || 0,
                                     customerId: item.CustomerID || '',
+                                    customer: item.Customer || '', // 客户名称
                                     orderNum: item.OrderNum || '',
                                     pNum: item.PNum || '',
                                     inDate: item.InDate || '',
@@ -982,10 +992,13 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                                         product: p.Product || orderData.Product || '',
                                         cProduct: p.CProduct || orderData.OrderNum || '',
                                         cpo: orderData.CPO || '',
+                                        apoid: p.APOID || '',      // 采购单号
                                         scale: p.Scale || '',
+                                        calUnit: p.CalUnit || '',  // 单位
                                         orderCount: p.OrderCount || 0,
                                         pCount: p.PCount || 0,
                                         customerId: orderData.CustomerID || '',
+                                        customer: orderData.Customer || '', // 客户名称
                                         orderNum: orderData.OrderNum || '',
                                         pNum: orderData.PNum || '',
                                         inDate: orderData.InDate || '',
@@ -1223,6 +1236,7 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                 return {
                     inId: item.BInMID,              // 入库单号
                     inDate: item.InDate,           // 入库日期
+                    apoid: item.APOID || '',       // 采购单号
                     dlyNum: item.DlyNum,           // 送货单号
                     supply: item.Supply,           // 供应商（关键字段）
                     materialId: item.MaterialID,   // 物料编码
@@ -1233,6 +1247,7 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     materialType: item.MType || materialInfo.materialType,      // 物料类型
                     materialSubType: materialInfo.materialSubType || '',        // 子物料类型
                     count: item.Acount || item.ACount,  // 入库数量
+                    calUnit: item.CalUnit || '',        // 单位
                     deliveryDate: item.DeliveryDate,    // 计划交货期
                     lastUpdateDate: item.LstUpdateDate  // 最后修改日期
                 };
@@ -1251,6 +1266,7 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                 return {
                     inId: item.BInMID,
                     inDate: item.InDate,
+                    apoid: item.APOID || '',       // 采购单号
                     dlyNum: item.DlyNum,
                     supply: item.Supply,
                     materialId: item.MaterialID,
@@ -1261,6 +1277,7 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                     materialType: item.MType || materialInfo.materialType,
                     materialSubType: materialInfo.materialSubType || '',
                     count: item.Acount || item.ACount,
+                    calUnit: item.CalUnit || '',  // 单位
                     deliveryDate: item.DeliveryDate,
                     lastUpdateDate: item.LstUpdateDate
                 };

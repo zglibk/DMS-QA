@@ -13,6 +13,28 @@ import { useRouter } from 'vue-router'
 // Token刷新状态管理
 let isRefreshing = false
 let failedQueue = []
+// 防止重复弹出登录过期对话框
+let isShowingLoginExpiredDialog = false
+
+/**
+ * 显示登录过期对话框
+ * 通过自定义事件触发App.vue中的全局对话框
+ */
+const showLoginExpiredDialog = () => {
+  if (!isShowingLoginExpiredDialog) {
+    isShowingLoginExpiredDialog = true
+    // 触发全局事件，由App.vue中的LoginExpiredDialog组件处理
+    window.dispatchEvent(new CustomEvent('show-login-expired'))
+  }
+}
+
+/**
+ * 重置登录过期对话框状态
+ * 在页面跳转后调用
+ */
+export const resetLoginExpiredState = () => {
+  isShowingLoginExpiredDialog = false
+}
 
 /**
  * 处理队列中的请求
@@ -243,34 +265,46 @@ api.interceptors.response.use(
     if (error.response) {
       switch (error.response.status) {
         case 401:
-          // Token过期或无效，保存当前页面状态
-          savePageState()
-          
-          // 清除token和用户数据
-          localStorage.removeItem('token')
-          // 清除Pinia中的用户数据
-          const userStore = useUserStore()
-          userStore.clearUser()
-          
-          // 静默跳转到登录页，不显示错误提示
-          window.location.href = '/login'
-          break
+          // Token过期或无效，防止重复弹出对话框
+          if (!isShowingLoginExpiredDialog) {
+            // 保存当前页面状态
+            savePageState()
+            
+            // 显示登录过期对话框
+            showLoginExpiredDialog()
+          }
+          // 401错误不再显示其他消息，直接返回
+          return Promise.reject(error)
         case 403:
-          ElMessage.error('权限不足')
+          // 如果正在显示登录过期对话框，不显示其他错误
+          if (!isShowingLoginExpiredDialog) {
+            ElMessage.error('权限不足')
+          }
           break
         case 404:
-          ElMessage.error('请求的资源不存在')
+          if (!isShowingLoginExpiredDialog) {
+            ElMessage.error('请求的资源不存在')
+          }
           break
         case 500:
-          ElMessage.error('服务器内部错误')
+          if (!isShowingLoginExpiredDialog) {
+            ElMessage.error('服务器内部错误')
+          }
           break
         default:
-          ElMessage.error(error.response.data?.message || '请求失败')
+          if (!isShowingLoginExpiredDialog) {
+            ElMessage.error(error.response.data?.message || '请求失败')
+          }
       }
     } else if (error.request) {
-      ElMessage.error('网络连接失败，请检查网络')
+      // 如果正在显示登录过期对话框，不显示网络错误
+      if (!isShowingLoginExpiredDialog) {
+        ElMessage.error('网络连接失败，请检查网络')
+      }
     } else {
-      ElMessage.error('请求配置错误')
+      if (!isShowingLoginExpiredDialog) {
+        ElMessage.error('请求配置错误')
+      }
     }
     
     return Promise.reject(error)

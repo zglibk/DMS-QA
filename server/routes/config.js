@@ -332,6 +332,46 @@ const cleanupOldBackups = async (retentionCount) => {
   }
 };
 
+// 获取文件服务器配置（公开API，无需认证）
+// 用于前端动态构建文件访问URL
+router.get('/file-server-config', async (req, res) => {
+  try {
+    let pool = await sql.connect(config);
+    const result = await pool.request()
+      .query('SELECT TOP 1 FileServerPort, FileUrlPrefix FROM DbConfig WHERE IsCurrent = 1 AND IsValid = 1');
+    await pool.close();
+    
+    if (result.recordset.length > 0) {
+      res.json({ 
+        success: true, 
+        data: {
+          fileServerPort: result.recordset[0].FileServerPort || 8080,
+          fileUrlPrefix: result.recordset[0].FileUrlPrefix || '/files'
+        }
+      });
+    } else {
+      // 返回默认配置
+      res.json({ 
+        success: true, 
+        data: {
+          fileServerPort: 8080,
+          fileUrlPrefix: '/files'
+        }
+      });
+    }
+  } catch (e) {
+    console.error('获取文件服务器配置失败:', e);
+    // 出错时返回默认配置，确保前端能正常工作
+    res.json({ 
+      success: true, 
+      data: {
+        fileServerPort: 8080,
+        fileUrlPrefix: '/files'
+      }
+    });
+  }
+});
+
 // 获取所有数据库配置列表
 router.get('/db-list', authenticateToken, checkPermission('system:config:view'), async (req, res) => {
   try {

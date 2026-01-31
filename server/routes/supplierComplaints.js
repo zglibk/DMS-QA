@@ -2401,14 +2401,15 @@ router.post('/import', upload.single('file'), async (req, res) => {
  */
 async function getDepartmentSupervisor(pool, userId) {
   // 先获取当前用户的部门
+  // Department表字段: ID, Name, ParentID, DeptCode, DeptType, Leader, Phone, Email, Description, SortOrder, Status
   const userResult = await pool.request()
     .input('userId', sql.Int, userId)
     .query(`
-      SELECT u.DepartmentID, d.ManagerID, d.DeptName,
+      SELECT u.DepartmentID, d.Name as DeptName, d.Leader,
              m.ID as ManagerUserId, m.RealName as ManagerName
       FROM [User] u
       LEFT JOIN Department d ON u.DepartmentID = d.ID
-      LEFT JOIN [User] m ON d.ManagerID = m.ID
+      LEFT JOIN [User] m ON d.Leader = m.RealName
       WHERE u.ID = @userId
     `);
   
@@ -2423,10 +2424,10 @@ async function getDepartmentSupervisor(pool, userId) {
   // 如果没有部门主管，获取品质部门主管
   const qaDeptResult = await pool.request()
     .query(`
-      SELECT TOP 1 d.ID as DeptID, d.ManagerID, m.ID as ManagerUserId, m.RealName as ManagerName
+      SELECT TOP 1 d.ID as DeptID, d.Leader, m.ID as ManagerUserId, m.RealName as ManagerName
       FROM Department d
-      LEFT JOIN [User] m ON d.ManagerID = m.ID
-      WHERE d.DeptName LIKE N'%品质%' OR d.DeptName LIKE N'%质量%'
+      LEFT JOIN [User] m ON d.Leader = m.RealName
+      WHERE d.Name LIKE N'%品质%' OR d.Name LIKE N'%质量%'
       ORDER BY d.ID
     `);
   
