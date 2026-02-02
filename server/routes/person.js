@@ -84,9 +84,9 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// GET /api/person/list?page=1&pageSize=10&search=xxx&includeInactive=false
+// GET /api/person/list?page=1&pageSize=10&search=xxx&includeInactive=false&departmentId=1
 router.get('/list', authenticateToken, async (req, res) => {
-  const { page = 1, pageSize = 10, search = '', includeInactive = 'false' } = req.query;
+  const { page = 1, pageSize = 10, search = '', includeInactive = 'false', departmentId } = req.query;
   
   try {
     const pool = await sql.connect(await getDynamicConfig());
@@ -102,6 +102,11 @@ router.get('/list', authenticateToken, async (req, res) => {
     // 是否包含离职员工
     if (includeInactive === 'false' || includeInactive === false) {
       whereConditions.push('p.IsActive = 1');
+    }
+
+    // 部门筛选
+    if (departmentId) {
+      whereConditions.push(`p.DepartmentID = ${parseInt(departmentId)}`);
     }
     
     const whereClause = whereConditions.length > 0 ? 'WHERE ' + whereConditions.join(' AND ') : '';
@@ -265,37 +270,55 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     }
     
     const personName = existResult.recordset[0].Name;
+    const blockReasons = [];
     
-    // 检查是否有关联的投诉记录
-    const complaintCheckResult = await pool.request()
-      .input('personName', sql.NVarChar, personName)
-      .query(`
-        SELECT COUNT(*) as count FROM ComplaintRegister 
-        WHERE MainPerson = @personName OR SecondPerson = @personName
-      `);
+    // 检查关联的投诉记录（表可能不存在）
+    try {
+      const r = await pool.request()
+        .input('personName', sql.NVarChar, personName)
+        .query(`SELECT COUNT(*) as count FROM ComplaintRegister WHERE MainPerson = @personName OR SecondPerson = @personName`);
+      if (r.recordset[0].count > 0) blockReasons.push(`${r.recordset[0].count} 条投诉记录`);
+    } catch (e) { /* 表不存在则跳过 */ }
     
-    // 检查是否有关联的返工记录
-    const reworkCheckResult = await pool.request()
-      .input('personName', sql.NVarChar, personName)
-      .query(`
-        SELECT COUNT(*) as count FROM ProductionReworkRegister 
-        WHERE ResponsiblePerson = @personName OR ReworkPersonnel LIKE '%' + @personName + '%'
-      `);
+    // 检查关联的返工记录
+    try {
+      const r = await pool.request()
+        .input('personName', sql.NVarChar, personName)
+        .query(`SELECT COUNT(*) as count FROM ProductionReworkRegister WHERE ResponsiblePerson = @personName OR ReworkPersonnel LIKE '%' + @personName + '%'`);
+      if (r.recordset[0].count > 0) blockReasons.push(`${r.recordset[0].count} 条返工记录`);
+    } catch (e) { /* 表不存在则跳过 */ }
     
-    const hasComplaintRecords = complaintCheckResult.recordset[0].count > 0;
-    const hasReworkRecords = reworkCheckResult.recordset[0].count > 0;
+    // 检查关联的资质记录
+    try {
+      const r = await pool.request()
+        .input('id', sql.Int, id)
+        .query(`SELECT COUNT(*) as count FROM PersonQualificationProfile WHERE PersonID = @id`);
+      if (r.recordset[0].count > 0) blockReasons.push(`${r.recordset[0].count} 条资质记录`);
+    } catch (e) { /* 表不存在则跳过 */ }
+
+    // 检查关联的发布异常记录
+    try {
+      const r = await pool.request()
+        .input('personName', sql.NVarChar, personName)
+        .query(`SELECT COUNT(*) as count FROM publishing_exceptions WHERE responsible_person = @personName`);
+      if (r.recordset[0].count > 0) blockReasons.push(`${r.recordset[0].count} 条发布异常记录`);
+    } catch (e) { /* 表不存在则跳过 */ }
+
+    // 检查关联的仪器设备记录
+    try {
+      const r = await pool.request()
+        .input('id', sql.Int, id)
+        .query(`SELECT COUNT(*) as count FROM Instruments WHERE ResponsiblePerson = @id`);
+      if (r.recordset[0].count > 0) blockReasons.push(`${r.recordset[0].count} 条仪器设备记录`);
+    } catch (e) { /* 表不存在则跳过 */ }
     
-    if (hasComplaintRecords || hasReworkRecords) {
+    if (blockReasons.length > 0) {
       return res.status(400).json({ 
-        error: '无法删除该人员，存在关联的投诉或返工记录。建议将其设置为离职状态。',
-        details: {
-          complaintRecords: hasComplaintRecords,
-          reworkRecords: hasReworkRecords
-        }
+        error: `无法删除"${personName}"，存在关联数据：${blockReasons.join('、')}。建议将其设置为离职状态。`
       });
     }
     
-    // 删除人员
+    // 执行删除
     await pool.request()
       .input('id', sql.Int, id)
       .query('DELETE FROM Person WHERE ID = @id');
@@ -306,6 +329,11 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     });
   } catch (error) {
     console.error('删除人员失败:', error);
+    // 捕获外键约束错误（兼容不同mssql库版本的error结构）
+    const errNum = error.number || error.originalError?.info?.number;
+    if (errNum === 547 || (error.message && error.message.includes('REFERENCE constraint'))) {
+      return res.status(400).json({ error: '无法删除该人员，存在其他关联数据。建议将其设置为离职状态。' });
+    }
     res.status(500).json({ error: '删除人员失败', details: error.message });
   }
 });
@@ -358,17 +386,42 @@ router.get('/departments', authenticateToken, async (req, res) => {
     const pool = await sql.connect(await getDynamicConfig());
     
     const result = await pool.request().query(`
-      SELECT ID, Name FROM Department ORDER BY Name
+      SELECT ID, Name, ParentID, DeptType, SortOrder FROM Department WHERE Status = 1 ORDER BY SortOrder, Name
     `);
+    
+    // 构建树形结构
+    const departments = result.recordset;
+    const tree = buildDepartmentTree(departments, null);
     
     res.json({
       success: true,
-      data: result.recordset
+      data: tree,
+      flatData: departments
     });
   } catch (error) {
     console.error('获取部门列表失败:', error);
     res.status(500).json({ error: '获取部门列表失败', details: error.message });
   }
 });
+
+/**
+ * 构建部门树形结构
+ */
+function buildDepartmentTree(departments, parentId) {
+  const tree = [];
+  for (const dept of departments) {
+    if (dept.ParentID === parentId) {
+      const children = buildDepartmentTree(departments, dept.ID);
+      tree.push({
+        ID: dept.ID,
+        Name: dept.Name,
+        ParentID: dept.ParentID,
+        DeptType: dept.DeptType,
+        children: children.length > 0 ? children : []
+      });
+    }
+  }
+  return tree;
+}
 
 module.exports = router;

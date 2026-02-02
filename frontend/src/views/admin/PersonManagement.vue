@@ -2,110 +2,161 @@
   <div class="person-management">
     <!-- 页面头部 -->
     <div class="page-header">
-      <h1>
+      <h2>
         <el-icon><User /></el-icon>
         人员管理
-      </h1>
+      </h2>
       <p class="page-subtitle">管理公司人员信息，设置人员有效性状态</p>
     </div>
 
-    <!-- 操作栏 -->
-    <el-card class="operation-card" shadow="never">
-      <div class="operation-bar">
-        <div class="left-actions">
-          <el-button type="primary" @click="showAddDialog = true" :icon="Plus" :disabled="!hasPermission('sys:person:add')">
-            新增人员
-          </el-button>
-          <el-switch
-            v-model="includeInactive"
-            @change="loadPersonList"
-            active-text="显示离职员工"
-            inactive-text="仅显示在职员工"
-            style="margin-left: 10px;"
-          />
-        </div>
-        <div class="right-actions">
-          <el-input
-            v-model="searchKeyword"
-            placeholder="搜索人员姓名或部门"
-            style="width: 250px; margin-right: 10px;"
-            clearable
-            @keyup.enter="loadPersonList"
+    <!-- 左右布局 -->
+    <div class="main-layout">
+      <!-- 左侧：部门导航 -->
+      <div class="left-panel">
+        <el-card shadow="never" class="dept-card">
+          <template #header>
+            <div class="dept-card-header">
+              <span>部门列表</span>
+              <el-tag size="small" type="info">{{ flatDepartments.length }}</el-tag>
+            </div>
+          </template>
+          <div class="dept-list">
+            <!-- 全部部门 -->
+            <div
+              class="dept-item-all"
+              :class="{ active: selectedDeptId === null }"
+              @click="selectDepartment(null)"
+            >
+              <el-icon><Grid /></el-icon>
+              <span>全部部门</span>
+            </div>
+            <!-- 多级部门树 -->
+            <el-tree
+              ref="deptTreeRef"
+              :data="departments"
+              :props="treeProps"
+              node-key="ID"
+              highlight-current
+              :expand-on-click-node="false"
+              default-expand-all
+              :current-node-key="selectedDeptId"
+              @node-click="handleTreeNodeClick"
+              class="dept-tree"
+            >
+              <template #default="{ node, data }">
+                <span class="dept-tree-node">
+                  <el-icon :class="'dept-type-' + (data.DeptType || 'department')">
+                    <component :is="deptTypeIcons[data.DeptType] || OfficeBuilding" />
+                  </el-icon>
+                  <span class="dept-tree-label">{{ node.label }}</span>
+                </span>
+              </template>
+            </el-tree>
+          </div>
+        </el-card>
+      </div>
+
+      <!-- 右侧：人员列表 -->
+      <div class="right-panel">
+        <!-- 操作栏 -->
+        <el-card class="operation-card" shadow="never">
+          <div class="operation-bar">
+            <div class="left-actions">
+              <el-button type="primary" @click="openAddDialog" :icon="Plus" :disabled="!hasPermission('sys:person:add')">
+                新增人员
+              </el-button>
+              <el-switch
+                v-model="includeInactive"
+                @change="loadPersonList"
+                active-text="显示离职"
+                inactive-text="仅在职"
+                style="margin-left: 10px;"
+              />
+            </div>
+            <div class="right-actions">
+              <el-input
+                v-model="searchKeyword"
+                placeholder="搜索姓名或部门"
+                style="width: 200px; margin-right: 10px;"
+                clearable
+                @keyup.enter="loadPersonList"
+                @clear="loadPersonList"
+              >
+                <template #prefix>
+                  <el-icon><Search /></el-icon>
+                </template>
+              </el-input>
+              <el-button @click="loadPersonList" :icon="Search">搜索</el-button>
+              <el-button @click="resetSearch" :icon="Refresh">重置</el-button>
+            </div>
+          </div>
+        </el-card>
+
+        <!-- 人员列表 -->
+        <el-card class="table-card" shadow="never">
+          <el-table
+            v-loading="loading"
+            :data="personList"
+            stripe
+            border
           >
-            <template #prefix>
-              <el-icon><Search /></el-icon>
-            </template>
-          </el-input>
-          <el-button @click="loadPersonList" :icon="Search">搜索</el-button>
-          <el-button @click="resetSearch" :icon="Refresh">重置</el-button>
-        </div>
-      </div>
-    </el-card>
+            <el-table-column prop="Name" label="姓名" width="120" />
+            <el-table-column prop="DepartmentName" label="部门" width="120" />
+            <el-table-column prop="IsActive" label="状态" width="80" align="center">
+              <template #default="{ row }">
+                <el-tag :type="row.IsActive ? 'success' : 'danger'" size="small">
+                  {{ row.IsActive ? '在职' : '离职' }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="240" fixed="right">
+              <template #default="{ row }">
+                <el-button
+                  type="primary"
+                  size="small"
+                  @click="editPerson(row)"
+                  :icon="Edit"
+                  :disabled="!hasPermission('sys:person:edit')"
+                >
+                  编辑
+                </el-button>
+                <el-button
+                  :type="row.IsActive ? 'warning' : 'success'"
+                  size="small"
+                  @click="togglePersonStatus(row)"
+                  :icon="Switch"
+                  :disabled="!hasPermission('sys:person:edit')"
+                >
+                  {{ row.IsActive ? '设为离职' : '设为在职' }}
+                </el-button>
+                <el-button
+                  type="danger"
+                  size="small"
+                  @click="deletePerson(row)"
+                  :icon="Delete"
+                  :disabled="!hasPermission('sys:person:delete')"
+                >
+                  删除
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
 
-    <!-- 人员列表 -->
-    <el-card class="table-card" shadow="never">
-      <el-table
-        v-loading="loading"
-        :data="personList"
-        stripe
-        border
-        height="500"
-      >
-        <el-table-column prop="Name" label="姓名" width="150" />
-        <el-table-column prop="DepartmentName" label="部门" width="150" />
-        <el-table-column prop="IsActive" label="状态" width="120">
-          <template #default="{ row }">
-            <el-tag :type="row.IsActive ? 'success' : 'danger'">
-              {{ row.IsActive ? '在职' : '离职' }}
-            </el-tag>
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="300" fixed="right">
-          <template #default="{ row }">
-            <el-button
-              type="primary"
-              size="small"
-              @click="editPerson(row)"
-              :icon="Edit"
-              :disabled="!hasPermission('sys:person:edit')"
-            >
-              编辑
-            </el-button>
-            <el-button
-              :type="row.IsActive ? 'warning' : 'success'"
-              size="small"
-              @click="togglePersonStatus(row)"
-              :icon="Switch"
-              :disabled="!hasPermission('sys:person:edit')"
-            >
-              {{ row.IsActive ? '设为离职' : '设为在职' }}
-            </el-button>
-            <el-button
-              type="danger"
-              size="small"
-              @click="deletePerson(row)"
-              :icon="Delete"
-              :disabled="!hasPermission('sys:person:delete')"
-            >
-              删除
-            </el-button>
-          </template>
-        </el-table-column>
-      </el-table>
-
-      <!-- 分页 -->
-      <div class="pagination-wrapper">
-        <el-pagination
-          v-model:current-page="pagination.current"
-          v-model:page-size="pagination.pageSize"
-          :page-sizes="[10, 20, 50, 100]"
-          :total="pagination.total"
-          layout="total, sizes, prev, pager, next, jumper"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        />
+          <!-- 分页 -->
+          <div class="pagination-wrapper">
+            <el-pagination
+              v-model:current-page="pagination.current"
+              v-model:page-size="pagination.pageSize"
+              :page-sizes="[10, 20, 50, 100]"
+              :total="pagination.total"
+              layout="total, sizes, prev, pager, next, jumper"
+              @size-change="handleSizeChange"
+              @current-change="handleCurrentChange"
+            />
+          </div>
+        </el-card>
       </div>
-    </el-card>
+    </div>
 
     <!-- 新增/编辑人员对话框 -->
     <el-dialog
@@ -113,6 +164,7 @@
       v-model="showAddDialog"
       width="500px"
       @close="resetForm"
+      :close-on-click-modal="false"
     >
       <el-form
         ref="formRef"
@@ -124,24 +176,21 @@
           <el-input v-model="formData.name" placeholder="请输入人员姓名" />
         </el-form-item>
         <el-form-item label="部门" prop="departmentId">
-          <el-select
+          <el-tree-select
             v-model="formData.departmentId"
+            :data="departments"
+            :props="{ label: 'Name', value: 'ID', children: 'children' }"
             placeholder="请选择部门"
             style="width: 100%"
             clearable
-          >
-            <el-option
-              v-for="dept in departments"
-              :key="dept.ID"
-              :label="dept.Name"
-              :value="dept.ID"
-            />
-          </el-select>
+            check-strictly
+            :render-after-expand="false"
+          />
         </el-form-item>
         <el-form-item label="状态" prop="isActive">
           <el-radio-group v-model="formData.isActive">
             <el-radio :value="true">在职</el-radio>
-              <el-radio :value="false">离职</el-radio>
+            <el-radio :value="false">离职</el-radio>
           </el-radio-group>
         </el-form-item>
       </el-form>
@@ -160,12 +209,20 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { User, Plus, Search, Refresh, Edit, Switch, Delete } from '@element-plus/icons-vue'
+import { User, Plus, Search, Refresh, Edit, Switch, Delete, Grid, OfficeBuilding, House, Files } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { useUserStore } from '@/store/user'
 
 const userStore = useUserStore()
 const hasPermission = (permission) => userStore.hasPermission(permission)
+
+// 部门类型图标映射
+const deptTypeIcons = {
+  company: OfficeBuilding,
+  department: House,
+  workshop: Grid,
+  team: Files
+}
 
 // 响应式数据
 const loading = ref(false)
@@ -176,11 +233,20 @@ const searchKeyword = ref('')
 const includeInactive = ref(false)
 const personList = ref([])
 const departments = ref([])
+const flatDepartments = ref([])
+const selectedDeptId = ref(null)
+const deptTreeRef = ref()
+
+// 树形配置
+const treeProps = {
+  label: 'Name',
+  children: 'children'
+}
 
 // 分页数据
 const pagination = reactive({
   current: 1,
-  pageSize: 20,
+  pageSize: 10,
   total: 0
 })
 
@@ -214,17 +280,39 @@ const getHeaders = () => {
   }
 }
 
+// 选择部门筛选（全部部门）
+const selectDepartment = (deptId) => {
+  selectedDeptId.value = deptId
+  // 清除树的高亮
+  if (deptTreeRef.value) {
+    deptTreeRef.value.setCurrentKey(null)
+  }
+  pagination.current = 1
+  loadPersonList()
+}
+
+// 树节点点击
+const handleTreeNodeClick = (data) => {
+  selectedDeptId.value = data.ID
+  pagination.current = 1
+  loadPersonList()
+}
+
 // 加载人员列表
 const loadPersonList = async () => {
   loading.value = true
   try {
+    const params = {
+      page: pagination.current,
+      pageSize: pagination.pageSize,
+      search: searchKeyword.value,
+      includeInactive: includeInactive.value
+    }
+    if (selectedDeptId.value !== null) {
+      params.departmentId = selectedDeptId.value
+    }
     const response = await axios.get('/person/list', {
-      params: {
-        page: pagination.current,
-        pageSize: pagination.pageSize,
-        search: searchKeyword.value,
-        includeInactive: includeInactive.value
-      },
+      params,
       headers: getHeaders()
     })
     
@@ -251,6 +339,7 @@ const loadDepartments = async () => {
     
     if (response.data.success) {
       departments.value = response.data.data
+      flatDepartments.value = response.data.flatData || []
     }
   } catch (error) {
     console.error('加载部门列表失败:', error)
@@ -261,6 +350,10 @@ const loadDepartments = async () => {
 const resetSearch = () => {
   searchKeyword.value = ''
   includeInactive.value = false
+  selectedDeptId.value = null
+  if (deptTreeRef.value) {
+    deptTreeRef.value.setCurrentKey(null)
+  }
   pagination.current = 1
   loadPersonList()
 }
@@ -272,6 +365,12 @@ const editPerson = (row) => {
   formData.name = row.Name
   formData.departmentId = row.DepartmentID
   formData.isActive = row.IsActive
+  showAddDialog.value = true
+}
+
+// 新增人员（先重置表单再打开对话框）
+const openAddDialog = () => {
+  resetForm()
   showAddDialog.value = true
 }
 
@@ -334,9 +433,10 @@ const deletePerson = async (row) => {
       ElMessage.error(response.data.error || '删除失败')
     }
   } catch (error) {
-    if (error !== 'cancel') {
+    if (error !== 'cancel' && error !== 'close') {
       console.error('删除人员失败:', error)
-      ElMessage.error('删除失败')
+      const msg = error.response?.data?.error || error.response?.data?.message || '删除失败'
+      ElMessage.error(msg)
     }
   }
 }
@@ -370,7 +470,8 @@ const submitForm = async () => {
     }
   } catch (error) {
     console.error('提交表单失败:', error)
-    ElMessage.error('操作失败')
+    const msg = error.response?.data?.error || error.response?.data?.message || '操作失败'
+    ElMessage.error(msg)
   } finally {
     submitting.value = false
   }
@@ -410,30 +511,170 @@ onMounted(() => {
 
 <style scoped>
 .person-management {
-  padding: 20px;
+  padding: 0.5rem 1.25rem;
+  box-sizing: border-box;
 }
 
 .page-header {
-  margin-bottom: 20px;
+  margin-bottom: 16px;
 }
 
-.page-header h1 {
-  margin: 0;
+.page-header h2 {
+  margin: 0 0 8px 0;
   color: #303133;
-  font-size: 24px;
   display: flex;
   align-items: center;
   gap: 8px;
 }
 
 .page-subtitle {
-  margin: 8px 0 0 0;
-  color: #606266;
+  margin: 0;
+  color: #909399;
   font-size: 14px;
 }
 
+/* 左右布局 */
+.main-layout {
+  display: flex;
+  gap: 16px;
+}
+
+.left-panel {
+  width: 220px;
+  flex-shrink: 0;
+}
+
+.right-panel {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 部门卡片 */
+.dept-card {
+  border-radius: 8px;
+}
+
+.dept-card :deep(.el-card__header) {
+  padding: 12px 16px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.dept-card :deep(.el-card__body) {
+  padding: 8px 0;
+}
+
+.dept-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  font-size: 14px;
+  color: #303133;
+}
+
+.dept-list {
+  max-height: calc(100vh - 240px);
+  overflow-y: auto;
+}
+
+/* 全部部门按钮 */
+.dept-item-all {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  cursor: pointer;
+  font-size: 13px;
+  color: #606266;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+  margin-bottom: 4px;
+}
+
+.dept-item-all:hover {
+  background-color: #f5f7fa;
+  color: #409eff;
+}
+
+.dept-item-all.active {
+  background-color: #ecf5ff;
+  color: #409eff;
+  font-weight: 600;
+  border-left-color: #409eff;
+}
+
+.dept-item-all .el-icon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* 部门树样式 */
+.dept-tree {
+  background: transparent;
+  --el-tree-node-hover-bg-color: #f5f7fa;
+}
+
+.dept-tree :deep(.el-tree-node__content) {
+  height: 34px;
+  padding-left: 8px !important;
+  border-left: 3px solid transparent;
+  transition: all 0.2s;
+}
+
+.dept-tree :deep(.el-tree-node.is-current > .el-tree-node__content) {
+  background-color: #ecf5ff;
+  color: #409eff;
+  font-weight: 600;
+  border-left-color: #409eff;
+}
+
+.dept-tree :deep(.el-tree-node__expand-icon) {
+  font-size: 14px;
+  color: #909399;
+  padding: 4px;
+}
+
+.dept-tree :deep(.el-tree-node__expand-icon.is-leaf) {
+  color: transparent;
+}
+
+.dept-tree-node {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  overflow: hidden;
+}
+
+.dept-tree-node .el-icon {
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+/* 部门类型图标颜色 */
+.dept-type-company { color: #E6A23C; }
+.dept-type-department { color: #409EFF; }
+.dept-type-workshop { color: #E6A23C; }
+.dept-type-team { color: #67C23A; }
+
+.dept-tree :deep(.el-tree-node.is-current > .el-tree-node__content) .dept-tree-node .el-icon {
+  color: #409eff;
+}
+
+.dept-tree-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 操作栏 */
 .operation-card {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
+  border-radius: 8px;
+}
+
+.operation-card :deep(.el-card__body) {
+  padding: 10px 16px;
 }
 
 .operation-bar {
@@ -452,14 +693,21 @@ onMounted(() => {
   align-items: center;
 }
 
+/* 表格卡片 */
 .table-card {
-  margin-bottom: 20px;
+  border-radius: 8px;
+}
+
+.table-card :deep(.el-card__body) {
+  padding: 16px;
 }
 
 .pagination-wrapper {
-  margin-top: 20px;
+  margin-top: 12px;
+  padding-top: 12px;
   display: flex;
   justify-content: center;
+  border-top: 1px solid #f0f0f0;
 }
 
 .dialog-footer {

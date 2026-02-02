@@ -405,7 +405,7 @@ async function getAllChildDepartmentIds(pool, parentId) {
 router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params
-    const { cascade = false } = req.query // 是否级联删除
+    const { cascade = false } = req.query
     const pool = await sql.connect(await getDynamicConfig())
     
     // 检查部门是否存在
@@ -414,10 +414,7 @@ router.delete('/:id', async (req, res) => {
       .query('SELECT Name FROM Department WHERE ID = @id')
     
     if (existResult.recordset.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: '部门不存在'
-      })
+      return res.status(404).json({ success: false, message: '部门不存在' })
     }
     
     const departmentName = existResult.recordset[0].Name
@@ -435,41 +432,65 @@ router.delete('/:id', async (req, res) => {
       })
     }
     
-    // 检查所有部门是否有用户或人员关联
-    const userCheckPromises = allDeptIds.map(deptId => 
-      pool.request()
+    // ====== 全面检查所有外键关联表 ======
+    // 完整外键清单（基于 sys.foreign_keys 查询结果）:
+    // FK引用Department.ID的表: AssessmentRecords, Instruments, Person, PlanTemplates,
+    //   Positions, RoleDepartments, User, UserLoginLogs, WorkPlans
+    // FK引用Department.Name的表: publishing_exceptions(responsible_unit)
+    // FK自引用: Department.ParentID（已通过childIds处理）
+    
+    const refTables = [
+      { table: '[User]',              column: 'DepartmentID', label: '系统用户',     byId: true },
+      { table: 'Person',              column: 'DepartmentID', label: '人员',         byId: true },
+      { table: 'Instruments',         column: 'DepartmentID', label: '仪器设备',     byId: true },
+      { table: 'Positions',           column: 'DepartmentID', label: '岗位',         byId: true },
+      { table: 'AssessmentRecords',   column: 'DepartmentID', label: '考核记录',     byId: true },
+      { table: 'PlanTemplates',       column: 'DepartmentID', label: '计划模板',     byId: true },
+      { table: 'RoleDepartments',     column: 'DepartmentID', label: '角色部门关联', byId: true },
+      { table: 'UserLoginLogs',       column: 'DepartmentID', label: '登录日志',     byId: true },
+      { table: 'WorkPlans',           column: 'DepartmentID', label: '工作计划',     byId: true },
+      { table: 'publishing_exceptions', column: 'responsible_unit', label: '发布异常记录', byId: false }
+    ]
+    
+    const blockReasons = []
+    
+    for (const deptId of allDeptIds) {
+      // 获取该部门名称
+      const nameResult = await pool.request()
         .input('deptId', sql.Int, deptId)
-        .query('SELECT COUNT(*) as count, (SELECT Name FROM Department WHERE ID = @deptId) as deptName FROM [User] WHERE DepartmentID = @deptId')
-    )
-    
-    const personCheckPromises = allDeptIds.map(deptId => 
-      pool.request()
-        .input('deptId', sql.Int, deptId)
-        .query('SELECT COUNT(*) as count, (SELECT Name FROM Department WHERE ID = @deptId) as deptName FROM Person WHERE DepartmentID = @deptId')
-    )
-    
-    const [userResults, personResults] = await Promise.all([
-      Promise.all(userCheckPromises),
-      Promise.all(personCheckPromises)
-    ])
-    
-    const deptsWithUsers = userResults.filter(result => result.recordset[0].count > 0)
-    const deptsWithPersons = personResults.filter(result => result.recordset[0].count > 0)
-    
-    if (deptsWithUsers.length > 0 || deptsWithPersons.length > 0) {
-      const userDeptNames = deptsWithUsers.map(result => result.recordset[0].deptName)
-      const personDeptNames = deptsWithPersons.map(result => result.recordset[0].deptName)
-      const allAffectedDepts = [...new Set([...userDeptNames, ...personDeptNames])]
+        .query('SELECT Name FROM Department WHERE ID = @deptId')
+      const dName = nameResult.recordset[0]?.Name || `ID=${deptId}`
       
+      for (const ref of refTables) {
+        try {
+          let result
+          if (ref.byId) {
+            result = await pool.request()
+              .input('val', sql.Int, deptId)
+              .query(`SELECT COUNT(*) as count FROM ${ref.table} WHERE ${ref.column} = @val`)
+          } else {
+            result = await pool.request()
+              .input('val', sql.NVarChar, dName)
+              .query(`SELECT COUNT(*) as count FROM ${ref.table} WHERE ${ref.column} = @val`)
+          }
+          if (result.recordset[0].count > 0) {
+            blockReasons.push(`"${dName}" 有 ${result.recordset[0].count} 条${ref.label}`)
+          }
+        } catch (e) {
+          // 表不存在则跳过
+        }
+      }
+    }
+    
+    if (blockReasons.length > 0) {
       return res.status(400).json({
         success: false,
-        message: `以下部门下还有用户或人员，无法删除：${allAffectedDepts.join('、')}。请先转移或删除相关用户和人员。`
+        message: `无法删除，存在以下关联：${blockReasons.join('；')}。请先处理关联数据。`
       })
     }
     
-    // 按照从子到父的顺序删除部门（避免外键约束问题）
+    // 按照从子到父的顺序删除
     const sortedDeptIds = [...allDeptIds].reverse()
-    
     for (const deptId of sortedDeptIds) {
       await pool.request()
         .input('id', sql.Int, deptId)
@@ -481,17 +502,17 @@ router.delete('/:id', async (req, res) => {
       ? `部门"${departmentName}"删除成功`
       : `成功删除部门"${departmentName}"及其 ${deletedCount - 1} 个子部门`
     
-    res.json({
-      success: true,
-      message: message,
-      deletedCount: deletedCount
-    })
+    res.json({ success: true, message, deletedCount })
   } catch (error) {
-    res.status(500).json({
-      success: false,
-      message: '删除部门失败',
-      error: error.message
-    })
+    console.error('删除部门失败:', error)
+    const errNum = error.number || error.originalError?.info?.number
+    if (errNum === 547 || (error.message && error.message.includes('REFERENCE constraint'))) {
+      return res.status(400).json({
+        success: false,
+        message: '无法删除该部门，存在其他数据表的关联引用。请先处理关联数据。'
+      })
+    }
+    res.status(500).json({ success: false, message: '删除部门失败', error: error.message })
   }
 })
 

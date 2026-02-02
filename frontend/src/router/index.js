@@ -16,6 +16,7 @@
 
 // 导入Vue Router核心函数
 import { createRouter, createWebHistory } from 'vue-router'
+import { isLoginExpired } from '../utils/api'
 
 // 导入主要页面组件（直接导入，首次加载）
 import Login from '../views/Login.vue'
@@ -801,11 +802,15 @@ router.beforeEach(async (to, from, next) => {
       next()
     } catch (error) {
       console.error('权限验证失败:', error)
-      // 如果是401错误，说明token无效，清除token并跳转到登录页
+      // 如果是401错误且登录过期对话框已弹出，不做跳转，等用户点击对话框按钮
       if (error.response && error.response.status === 401) {
+        if (isLoginExpired()) {
+          // 对话框已显示，阻止导航
+          return
+        }
         localStorage.removeItem('token')
       }
-      // 权限验证失败，跳转到登录页
+      // 其他错误跳转到登录页
       next('/login')
     }
   } else if (to.path.startsWith('/admin') && !token) {

@@ -1266,7 +1266,7 @@ const searchForm = reactive({
 // 分页数据
 const pagination = reactive({
   current: 1,
-  pageSize: 20,
+  pageSize: 10,
   total: 0
 })
 
@@ -2577,19 +2577,12 @@ const initQualityLevels = () => {
 <style scoped>
 .rework-management {
   padding: 0.5rem 1.25rem;
-  height: auto;
-  overflow: hidden;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
 }
 
 @media (max-width: 48rem) {
   .rework-management {
     padding: 0.75rem;
-    height: auto;
-    overflow-y: auto;
-    box-sizing: border-box;
   }
   
   .page-description {
@@ -2672,22 +2665,26 @@ const initQualityLevels = () => {
 }
 
 .search-card {
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
   border-radius: 0.5rem;
   box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08);
   border: 1px solid #e4e7ed;
 }
 
 .search-card :deep(.el-card__body) {
-  padding: 1.25rem;
+  padding: 0.75rem 1.25rem;
 }
 
 .search-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr));
-  gap: 1.2rem;
+  gap: 0.5rem 1.2rem;
   align-items: end;
-  padding: 0.5rem;
+  padding: 0;
+}
+
+.search-form :deep(.el-form-item) {
+  margin-bottom: 0;
 }
 
 /* 日期范围控件特殊处理 */
@@ -2774,22 +2771,13 @@ const initQualityLevels = () => {
 }
 
 .table-card {
-  overflow: hidden;
   border-radius: 0.5rem;
   box-shadow: 0 0.125rem 0.5rem rgba(0, 0, 0, 0.08);
   border: 1px solid #e4e7ed;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
 }
 
 .table-card :deep(.el-card__body) {
-  padding: 1.25rem;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+  padding: 0.75rem 1.25rem;
 }
 
 @media (max-width: 48rem) {
@@ -2823,9 +2811,10 @@ const initQualityLevels = () => {
 .pagination-wrapper {
   display: flex;
   justify-content: center;
-  margin-top: 20px;
-  padding: 1rem 0;
+  margin-top: 12px;
+  padding: 0;
   border-top: 1px solid #f0f0f0;
+  padding-top: 12px;
 }
 
 .rework-form {
@@ -2967,7 +2956,6 @@ const initQualityLevels = () => {
   font-family: 'Consolas', 'Monaco', 'Courier New', monospace, 'Microsoft YaHei', sans-serif;
   font-size: 14px;
   line-height: 1.4;
-  height: 100%;
 }
 
 /* 表格容器高度优化 */
@@ -3473,9 +3461,9 @@ const initQualityLevels = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 0;
+  padding: 0 0 0.5rem;
   border-bottom: 1px solid #ebeef5;
-  margin-bottom: 1rem;
+  margin-bottom: 0.75rem;
 }
 
 .actions-left {

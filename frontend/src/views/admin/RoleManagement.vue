@@ -295,11 +295,13 @@
           <div class="department-node">
             <el-icon class="department-icon">
               <OfficeBuilding v-if="data.DeptType === 'company'" />
-              <Grid v-else />
+              <House v-else-if="data.DeptType === 'department'" />
+              <Grid v-else-if="data.DeptType === 'workshop'" />
+              <Files v-else />
             </el-icon>
             <span>{{ data.Name }}</span>
-            <el-tag :type="data.DeptType === 'company' ? 'danger' : 'primary'" size="small">
-              {{ data.DeptType === 'company' ? '公司' : '部门' }}
+            <el-tag :type="(deptTypeMap[data.DeptType] || deptTypeMap.department).tagType" size="small">
+              {{ (deptTypeMap[data.DeptType] || deptTypeMap.department).label }}
             </el-tag>
           </div>
         </template>
@@ -330,11 +332,21 @@ import {
   OfficeBuilding,
   Grid,
   UserFilled,
-  Setting
+  Setting,
+  House,
+  Files
 } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 
 const userStore = useUserStore()
+
+// 部门类型映射
+const deptTypeMap = {
+  company:    { label: '公司', tagType: 'danger',  icon: 'OfficeBuilding' },
+  department: { label: '部门', tagType: 'primary', icon: 'House' },
+  workshop:   { label: '车间', tagType: 'warning', icon: 'Grid' },
+  team:       { label: '小组', tagType: 'success', icon: 'Files' }
+}
 
 // 响应式数据
 const loading = ref(false)

@@ -1,41 +1,63 @@
 <template>
   <div class="audit-reports">
+    <!-- 页面标题 -->
+    <div class="page-header">
+      <h2>审核报告管理</h2>
+      <p class="page-description">管理供应商审核报告，跟踪不符合项及整改情况</p>
+    </div>
+
     <!-- 统计卡片 -->
     <el-row :gutter="20" class="stats-cards">
       <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-number">{{ stats.totalReports }}</div>
-            <div class="stat-label">总报告数</div>
+        <el-card class="stats-card">
+          <div class="stats-content">
+            <div class="stats-icon total">
+              <el-icon><Files /></el-icon>
+            </div>
+            <div class="stats-info">
+              <div class="stats-value">{{ stats.totalReports }}</div>
+              <div class="stats-label">总报告数</div>
+            </div>
           </div>
-          <el-icon class="stat-icon"><Files /></el-icon>
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-number">{{ stats.nonConformities }}</div>
-            <div class="stat-label">不符合项</div>
+        <el-card class="stats-card">
+          <div class="stats-content">
+            <div class="stats-icon warning">
+              <el-icon><Warning /></el-icon>
+            </div>
+            <div class="stats-info">
+              <div class="stats-value">{{ stats.nonConformities }}</div>
+              <div class="stats-label">不符合项</div>
+            </div>
           </div>
-          <el-icon class="stat-icon"><Warning /></el-icon>
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-number">{{ stats.pendingCorrections }}</div>
-            <div class="stat-label">待整改</div>
+        <el-card class="stats-card">
+          <div class="stats-content">
+            <div class="stats-icon pending">
+              <el-icon><Clock /></el-icon>
+            </div>
+            <div class="stats-info">
+              <div class="stats-value">{{ stats.pendingCorrections }}</div>
+              <div class="stats-label">待整改</div>
+            </div>
           </div>
-          <el-icon class="stat-icon"><Clock /></el-icon>
         </el-card>
       </el-col>
       <el-col :span="6">
-        <el-card class="stat-card">
-          <div class="stat-content">
-            <div class="stat-number">{{ stats.completedCorrections }}</div>
-            <div class="stat-label">已验证</div>
+        <el-card class="stats-card">
+          <div class="stats-content">
+            <div class="stats-icon completed">
+              <el-icon><Check /></el-icon>
+            </div>
+            <div class="stats-info">
+              <div class="stats-value">{{ stats.completedCorrections }}</div>
+              <div class="stats-label">已验证</div>
+            </div>
           </div>
-          <el-icon class="stat-icon"><Check /></el-icon>
         </el-card>
       </el-col>
     </el-row>
@@ -137,9 +159,9 @@
         </el-table-column>
         <el-table-column prop="nonConformityCount" label="不符合项" min-width="80" align="center">
           <template #default="{ row }">
-            <el-badge :value="row.nonConformityCount" :type="row.nonConformityCount > 0 ? 'danger' : 'success'">
-              <span>{{ row.nonConformityCount }}</span>
-            </el-badge>
+            <el-tag :type="row.nonConformityCount > 0 ? 'danger' : 'success'" size="small">
+              {{ row.nonConformityCount }}
+            </el-tag>
           </template>
         </el-table-column>
         <el-table-column prop="correctionStatus" label="整改状态" min-width="80" align="center">
@@ -333,9 +355,9 @@
           <el-tag :type="getScoreTagType(viewData.overallScore)">{{ viewData.overallScore }}分</el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="不符合项数量">
-          <el-badge :value="viewData.nonConformityCount" :type="viewData.nonConformityCount > 0 ? 'danger' : 'success'">
-            <span>{{ viewData.nonConformityCount }}</span>
-          </el-badge>
+          <el-tag :type="viewData.nonConformityCount > 0 ? 'danger' : 'success'" size="small">
+            {{ viewData.nonConformityCount }}
+          </el-tag>
         </el-descriptions-item>
         <el-descriptions-item label="整改状态">
           <el-tag :type="getCorrectionStatusTagType(viewData.correctionStatus)">{{ getCorrectionStatusText(viewData.correctionStatus) }}</el-tag>
@@ -353,7 +375,8 @@
     <el-dialog
       v-model="nonConformityDialogVisible"
       title="不符合项管理"
-      width="1200px"
+      width="900px"
+      :close-on-click-modal="false"
     >
       <div class="non-conformity-header">
         <el-button type="primary" @click="handleAddNonConformity">
@@ -361,36 +384,38 @@
           新增不符合项
         </el-button>
       </div>
-      <el-table :data="nonConformityData" border style="width: 100%">
-        <el-table-column prop="ncCode" label="编号" width="120" />
-        <el-table-column prop="category" label="类别" width="100">
+      <el-table :data="nonConformityData" border style="width: 100%" :header-cell-style="{ textAlign: 'center', whiteSpace: 'nowrap' }">
+        <el-table-column prop="ncCode" label="编号" width="110" align="center" />
+        <el-table-column prop="category" label="类别" width="90" align="center">
           <template #default="{ row }">
             <el-tag :type="getNcCategoryTagType(row.category)">{{ row.category }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="description" label="描述" min-width="200" />
-        <el-table-column prop="severity" label="严重程度" width="100">
+        <el-table-column prop="description" label="描述" min-width="160" show-overflow-tooltip />
+        <el-table-column prop="severity" label="严重程度" width="85" align="center">
           <template #default="{ row }">
             <el-tag :type="getSeverityTagType(row.severity)">{{ row.severity }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="correctionStatus" label="整改状态" width="100">
+        <el-table-column prop="correctionStatus" label="整改状态" width="85" align="center">
           <template #default="{ row }">
             <el-tag :type="getCorrectionStatusTagType(row.correctionStatus)">{{ getCorrectionStatusText(row.correctionStatus) }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="dueDate" label="整改期限" width="100" />
-        <el-table-column label="操作" width="200">
+        <el-table-column prop="dueDate" label="整改期限" width="95" align="center" />
+        <el-table-column label="操作" width="180" align="center" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" size="small" @click="handleViewCorrection(row)">
-              查看整改
-            </el-button>
-            <el-button type="warning" size="small" @click="handleEditNonConformity(row)">
-              编辑
-            </el-button>
-            <el-button type="success" size="small" @click="handleVerifyCorrection(row)" v-if="row.correctionStatus === 'submitted'">
-              验证
-            </el-button>
+            <div class="action-buttons">
+              <el-button type="primary" size="small" @click="handleViewCorrection(row)">
+                查看整改
+              </el-button>
+              <el-button type="warning" size="small" @click="handleEditNonConformity(row)">
+                编辑
+              </el-button>
+              <el-button type="success" size="small" @click="handleVerifyCorrection(row)" :disabled="row.correctionStatus !== 'submitted'">
+                验证
+              </el-button>
+            </div>
           </template>
         </el-table-column>
       </el-table>
@@ -1075,38 +1100,84 @@ onMounted(() => {
   padding: 20px;
 }
 
+.page-header {
+  margin-bottom: 20px;
+}
+
+.page-header h2 {
+  margin: 0 0 8px 0;
+  color: #303133;
+}
+
+.page-description {
+  margin: 0;
+  color: #909399;
+  font-size: 14px;
+}
+
 .stats-cards {
   margin-bottom: 20px;
 }
 
-.stat-card {
-  position: relative;
-  overflow: hidden;
+.stats-card {
+  border-radius: 8px;
+  transition: all 0.3s;
 }
 
-.stat-content {
-  padding: 20px;
+.stats-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
-.stat-number {
-  font-size: 32px;
+.stats-content {
+  display: flex;
+  align-items: center;
+  padding: 10px;
+}
+
+.stats-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 15px;
+  font-size: 24px;
+  color: white;
+}
+
+.stats-icon.total {
+  background: linear-gradient(135deg, #409eff, #66b1ff);
+}
+
+.stats-icon.warning {
+  background: linear-gradient(135deg, #e6a23c, #f0a020);
+}
+
+.stats-icon.pending {
+  background: linear-gradient(135deg, #909399, #b1b3b8);
+}
+
+.stats-icon.completed {
+  background: linear-gradient(135deg, #67c23a, #85ce61);
+}
+
+.stats-info {
+  flex: 1;
+}
+
+.stats-value {
+  font-size: 28px;
   font-weight: bold;
-  color: #409eff;
-  margin-bottom: 8px;
+  color: #303133;
+  line-height: 1;
 }
 
-.stat-label {
+.stats-label {
   font-size: 14px;
-  color: #666;
-}
-
-.stat-icon {
-  position: absolute;
-  right: 20px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 40px;
-  color: #e6f7ff;
+  color: #909399;
+  margin-top: 5px;
 }
 
 .search-card {

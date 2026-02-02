@@ -30,6 +30,7 @@
     <el-card class="table-card" shadow="never">
       <el-table
         ref="tableRef"
+        :key="tableKey"
         :data="topLevelDepartments"
         style="width: 100%"
         row-key="ID"
@@ -44,8 +45,8 @@
       >
       <el-table-column prop="Name" label="部门名称" min-width="200" resizable show-overflow-tooltip>
         <template #default="{ row }">
-          <el-icon class="dept-icon" :class="getDeptIconClass(row, getDeptLevel(row.ID))">
-            <component :is="getDeptIcon(row, getDeptLevel(row.ID))" />
+          <el-icon class="dept-icon" :class="getDeptIconClass(row)">
+            <component :is="getDeptIcon(row)" />
           </el-icon>
           {{ row.Name }}
         </template>
@@ -53,8 +54,8 @@
       <el-table-column prop="DeptCode" label="部门编码" min-width="120" resizable show-overflow-tooltip />
       <el-table-column prop="DeptType" label="部门类型" width="100" resizable>
         <template #default="{ row }">
-          <el-tag :type="row.DeptType === 'company' ? 'danger' : 'primary'" size="small">
-            {{ row.DeptType === 'company' ? '公司' : '部门' }}
+          <el-tag :type="deptTypeMap[row.DeptType]?.tagType || 'info'" size="small">
+            {{ deptTypeMap[row.DeptType]?.label || row.DeptType }}
           </el-tag>
         </template>
       </el-table-column>
@@ -137,6 +138,8 @@
               <el-select v-model="formData.DeptType" placeholder="请选择部门类型">
                 <el-option label="公司" value="company" />
                 <el-option label="部门" value="department" />
+                <el-option label="车间" value="workshop" />
+                <el-option label="小组" value="team" />
               </el-select>
             </el-form-item>
           </el-col>
@@ -218,6 +221,14 @@ const hasPermission = (permission) => {
   return userStore.hasPermission(permission)
 }
 
+// 部门类型映射：公司 > 部门 > 车间 > 小组
+const deptTypeMap = {
+  company:    { label: '公司', tagType: 'danger',  icon: OfficeBuilding, iconClass: 'company-icon' },
+  department: { label: '部门', tagType: 'primary', icon: House,          iconClass: 'dept-icon-blue' },
+  workshop:   { label: '车间', tagType: 'warning', icon: Grid,           iconClass: 'workshop-icon' },
+  team:       { label: '小组', tagType: 'success', icon: Files,          iconClass: 'team-icon' }
+}
+
 // 响应式数据
 const loading = ref(false)
 const submitting = ref(false)
@@ -227,6 +238,7 @@ const formRef = ref()
 const departmentList = ref([])
 const isEdit = ref(false)
 const currentEditId = ref(null)
+const tableKey = ref(0) // 强制刷新lazy表格的key
 
 // 表单数据
 const formData = reactive({
@@ -320,10 +332,10 @@ const fetchDepartments = async () => {
   try {
     loading.value = true
     const response = await api.get('/departments')
-    // 后端返回格式: {success: true, data: [...]}
     const data = response.data?.data || response.data || []
-    // 确保数据是数组格式
     departmentList.value = Array.isArray(data) ? data : []
+    // 递增key强制重建lazy表格（清除子节点缓存）
+    tableKey.value++
   } catch (error) {
     console.error('获取部门列表失败:', error)
     ElMessage.error('获取部门列表失败')
@@ -349,46 +361,16 @@ const loadChildren = (row, treeNode, resolve) => {
   }, 200)
 }
 
-// 根据部门层级获取对应图标
-// 参数: row - 部门数据, level - 当前层级（从0开始）
-const getDeptIcon = (row, level = 0) => {
-  // 如果是公司类型，始终使用办公楼图标
-  if (row.DeptType === 'company') {
-    return OfficeBuilding
-  }
-  
-  // 根据层级返回不同图标
-  switch (level) {
-    case 0:
-      return House // 一级部门使用房屋图标
-    case 1:
-      return Files // 二级部门使用文件夹图标
-    case 2:
-      return Folder // 三级部门使用文件夹图标
-    default:
-      return Document // 四级及以下使用文档图标
-  }
+// 根据部门类型获取对应图标
+const getDeptIcon = (row) => {
+  const config = deptTypeMap[row.DeptType]
+  return config ? config.icon : Document
 }
 
-// 根据部门层级获取图标CSS类名
-// 参数: row - 部门数据, level - 当前层级（从0开始）
-const getDeptIconClass = (row, level = 0) => {
-  // 如果是公司类型
-  if (row.DeptType === 'company') {
-    return 'company-icon'
-  }
-  
-  // 根据层级返回不同类名
-  switch (level) {
-    case 0:
-      return 'level-0-icon'
-    case 1:
-      return 'level-1-icon'
-    case 2:
-      return 'level-2-icon'
-    default:
-      return 'level-3-icon'
-  }
+// 根据部门类型获取图标CSS类名
+const getDeptIconClass = (row) => {
+  const config = deptTypeMap[row.DeptType]
+  return config ? config.iconClass : 'level-3-icon'
 }
 
 // 计算部门层级
@@ -412,6 +394,9 @@ const showAddDialog = (parentDept = null) => {
   resetForm()
   if (parentDept) {
     formData.ParentID = parentDept.ID
+    // 根据父级类型自动推断子级类型
+    const typeHierarchy = { company: 'department', department: 'workshop', workshop: 'team', team: 'team' }
+    formData.DeptType = typeHierarchy[parentDept.DeptType] || 'department'
   }
   dialogVisible.value = true
 }
@@ -629,24 +614,19 @@ onMounted(() => {
   color: #E6A23C;
 }
 
-/* 一级部门图标样式 */
-.dept-icon.level-0-icon {
+/* 部门级别图标样式 */
+.dept-icon.dept-icon-blue {
   color: #409EFF;
 }
 
-/* 二级部门图标样式 */
-.dept-icon.level-1-icon {
+/* 车间级别图标样式 */
+.dept-icon.workshop-icon {
+  color: #E6A23C;
+}
+
+/* 小组级别图标样式 */
+.dept-icon.team-icon {
   color: #67C23A;
-}
-
-/* 三级部门图标样式 */
-.dept-icon.level-2-icon {
-  color: #909399;
-}
-
-/* 四级及以下部门图标样式 */
-.dept-icon.level-3-icon {
-  color: #F56C6C;
 }
 
 .dialog-footer {

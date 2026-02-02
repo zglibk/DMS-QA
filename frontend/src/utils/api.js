@@ -37,6 +37,13 @@ export const resetLoginExpiredState = () => {
 }
 
 /**
+ * 检查是否正在显示登录过期对话框
+ */
+export const isLoginExpired = () => {
+  return isShowingLoginExpiredDialog
+}
+
+/**
  * 处理队列中的请求
  * @param {Error|null} error - 错误对象
  * @param {string|null} token - 新的token
