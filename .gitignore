@@ -154,3 +154,10 @@ config/local.json
 # package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
+
+# User specific ignored files
+迅越ERP接口文档V2_20260108.pdf
+FM100_色觉测试分析工具.html
+出货报告功能实现逻辑总结V1.1.html
+出货报告功能实现逻辑总结V1.2.html
+质量考核通知单.html
