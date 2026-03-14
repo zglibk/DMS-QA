@@ -1266,10 +1266,11 @@ const handleSubmit = async () => {
     }
     
     // 验证目标值格式
-    const targetValuePattern = /^[≥≤><]?\s*\d+(\.\d+)?\s*%?$/
+    // 支持格式：95%、≥95%、<90、100、≤1次、0次、<3次 等
+    const targetValuePattern = /^[≥≤><]?\s*\d+(\.\d+)?\s*(%|次)?$/
     if (!targetValuePattern.test(formData.targetValue.trim())) {
       console.error('目标值格式不正确:', formData.targetValue)
-      ElMessage.error('目标值格式不正确，请输入有效格式（如：95%、≥95%、<90、100等）')
+      ElMessage.error('目标值格式不正确，请输入有效格式（如：95%、≥95%、<90、100、≤1次等）')
       return
     }
     

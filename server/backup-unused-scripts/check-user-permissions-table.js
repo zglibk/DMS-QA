@@ -3,7 +3,7 @@
  */
 
 const sql = require('mssql');
-const { getDynamicConfig } = require('./config/database');
+const { getDynamicConfig } = require('../db');
 
 /**
  * 检查UserPermissions表结构

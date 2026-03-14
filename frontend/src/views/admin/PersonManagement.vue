@@ -38,7 +38,9 @@
               node-key="ID"
               highlight-current
               :expand-on-click-node="false"
-              default-expand-all
+              :default-expanded-keys="defaultExpandedKeys"
+              accordion
+              :indent="18"
               :current-node-key="selectedDeptId"
               @node-click="handleTreeNodeClick"
               class="dept-tree"
@@ -49,6 +51,7 @@
                     <component :is="deptTypeIcons[data.DeptType] || OfficeBuilding" />
                   </el-icon>
                   <span class="dept-tree-label">{{ node.label }}</span>
+                  <span :class="['dept-person-count', { 'count-zero': data.PersonCount === 0 }]">({{ data.PersonCount || 0 }})</span>
                 </span>
               </template>
             </el-tree>
@@ -175,17 +178,19 @@
         <el-form-item label="姓名" prop="name">
           <el-input v-model="formData.name" placeholder="请输入人员姓名" />
         </el-form-item>
-        <el-form-item label="部门" prop="departmentId">
+        <el-form-item label="部门" prop="departmentIds">
           <el-tree-select
-            v-model="formData.departmentId"
+            v-model="formData.departmentIds"
             :data="departments"
             :props="{ label: 'Name', value: 'ID', children: 'children' }"
-            placeholder="请选择部门"
+            placeholder="请选择部门（可多选）"
             style="width: 100%"
             clearable
+            multiple
             check-strictly
             :render-after-expand="false"
           />
+          <div class="form-tip">第一个选中的部门为主部门，其他为兼职部门</div>
         </el-form-item>
         <el-form-item label="状态" prop="isActive">
           <el-radio-group v-model="formData.isActive">
@@ -236,6 +241,7 @@ const departments = ref([])
 const flatDepartments = ref([])
 const selectedDeptId = ref(null)
 const deptTreeRef = ref()
+const defaultExpandedKeys = ref([]) // 默认展开的节点key
 
 // 树形配置
 const treeProps = {
@@ -254,7 +260,7 @@ const pagination = reactive({
 const formData = reactive({
   id: null,
   name: '',
-  departmentId: null,
+  departmentIds: [],  // 改为数组，支持多部门
   isActive: true
 })
 
@@ -340,6 +346,10 @@ const loadDepartments = async () => {
     if (response.data.success) {
       departments.value = response.data.data
       flatDepartments.value = response.data.flatData || []
+      // 默认展开第一个顶级节点（通常是公司）
+      if (departments.value.length > 0) {
+        defaultExpandedKeys.value = [departments.value[0].ID]
+      }
     }
   } catch (error) {
     console.error('加载部门列表失败:', error)
@@ -363,7 +373,7 @@ const editPerson = (row) => {
   isEdit.value = true
   formData.id = row.ID
   formData.name = row.Name
-  formData.departmentId = row.DepartmentID
+  formData.departmentIds = row.DepartmentIds || (row.DepartmentID ? [row.DepartmentID] : [])
   formData.isActive = row.IsActive
   showAddDialog.value = true
 }
@@ -429,14 +439,20 @@ const deletePerson = async (row) => {
     if (response.data.success) {
       ElMessage.success('删除成功')
       loadPersonList()
+      loadDepartments()  // 刷新部门人数
     } else {
-      ElMessage.error(response.data.error || '删除失败')
+      ElMessage.warning(response.data.error || '删除失败')
     }
   } catch (error) {
     if (error !== 'cancel' && error !== 'close') {
-      console.error('删除人员失败:', error)
       const msg = error.response?.data?.error || error.response?.data?.message || '删除失败'
-      ElMessage.error(msg)
+      // 400是业务错误（如存在关联数据），用warning；500是系统异常
+      if (error.response?.status === 400) {
+        ElMessage.warning(msg)
+      } else {
+        console.error('删除人员失败:', error)
+        ElMessage.error(msg)
+      }
     }
   }
 }
@@ -454,8 +470,8 @@ const submitForm = async () => {
     const method = isEdit.value ? 'put' : 'post'
     
     const response = await axios[method](url, {
-      name: formData.name,
-      departmentId: formData.departmentId,
+      name: formData.name.trim(),
+      departmentIds: formData.departmentIds,
       isActive: formData.isActive
     }, {
       headers: getHeaders()
@@ -465,13 +481,19 @@ const submitForm = async () => {
       ElMessage.success(response.data.message)
       showAddDialog.value = false
       loadPersonList()
+      loadDepartments()  // 刷新部门人数
     } else {
-      ElMessage.error(response.data.error || '操作失败')
+      ElMessage.warning(response.data.error || '操作失败')
     }
   } catch (error) {
-    console.error('提交表单失败:', error)
     const msg = error.response?.data?.error || error.response?.data?.message || '操作失败'
-    ElMessage.error(msg)
+    // 400是业务错误（如重名），用warning提示；500是系统异常，输出到控制台
+    if (error.response?.status === 400) {
+      ElMessage.warning(msg)
+    } else {
+      console.error('提交表单失败:', error)
+      ElMessage.error(msg)
+    }
   } finally {
     submitting.value = false
   }
@@ -482,7 +504,7 @@ const resetForm = () => {
   isEdit.value = false
   formData.id = null
   formData.name = ''
-  formData.departmentId = null
+  formData.departmentIds = []
   formData.isActive = true
   
   if (formRef.value) {
@@ -552,15 +574,24 @@ onMounted(() => {
 /* 部门卡片 */
 .dept-card {
   border-radius: 8px;
+  position: sticky;
+  top: 16px;
+  max-height: calc(100vh - 32px);
+  display: flex;
+  flex-direction: column;
 }
 
 .dept-card :deep(.el-card__header) {
   padding: 12px 16px;
   border-bottom: 1px solid #ebeef5;
+  flex-shrink: 0;
 }
 
 .dept-card :deep(.el-card__body) {
   padding: 8px 0;
+  overflow: hidden;
+  flex: 1;
+  min-height: 0;
 }
 
 .dept-card-header {
@@ -573,7 +604,7 @@ onMounted(() => {
 }
 
 .dept-list {
-  max-height: calc(100vh - 240px);
+  max-height: 100%;
   overflow-y: auto;
 }
 
@@ -616,7 +647,6 @@ onMounted(() => {
 
 .dept-tree :deep(.el-tree-node__content) {
   height: 34px;
-  padding-left: 8px !important;
   border-left: 3px solid transparent;
   transition: all 0.2s;
 }
@@ -665,6 +695,23 @@ onMounted(() => {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dept-person-count {
+  color: #F56C6C;
+  font-size: 12px;
+  margin-left: 4px;
+  flex-shrink: 0;
+}
+
+.dept-person-count.count-zero {
+  color: #C0C4CC;
+}
+
+.form-tip {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 
 /* 操作栏 */

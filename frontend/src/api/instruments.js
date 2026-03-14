@@ -443,6 +443,25 @@ export const instrumentApi = {
    */
   generateWarningNotices(data = {}) {
     return api.post('/api/instruments/generate-warning-notices', data)
+  },
+
+  /**
+   * 导出到期预警清单
+   * @param {Object} params - 参数
+   * @param {number} params.warningDays - 预警天数（默认15）
+   * @param {boolean} params.externalOnly - 是否仅导出第三方校准
+   * @returns {Promise} Blob响应
+   */
+  exportExpiryList(params = {}) {
+    const query = new URLSearchParams({
+      warningDays: params.warningDays || 15,
+      externalOnly: params.externalOnly ? 'true' : 'false'
+    }).toString()
+    const token = localStorage.getItem('token')
+    return fetch(`/api/instruments/export/expiry-list?${query}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${token}` }
+    })
   }
 }
 

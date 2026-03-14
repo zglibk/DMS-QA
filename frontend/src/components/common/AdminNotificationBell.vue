@@ -384,6 +384,14 @@ const handleNoticeClick = async (notice) => {
       notificationDropdown.value.handleClose()
     }
     
+    // 校准预警类通知：直接跳转到到期预警页面
+    if (notice.title && notice.title.includes('校准预警')) {
+      // 先标记为已读
+      await markNoticeAsRead(notice.id)
+      router.push('/admin/instruments/expiry')
+      return
+    }
+    
     // 获取完整的通知详情
     const response = await api.get(`/api/notice/${notice.id}`)
     if (response.data.success) {

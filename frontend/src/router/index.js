@@ -282,6 +282,17 @@ const routes = [
         component: () => import('../views/quality/targets/QualityTargets.vue'), // 质量目标管理页面
         meta: { title: '目标管理', requiresAuth: true }
       },
+      {
+        path: 'quality/basic/measure-library',
+        name: 'MeasureLibrary',
+        component: () => import('../views/quality/basic/MeasureLibrary.vue'), // 异常对策库页面
+        meta: { title: '异常对策库', requiresAuth: true, breadcrumb: '异常对策库' }
+      },
+      {
+        path: 'quality/exception',
+        component: () => import('@/views/quality/exception/QualityException.vue'), // 品质异常联络单页面
+        meta: { title: '品质异常联络单', requiresAuth: true }
+      },
       
       {
         path: 'quality/targets/analysis',
@@ -505,6 +516,11 @@ const routes = [
         path: 'instruments/annual-plan',
         component: () => import('../views/admin/instruments/InstrumentManagement.vue'), // 年度计划页面
         meta: { title: '年度计划', requiresAuth: true }
+      },
+      {
+        path: 'instruments/expiry',
+        component: () => import('../views/admin/instruments/InstrumentManagement.vue'), // 到期预警页面
+        meta: { title: '到期预警', requiresAuth: true }
       },
 
       // 二次开发模块

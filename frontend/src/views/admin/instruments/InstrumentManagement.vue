@@ -28,6 +28,11 @@
         <el-tab-pane label="年度计划" name="annual-plan">
           <AnnualPlan ref="annualPlanRef" />
         </el-tab-pane>
+
+        <!-- 到期预警 -->
+        <el-tab-pane label="到期预警" name="expiry">
+          <CalibrationExpiry ref="calibrationExpiryRef" />
+        </el-tab-pane>
       </el-tabs>
     </div>
   </div>
@@ -51,6 +56,7 @@ import { Tools } from '@element-plus/icons-vue'
 import InstrumentList from './InstrumentList.vue'
 import CalibrationResults from './CalibrationResults.vue'
 import AnnualPlan from './AnnualPlan.vue'
+import CalibrationExpiry from './CalibrationExpiry.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -61,6 +67,7 @@ const activeTab = ref('instruments')
 // 组件引用
 const calibrationResultsRef = ref(null)
 const annualPlanRef = ref(null)
+const calibrationExpiryRef = ref(null)
 
 /**
  * 处理仪器删除后的数据刷新
@@ -88,6 +95,10 @@ const handleTabClick = (tabName) => {
   if (tabName === 'calibration' && calibrationResultsRef.value && calibrationResultsRef.value.refreshData) {
     calibrationResultsRef.value.refreshData()
   }
+  // 切换到到期预警时，刷新数据
+  if (tabName === 'expiry' && calibrationExpiryRef.value && calibrationExpiryRef.value.refreshData) {
+    calibrationExpiryRef.value.refreshData()
+  }
 }
 
 /**
@@ -101,6 +112,8 @@ const setActiveTabFromRoute = () => {
     activeTab.value = 'calibration'
   } else if (path.includes('/annual-plan')) {
     activeTab.value = 'annual-plan'
+  } else if (path.includes('/expiry')) {
+    activeTab.value = 'expiry'
   } else {
     activeTab.value = 'instruments'
   }
@@ -121,6 +134,9 @@ const handleTabChange = (tabName) => {
       break
     case 'annual-plan':
       newPath = '/admin/instruments/annual-plan'
+      break
+    case 'expiry':
+      newPath = '/admin/instruments/expiry'
       break
   }
   

@@ -1233,7 +1233,7 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
  */
 router.get('/calibration-warnings', authenticateToken, async (req, res) => {
   try {
-    const { warningDays = 30 } = req.query; // 默认提前30天预警
+    const { warningDays = 15 } = req.query; // 默认提前15天预警
     const pool = await getConnection();
     
     // 查询即将到期的仪器（综合年度计划和校准结果）
@@ -1259,7 +1259,11 @@ router.get('/calibration-warnings', authenticateToken, async (req, res) => {
             ELSE 'normal'
           END as WarningLevel,
           ap.CalibrationAgency,
-          NULL as CertificateNumber
+          NULL as CertificateNumber,
+          COALESCE(
+            (SELECT TOP 1 CalibrationDate FROM CalibrationResults WHERE InstrumentID = i.ID ORDER BY CalibrationDate DESC),
+            (SELECT TOP 1 ActualDate FROM AnnualCalibrationPlan WHERE InstrumentID = i.ID AND Status = N'已完成' AND ActualDate IS NOT NULL ORDER BY ActualDate DESC)
+          ) as LastCalibrationDate
         FROM AnnualCalibrationPlan ap
         INNER JOIN Instruments i ON ap.InstrumentID = i.ID
         LEFT JOIN Department d ON i.DepartmentID = d.ID
@@ -1290,13 +1294,15 @@ router.get('/calibration-warnings', authenticateToken, async (req, res) => {
             ELSE 'normal'
           END as WarningLevel,
           cr.CalibrationAgency,
-          cr.CertificateNumber
+          cr.CertificateNumber,
+          cr.CalibrationDate as LastCalibrationDate
         FROM (
           SELECT 
             InstrumentID,
             ExpiryDate,
             CalibrationAgency,
             CertificateNumber,
+            CalibrationDate,
             ROW_NUMBER() OVER (PARTITION BY InstrumentID ORDER BY CalibrationDate DESC) as rn
           FROM CalibrationResults
           WHERE ExpiryDate IS NOT NULL
@@ -4470,6 +4476,264 @@ router.patch('/annual-plan/:id/status', authenticateToken, async (req, res) => {
   } catch (error) {
     console.error('更新计划状态失败:', error);
     res.status(500).json({ code: 500, message: '更新计划状态失败', error: error.message });
+  }
+});
+
+/**
+ * 导出到期预警清单（Excel格式同导出计划表）
+ * GET /api/instruments/export/expiry-list
+ * 参数：warningDays - 预警天数（默认15天）
+ *       externalOnly - 是否仅导出第三方校准（可选）
+ */
+router.get('/export/expiry-list', authenticateToken, async (req, res) => {
+  try {
+    const { warningDays = 15, externalOnly = 'false' } = req.query;
+    const isExternalOnly = externalOnly === 'true';
+    const pool = await getConnection();
+
+    // 复用校准预警的查询逻辑，并JOIN更多仪器详细信息以匹配导出计划表的列
+    const result = await pool.request()
+      .input('warningDays', sql.Int, parseInt(warningDays))
+      .query(`
+        ;WITH WarningList AS (
+          -- 从年度校准计划获取即将到期的仪器
+          SELECT 
+            i.ID as InstrumentID,
+            i.InstrumentCode,
+            i.ManagementCode,
+            i.InstrumentName,
+            i.Model,
+            i.Manufacturer,
+            i.Location,
+            d.Name as DepartmentName,
+            p.Name as ResponsiblePersonName,
+            ap.PlannedDate,
+            ap.CalibrationAgency,
+            ap.EstimatedCost,
+            ap.Priority,
+            ap.Status,
+            ap.ActualDate,
+            ap.ActualCost,
+            ap.Remarks,
+            NULL as CertificateNumber,
+            NULL as CalibrationResult,
+            NULL as ExpiryDate,
+            N'计划校准' as WarningSource,
+            DATEDIFF(DAY, GETDATE(), ap.PlannedDate) as DaysRemaining,
+            CASE 
+              WHEN ap.PlannedDate < GETDATE() THEN N'已过期'
+              WHEN DATEDIFF(DAY, GETDATE(), ap.PlannedDate) <= 7 THEN N'7天内到期'
+              WHEN DATEDIFF(DAY, GETDATE(), ap.PlannedDate) <= @warningDays THEN N'即将到期'
+              ELSE N'正常'
+            END as WarningLevelText
+          FROM AnnualCalibrationPlan ap
+          INNER JOIN Instruments i ON ap.InstrumentID = i.ID
+          LEFT JOIN Department d ON i.DepartmentID = d.ID
+          LEFT JOIN Person p ON i.ResponsiblePerson = p.ID
+          WHERE i.IsActive = 1 
+            AND ap.PlannedDate IS NOT NULL
+            AND ap.Status IN (N'计划中', N'待校准', N'planned', 'planned')
+            AND DATEDIFF(DAY, GETDATE(), ap.PlannedDate) <= @warningDays
+          
+          UNION
+          
+          -- 从校准结果获取证书即将到期的仪器
+          SELECT 
+            i.ID as InstrumentID,
+            i.InstrumentCode,
+            i.ManagementCode,
+            i.InstrumentName,
+            i.Model,
+            i.Manufacturer,
+            i.Location,
+            d.Name as DepartmentName,
+            p.Name as ResponsiblePersonName,
+            NULL as PlannedDate,
+            cr.CalibrationAgency,
+            NULL as EstimatedCost,
+            NULL as Priority,
+            NULL as Status,
+            NULL as ActualDate,
+            NULL as ActualCost,
+            NULL as Remarks,
+            cr.CertificateNumber,
+            cr.CalibrationResult,
+            cr.ExpiryDate,
+            N'证书到期' as WarningSource,
+            DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) as DaysRemaining,
+            CASE 
+              WHEN cr.ExpiryDate < GETDATE() THEN N'已过期'
+              WHEN DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) <= 7 THEN N'7天内到期'
+              WHEN DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) <= @warningDays THEN N'即将到期'
+              ELSE N'正常'
+            END as WarningLevelText
+          FROM (
+            SELECT 
+              InstrumentID,
+              ExpiryDate,
+              CalibrationAgency,
+              CertificateNumber,
+              CalibrationResult,
+              ROW_NUMBER() OVER (PARTITION BY InstrumentID ORDER BY CalibrationDate DESC) as rn
+            FROM CalibrationResults
+            WHERE ExpiryDate IS NOT NULL
+          ) cr
+          INNER JOIN Instruments i ON cr.InstrumentID = i.ID AND cr.rn = 1
+          LEFT JOIN Department d ON i.DepartmentID = d.ID
+          LEFT JOIN Person p ON i.ResponsiblePerson = p.ID
+          WHERE i.IsActive = 1 
+            AND DATEDIFF(DAY, GETDATE(), cr.ExpiryDate) <= @warningDays
+        )
+        SELECT * FROM WarningList
+        ${isExternalOnly ? "WHERE CalibrationAgency IS NOT NULL AND LTRIM(RTRIM(CalibrationAgency)) != ''" : ''}
+        ORDER BY DaysRemaining ASC
+      `);
+
+    const rows = result.recordset || [];
+
+    // 创建Excel工作簿（格式同导出计划表）
+    const workbook = new ExcelJS.Workbook();
+    const sheetTitle = isExternalOnly ? '第三方校准到期清单' : '校准到期预警清单';
+    const worksheet = workbook.addWorksheet(sheetTitle);
+
+    // 列定义：前20列同导出计划表，额外追加3列预警信息
+    worksheet.columns = [
+      { header: '序号', key: 'index', width: 8 },
+      { header: '仪器编号', key: 'instrumentCode', width: 15 },
+      { header: '管理编号', key: 'managementCode', width: 15 },
+      { header: '仪器名称', key: 'instrumentName', width: 20 },
+      { header: '型号', key: 'model', width: 15 },
+      { header: '制造商', key: 'manufacturer', width: 15 },
+      { header: '存放位置', key: 'location', width: 15 },
+      { header: '所属部门', key: 'departmentName', width: 12 },
+      { header: '责任人', key: 'responsiblePersonName', width: 10 },
+      { header: '计划日期', key: 'plannedDate', width: 12 },
+      { header: '校准机构', key: 'calibrationAgency', width: 15 },
+      { header: '预估费用', key: 'estimatedCost', width: 10 },
+      { header: '优先级', key: 'priority', width: 8 },
+      { header: '状态', key: 'status', width: 10 },
+      { header: '实际日期', key: 'actualDate', width: 12 },
+      { header: '实际费用', key: 'actualCost', width: 10 },
+      { header: '证书编号', key: 'certificateNumber', width: 15 },
+      { header: '校准结果', key: 'calibrationResult', width: 10 },
+      { header: '有效期至', key: 'expiryDate', width: 12 },
+      { header: '备注', key: 'remarks', width: 20 },
+      // 额外预警信息列
+      { header: '预警来源', key: 'warningSource', width: 10 },
+      { header: '预警级别', key: 'warningLevelText', width: 12 },
+      { header: '剩余天数', key: 'daysRemaining', width: 10 }
+    ];
+
+    const columnCount = worksheet.columns.length;
+    const defaultFont = { name: 'Tahoma', size: 10 };
+
+    // 表头样式
+    const headerRow = worksheet.getRow(1);
+    headerRow.height = 16.5;
+    headerRow.alignment = { horizontal: 'center', vertical: 'middle' };
+    for (let col = 1; col <= columnCount; col++) {
+      const cell = headerRow.getCell(col);
+      cell.font = { ...defaultFont, bold: true, color: { argb: '000000' } };
+      cell.fill = {
+        type: 'pattern',
+        pattern: 'solid',
+        fgColor: { argb: 'F0F0F0' }
+      };
+    }
+
+    // 添加数据行
+    const formatDateStr = (d) => d ? new Date(d).toISOString().split('T')[0] : '';
+    rows.forEach((row, index) => {
+      const dataRow = worksheet.addRow({
+        index: index + 1,
+        instrumentCode: row.InstrumentCode || '',
+        managementCode: row.ManagementCode || '',
+        instrumentName: row.InstrumentName || '',
+        model: row.Model || '',
+        manufacturer: row.Manufacturer || '',
+        location: row.Location || '',
+        departmentName: row.DepartmentName || '',
+        responsiblePersonName: row.ResponsiblePersonName || '',
+        plannedDate: formatDateStr(row.PlannedDate),
+        calibrationAgency: row.CalibrationAgency || '',
+        estimatedCost: row.EstimatedCost || '',
+        priority: row.Priority || '',
+        status: row.Status || '',
+        actualDate: formatDateStr(row.ActualDate),
+        actualCost: row.ActualCost || '',
+        certificateNumber: row.CertificateNumber || '',
+        calibrationResult: row.CalibrationResult || '',
+        expiryDate: formatDateStr(row.ExpiryDate),
+        remarks: row.Remarks || '',
+        warningSource: row.WarningSource || '',
+        warningLevelText: row.WarningLevelText || '',
+        daysRemaining: row.DaysRemaining != null ? row.DaysRemaining : ''
+      });
+
+      dataRow.height = 16.5;
+      // 需左对齐的列：仪器名称(4)、制造商(6)、校准机构(11)
+      const leftAlignCols = [4, 6, 11];
+      for (let col = 1; col <= columnCount; col++) {
+        const cell = dataRow.getCell(col);
+        cell.font = defaultFont;
+        cell.alignment = {
+          horizontal: leftAlignCols.includes(col) ? 'left' : 'center',
+          vertical: 'middle'
+        };
+      }
+
+      // 根据预警级别设置行背景色
+      let bgColor = null;
+      if (row.WarningLevelText === '已过期') {
+        bgColor = 'FFCCCC'; // 浅红 - 已过期
+      } else if (row.WarningLevelText === '7天内到期') {
+        bgColor = 'FFEEBA'; // 浅橙 - 紧急
+      } else if (index % 2 === 1) {
+        bgColor = 'F8F8F8'; // 隔行变色
+      }
+      if (bgColor) {
+        for (let col = 1; col <= columnCount; col++) {
+          dataRow.getCell(col).fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: bgColor }
+          };
+        }
+      }
+    });
+
+    // 添加边框
+    const borderStyle = {
+      top: { style: 'thin', color: { argb: 'A0A0A0' } },
+      left: { style: 'thin', color: { argb: 'A0A0A0' } },
+      bottom: { style: 'thin', color: { argb: 'A0A0A0' } },
+      right: { style: 'thin', color: { argb: 'A0A0A0' } }
+    };
+    worksheet.eachRow((row) => {
+      for (let col = 1; col <= columnCount; col++) {
+        row.getCell(col).border = borderStyle;
+      }
+    });
+
+    // 冻结首行
+    worksheet.views = [{ state: 'frozen', ySplit: 1, showGridLines: false }];
+
+    // 响应
+    const typeLabel = isExternalOnly ? '第三方校准到期清单' : '校准到期预警清单';
+    const filename = `${typeLabel}_${new Date().toISOString().split('T')[0]}.xlsx`;
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+
+  } catch (error) {
+    console.error('导出到期预警清单失败:', error);
+    res.status(500).json({
+      code: 500,
+      message: '导出到期预警清单失败',
+      error: error.message
+    });
   }
 });
 

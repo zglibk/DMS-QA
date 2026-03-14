@@ -547,19 +547,30 @@ router.get('/export', async (req, res) => {
     }
 
     // 计算编制信息：取该年度最早创建的目标的创建人和创建日期
-    let makerName = req.user?.username || '系统管理员';
+    let makerName = '系统管理员';
     let makerDate = new Date().toISOString().slice(0, 10);
     
     if (records.length > 0) {
-      // 找到最早的记录 (逻辑修正：确保是按CreatedAt排序后的第一条)
-      // 使用上面已经排序好的结果
+      // 找到最早的记录
       const sortedRecords = [...records].sort((a, b) => new Date(a.CreatedAt) - new Date(b.CreatedAt));
       const earliestRecord = sortedRecords[0];
       
-      // 优先使用数据库中的 CreatedBy，如果为空则回退默认值
-      // 注意：数据库字段可能是 null 或 空字符串
+      // 通过CreatedBy（用户名）查询用户真实姓名
       if (earliestRecord.CreatedBy && earliestRecord.CreatedBy.trim() !== '') {
+        try {
+          const userResult = await pool.request()
+            .input('username', sql.NVarChar, earliestRecord.CreatedBy.trim())
+            .query('SELECT RealName FROM [User] WHERE Username = @username');
+          if (userResult.recordset.length > 0 && userResult.recordset[0].RealName) {
+            makerName = userResult.recordset[0].RealName.trim();
+          } else {
+            // 如果找不到真实姓名，使用CreatedBy原值
+            makerName = earliestRecord.CreatedBy;
+          }
+        } catch (e) {
+          // 查询失败时使用CreatedBy原值
           makerName = earliestRecord.CreatedBy;
+        }
       }
       
       const eDate = new Date(earliestRecord.CreatedAt);
@@ -581,15 +592,15 @@ router.get('/export', async (req, res) => {
     
     // 设置列 (A-J列)
     // A: 部门名称, B: 质量目标, C+D: 计算公式, E: 目标值, F+G+H: 保证达标的措施, I: 责任人, J: 统计频次
-    // 用户期望列宽: A=5.5, B=9.25, C=5.75, D=11.38, E=5, F=13.5, G=11, H=12, I=8.38, J=9.88
-    // ExcelJS设置值需补偿偏差(+0.63): A=6.13, B=9.88, C=6.38, D=12.01, E=5.63, F=14.13, G=11.63, H=12.63, I=9.01, J=10.51
+    // 用户期望列宽: A=5.5, B=9.25, C=8.75, D=11.38, E=6.75, F=14.5, G=11, H=12, I=8.38, J=9.88
+    // ExcelJS设置值需补偿偏差(+0.63): A=6.13, B=9.88, C=9.38, D=12.01, E=7.38, F=15.13, G=11.63, H=12.63, I=9.01, J=10.51
     worksheet.columns = [
       { key: 'AssessmentUnit', width: 6.13 },       // A 部门名称
       { key: 'QualityTarget', width: 9.88 },        // B 质量目标
-      { key: 'CalculationFormula', width: 6.38 },   // C 计算公式 (合并起始)
+      { key: 'CalculationFormula', width: 9.38 },   // C 计算公式 (合并起始)
       { key: 'FormulaPlaceholder', width: 12.01 },  // D (合并)
-      { key: 'TargetValue', width: 5.63 },          // E 目标值
-      { key: 'Measures', width: 14.13 },            // F 措施 (合并起始)
+      { key: 'TargetValue', width: 7.38 },          // E 目标值
+      { key: 'Measures', width: 15.13 },            // F 措施 (合并起始)
       { key: 'MeasuresPlaceholder1', width: 11.63 },// G (合并)
       { key: 'MeasuresPlaceholder2', width: 12.63 },// H (合并)
       { key: 'ResponsiblePerson', width: 9.01 },    // I 责任人

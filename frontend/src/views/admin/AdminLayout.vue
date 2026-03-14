@@ -912,6 +912,11 @@ onUnmounted(() => {
   .logo-text { font-size: 0.9rem; }
   .admin-main { padding: 0.5rem; }
   
+  /* 隐藏面包屑 */
+  .header-left :deep(.el-breadcrumb) {
+    display: none;
+  }
+  
   .user-dropdown-card {
     min-width: 16rem;
     max-width: 18rem;

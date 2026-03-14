@@ -324,6 +324,8 @@ app.use('/api/erp-api-doc', erpApiDocRouter); // ERP接口文档管理
 app.use('/api/inspection/performance', require('./routes/performanceInspection')); // 性能实验报告
 app.use('/api/inspection/dashboard', require('./routes/inspectionDashboard')); // 检验工作台
 app.use('/api/log-export', require('./routes/logExport'));
+app.use('/api/quality-exceptions', require('./routes/qualityExceptions')); // 品质异常联络单
+app.use('/api/quality-measures', require('./routes/qualityMeasures')); // 临时对策内容库
 
 // 错误日志记录中间件（必须在所有路由之后）
 app.use(errorLoggerMiddleware());

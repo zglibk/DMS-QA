@@ -2,7 +2,8 @@
   <el-dialog
     v-model="visible"
     :show-close="false"
-    width="960px"
+    width="768px"
+    top="8vh"
     :close-on-click-modal="false"
     class="warning-dialog"
     @close="handleClose"
@@ -13,7 +14,7 @@
         <div class="header-left">
           <div class="header-icon-wrapper">
             <div class="icon-bg">
-              <el-icon :size="32"><WarningFilled /></el-icon>
+              <el-icon :size="24"><WarningFilled /></el-icon>
             </div>
             <div class="icon-pulse"></div>
           </div>
@@ -36,7 +37,7 @@
       <div class="stats-grid">
         <div class="stat-card expired" :class="{ 'has-data': summary.expired > 0 }">
           <div class="stat-icon">
-            <el-icon :size="28"><CircleCloseFilled /></el-icon>
+            <el-icon :size="22"><CircleCloseFilled /></el-icon>
           </div>
           <div class="stat-info">
             <span class="stat-value">{{ summary.expired }}</span>
@@ -47,7 +48,7 @@
         
         <div class="stat-card critical" :class="{ 'has-data': summary.critical > 0 }">
           <div class="stat-icon">
-            <el-icon :size="28"><WarningFilled /></el-icon>
+            <el-icon :size="22"><WarningFilled /></el-icon>
           </div>
           <div class="stat-info">
             <span class="stat-value">{{ summary.critical }}</span>
@@ -58,18 +59,18 @@
         
         <div class="stat-card warning" :class="{ 'has-data': summary.warning > 0 }">
           <div class="stat-icon">
-            <el-icon :size="28"><Clock /></el-icon>
+            <el-icon :size="22"><Clock /></el-icon>
           </div>
           <div class="stat-info">
             <span class="stat-value">{{ summary.warning }}</span>
-            <span class="stat-label">30天内到期</span>
+            <span class="stat-label">15天内到期</span>
           </div>
           <div class="stat-decoration"></div>
         </div>
         
         <div class="stat-card total">
           <div class="stat-icon">
-            <el-icon :size="28"><DataAnalysis /></el-icon>
+            <el-icon :size="22"><DataAnalysis /></el-icon>
           </div>
           <div class="stat-info">
             <span class="stat-value">{{ summary.total }}</span>
@@ -103,7 +104,7 @@
         <el-table 
           :data="filteredWarningList" 
           v-loading="loading"
-          :max-height="320"
+          :max-height="240"
           :row-class-name="getRowClassName"
           :header-cell-style="{ background: '#f8fafc', color: '#475569', fontWeight: '600' }"
           empty-text="暂无预警数据"
@@ -210,7 +211,7 @@
           </el-button>
           <el-button type="primary" @click="handleGoToCalibration" class="btn-primary">
             <el-icon><Operation /></el-icon>
-            前往校准管理
+            查看到期详情
           </el-button>
         </div>
       </div>
@@ -286,7 +287,7 @@ const filteredWarningList = computed(() => {
 async function fetchWarnings() {
   try {
     loading.value = true
-    const response = await instrumentApi.getCalibrationWarnings({ warningDays: 30 })
+    const response = await instrumentApi.getCalibrationWarnings({ warningDays: 15 })
     if (response.data && response.data.data) {
       warningList.value = response.data.data.list || []
       summary.value = response.data.data.summary || { total: 0, expired: 0, critical: 0, warning: 0 }
@@ -366,7 +367,7 @@ async function handleGenerateNotice() {
  * 前往校准管理
  */
 function handleGoToCalibration() {
-  router.push('/admin/instruments')
+  router.push('/admin/instruments/expiry')
   handleClose()
 }
 
@@ -419,22 +420,32 @@ defineExpose({
 <style scoped>
 /* 对话框整体样式 */
 .warning-dialog :deep(.el-dialog) {
-  border-radius: 16px;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 20px 40px -10px rgba(0, 0, 0, 0.25);
+  margin-top: 8vh !important;
+  margin-bottom: auto;
+  max-height: 84vh;
+  display: flex;
+  flex-direction: column;
 }
 
 .warning-dialog :deep(.el-dialog__header) {
   padding: 0;
   margin: 0;
+  flex-shrink: 0;
 }
 
 .warning-dialog :deep(.el-dialog__body) {
   padding: 0;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .warning-dialog :deep(.el-dialog__footer) {
   padding: 0;
+  flex-shrink: 0;
 }
 
 /* 头部样式 */
@@ -442,7 +453,7 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 24px 28px;
+  padding: 16px 20px;
   background: linear-gradient(135deg, #FEF3E2 0%, #FDE8C8 50%, #FCE0B0 100%);
   border-bottom: 1px solid rgba(230, 162, 60, 0.2);
 }
@@ -450,7 +461,7 @@ defineExpose({
 .header-left {
   display: flex;
   align-items: center;
-  gap: 20px;
+  gap: 14px;
 }
 
 .header-icon-wrapper {
@@ -461,23 +472,23 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 60px;
-  height: 60px;
+  width: 46px;
+  height: 46px;
   background: linear-gradient(135deg, #E6A23C 0%, #F5BA4D 100%);
-  border-radius: 16px;
+  border-radius: 12px;
   color: white;
-  box-shadow: 0 8px 16px rgba(230, 162, 60, 0.3);
+  box-shadow: 0 6px 12px rgba(230, 162, 60, 0.3);
 }
 
 .icon-pulse {
   position: absolute;
-  top: -4px;
-  right: -4px;
-  width: 16px;
-  height: 16px;
+  top: -3px;
+  right: -3px;
+  width: 13px;
+  height: 13px;
   background: #F56C6C;
   border-radius: 50%;
-  border: 3px solid #FEF3E2;
+  border: 2px solid #FEF3E2;
   animation: pulse 2s infinite;
 }
 
@@ -489,22 +500,22 @@ defineExpose({
 .header-text {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 3px;
 }
 
 .header-text .title {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   margin: 0;
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 700;
   color: #1e293b;
 }
 
 .header-text .subtitle {
   margin: 0;
-  font-size: 14px;
+  font-size: 12px;
   color: #64748b;
 }
 
@@ -522,32 +533,32 @@ defineExpose({
 
 /* 统计卡片区域 */
 .stats-section {
-  padding: 24px 28px;
+  padding: 14px 20px;
   background: #f8fafc;
 }
 
 .stats-grid {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 16px;
+  gap: 10px;
 }
 
 .stat-card {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 20px;
+  gap: 10px;
+  padding: 12px 14px;
   background: white;
-  border-radius: 14px;
+  border-radius: 10px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
   transition: all 0.3s ease;
 }
 
 .stat-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.1);
 }
 
 .stat-card.has-data {
@@ -577,36 +588,36 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 52px;
-  height: 52px;
-  border-radius: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
   flex-shrink: 0;
 }
 
 .stat-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .stat-value {
-  font-size: 28px;
+  font-size: 22px;
   font-weight: 700;
   line-height: 1;
 }
 
 .stat-label {
-  font-size: 13px;
+  font-size: 11px;
   color: #64748b;
   font-weight: 500;
 }
 
 .stat-decoration {
   position: absolute;
-  top: -20px;
-  right: -20px;
-  width: 80px;
-  height: 80px;
+  top: -16px;
+  right: -16px;
+  width: 60px;
+  height: 60px;
   border-radius: 50%;
   background: currentColor;
   opacity: 0.03;
@@ -614,21 +625,21 @@ defineExpose({
 
 /* 列表区域 */
 .list-section {
-  padding: 0 28px 24px;
+  padding: 0 20px 16px;
 }
 
 .list-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 16px;
+  margin-bottom: 10px;
 }
 
 .list-title {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 16px;
+  gap: 6px;
+  font-size: 14px;
   font-weight: 600;
   color: #1e293b;
 }
@@ -638,17 +649,17 @@ defineExpose({
 }
 
 .table-wrapper {
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid #e2e8f0;
   overflow: hidden;
 }
 
 .table-wrapper :deep(.el-table) {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .table-wrapper :deep(.el-table__header-wrapper) {
-  border-radius: 12px 12px 0 0;
+  border-radius: 8px 8px 0 0;
 }
 
 .table-wrapper :deep(.row-expired) {
@@ -660,55 +671,57 @@ defineExpose({
 }
 
 .table-wrapper :deep(.el-table__empty-block) {
-  min-height: 200px;
+  min-height: 120px;
 }
 
 /* 表格单元格内容样式 */
 .instrument-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .instrument-name {
   font-weight: 600;
   color: #1e293b;
-  line-height: 1.4;
+  line-height: 1.3;
+  font-size: 12px;
 }
 
 .instrument-code {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  gap: 3px;
+  font-size: 11px;
   color: #64748b;
 }
 
 .dept-info {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 
 .dept-name {
   font-weight: 500;
   color: #334155;
+  font-size: 12px;
 }
 
 .person-name {
   display: flex;
   align-items: center;
-  gap: 4px;
-  font-size: 12px;
+  gap: 3px;
+  font-size: 11px;
   color: #64748b;
 }
 
 .source-tag {
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .date-text {
-  font-size: 13px;
+  font-size: 12px;
   color: #475569;
   font-variant-numeric: tabular-nums;
 }
@@ -721,13 +734,14 @@ defineExpose({
 .status-tag {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   font-weight: 600;
+  font-size: 11px;
 }
 
 .status-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   background: currentColor;
   animation: blink 1.5s infinite;
@@ -740,23 +754,23 @@ defineExpose({
 
 .agency-text {
   color: #64748b;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 /* 列表底部 */
 .list-footer {
-  margin-top: 16px;
-  padding: 12px 16px;
+  margin-top: 10px;
+  padding: 8px 12px;
   background: #f8fafc;
-  border-radius: 8px;
+  border-radius: 6px;
   border: 1px dashed #e2e8f0;
 }
 
 .footer-info {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 6px;
+  font-size: 12px;
   color: #64748b;
 }
 
@@ -769,7 +783,7 @@ defineExpose({
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 28px;
+  padding: 12px 20px;
   background: #f8fafc;
   border-top: 1px solid #e2e8f0;
 }
@@ -780,31 +794,34 @@ defineExpose({
 }
 
 .checkbox-text {
-  font-size: 13px;
+  font-size: 12px;
   color: #64748b;
 }
 
 .footer-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
 }
 
 .btn-close {
-  padding: 10px 20px;
-  border-radius: 8px;
+  padding: 7px 16px;
+  border-radius: 6px;
+  font-size: 13px;
 }
 
 .btn-generate {
-  padding: 10px 20px;
-  border-radius: 8px;
+  padding: 7px 16px;
+  border-radius: 6px;
   font-weight: 500;
+  font-size: 13px;
 }
 
 .btn-primary {
-  padding: 10px 20px;
-  border-radius: 8px;
+  padding: 7px 16px;
+  border-radius: 6px;
   font-weight: 500;
+  font-size: 13px;
   background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
   border: none;
 }

@@ -98,6 +98,12 @@ export const breadcrumbConfig = {
     icon: 'mdi:chart-areaspline'
   },
 
+  // 品质异常联络单
+  '/admin/quality/exception': {
+    title: '品质异常联络单',
+    icon: 'mdi:alert-octagon'
+  },
+
   // 考核记录管理
   '/admin/quality/assessment': {
     title: '考核记录管理',
@@ -292,6 +298,18 @@ export const breadcrumbConfig = {
   '/admin/quality/data-management': {
     title: '质量异常数据导入',
     icon: 'mdi:upload'
+  },
+
+  // 数据字典
+  '/admin/quality/basic': {
+    title: '数据字典',
+    icon: 'mdi:database-cog'
+  },
+
+  // 异常对策库
+  '/admin/quality/basic/measure-library': {
+    title: '异常对策库',
+    icon: 'mdi:format-list-checks'
   },
 
   // 不良类别管理
@@ -551,6 +569,10 @@ export const breadcrumbConfig = {
     title: '年度计划',
     icon: 'mdi:calendar-clock'
   },
+  '/admin/instruments/expiry': {
+    title: '到期预警',
+    icon: 'mdi:alert-clock'
+  },
   '/admin/instruments/import': {
     title: '批量导入',
     icon: 'mdi:upload'
@@ -798,6 +820,7 @@ function generateDefaultTitle(segment) {
     'ledger': '仪器台账',
     'calibration': '校准检定',
     'annual-plan': '年度计划',
+    'expiry': '到期预警',
     'import': '批量导入',
     'list': '列表',
     'management': '管理',
@@ -822,6 +845,7 @@ function generateDefaultTitle(segment) {
     'assessment': '考核记录管理',
     'defective-management': '不良类别管理',
     'publishing-exceptions': '出版异常',
+    'exception': '品质异常联络单',
     // 工作计划相关映射
     'work-plan': '工作计划',
     'work': '工作',
