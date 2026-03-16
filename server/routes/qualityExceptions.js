@@ -268,6 +268,13 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     try {
         const { id } = req.params;
         await executeQuery(async (pool) => {
+            // 首先删除关联的考核通知记录
+            await pool.request()
+                .input('SourceID', sql.Int, id)
+                .input('SourceType', sql.NVarChar, 'Exception')
+                .query('DELETE FROM QualityAssessmentNotices WHERE SourceType = @SourceType AND SourceID = @SourceID');
+
+            // 然后删除异常联络单本身
             await pool.request()
                 .input('ID', sql.Int, id)
                 .query('DELETE FROM QualityExceptions WHERE ID = @ID');

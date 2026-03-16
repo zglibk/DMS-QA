@@ -1,9 +1,20 @@
 <template>
   <el-container class="admin-layout">
     <!-- 侧边栏 -->
-    <el-aside :width="sidebarWidth" class="admin-aside">
+    <!-- 移动端遮罩层 -->
+    <div 
+      v-if="isMobile && !collapsed" 
+      class="mobile-mask"
+      @click="collapsed = true"
+    ></div>
+    
+    <el-aside 
+      :width="sidebarWidth" 
+      class="admin-aside"
+      :class="{ 'is-mobile': isMobile, 'is-collapsed': collapsed }"
+    >
       <div class="logo-wrap">
-        <img :src="siteConfig.logoBase64Img" class="logo-img" />
+        <img :src="siteConfig.logoBase64Img" class="logo-img" @error="handleLogoError" />
         <span class="logo-text" v-show="!collapsed">{{ siteConfig.headerTitle }}</span>
       </div>
       <!-- 动态菜单组件 -->
@@ -223,21 +234,20 @@ const goHome = () => {
  * 作用：用于记录当前浏览器窗口的宽度，并作为侧边栏宽度计算的依据
  */
 const windowWidth = ref(window.innerWidth)
+const isMobile = computed(() => windowWidth.value < 768)
 
 /**
  * 侧边栏宽度计算属性
  * 作用：根据折叠状态和当前窗口宽度返回侧边栏在不同场景下的宽度
  * 逻辑：
- * - 折叠状态：固定 64px
- * - 窄屏（<768px）：200px
- * - 中屏（<1200px）：220px
- * - 大屏（>=1200px）：260px
+ * - 移动端：折叠时 0px (隐藏)，展开时 220px (抽屉模式)
+ * - 桌面端：折叠时 64px (小图标模式)，展开时 220px/260px
  */
-
- 
 const sidebarWidth = computed(() => {
+  if (isMobile.value) {
+    return collapsed.value ? '0px' : '220px'
+  }
   if (collapsed.value) return '64px'
-  if (windowWidth.value < 768) return '200px'
   if (windowWidth.value < 1200) return '220px'
   return '260px'
 })
@@ -248,6 +258,10 @@ const sidebarWidth = computed(() => {
  */
 const handleResize = () => {
   windowWidth.value = window.innerWidth
+  // 移动端下自动折叠侧边栏
+  if (windowWidth.value < 768) {
+    collapsed.value = true
+  }
 }
 
 // 移除用户下拉菜单相关方法（已迁移到UserDropdown组件）
@@ -300,6 +314,8 @@ onMounted(async () => {
   }
   // 监听窗口尺寸变化，保证侧边栏与内容区宽度自适应
   window.addEventListener('resize', handleResize)
+  // 初始化时执行一次resize处理，确保移动端默认折叠
+  handleResize()
 })
 
 onUnmounted(() => {
@@ -940,6 +956,45 @@ onUnmounted(() => {
     flex-direction: column;
     align-items: flex-start;
     gap: 8px;
+  }
+}
+
+/* 移动端适配增强 */
+@media (max-width: 768px) {
+  /* 移动端侧边栏 */
+  .admin-aside.is-mobile {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100vh;
+    z-index: 2000; /* 提高层级，确保在最上层 */
+    /* 解决移动端侧边栏阴影问题 */
+    box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+  }
+  
+  /* 移动端遮罩层 */
+  .mobile-mask {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100vw;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 1999; /* 遮罩层层级略低于侧边栏 */
+  }
+  
+  /* 移动端头部调整 */
+  .admin-header {
+    padding: 0 10px;
+  }
+  
+  /* 隐藏不必要的头部元素 */
+  .header-left :deep(.el-breadcrumb) {
+    display: none;
+  }
+  
+  .fullscreen-icon-wrap {
+    display: none;
   }
 }
 

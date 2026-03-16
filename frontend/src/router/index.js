@@ -312,6 +312,23 @@ const routes = [
         redirect: '/admin/quality/assessment/records'
       },
       {
+        path: 'quality/assessment-notices',
+        component: () => import('../views/quality/assessment-notices/AssessmentNoticeList.vue'),
+        meta: { title: '考核通知', requiresAuth: true }
+      },
+      {
+        path: 'quality/assessment-notices/create',
+        component: () => import('../views/quality/assessment-notices/AssessmentNoticeForm.vue'),
+        meta: { title: '新建考核通知', requiresAuth: true, activeMenu: '/admin/quality/assessment-notices' },
+        hidden: true
+      },
+      {
+        path: 'quality/assessment-notices/edit/:id',
+        component: () => import('../views/quality/assessment-notices/AssessmentNoticeForm.vue'),
+        meta: { title: '编辑考核通知', requiresAuth: true, activeMenu: '/admin/quality/assessment-notices' },
+        hidden: true
+      },
+      {
         path: 'quality/assessment/records',
         component: () => import('../views/quality/assessment/AssessmentRecords.vue'),
         meta: { title: '考核记录管理', requiresAuth: true }

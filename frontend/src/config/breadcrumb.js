@@ -110,6 +110,24 @@ export const breadcrumbConfig = {
     icon: 'mdi:clipboard-list'
   },
 
+  // 考核通知
+  '/admin/quality/assessment-notices': {
+    title: '考核通知',
+    icon: 'mdi:file-document-edit'
+  },
+  // 编辑考核通知（中间路径，不可点击）
+  '/admin/quality/assessment-notices/edit': {
+    title: '编辑考核通知',
+    icon: 'mdi:file-document-edit',
+    clickable: false
+  },
+  // 新建考核通知
+  '/admin/quality/assessment-notices/create': {
+    title: '新建考核通知',
+    icon: 'mdi:plus',
+    clickable: false
+  },
+
   // 考核记录列表
   '/admin/quality/assessment/records': {
     title: '考核记录',
@@ -773,11 +791,16 @@ export function getBreadcrumbConfig(path) {
     }
     
     if (config) {
+      // 优先使用配置中的 clickable 属性，如果没有则默认除了最后一级外都可点击
+      const isClickable = config.clickable !== undefined 
+        ? config.clickable 
+        : (i < pathSegments.length - 1)
+
       breadcrumbs.push({
         title: config.title,
         path: currentPath,
         icon: config.icon,
-        clickable: i < pathSegments.length - 1 // 最后一个不可点击
+        clickable: isClickable
       })
     } else {
       // 如果没有找到配置，尝试根据路径生成默认标题
@@ -843,6 +866,7 @@ function generateDefaultTitle(segment) {
     'color-test': '色觉测试',
     'targets': '目标管理',
     'assessment': '考核记录管理',
+    'assessment-notices': '考核通知',
     'defective-management': '不良类别管理',
     'publishing-exceptions': '出版异常',
     'exception': '品质异常联络单',
