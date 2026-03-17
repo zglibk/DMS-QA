@@ -26,6 +26,17 @@ const router = useRouter()
 const saving = ref(false)
 const noticeRef = ref(null)
 
+const getDiscoveryStageLabel = (stage) => {
+  const map = {
+    'Incoming': '来料',
+    'Process': '制程',
+    'Finished': '成品',
+    'Shipment': '出货',
+    'Client': '客户端'
+  }
+  return map[stage] || stage
+}
+
 const isEdit = ref(false)
 const recordId = ref(null)
 
@@ -94,7 +105,7 @@ const loadData = async (id, onlyGetDocNo = false) => {
           workOrder: data.WorkOrder || '',
           submitter: data.Submitter || '',
           occurrenceDate: data.OccurrenceDate ? data.OccurrenceDate.split('T')[0] : '',
-          location: data.Location || '',
+          location: getDiscoveryStageLabel(data.Location) || '',
           submitDate: data.SubmitDate ? data.SubmitDate.split('T')[0] : ''
         },
         description: {
@@ -130,16 +141,6 @@ const loadFromException = async (exceptionId) => {
     const res = await apiService.get(`/quality-exceptions/${exceptionId}`)
     if (res.data.success) {
       const row = res.data.data
-      
-      const getDiscoveryStageLabel = (stage) => {
-        const map = {
-          'Incoming': '来料',
-          'Process': '制程',
-          'Finished': '成品',
-          'Shipment': '出货'
-        }
-        return map[stage] || stage
-      }
       
       noticeData.value = {
         docNo: '',

@@ -548,24 +548,29 @@ async function fetchQualityTarget(token, year, targetName) {
       params: {
         year: year,
         keyword: targetName,
+        category: '公司', // 只查询公司级目标
         page: 1,
-        pageSize: 1
+        pageSize: 10 // 获取更多记录以便进行精确匹配
       }
     })
     
     if (response.data.success && response.data.data && response.data.data.records && response.data.data.records.length > 0) {
-      const target = response.data.data.records[0]
-      if (target.TargetValue) {
+      const records = response.data.data.records
+      // 优先寻找名称完全匹配的记录
+      const exactMatch = records.find(r => r.QualityTarget === targetName)
+      const target = exactMatch || records[0]
+      
+      if (target && target.TargetValue) {
         // 解析目标值，处理特殊符号（如≥、%等）
         const targetValue = target.TargetValue.replace(/[≥%]/g, '').trim()
-        const parsedValue = parseFloat(targetValue) || 98.5
-        return parsedValue
+        const parsedValue = parseFloat(targetValue)
+        return isNaN(parsedValue) ? 98.5 : parsedValue
       }
     }
     return 98.5
   } catch (error) {
     console.warn('获取质量目标失败:', error)
-    return 0
+    return 98.5 // 发生错误时返回默认值
   }
 }
 
