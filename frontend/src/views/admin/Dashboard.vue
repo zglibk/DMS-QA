@@ -544,33 +544,40 @@ async function fetchLastQualityStats(token) {
  */
 async function fetchQualityTarget(token, year, targetName) {
   try {
+    // 改为获取当年所有公司级目标，然后在前端筛选，避免后端模糊匹配问题
     const response = await api.get('/quality-targets', {
       params: {
         year: year,
-        keyword: targetName,
-        category: '公司', // 只查询公司级目标
+        category: '公司',
         page: 1,
-        pageSize: 10 // 获取更多记录以便进行精确匹配
+        pageSize: 100 // 获取足够多的记录
       }
     })
     
-    if (response.data.success && response.data.data && response.data.data.records && response.data.data.records.length > 0) {
+    if (response.data.success && response.data.data && response.data.data.records) {
       const records = response.data.data.records
-      // 优先寻找名称完全匹配的记录
-      const exactMatch = records.find(r => r.QualityTarget === targetName)
-      const target = exactMatch || records[0]
+      // console.log(`查找目标: ${targetName}, 年份: ${year}, 找到记录数: ${records.length}`)
       
-      if (target && target.TargetValue) {
-        // 解析目标值，处理特殊符号（如≥、%等）
-        const targetValue = target.TargetValue.replace(/[≥%]/g, '').trim()
-        const parsedValue = parseFloat(targetValue)
-        return isNaN(parsedValue) ? 98.5 : parsedValue
+      // 精确匹配目标名称（忽略前后空格）
+      const target = records.find(r => r.QualityTarget && r.QualityTarget.trim() === targetName.trim())
+      
+      if (target) {
+        // console.log('找到匹配目标:', target)
+        if (target.TargetValue) {
+          // 解析目标值，提取其中的数字
+          const match = target.TargetValue.match(/(\d+(\.\d+)?)/)
+          if (match) {
+            return parseFloat(match[0])
+          }
+        }
+      } else {
+        // console.warn(`未在${year}年公司目标中找到: ${targetName}`)
       }
     }
     return 98.5
   } catch (error) {
-    console.warn('获取质量目标失败:', error)
-    return 98.5 // 发生错误时返回默认值
+    console.error('获取质量目标失败:', error)
+    return 98.5
   }
 }
 
