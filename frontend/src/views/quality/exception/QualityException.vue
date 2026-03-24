@@ -107,6 +107,9 @@
         <el-table-column label="操作" min-width="100" fixed="right" align="center" header-align="center">
           <template #default="scope">
             <div style="display: flex; justify-content: center; gap: 8px;">
+              <el-button link type="primary" size="small" style="padding: 0; margin: 0; font-size: 13px;" @click="handleView(scope.row)">
+                <el-icon style="margin-right: 2px"><Document /></el-icon>查看
+              </el-button>
               <el-button link type="primary" size="small" style="padding: 0; margin: 0; font-size: 13px;" @click="handleEdit(scope.row)" v-permission="['quality:exception:edit']">
                 <el-icon style="margin-right: 2px"><Edit /></el-icon>编辑
               </el-button>
@@ -781,6 +784,11 @@ const handleAdd = () => {
     Status: 'Open'
   })
   dialogVisible.value = true
+}
+
+const handleView = (row) => {
+  const routeData = router.resolve(`/print/quality-exception/${row.ID}`)
+  window.open(routeData.href, '_blank')
 }
 
 // 编辑

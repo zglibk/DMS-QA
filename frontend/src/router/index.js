@@ -21,7 +21,6 @@ import { isLoginExpired } from '../utils/api'
 // 导入主要页面组件（直接导入，首次加载）
 import Login from '../views/Login.vue'
 import Home from '../views/Home.vue'
-import DataVisualization from '../views/DataVisualization.vue'
 
 // 导入管理后台相关组件
 import AdminLayout from '../views/admin/AdminLayout.vue'
@@ -46,8 +45,8 @@ const routes = [
   // 首页
   { path: '/', component: Home },
 
-  // 数据可视化页面
-  { path: '/data-visualization', component: DataVisualization },
+  // 数据可视化页面 (前台纯净全屏版)
+  { path: '/data-visualization', component: () => import('../views/FrontendDataVisualization.vue') },
 
   // 返工分析页面
   { path: '/rework-analysis', component: () => import('../views/ReworkAnalysis.vue') },
@@ -141,6 +140,12 @@ const routes = [
     name: 'ShipmentReportPrintPreview',
     component: () => import('../views/admin/inspection/ShipmentPrintPreview.vue'),
     meta: { title: '出货检验报告打印预览', requiresAuth: true }
+  },
+  {
+    path: '/print/quality-exception/:id',
+    name: 'QualityExceptionPrintPreview',
+    component: () => import('../views/quality/exception/QualityExceptionPrintPreview.vue'),
+    meta: { title: '品质异常联络单预览打印', requiresAuth: true }
   },
 
   // 管理后台路由（嵌套路由结构）
@@ -265,6 +270,11 @@ const routes = [
         path: 'quality/data-management',
         component: () => import('../views/admin/DataManagement.vue'), // 质量异常数据导入页面
         meta: { requiresAuth: true }
+      },
+      {
+        path: 'quality/data-visualization',
+        component: () => import('@/views/AdminDataVisualization.vue'), // 数据可视化大屏(后台内嵌版)
+        meta: { title: '数据看板', requiresAuth: true }
       },
       {
         path: 'quality/defective-management',

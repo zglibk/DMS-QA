@@ -346,6 +346,19 @@ const fetchUserMenus = async () => {
             ]
           })
         }
+
+        // 注入数据可视化看板菜单
+        const existingDataVisMenu = qualityMenu.children.find(m => m.Name === '数据看板')
+        if (!existingDataVisMenu) {
+          qualityMenu.children.push({
+            ID: 'temp-data-vis',
+            Name: '数据看板',
+            Code: 'data-visualization',
+            Path: '/admin/quality/data-visualization',
+            Icon: 'TrendCharts',
+            Type: 'menu'
+          })
+        }
       }
     } else {
       throw new Error(response.data.message || '获取菜单数据失败')

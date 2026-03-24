@@ -366,7 +366,7 @@
                           <el-icon><Refresh /></el-icon>
                           重新导入
                         </el-button>
-                        <el-button @click="$router.push('/admin/quality/complaint/customer')">
+                        <el-button @click="$router.push('/admin/quality/complaint/internal')">
                           <el-icon><Document /></el-icon>
                           查看数据
                         </el-button>

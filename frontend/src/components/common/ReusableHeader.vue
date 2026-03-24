@@ -43,7 +43,7 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
+import { ref, watch } from 'vue'
 import { ArrowDown, User } from '@element-plus/icons-vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
@@ -63,8 +63,7 @@ const { siteConfig } = useSiteConfig()
 /**
  * 根据当前路由计算激活的菜单项
  */
-const activeMenu = computed(() => {
-  const path = route.path
+const getActiveMenuByPath = (path) => {
   if (path === '/' || path === '/home') {
     return 'home'
   } else if (path === '/data-visualization') {
@@ -81,14 +80,29 @@ const activeMenu = computed(() => {
     return 'performance-report'
   }
   return ''
-})
+}
+
+const activeMenu = ref(getActiveMenuByPath(route.path))
+
+watch(
+  () => route.path,
+  (newPath) => {
+    activeMenu.value = getActiveMenuByPath(newPath)
+  },
+  { immediate: true }
+)
 
 // 导航相关方法
 const handleMenuSelect = (index) => {
   if (index === 'home') {
     router.push('/')
   } else if (index === 'stats') {
-    router.push('/data-visualization')
+    const statsUrl = router.resolve('/data-visualization').href
+    window.open(statsUrl, '_blank')
+    activeMenu.value = 'home'
+    if (route.path !== '/' && route.path !== '/home') {
+      router.push('/')
+    }
   } else if (index === 'rework') {
     router.push('/rework-analysis')
   } else if (index === 'publishing-exceptions') {

@@ -544,34 +544,27 @@ async function fetchLastQualityStats(token) {
  */
 async function fetchQualityTarget(token, year, targetName) {
   try {
-    // 改为获取当年所有公司级目标，然后在前端筛选，避免后端模糊匹配问题
     const response = await api.get('/quality-targets', {
       params: {
         year: year,
         category: '公司',
         page: 1,
-        pageSize: 100 // 获取足够多的记录
+        size: 100
       }
     })
     
-    if (response.data.success && response.data.data && response.data.data.records) {
-      const records = response.data.data.records
-      // console.log(`查找目标: ${targetName}, 年份: ${year}, 找到记录数: ${records.length}`)
-      
-      // 精确匹配目标名称（忽略前后空格）
+    if (response && response.success && response.data && response.data.records) {
+      const records = response.data.records
       const target = records.find(r => r.QualityTarget && r.QualityTarget.trim() === targetName.trim())
+        || records.find(r => r.QualityTarget && r.QualityTarget.includes(targetName))
       
       if (target) {
-        // console.log('找到匹配目标:', target)
         if (target.TargetValue) {
-          // 解析目标值，提取其中的数字
           const match = target.TargetValue.match(/(\d+(\.\d+)?)/)
           if (match) {
             return parseFloat(match[0])
           }
         }
-      } else {
-        // console.warn(`未在${year}年公司目标中找到: ${targetName}`)
       }
     }
     return 98.5
