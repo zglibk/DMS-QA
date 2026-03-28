@@ -707,6 +707,10 @@ export const breadcrumbConfig = {
     title: '物料分类配置',
     icon: 'mdi:cog'
   },
+  '/admin/inspection/finished-attributes': {
+    title: '成品检验属性设置',
+    icon: 'mdi:tune-variant'
+  },
   '/admin/inspection/shipment': {
     title: '出货检验报告',
     icon: 'DocumentChecked'

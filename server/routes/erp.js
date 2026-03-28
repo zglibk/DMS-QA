@@ -662,7 +662,8 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                         InDate: orderData.InDate,        // 开单日期
                         DeliveryDate: orderData.DeliveryDate,
                         Sales: orderData.Sales,
-                        StatusDes: orderData.StatusDes
+                        StatusDes: orderData.StatusDes,
+                        PNumProductInfoList: orderData.PNumProductInfoList // 保留完整的产品列表供前端使用
                     };
                     
                     // 提取纸张资料（包含品牌/供应商信息）
@@ -790,7 +791,8 @@ router.get('/shipment-report', authenticateToken, async (req, res) => {
                                     InDate: orderData.InDate,
                                     DeliveryDate: orderData.DeliveryDate,
                                     Sales: orderData.Sales,
-                                    StatusDes: orderData.StatusDes
+                                    StatusDes: orderData.StatusDes,
+                                    PNumProductInfoList: orderData.PNumProductInfoList // 保留完整的产品列表供前端使用
                                 };
                                 
                                 // 提取纸张资料

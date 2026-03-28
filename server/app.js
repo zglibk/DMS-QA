@@ -82,6 +82,7 @@ const supplierComplaintTemplatesRouter = require('./routes/supplierComplaintTemp
 const electronicSealsRouter = require('./routes/electronicSeals'); // 电子签章管理路由
 const todoItemsRouter = require('./routes/todoItems'); // 待办事项管理路由
 const erpApiDocRouter = require('./routes/erpApiDoc'); // ERP接口文档管理路由
+const finishedInspectionAttributesRouter = require('./routes/finishedInspectionAttributes'); // 成品检验属性设置路由
 const erpSyncService = require('./services/erpSyncService');
 const { startFileServer } = require('./file-server');
 const { logCleanupService } = require('./services/logCleanupService');
@@ -323,6 +324,7 @@ app.use('/api/todo-items', todoItemsRouter); // 待办事项管理
 app.use('/api/erp-api-doc', erpApiDocRouter); // ERP接口文档管理
 app.use('/api/inspection/performance', require('./routes/performanceInspection')); // 性能实验报告
 app.use('/api/inspection/dashboard', require('./routes/inspectionDashboard')); // 检验工作台
+app.use('/api/inspection/finished-attributes', finishedInspectionAttributesRouter);
 app.use('/api/log-export', require('./routes/logExport'));
 app.use('/api/quality-exceptions', require('./routes/qualityExceptions')); // 品质异常联络单
 app.use('/api/quality-measures', require('./routes/qualityMeasures')); // 临时对策内容库

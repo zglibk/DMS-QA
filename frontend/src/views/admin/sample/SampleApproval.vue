@@ -2815,6 +2815,11 @@ onMounted(async () => {
   width: 100%;
 }
 
+.upload-tip {
+  margin-top: 4px;
+  line-height: 1.2;
+}
+
 .image-preview {
   text-align: center;
 }
@@ -2929,6 +2934,8 @@ onMounted(async () => {
 :deep(.el-dialog__body) {
   padding: 20px 20px 8px 20px;
   overflow-x: hidden;
+  overflow-y: auto;
+  max-height: 62vh;
 }
 
 :deep(.el-dialog__footer) {
@@ -2982,14 +2989,42 @@ onMounted(async () => {
 .upload-no-filename :deep(.el-upload-list--picture-card .el-upload-list__item) {
   width: 60px;
   height: 60px;
-  margin-right: 8px;
-  margin-bottom: 8px;
+  margin: 0 !important;
+  float: none !important;
+}
+
+.upload-no-filename :deep(.el-upload-list--picture-card) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  max-height: 136px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 0 4px 0 !important;
+  padding: 0 !important;
+}
+
+.upload-no-filename :deep(.el-upload-list) {
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+.upload-no-filename :deep(.el-upload-list--picture-card::-webkit-scrollbar) {
+  width: 6px;
+}
+
+.upload-no-filename :deep(.el-upload-list--picture-card::-webkit-scrollbar-thumb) {
+  background: rgba(144, 147, 153, 0.45);
+  border-radius: 4px;
 }
 
 .upload-no-filename :deep(.el-upload--picture-card) {
   width: 60px;
   height: 60px;
   line-height: 58px;
+  margin: 0 !important;
+  vertical-align: top;
 }
 
 .upload-no-filename :deep(.el-upload-list--picture-card .el-upload-list__item-thumbnail) {

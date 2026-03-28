@@ -103,8 +103,14 @@
           </template>
           <div class="field-list">
             <div v-for="(f, idx) in mappingData.fields" :key="idx" class="field-item" :class="{ active: currentBindFieldIndex === idx }">
-              <el-input v-model="f.name" placeholder="字段名" size="small" style="width: 120px" />
-              <el-input v-model="f.cell" placeholder="单元格" size="small" style="width: 80px" @focus="setBindFieldIndex(idx)" />
+              <span class="field-zh-label">{{ getFieldZhLabel(f.name) }}</span>
+              <el-select v-model="f.name" placeholder="选择或输入字段名" size="small" style="width: 130px" filterable allow-create>
+                <el-option v-for="opt in AVAILABLE_FIELD_OPTIONS" :key="opt.value" :label="opt.value" :value="opt.value">
+                  <span style="float: left">{{ opt.value }}</span>
+                  <span style="float: right; color: #8492a6; font-size: 12px">{{ opt.label }}</span>
+                </el-option>
+              </el-select>
+              <el-input v-model="f.cell" placeholder="单元格" size="small" style="width: 70px" @focus="setBindFieldIndex(idx)" />
               <el-button size="small" type="primary" :plain="currentBindFieldIndex !== idx" @click="setBindFieldIndex(idx)">
                 {{ currentBindFieldIndex === idx ? '绑定中' : '绑定' }}
               </el-button>
@@ -128,8 +134,13 @@
           <div class="column-list">
             <div v-for="(col, idx) in mappingData.table.columns" :key="idx" class="column-item" :class="{ active: currentBindColumnIndex === idx }">
               <div class="column-row">
-                <el-input v-model="col.header" placeholder="表头" size="small" style="width: 90px" />
-                <el-input v-model="col.name" placeholder="字段名" size="small" style="width: 90px" />
+                <el-input v-model="col.header" placeholder="表头" size="small" style="width: 80px" />
+                <el-select v-model="col.name" placeholder="选择或输入" size="small" style="width: 100px" filterable allow-create>
+                  <el-option v-for="opt in AVAILABLE_TABLE_FIELD_OPTIONS" :key="opt.value" :label="opt.value" :value="opt.value">
+                    <span style="float: left">{{ opt.value }}</span>
+                    <span style="float: right; color: #8492a6; font-size: 12px">{{ opt.label }}</span>
+                  </el-option>
+                </el-select>
                 <div class="col-number-wrapper">
                   <el-input-number v-model="col.col" :min="1" size="small" style="width: 70px" controls-position="right" @focus="setBindColumnIndex(idx)" />
                   <span class="col-letter">({{ getColLetter(col.col) }}列)</span>
@@ -138,9 +149,6 @@
                   {{ currentBindColumnIndex === idx ? '绑定中' : '绑定' }}
                 </el-button>
                 <el-button size="small" type="danger" link @click="removeColumn(idx)"><el-icon><Delete /></el-icon></el-button>
-              </div>
-              <div class="column-merge" v-if="col.merge">
-                <el-tag size="small" type="info">合并列：{{ col.merge.startColLetter }}-{{ col.merge.endColLetter }}</el-tag>
               </div>
             </div>
             <el-empty v-if="!mappingData.table.columns.length" description="暂无列映射" :image-size="40" />
@@ -225,9 +233,168 @@ const mappingPreviewHtml = ref('')
 // 当前绑定索引
 const currentBindFieldIndex = ref(-1)
 const currentBindColumnIndex = ref(-1)
+const FIELD_ZH_MAP = {
+  CustomerID: '客户编码',
+  PNum: '工单号',
+  CPO: 'CPO',
+  OrderNum: '订单号',
+  ProductID: '产品编码',
+  CProductID: '客户料号',
+  Product: '产品名称',
+  CProduct: '工厂订单号',
+  Customer: '客户名称',
+  MaterialCode: '物料编码',
+  MaterialName: '物料名称',
+  BatchNo: '生产批次',
+  DeliveryNoteNo: '送货单号',
+  Standard: '依据标准',
+  SpecialInspection: '特殊检测',
+  Scale: '规格',
+  MeasuredSize: '实测尺寸',
+  Count: '出货数量',
+  SampleCount: '抽检数量',
+  ReportNo: '报告编号',
+  ReportDate: '报告日期',
+  Inspector: '检验员',
+  InspectDate: '检验日期',
+  InspectItem: '检验项目',
+  InspectStandard: '检验标准',
+  InspectRes: '检验结果',
+  Remark: '备注'
+}
+
+// 可选字段的映射选项
+const AVAILABLE_FIELD_OPTIONS = [
+  { value: 'CustomerID', label: '客户编码(原客户名称)' },
+  { value: 'PNum', label: '工单号' },
+  { value: 'CPO', label: 'CPO' },
+  { value: 'OrderNum', label: '订单号' },
+  { value: 'ProductID', label: '产品编码' },
+  { value: 'CProductID', label: '物料编码/客户料号' },
+  { value: 'Product', label: '物料名称/产品名称' },
+  { value: 'CProduct', label: '工厂订单号' },
+  { value: 'BatchNo', label: '生产批次' },
+  { value: 'DeliveryNoteNo', label: '送货单号' },
+  { value: 'Standard', label: '依据标准' },
+  { value: 'SpecialInspection', label: '特殊检测' },
+  { value: 'Scale', label: '规格' },
+  { value: 'MeasuredSize', label: '实测尺寸' },
+  { value: 'Count', label: '出货数量' },
+  { value: 'SampleCount', label: '抽检数量' },
+  { value: 'ReportNo', label: '报告编号' },
+  { value: 'ReportDate', label: '报告日期' },
+  { value: 'Inspector', label: '检验员' },
+  { value: 'InspectDate', label: '检验日期' }
+]
+
+// 表格可选字段选项
+const AVAILABLE_TABLE_FIELD_OPTIONS = [
+  { value: 'Index', label: '序号' },
+  { value: 'InspectItem', label: '检验项目' },
+  { value: 'InspectStandard', label: '检验标准' },
+  { value: 'InspectRes', label: '检验结果' },
+  { value: 'Remark', label: '备注' }
+]
 
 // 计算属性
 const headerRowsCount = computed(() => Math.max(1, (mappingData.table.startRow || 1) - (mappingData.table.headerRow || 1)))
+function getFieldZhLabel(name) {
+  const key = String(name || '').trim()
+  if (!key) return '中文名'
+  if (/[\u4e00-\u9fa5]/.test(key)) return key
+  return FIELD_ZH_MAP[key] || key
+}
+function dedupeTopFields(fields) {
+  if (!Array.isArray(fields)) return []
+  const seen = new Set()
+  const result = []
+  for (const item of fields) {
+    if (!item || typeof item !== 'object') continue
+    const name = String(item.name || '').trim()
+    const cell = String(item.cell || '').trim().toUpperCase()
+    const dedupeKey = `${name}@@${cell}`
+    if (seen.has(dedupeKey)) continue
+    seen.add(dedupeKey)
+    result.push(item)
+  }
+  return result
+}
+function mergeTopFields(parsedFields, savedFields) {
+  const parsed = dedupeTopFields(parsedFields)
+  const saved = dedupeTopFields(savedFields)
+  const buildKey = (item) => {
+    const name = String(item?.name || '').trim().toUpperCase()
+    if (name) return `NAME:${name}`
+    const label = String(item?.label || '').trim().toUpperCase()
+    if (label) return `LABEL:${label}`
+    return `CELL:${String(item?.cell || '').trim().toUpperCase()}`
+  }
+  const merged = []
+  const used = new Set()
+  saved.forEach(item => {
+    const key = buildKey(item)
+    if (used.has(key)) return
+    used.add(key)
+    merged.push(item)
+  })
+  parsed.forEach(item => {
+    const key = buildKey(item)
+    if (used.has(key)) return
+    used.add(key)
+    merged.push(item)
+  })
+  return merged
+}
+function dedupeTableColumns(columns) {
+  if (!Array.isArray(columns)) return []
+  const seen = new Set()
+  const result = []
+  for (const item of columns) {
+    if (!item || typeof item !== 'object') continue
+    const name = String(item.name || '').trim().toUpperCase()
+    const header = String(item.header || '').trim().toUpperCase()
+    const col = Number(item.col || 0)
+    const key = `${name}@@${header}@@${col}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(item)
+  }
+  return result
+}
+function mergeTableColumns(parsedColumns, savedColumns) {
+  const parsed = dedupeTableColumns(parsedColumns)
+  const saved = dedupeTableColumns(savedColumns)
+  const rowKey = (item) => {
+    const header = String(item?.header || '').trim().toUpperCase()
+    const col = Number(item?.col || 0)
+    return `${header}@@${col}`
+  }
+  const parsedByRow = new Map(parsed.map(item => [rowKey(item), item]))
+  const merged = []
+  const used = new Set()
+
+  saved.forEach(item => {
+    const key = rowKey(item)
+    const parsedItem = parsedByRow.get(key)
+    const savedName = String(item?.name || '').trim()
+    const savedHeader = String(item?.header || '').trim()
+    const parsedName = String(parsedItem?.name || '').trim()
+    const parsedLooksLikeKey = /^[A-Za-z_][A-Za-z0-9_]*$/.test(parsedName)
+    const shouldUpgradeName = !!parsedItem && (!savedName || savedName === savedHeader || (/[一-龥]/.test(savedName) && parsedLooksLikeKey))
+
+    merged.push(shouldUpgradeName ? { ...item, name: parsedName } : item)
+    used.add(key)
+  })
+
+  parsed.forEach(item => {
+    const key = rowKey(item)
+    if (used.has(key)) return
+    used.add(key)
+    merged.push(item)
+  })
+
+  return dedupeTableColumns(merged)
+}
 
 // 返回上一页
 function goBack() {
@@ -252,8 +419,14 @@ async function loadTemplate() {
     const parseResp = await api.post(`/shipment-report/templates/${id}/parse`)
     const parsed = parseResp?.data || parseResp || {}
     
+    const parsedFields = parsed.mapping?.fields || []
+    const parsedColumns = parsed.mapping?.table?.columns || []
     if (parsed.mapping) {
       Object.assign(mappingData, parsed.mapping)
+      mappingData.fields = dedupeTopFields(mappingData.fields)
+      if (mappingData.table) {
+        mappingData.table.columns = dedupeTableColumns(mappingData.table.columns)
+      }
     }
     mappingPreviewHtml.value = parsed.previewHtml || ''
 
@@ -263,6 +436,9 @@ async function loadTemplate() {
       const saved = savedResp?.data || savedResp
       if (saved && typeof saved === 'object' && Object.keys(saved).length > 0) {
         Object.assign(mappingData, saved)
+        mappingData.fields = mergeTopFields(parsedFields, saved.fields)
+        if (!mappingData.table) mappingData.table = {}
+        mappingData.table.columns = mergeTableColumns(parsedColumns, saved.table?.columns)
         
         // 强制使用最新解析的列宽信息（因为这是由模板文件决定的，且后端解析逻辑已优化）
         if (parsed.mapping?.layout?.cols) {
@@ -333,11 +509,14 @@ function buildTestContext() {
     
     // 中文键
     客户编码: 'TEST001',
+    客户名称: 'TEST001', // 为了测试填充显示，可以给测试上下文中的客户名称也赋值为CustomerID
     工单号: 'WO-20241209-001',
     订单号: 'ORD-67890',
     产品编码: 'PROD-001',
     客户料号: 'CPROD-001',
+    物料编码: 'CPROD-001', // 为了测试填充显示，将物料编码加上
     产品名称: '测试产品名称',
+    物料名称: '测试产品名称', // 为了测试填充显示，将物料名称加上
     品名: '测试产品名称',
     规格: '100x50x25mm',
     实测尺寸: '100.1*50.2',
@@ -476,6 +655,7 @@ function generatePreviewHtmlWithCoords(ws) {
 // 保存映射
 async function saveCurrentMapping() {
   try {
+    mappingData.fields = dedupeTopFields(mappingData.fields)
     await api.post(`/shipment-report/templates/${templateId.value}/mapping`, mappingData)
     ElMessage.success('映射保存成功')
   } catch (e) {
@@ -698,15 +878,16 @@ onMounted(() => {
   border-collapse: collapse;
   font-size: 12px;
   width: max-content;
-  min-width: 100%;
+  min-width: max-content;
+  margin: 0 auto;
 }
 
 .mapping-preview :deep(th),
 .mapping-preview :deep(td) {
   border: 1px solid #dcdfe6;
-  padding: 6px 10px;
-  text-align: left;
-  min-width: 60px;
+  padding: 2px 4px;
+  text-align: center;
+  min-width: 0;
   white-space: nowrap;
 }
 
@@ -807,6 +988,13 @@ onMounted(() => {
   font-size: 11px;
   color: #909399;
   white-space: nowrap;
+}
+
+.field-zh-label {
+  min-width: 78px;
+  color: #606266;
+  font-size: 12px;
+  text-align: right;
 }
 
 .column-widths-config {

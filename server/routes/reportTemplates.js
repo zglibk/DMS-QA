@@ -12,6 +12,11 @@ const META_FILE = path.join(DATA_DIR, 'report-templates.json')
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true })
 if (!fs.existsSync(UPLOAD_DIR)) fs.mkdirSync(UPLOAD_DIR, { recursive: true })
 if (!fs.existsSync(META_FILE)) fs.writeFileSync(META_FILE, JSON.stringify([]))
+const VALID_TEMPLATE_TYPES = ['customer_specific', 'in_mold_label', 'general_non_adhesive', 'general_adhesive']
+function normalizeTemplateType(type) {
+  const value = String(type || '').trim()
+  return VALID_TEMPLATE_TYPES.includes(value) ? value : 'customer_specific'
+}
 
 function readMeta() {
   try { return JSON.parse(fs.readFileSync(META_FILE, 'utf-8')) } catch { return [] }
@@ -86,6 +91,7 @@ router.get('/', authenticateToken, (req, res) => {
   // 对历史数据的文件名进行解码处理
   const decodedList = list.map(item => ({
     ...item,
+    templateType: normalizeTemplateType(item.templateType),
     fileName: decodeFileName(item.fileName)
   }))
   res.json({ code: 0, data: decodedList })
@@ -97,12 +103,12 @@ router.get('/:id', authenticateToken, (req, res) => {
   const curr = list.find(t => t.id === id)
   if (!curr) return res.status(404).json({ code: -1, message: '模板不存在' })
   // 解码文件名
-  res.json({ code: 0, data: { ...curr, fileName: decodeFileName(curr.fileName) } })
+  res.json({ code: 0, data: { ...curr, templateType: normalizeTemplateType(curr.templateType), fileName: decodeFileName(curr.fileName) } })
 })
 
 router.post('/', authenticateToken, upload.single('file'), (req, res) => {
   try {
-    const { customerId, customerName, templateName, description, enabled } = req.body
+    const { templateType, customerId, customerName, templateName, description, enabled } = req.body
     const file = req.file
     if (!file) return res.status(400).json({ code: -1, message: '缺少模板文件' })
     
@@ -110,10 +116,12 @@ router.post('/', authenticateToken, upload.single('file'), (req, res) => {
     const originalName = file.decodedOriginalname || decodeFileName(file.originalname)
     
     const list = readMeta()
+    const normalizedType = normalizeTemplateType(templateType)
     const item = {
       id: Date.now(),
-      customerId: customerId || '',
-      customerName: customerName || '',
+      templateType: normalizedType,
+      customerId: normalizedType === 'customer_specific' ? (customerId || '') : '',
+      customerName: normalizedType === 'customer_specific' ? (customerName || '') : '',
       templateName: templateName || '',
       description: description || '',
       enabled: String(enabled).toLowerCase() !== 'false',
@@ -138,10 +146,12 @@ router.put('/:id', authenticateToken, upload.single('file'), (req, res) => {
     const idx = list.findIndex(t => t.id === id)
     if (idx === -1) return res.status(404).json({ code: -1, message: '模板不存在' })
     const curr = list[idx]
-    const { customerId, customerName, templateName, description, enabled } = req.body
+    const { templateType, customerId, customerName, templateName, description, enabled } = req.body
+    const normalizedType = templateType !== undefined ? normalizeTemplateType(templateType) : normalizeTemplateType(curr.templateType)
     Object.assign(curr, {
-      customerId: customerId ?? curr.customerId,
-      customerName: customerName ?? curr.customerName,
+      templateType: normalizedType,
+      customerId: normalizedType === 'customer_specific' ? (customerId ?? curr.customerId) : '',
+      customerName: normalizedType === 'customer_specific' ? (customerName ?? curr.customerName) : '',
       templateName: templateName ?? curr.templateName,
       description: description ?? curr.description,
       enabled: enabled !== undefined ? String(enabled).toLowerCase() !== 'false' : curr.enabled,
@@ -246,9 +256,11 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
     const merges = ws['!merges'] || []
 
     // 常见标签字典（用于识别顶部字段）
+    const normalizeLabel = (text) => String(text || '').replace(/[\s：:]/g, '').trim().toUpperCase()
     const labelDict = {
       '客户编码': 'CustomerID',
       '客户代码': 'CustomerID',
+      '客户名称': 'Customer',
       '工单号': 'PNum',
       '工单编号': 'PNum',
       '订单号': 'OrderNum',
@@ -257,17 +269,29 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
       '产品编码': 'ProductID',
       '产品名称': 'Product',
       '品名': 'Product',
+      '物料编码': 'MaterialCode',
+      '物料名称': 'MaterialName',
+      '生产批次': 'BatchNo',
+      '送货单号': 'DeliveryNoteNo',
+      '抽样数量': 'SampleCount',
+      '抽检数量': 'SampleCount',
       '规格': 'Scale',
       '规格型号': 'Scale',
       '数量': 'Count',
       '出货数量': 'Count',
+      '依据标准': 'Standard',
+      '特殊检测': 'SpecialInspection',
       'CPO': 'CPO',
+      '编号': 'ReportNo',
       '报告编号': 'ReportNo',
       '报告号': 'ReportNo',
       '日期': 'ReportDate',
       '报告日期': 'ReportDate',
       '检验日期': 'InspectDate'
     }
+    const normalizedLabelDict = Object.fromEntries(
+      Object.entries(labelDict).map(([k, v]) => [normalizeLabel(k), v])
+    )
 
     // 获取单元格文本值
     const getCellValue = (r0, c0) => {
@@ -332,7 +356,8 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
     }
 
     // 记录已处理的合并单元格，避免重复
-    const processedMerges = new Set()
+    const processedPhMerges = new Set()
+    const processedFieldMerges = new Set()
 
     // 扫描顶部字段和占位符
     for (let r = top; r <= bottom; r++) {
@@ -340,14 +365,15 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
         const val = grid[r][c]
         if (!val) continue
 
+        const merge = findMergeAt(r, c)
+        const mergeKey = merge ? `${merge.s.r}-${merge.s.c}` : null
+
         // 检查占位符 {{Key}}
         const phMatch = val.match(/\{\{(\w+)\}\}/)
         if (phMatch) {
-          const merge = findMergeAt(r, c)
           if (merge) {
-            const mergeKey = `${merge.s.r}-${merge.s.c}`
-            if (!processedMerges.has(mergeKey)) {
-              processedMerges.add(mergeKey)
+            if (!processedPhMerges.has(mergeKey)) {
+              processedPhMerges.add(mergeKey)
               mapping.placeholders.push({
                 name: phMatch[1],
                 cell: toA1(merge.s.r, merge.s.c),
@@ -365,74 +391,174 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
         }
 
         // 检查标签字典匹配
-        const fieldName = labelDict[val]
-        if (fieldName) {
-          // 查找标签右侧或下方的值单元格
-          const merge = findMergeAt(r, c)
-          let valueCol = merge ? (merge.e.c + 1) : (c + 1)
-          
-          // 确保值列在范围内
-          if (valueCol <= right) {
-            const valueMerge = findMergeAt(r, valueCol)
-            mapping.fields.push({
-              label: val,
-              name: fieldName,
-              cell: toA1(r, valueCol),
-              merge: valueMerge ? {
-                startCol: valueMerge.s.c + 1,
-                endCol: valueMerge.e.c + 1,
-                startRow: valueMerge.s.r + 1,
-                endRow: valueMerge.e.r + 1
-              } : null
-            })
+        const normalizedVal = normalizeLabel(val)
+        let matchedLabel = null
+        let fieldName = null
+        
+        // 寻找最长匹配的标签
+        for (const [dictLabel, dictFieldName] of Object.entries(normalizedLabelDict)) {
+          if (normalizedVal.startsWith(dictLabel)) {
+            if (!matchedLabel || dictLabel.length > matchedLabel.length) {
+              matchedLabel = dictLabel
+              fieldName = dictFieldName
+            }
           }
+        }
+
+        if (fieldName) {
+          if (merge) {
+            // 如果已经在合并单元格处理过该标签，则跳过
+            if (processedFieldMerges.has(mergeKey)) continue
+            processedFieldMerges.add(mergeKey)
+          }
+
+          let valueCellR = merge ? merge.s.r : r
+          let valueCellC = merge ? merge.s.c : c
+          let isSameCell = false
+          
+          if (normalizedVal === matchedLabel) {
+            // 完全匹配（可能带冒号等，已被normalize去掉），值在右侧
+            valueCellC = merge ? (merge.e.c + 1) : (c + 1)
+            
+            // 如果右侧超出了表格范围，回退到当前单元格
+            if (valueCellC > right) {
+              valueCellC = merge ? merge.s.c : c
+              isSameCell = true
+            }
+          } else {
+            // 同一个单元格包含标签和内容（例如 "客户名称：XXX"）
+            isSameCell = true
+          }
+          
+          const valueMerge = findMergeAt(valueCellR, valueCellC)
+          mapping.fields.push({
+            label: val, // 原始文本
+            name: fieldName,
+            cell: toA1(valueCellR, valueCellC),
+            isSameCell: isSameCell,
+            merge: valueMerge ? {
+              startCol: valueMerge.s.c + 1,
+              endCol: valueMerge.e.c + 1,
+              startRow: valueMerge.s.r + 1,
+              endRow: valueMerge.e.r + 1
+            } : null
+          })
         }
       }
     }
 
     // 动态识别表格表头行
-    // 策略：查找连续多个非空单元格的行，且该行下方有数据行
     let headerRowIndex = null
     let headerColumns = []
 
-    // 表头识别的启发式规则
-    const isLikelyHeaderRow = (rowIndex) => {
+    // 强表头关键字（通常只出现在明细表头中）
+    const strongTableHeaders = ['序号', '项目', '检验', '检测', '测试', '标准', '要求', '结果', '判定', '结论', '不良', '缺陷', '备注', '上限', '下限', '最大', '最小', '实测', '外观', '尺寸']
+    const typicalHeaders = ['序号', '料号', '品名', '名称', '产品', '数量', '规格', '单位', '备注', '结果', '判定']
+
+    const getHeaderScore = (rowIndex) => {
       let nonEmptyCells = 0
+      let strongHeaderCount = 0
       let hasTypicalHeaders = false
-      const typicalHeaders = ['序号', '№', 'No', '料号', '品名', '名称', '产品', '数量', '规格', '单位', '备注', '结果', '判定']
       
+      const processedCols = new Set()
+
       for (let c = left; c <= right; c++) {
+        if (processedCols.has(c)) continue
+
         const val = grid[rowIndex][c]
         if (val) {
           nonEmptyCells++
-          if (typicalHeaders.some(h => val.includes(h))) {
+          const upperVal = String(val).toUpperCase().trim()
+          if (upperVal === 'NO' || upperVal === 'NO.' || strongTableHeaders.some(h => upperVal.includes(h))) {
+            strongHeaderCount++
+          }
+          if (typicalHeaders.some(h => upperVal.includes(h.toUpperCase()))) {
             hasTypicalHeaders = true
+          }
+        }
+
+        const merge = findMergeAt(rowIndex, c)
+        if (merge) {
+          for (let mc = merge.s.c; mc <= merge.e.c; mc++) {
+            processedCols.add(mc)
           }
         }
       }
       
-      // 至少3个非空单元格，或者包含典型表头关键字
-      return nonEmptyCells >= 3 || hasTypicalHeaders
+      // 1. 包含至少2个强表头关键字，且至少有3个非空单元格
+      if (strongHeaderCount >= 2 && nonEmptyCells >= 3) return 100
+      // 2. 包含1个强表头关键字，且至少有4个非空单元格
+      if (strongHeaderCount >= 1 && nonEmptyCells >= 4) return 80
+      // 3. 包含普通表头关键字，且至少有5个非空单元格
+      if (hasTypicalHeaders && nonEmptyCells >= 5) return 60
+      // 4. 没有任何关键字，但全是密集数据（至少8个独立非空单元格）
+      if (nonEmptyCells >= 8) return 40
+      
+      return 0
     }
 
     // 从上往下扫描，找到第一个像表头的行
+    // 修改策略：记录所有可能行的分数，取最高分且分数 >= 60 的行。
+    // 如果没有 >= 60 的行，则取最后一行分数 >= 40 且下一行有数据的行。
+    let bestHeaderRow = null
+    let maxScore = 0
+    let possibleHeaderRows = []
+
     for (let r = top; r <= Math.min(bottom - 1, top + 30); r++) {
-      if (isLikelyHeaderRow(r)) {
-        // 验证下一行是否有数据（排除标题行被误识别）
-        let nextRowHasData = false
-        for (let c = left; c <= right; c++) {
-          if (grid[r + 1] && grid[r + 1][c]) {
-            nextRowHasData = true
-            break
+      const score = getHeaderScore(r)
+      if (score > 0) {
+        possibleHeaderRows.push({ r, score })
+      }
+    }
+
+    // 优先选择高分表头（>=80），如果有多个，选最下面的一个（通常明细表在下面）
+    const highScorers = possibleHeaderRows.filter(item => item.score >= 80)
+    if (highScorers.length > 0) {
+      headerRowIndex = highScorers[highScorers.length - 1].r
+    } else {
+      // 其次选择 >= 60 的
+      const midScorers = possibleHeaderRows.filter(item => item.score >= 60)
+      if (midScorers.length > 0) {
+        headerRowIndex = midScorers[midScorers.length - 1].r
+      } else {
+        // 最后选择 >= 40 且下一行有数据的
+        for (let i = possibleHeaderRows.length - 1; i >= 0; i--) {
+          const item = possibleHeaderRows[i]
+          if (item.score >= 40) {
+            let nextRowHasData = false
+            for (let c = left; c <= right; c++) {
+              if (grid[item.r + 1] && grid[item.r + 1][c]) {
+                nextRowHasData = true
+                break
+              }
+            }
+            if (nextRowHasData) {
+              headerRowIndex = item.r
+              break
+            }
           }
-        }
-        
-        if (nextRowHasData) {
-          headerRowIndex = r
-          break
         }
       }
     }
+
+    // 表格表头字段名字典（用于识别表格列的实际字段名）
+    const tableHeaderDict = {
+      'NO': 'Index',
+      'NO.': 'Index',
+      '序号': 'Index',
+      '检验项目': 'InspectItem',
+      '检测项目': 'InspectItem',
+      '检验标准': 'InspectStandard',
+      '检测标准': 'InspectStandard',
+      '检验结果': 'InspectResult',
+      '检测结果': 'InspectResult',
+      '结果': 'InspectResult',
+      '备注': 'Remark',
+      '判定': 'Judge'
+    }
+    const normalizedTableHeaderDict = Object.fromEntries(
+      Object.entries(tableHeaderDict).map(([k, v]) => [normalizeLabel(k), v])
+    )
 
     // 如果找到表头行，提取列信息
     if (headerRowIndex !== null) {
@@ -447,8 +573,9 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
 
         const merge = findMergeAt(headerRowIndex, c)
         
-        // 生成字段名（使用表头文本作为默认名称）
-        const fieldName = labelDict[headerText] || headerText
+        // 生成字段名（优先使用表格表头字典，再回退到通用字典，最后使用原始表头）
+        const normalizedHeader = normalizeLabel(headerText)
+        const fieldName = normalizedTableHeaderDict[normalizedHeader] || normalizedLabelDict[normalizedHeader] || headerText
         
         const colInfo = {
           header: headerText,
@@ -495,8 +622,41 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
       }))
     }
 
+    let maxMappedCol = left
+    if (mapping.fields && Array.isArray(mapping.fields)) {
+      mapping.fields.forEach(field => {
+        if (!field || !field.cell) return
+        try {
+          const c = XLSX.utils.decode_cell(String(field.cell)).c
+          if (c > maxMappedCol) maxMappedCol = c
+        } catch {}
+      })
+    }
+    if (mapping.placeholders && Array.isArray(mapping.placeholders)) {
+      mapping.placeholders.forEach(ph => {
+        if (!ph || !ph.cell) return
+        try {
+          const c = XLSX.utils.decode_cell(String(ph.cell)).c
+          if (c > maxMappedCol) maxMappedCol = c
+        } catch {}
+      })
+    }
+    if (mapping.table && Array.isArray(mapping.table.columns)) {
+      mapping.table.columns.forEach(col => {
+        if (!col) return
+        const c1 = Number(col.col || 0) - 1
+        if (c1 > maxMappedCol) maxMappedCol = c1
+        if (col.merge && Number(col.merge.endCol || 0) > 0) {
+          const c2 = Number(col.merge.endCol) - 1
+          if (c2 > maxMappedCol) maxMappedCol = c2
+        }
+      })
+    }
+
     // 生成带行列坐标的预览HTML
-    const previewHtml = generatePreviewHtmlWithCoords(ws, range, merges)
+    const previewHtml = generatePreviewHtmlWithCoords(ws, range, merges, ws['!cols'], {
+      maxMappedCol
+    })
 
     res.json({
       code: 0,
@@ -519,7 +679,7 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
 /**
  * 生成带行列坐标的预览HTML
  */
-function generatePreviewHtmlWithCoords(ws, range, merges) {
+function generatePreviewHtmlWithCoords(ws, range, merges, cols, options = {}) {
   const XLSX = require('xlsx')
   const top = range.s.r, left = range.s.c, bottom = range.e.r, right = range.e.c
   
@@ -550,24 +710,90 @@ function generatePreviewHtmlWithCoords(ws, range, merges) {
     return String(cell.v)
   }
 
-  let html = '<table>'
+  const rowHasValue = (r) => {
+    for (let c = left; c <= right; c++) {
+      if (getCellValue(r, c).trim() !== '') return true
+    }
+    return false
+  }
+
+  let effectiveBottom = bottom
+  while (effectiveBottom > top && !rowHasValue(effectiveBottom)) {
+    effectiveBottom--
+  }
+
+  const colHasValue = (c) => {
+    for (let r = top; r <= effectiveBottom; r++) {
+      if (getCellValue(r, c).trim() !== '') return true
+    }
+    return false
+  }
+
+  let effectiveRight = right
+  while (effectiveRight > left && !colHasValue(effectiveRight)) {
+    effectiveRight--
+  }
+  if (typeof options.maxMappedCol === 'number' && options.maxMappedCol >= left) {
+    const hintRight = Math.max(left, Math.min(right, options.maxMappedCol + 2))
+    effectiveRight = Math.max(effectiveRight, hintRight)
+  }
+
+  // 提取并计算列宽 (限制范围，防止过宽过窄)
+  const colWidths = {}
+  for (let c = left; c <= effectiveRight; c++) {
+    let widthPx = 64 // 默认宽度
+    if (cols && cols[c]) {
+      const colData = cols[c]
+      if (colData.wpx) {
+        widthPx = colData.wpx
+      } else if (colData.wch) {
+        // Excel的wch是字符数，在网页中每个字符约对应6-8像素，但原先乘7后还是太大
+        widthPx = Math.round(colData.wch * 6)
+      } else if (colData.width) {
+        // Excel中的width通常也是基于字符宽度的某种单位
+        widthPx = Math.round(colData.width * 6)
+      }
+    }
+    
+    // 我们发现预览时的列宽比实际期望大得多。
+    // 这可能是因为Excel的列宽单位(字符数)和前端显示的缩放比例不一致。
+    // 强制缩小比例。
+    widthPx = Math.round(widthPx * 0.15)
+    
+    // 设置一个比较小的最小宽度，允许较窄的列。
+    // 设置一个较小的最大宽度，防止单列过宽破坏排版。
+    colWidths[c] = Math.max(20, Math.min(widthPx, 100))
+    if (c === effectiveRight) {
+      colWidths[c] = Math.min(120, Math.round(colWidths[c] * 1.25))
+    }
+  }
+
+  let html = '<table style="table-layout: fixed; border-collapse: collapse; width: max-content;">'
+  
+  // colgroup定义列宽
+  html += '<colgroup>'
+  html += '<col style="width: 40px;">' // 行号列
+  for (let c = left; c <= effectiveRight; c++) {
+    html += `<col style="width: ${colWidths[c]}px;">`
+  }
+  html += '</colgroup>'
   
   // 表头行：列字母
-  html += '<thead><tr><th style="background:#e0e0e0;min-width:40px;"></th>'
-  for (let c = left; c <= right; c++) {
+  html += '<thead><tr><th style="background:#e0e0e0;min-width:40px;width:40px;border: 1px solid #ccc;"></th>'
+  for (let c = left; c <= effectiveRight; c++) {
     const colLetter = XLSX.utils.encode_col(c)
-    html += `<th style="background:#e0e0e0;text-align:center;font-weight:bold;color:#666;">${colLetter}</th>`
+    html += `<th style="background:#e0e0e0;text-align:center;font-weight:bold;color:#666;border: 1px solid #ccc;overflow:hidden;text-overflow:ellipsis;">${colLetter}</th>`
   }
   html += '</tr></thead>'
   
   // 数据行
   html += '<tbody>'
-  for (let r = top; r <= bottom; r++) {
+  for (let r = top; r <= effectiveBottom; r++) {
     html += '<tr>'
     // 行号
-    html += `<td style="background:#e0e0e0;text-align:center;font-weight:bold;color:#666;min-width:40px;">${r + 1}</td>`
+    html += `<td style="background:#e0e0e0;text-align:center;font-weight:bold;color:#666;min-width:40px;border: 1px solid #ccc;">${r + 1}</td>`
     
-    for (let c = left; c <= right; c++) {
+    for (let c = left; c <= effectiveRight; c++) {
       const mergeInfo = mergeMap.get(`${r}-${c}`)
       
       if (mergeInfo && !mergeInfo.isOrigin) {
@@ -592,7 +818,8 @@ function generatePreviewHtmlWithCoords(ws, range, merges) {
         .replace(/>/g, '&gt;')
         .replace(/"/g, '&quot;')
       
-      html += `<td ${tdAttrs}>${safeValue}</td>`
+      let cellStyle = 'border: 1px solid #ccc; padding: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;'
+      html += `<td ${tdAttrs} style="${cellStyle}">${safeValue}</td>`
     }
     html += '</tr>'
   }

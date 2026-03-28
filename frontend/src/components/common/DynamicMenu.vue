@@ -320,7 +320,7 @@ const fetchUserMenus = async () => {
     const response = await apiService.get('/menus/user-menus')
     if (response.data.success) {
       menuList.value = response.data.data || []
-      
+
       // 临时注入设备参数管理菜单（开发用）
       const qualityMenu = menuList.value.find(m => m.Name === '质量管理' || m.Code === 'quality')
       if (qualityMenu) {

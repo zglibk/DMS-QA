@@ -660,16 +660,25 @@
   </div>
 
         <!-- 模板管理对话框 -->
-        <el-dialog v-model="showTemplateManager" title="出货报告模板管理" width="900px">
+        <el-dialog v-model="showTemplateManager" class="template-manager-dialog" title="出货报告模板管理" width="920px">
           <div class="template-toolbar">
             <el-button :disabled="!userStore.hasPermission('shipment:template:add')" type="primary" @click="handleAddTemplate"><el-icon style="margin-right: 4px;"><Plus /></el-icon> 新增模板</el-button>
             <el-button @click="fetchTemplates"><el-icon style="margin-right: 4px;"><Refresh /></el-icon> 刷新</el-button>
+            <el-select v-model="templateManagerTypeFilter" placeholder="筛选模板类型" style="width: 220px; margin-left: auto;" clearable>
+              <el-option label="全部类型" value="all" />
+              <el-option v-for="item in REPORT_TEMPLATE_TYPE_OPTIONS" :key="item.value" :label="item.label" :value="item.value" />
+            </el-select>
           </div>
-          <el-table :data="templateList" stripe border>
-            <el-table-column prop="customerId" label="客户编码" width="100" />
-            <el-table-column prop="customerName" label="客户名称" width="120" show-overflow-tooltip />
+          <el-table :data="filteredTemplateList" stripe border max-height="56vh" size="small">
+            <el-table-column label="模板类型" width="128" align="center">
+              <template #default="{ row }">
+                <el-tag size="small" type="info">{{ getTemplateTypeText(row.templateType) }}</el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column prop="customerId" label="客户编码" width="90" />
+            <el-table-column prop="customerName" label="客户名称" width="110" show-overflow-tooltip />
             <el-table-column prop="templateName" label="模板名称" min-width="120" show-overflow-tooltip />
-            <el-table-column prop="fileName" label="文件名" min-width="150" show-overflow-tooltip>
+            <el-table-column prop="fileName" label="文件名" min-width="120" show-overflow-tooltip>
               <template #default="{ row }">
                 <el-link v-if="row.fileName" type="primary" :underline="false" @click="downloadTemplate(row)">
                   {{ row.fileName }}
@@ -677,23 +686,26 @@
                 <span v-else class="text-muted">-</span>
               </template>
             </el-table-column>
-            <el-table-column prop="updateTime" label="更新时间" width="110" />
+            <el-table-column prop="updateTime" label="更新时间" width="100" />
             <el-table-column label="状态" width="70" align="center">
               <template #default="{ row }">
                 <el-tag :type="row.enabled ? 'success' : 'info'" size="small">{{ row.enabled ? '启用' : '停用' }}</el-tag>
               </template>
             </el-table-column>
-            <el-table-column label="操作" width="220" align="center">
+            <el-table-column label="操作" width="98" align="center" fixed="right">
               <template #default="{ row }">
-                <el-button :disabled="!userStore.hasPermission('shipment:template:edit')" type="primary" link size="small" @click="handleEditTemplate(row)">
-                  <el-icon style="margin-right: 4px;"><Edit /></el-icon> 编辑
-                </el-button>
-                <el-button :disabled="!userStore.hasPermission('shipment:template:delete')" type="danger" link size="small" @click="handleDeleteTemplate(row)">
-                  <el-icon style="margin-right: 4px;"><Delete /></el-icon> 删除
-                </el-button>
-                <el-button :disabled="!userStore.hasPermission('shipment:template:mapping')" type="success" link size="small" @click="openMappingDialog(row)">
-                  <el-icon style="margin-right: 4px;"><Setting /></el-icon> 映射
-                </el-button>
+                <el-dropdown trigger="click" @command="(cmd) => handleTemplateAction(cmd, row)">
+                  <el-button type="primary" text size="small" class="template-action-btn">
+                    操作<el-icon style="margin-left: 4px;"><ArrowDown /></el-icon>
+                  </el-button>
+                  <template #dropdown>
+                    <el-dropdown-menu>
+                      <el-dropdown-item command="edit" :disabled="!userStore.hasPermission('shipment:template:edit')">编辑</el-dropdown-item>
+                      <el-dropdown-item command="mapping" :disabled="!userStore.hasPermission('shipment:template:mapping')">映射</el-dropdown-item>
+                      <el-dropdown-item command="delete" :disabled="!userStore.hasPermission('shipment:template:delete')">删除</el-dropdown-item>
+                    </el-dropdown-menu>
+                  </template>
+                </el-dropdown>
               </template>
             </el-table-column>
           </el-table>
@@ -704,10 +716,15 @@
         <!-- 新增/编辑模板对话框 -->
         <el-dialog v-model="showTemplateForm" :title="templateFormMode === 'add' ? '新增报告模板' : '编辑报告模板'" width="550px">
           <el-form :model="templateForm" label-width="100px" :rules="templateRules" ref="templateFormRef">
-            <el-form-item label="客户编码" prop="customerId">
+            <el-form-item label="模板类型" prop="templateType">
+              <el-select v-model="templateForm.templateType" placeholder="请选择模板类型" style="width: 100%">
+                <el-option v-for="item in REPORT_TEMPLATE_TYPE_OPTIONS" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="客户编码" prop="customerId" v-if="templateForm.templateType === 'customer_specific'">
               <el-input v-model="templateForm.customerId" placeholder="请输入客户编码" />
             </el-form-item>
-            <el-form-item label="客户名称" prop="customerName">
+            <el-form-item label="客户名称" prop="customerName" v-if="templateForm.templateType === 'customer_specific'">
               <el-input v-model="templateForm.customerName" placeholder="请输入客户名称" />
             </el-form-item>
             <el-form-item label="模板名称" prop="templateName">
@@ -778,12 +795,12 @@
           
           <!-- 单产品显示 -->
           <el-descriptions v-if="reportDialogProducts.length === 1" :column="2" border size="small" style="margin-top: 16px">
-            <el-descriptions-item label="客户编码">{{ result.workOrderInfo?.CustomerID || reportDialogProducts[0]?.customerId }}</el-descriptions-item>
-            <el-descriptions-item label="产品编码">{{ reportDialogProducts[0]?.productId }}</el-descriptions-item>
-            <el-descriptions-item label="客户料号">{{ reportDialogProducts[0]?.cProductId }}</el-descriptions-item>
-            <el-descriptions-item label="产品名称">{{ reportDialogProducts[0]?.product }}</el-descriptions-item>
-            <el-descriptions-item label="数量">{{ reportDialogProducts[0]?.pCount || reportDialogProducts[0]?.orderCount }}</el-descriptions-item>
-            <el-descriptions-item label="抽检数">{{ calculateSampleSize(reportDialogProducts[0]?.pCount || reportDialogProducts[0]?.orderCount) }}</el-descriptions-item>
+            <el-descriptions-item label="客户编码">{{ result.workOrderInfo?.CustomerID || reportDialogProducts[0]?.customerId || currentHistoryRow?.CustomerID }}</el-descriptions-item>
+            <el-descriptions-item label="料号">{{ result.workOrderInfo?.PNumProductInfoList?.find(p => p.Product === (reportDialogProducts[0]?.product || reportDialogProducts[0]?.Product))?.CProductID || result.workOrderInfo?.PNumProductInfoList?.[0]?.CProductID || reportDialogProducts[0]?.CProductID || reportDialogProducts[0]?.cProduct || reportDialogProducts[0]?.CProduct || reportDialogProducts[0]?.cProductId }}</el-descriptions-item>
+            <el-descriptions-item label="工单号">{{ result.workOrderInfo?.PNum || reportDialogProducts[0]?.pNum || reportDialogProducts[0]?.PNum || currentHistoryRow?.PNum }}</el-descriptions-item>
+            <el-descriptions-item label="产品名称">{{ reportDialogProducts[0]?.product || reportDialogProducts[0]?.Product }}</el-descriptions-item>
+            <el-descriptions-item label="数量">{{ reportDialogProducts[0]?.pCount || reportDialogProducts[0]?.orderCount || reportDialogProducts[0]?.Count }}</el-descriptions-item>
+            <el-descriptions-item label="抽检数">{{ calculateSampleSize(reportDialogProducts[0]?.pCount || reportDialogProducts[0]?.orderCount || reportDialogProducts[0]?.Count) }}</el-descriptions-item>
           </el-descriptions>
           
           <!-- 多产品列表 -->
@@ -806,9 +823,19 @@
           </div>
           
           <el-form label-width="100px" style="margin-top: 16px">
+            <el-form-item label="报告类型">
+              <el-select v-model="selectedReportTemplateType" placeholder="请选择报告类型" style="width: 100%">
+                <el-option v-for="item in REPORT_TEMPLATE_TYPE_OPTIONS" :key="item.value" :label="item.label" :value="item.value" />
+              </el-select>
+            </el-form-item>
             <el-form-item label="报告模板">
               <el-select v-model="selectedTemplateId" placeholder="选择报告模板" style="width: 100%">
                 <el-option v-for="tpl in availableTemplates" :key="tpl.id" :label="tpl.templateName" :value="tpl.id" />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="检验组别" required>
+              <el-select v-model="selectedInspectionGroup" placeholder="选择检验项目组别" filterable style="width: 100%">
+                <el-option v-for="group in inspectionGroups" :key="group" :label="group" :value="group" />
               </el-select>
             </el-form-item>
             <el-form-item label="报告格式">
@@ -849,7 +876,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, nextTick, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Box, Search, Document, Collection, Goods, Refresh, Tickets, ShoppingBag, Files, OfficeBuilding, Setting, Plus, Upload, Download, Printer, RefreshRight, Check, QuestionFilled, DocumentCopy, Delete, Edit, Grid, Position, CircleCheck, Promotion, ArrowDown, RefreshLeft } from '@element-plus/icons-vue'
@@ -857,7 +884,7 @@ import * as XLSX from 'xlsx'
 import { saveAs } from 'file-saver'
 import ExcelJS from 'exceljs'
 import api from '@/utils/api'
-import { submitShipmentReport, approveShipmentReport, rejectShipmentReport, revokeShipmentReport } from '@/api/inspection'
+import { submitShipmentReport, approveShipmentReport, rejectShipmentReport, revokeShipmentReport, getFinishedInspectionItems } from '@/api/inspection'
 
 const route = useRoute()
 const router = useRouter()
@@ -869,6 +896,20 @@ const loading = ref(false)
 const hasSearched = ref(false)
 const result = reactive({ workOrderInfo: null, materialList: [], materialInList: [], productInfo: [], isBatchResult: false })
 const activeCollapse = ref(['material'])
+const REPORT_TEMPLATE_TYPE_OPTIONS = [
+  { label: '专用报告', value: 'customer_specific' },
+  { label: '模内标报告', value: 'in_mold_label' },
+  { label: '通用报告-无粘性产品', value: 'general_non_adhesive' },
+  { label: '通用报告-有粘性产品', value: 'general_adhesive' }
+]
+function normalizeTemplateType(type) {
+  const value = String(type || '').trim()
+  return REPORT_TEMPLATE_TYPE_OPTIONS.some(item => item.value === value) ? value : 'customer_specific'
+}
+function getTemplateTypeText(type) {
+  const target = REPORT_TEMPLATE_TYPE_OPTIONS.find(item => item.value === normalizeTemplateType(type))
+  return target?.label || '专用报告'
+}
 const selectedProduct = ref(null)
 
 // 批量查询相关
@@ -894,7 +935,27 @@ const historyQuery = reactive({
   keyword: ''
 })
 
-// 初始化查询时间范围（默认前90天）
+// 引入用户Store
+import { useUserStore } from '@/store/user'
+const userStore = useUserStore()
+
+// 检验项目组相关
+const inspectionGroups = ref([])
+const fullInspectionGroups = ref([]) // 保存完整的项目组数据
+const selectedInspectionGroup = ref('')
+
+async function fetchInspectionGroups() {
+  try {
+    const res = await getFinishedInspectionItems()
+    const items = res?.data || []
+    fullInspectionGroups.value = items // 保存完整的列表以便后续提取依据标准等信息
+    const names = items.map(it => it.templateName).filter(Boolean)
+    inspectionGroups.value = [...new Set(names)]
+  } catch (e) {
+    console.error('获取检验项目组失败', e)
+  }
+}
+
 onMounted(() => {
   const end = new Date()
   const start = new Date()
@@ -906,15 +967,13 @@ onMounted(() => {
   loadTemplatesFromStorage()
   fetchTemplates()
   fetchHistory()
+  fetchInspectionGroups()
 })
+
 const currentProductList = computed(() => {
   if (!currentHistoryRow.value || !currentHistoryRow.value.ProductInfo) return []
   return parseProductInfo(currentHistoryRow.value.ProductInfo)
 })
-
-// 引入用户Store
-import { useUserStore } from '@/store/user'
-const userStore = useUserStore()
 
 /**
  * 获取当前登录用户名
@@ -1534,9 +1593,6 @@ function handleViewHistory(row) {
       return
     }
 
-    // 切换到生成报告标签页
-    activeTab.value = 'generate'
-    
     // 设置模式为单条或批量（根据产品数量）
     if (products.length > 1) {
       // 批量模式模拟
@@ -1559,10 +1615,31 @@ function handleViewHistory(row) {
     reportPreview.reportNo = row.ReportNo
     reportPreview.date = row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : ''
     
+    // 如果 result.workOrderInfo 为空且需要依赖，可以通过解析 currentHistoryRow 模拟恢复
+    if (!result.workOrderInfo) {
+      result.workOrderInfo = {
+        CustomerID: row.CustomerID || products[0].customerId || products[0].CustomerID || '',
+        PNum: row.PNum || products[0].pNum || products[0].PNum || '',
+        OrderNum: row.OrderNum || products[0].orderNum || products[0].OrderNum || ''
+      }
+    }
+
     // 自动匹配模板
-    const customerId = row.CustomerID || products[0].customerId || ''
-    const matched = templateList.value.find(t => t.customerId === customerId && t.enabled)
-    selectedTemplateId.value = matched?.id || templateList.value[0]?.id
+    const customerId = row.CustomerID || products[0].customerId || products[0].CustomerID || ''
+    let templateType = 'customer_specific'
+    if (row.InspectionData) {
+      const parsedInspectionData = typeof row.InspectionData === 'string' ? JSON.parse(row.InspectionData) : row.InspectionData
+      templateType = normalizeTemplateType(parsedInspectionData?.reportInfo?.templateType)
+      if (parsedInspectionData?.reportInfo?.inspectionGroup) {
+        selectedInspectionGroup.value = parsedInspectionData.reportInfo.inspectionGroup
+      } else {
+        selectedInspectionGroup.value = ''
+      }
+    } else {
+      selectedInspectionGroup.value = ''
+    }
+    selectedReportTemplateType.value = templateType
+    selectedTemplateId.value = pickTemplateIdByType(customerId, templateType)
     
     // 打开对话框
     showReportDialog.value = true
@@ -1574,7 +1651,7 @@ function handleViewHistory(row) {
 }
 
 /**
- * 打印预览 - 跳转到HTML报告预览页面
+ * 打印预览 - 跳转到HTML报告预览页面或打开模板选择对话框
  * @param {Object} row 报告记录
  */
 function handlePrintPreview(row) {
@@ -1583,9 +1660,27 @@ function handlePrintPreview(row) {
     return
   }
   
-  // 在新标签页打开打印预览页面
-  const url = router.resolve(`/print/shipment/${row.ID}`).href
-  window.open(url, '_blank')
+  // 判断客户编码是否有专用报告模板
+  let customerId = row.CustomerID
+  if (!customerId) {
+    try {
+      const pInfo = typeof row.ProductInfo === 'string' ? JSON.parse(row.ProductInfo) : row.ProductInfo
+      if (Array.isArray(pInfo) && pInfo.length > 0) {
+        customerId = pInfo[0].customerId
+      }
+    } catch (e) {}
+  }
+  
+  const specificTemplateId = pickTemplateIdByType(customerId, 'customer_specific')
+  
+  if (specificTemplateId) {
+    // 有专用模板，直接跳转打印预览页面
+    const url = router.resolve(`/print/shipment/${row.ID}`).href
+    window.open(url, '_blank')
+  } else {
+    // 没有专用模板，复用报告生成/查看弹窗，要求用户选择报告模板及检验组别
+    handleViewHistory(row)
+  }
 }
 
 /**
@@ -1617,10 +1712,12 @@ async function handleExportHistoryReport(row) {
     
     // 获取客户ID并匹配模板
     const customerId = row.CustomerID || products[0]?.customerId || ''
-    const matched = templateList.value.find(t => t.customerId === customerId && t.enabled)
+    const savedType = normalizeTemplateType(inspectionData?.reportInfo?.templateType)
+    const matchedId = pickTemplateIdByType(customerId, savedType)
+    const matched = matchedId ? templateList.value.find(t => t.id === matchedId) : null
     
     if (!matched) {
-      ElMessage.warning(`未找到客户 ${customerId} 的可用模板，请先配置模板`)
+      ElMessage.warning(`未找到${getTemplateTypeText(savedType)}模板，请先在模板管理中配置`)
       return
     }
     
@@ -1878,12 +1975,14 @@ function formatDateTime(date) {
 // 模板管理
 const showTemplateManager = ref(false)
 const templateList = ref([])
+const templateManagerTypeFilter = ref('all')
 const showTemplateForm = ref(false)
 const templateFormMode = ref('add')
 const templateFormRef = ref(null)
 const replaceUploadRef = ref(null)
 const templateForm = reactive({ 
   id: null, 
+  templateType: 'customer_specific',
   customerId: '', 
   customerName: '', 
   templateName: '', 
@@ -1897,9 +1996,17 @@ const templateForm = reactive({
   newFileArrayBuffer: null,  // 替换的新文件内容
   newFileBase64: null
 })
+const validateCustomerRequired = (label) => (rule, value, callback) => {
+  if (templateForm.templateType === 'customer_specific' && !String(value || '').trim()) {
+    callback(new Error(`请输入${label}`))
+    return
+  }
+  callback()
+}
 const templateRules = {
-  customerId: [{ required: true, message: '请输入客户编码', trigger: 'blur' }],
-  customerName: [{ required: true, message: '请输入客户名称', trigger: 'blur' }],
+  templateType: [{ required: true, message: '请选择模板类型', trigger: 'change' }],
+  customerId: [{ validator: validateCustomerRequired('客户编码'), trigger: 'blur' }],
+  customerName: [{ validator: validateCustomerRequired('客户名称'), trigger: 'blur' }],
   templateName: [{ required: true, message: '请输入模板名称', trigger: 'blur' }]
 }
 
@@ -1908,13 +2015,37 @@ const showReportDialog = ref(false)
 const reportDialogProduct = ref(null)  // 兼容旧代码
 const reportDialogProducts = ref([])   // 支持多产品
 const selectedTemplateId = ref(null)
+const selectedReportTemplateType = ref('customer_specific')
 const reportFormat = ref('excel')
 const generatingReport = ref(false)
-
-const availableTemplates = computed(() => {
-  if (!result.workOrderInfo?.CustomerID) return templateList.value.filter(t => t.enabled)
-  return templateList.value.filter(t => t.enabled && (t.customerId === result.workOrderInfo.CustomerID || t.customerId === 'DEFAULT'))
+const filteredTemplateList = computed(() => {
+  const filterType = normalizeTemplateType(templateManagerTypeFilter.value)
+  if (!templateManagerTypeFilter.value || templateManagerTypeFilter.value === 'all') return templateList.value
+  return templateList.value.filter(item => normalizeTemplateType(item.templateType) === filterType)
 })
+
+const currentReportCustomerId = computed(() => result.workOrderInfo?.CustomerID || reportDialogProducts.value?.[0]?.customerId || '')
+const availableTemplates = computed(() => {
+  const templateType = normalizeTemplateType(selectedReportTemplateType.value)
+  const customerId = currentReportCustomerId.value
+  return templateList.value.filter(t => {
+    if (!t.enabled) return false
+    const currentType = normalizeTemplateType(t.templateType)
+    if (currentType !== templateType) return false
+    if (templateType === 'customer_specific') {
+      return t.customerId === customerId || t.customerId === 'DEFAULT'
+    }
+    return true
+  })
+})
+watch([selectedReportTemplateType, currentReportCustomerId, templateList], () => {
+  if (!showReportDialog.value) return
+  const currentId = selectedTemplateId.value
+  const exists = availableTemplates.value.some(item => item.id === currentId)
+  if (!exists) {
+    selectedTemplateId.value = availableTemplates.value[0]?.id || null
+  }
+}, { deep: true })
 
 const TEMPLATE_STORAGE_KEY = 'shipment_report_templates'
 
@@ -1951,6 +2082,7 @@ function saveTemplatesToStorage() {
   try {
     const data = templateList.value.map(t => ({
       id: t.id,
+      templateType: normalizeTemplateType(t.templateType),
       customerId: t.customerId,
       customerName: t.customerName,
       templateName: t.templateName,
@@ -1976,6 +2108,7 @@ function loadTemplatesFromStorage() {
     if (Array.isArray(list)) {
       templateList.value = list.map(item => ({
         ...item,
+        templateType: normalizeTemplateType(item.templateType),
         fileArrayBuffer: item.fileBase64 ? base64ToArrayBuffer(item.fileBase64) : null
       }))
     }
@@ -2207,16 +2340,65 @@ function buildTemplateContext() {
   const handler = getCustomerHandler(customerID)
   console.log('buildTemplateContext - customerID:', customerID, 'handler:', handler ? '已获取' : '未找到')
 
+  // 这里可以根据 selectedInspectionGroup.value 动态获取需要检查的项目清单和AQL要求
+  // 目前我们记录下选择的检验组别，并在构造表格数据时使用
+  const inspectionGroup = selectedInspectionGroup.value
+  console.log('buildTemplateContext - inspectionGroup:', inspectionGroup)
+
   // 获取要处理的产品列表（多产品或单产品）
   const products = reportDialogProducts.value && reportDialogProducts.value.length > 0 
     ? reportDialogProducts.value 
     : (selectedProduct.value ? [selectedProduct.value] : [])
+  const firstMaterial = result.materialInList?.[0] || result.materialList?.[0] || {}
   
   // 第一个产品用于填充顶部字段（单产品模式时的主要产品）
   const sp = products[0] || {}
   
-  // 构建表格数据 - 支持多产品，只包含明确定义的字段
-  const tableData = products.map((p, index) => {
+  // 提取对应产品的信息以覆盖物料相关字段
+  const targetPNumProduct = wo.PNumProductInfoList?.find(p => p.Product === (sp.product || sp.Product)) || wo.PNumProductInfoList?.[0] || {}
+
+  // 提取所选检验项目组对应的依据标准和明细数据
+  let groupStandard = ''
+  let inspectionDetails = []
+  if (inspectionGroup && fullInspectionGroups.value && fullInspectionGroups.value.length > 0) {
+    const matchedGroup = fullInspectionGroups.value.find(g => g.templateName === inspectionGroup)
+    if (matchedGroup) {
+      if (matchedGroup.standard) groupStandard = matchedGroup.standard
+      if (matchedGroup.details && Array.isArray(matchedGroup.details)) {
+        inspectionDetails = matchedGroup.details
+      }
+    }
+  }
+
+  // 构建表格数据 - 支持多产品或多检验项目明细
+  let tableData = []
+  
+  // 模式1：如果是基于检验组别的动态多行数据（如果存在明细，则渲染为检验明细列表）
+  if (inspectionDetails.length > 0) {
+    tableData = inspectionDetails.map((detail, index) => {
+      return {
+        Index: index + 1,
+        序号: index + 1,
+        No: index + 1, // 为了兼容部分模板直接用 No
+        
+        // 动态检验项映射
+        InspectItem: detail.itemName || '',
+        InspectIten: detail.itemName || '', // 兼容截图中的 InspectIten 拼写错误
+        检验项目: detail.itemName || '',
+        InspectStandard: detail.standard || '',
+        检验标准: detail.standard || '',
+        InspectStar: detail.standard || '', // 兼容模板图上的别名 InspectStar
+        
+        // 默认结果和备注
+        InspectRes: 'OK',
+        检验结果: 'OK',
+        Remark: '',
+        备注: ''
+      }
+    })
+  } else {
+    // 模式2：传统的基于多产品的固定项填充模式
+    tableData = products.map((p, index) => {
     // 只提取我们明确需要的字段，避免原始对象的其他属性干扰
     const count = p.pCount || p.orderCount || ''
     
@@ -2272,7 +2454,11 @@ function buildTemplateContext() {
       PCount: count,
       成品数: count,
 
-      // 检验项目 - 默认值填充
+      // 检验项目 - 默认值填充（若需要严格按照检验组别映射，可以在这里基于 inspectionGroup 扩展逻辑）
+      // 这里添加检验组别字段供映射模板使用
+      InspectionGroup: inspectionGroup,
+      检验组别: inspectionGroup,
+      
       Appearance: 'OK',
       外观: 'OK',
       Color: 'OK',
@@ -2314,7 +2500,8 @@ function buildTemplateContext() {
     
     return baseFields
   })
-  
+}
+
   // 计算合计数量
   const totalCount = products.reduce((sum, p) => sum + (p.pCount || p.orderCount || 0), 0)
   
@@ -2328,16 +2515,32 @@ function buildTemplateContext() {
   if (!spScale && handler?.extractSpec && sp.product) {
     spScale = handler.extractSpec(sp.product)
   }
-  
+
   return {
     // 工单信息
     CustomerID: wo.CustomerID || '',
     客户编码: wo.CustomerID || '',
+    Customer: wo.Customer || '',
+    客户名称: wo.CustomerID || '', // 修改客户名称为映射CustomerID
     PNum: wo.PNum || '',
     工单号: wo.PNum || '',
     CPO: wo.CPO || '',
     OrderNum: wo.OrderNum || '',
     订单号: wo.OrderNum || '',
+    MaterialCode: targetPNumProduct.CProductID || sp.CProductID || sp.cProductId || '', // 修改物料编码为CProductID
+    物料编码: targetPNumProduct.CProductID || sp.CProductID || sp.cProductId || '',
+    MaterialName: targetPNumProduct.Product || sp.product || sp.Product || '', // 修改物料名称为Product
+    物料名称: targetPNumProduct.Product || sp.product || sp.Product || '',
+    BatchNo: wo.PNum || '',
+    生产批次: wo.PNum || '',
+    DeliveryNoteNo: firstMaterial.inId || firstMaterial.InID || '',
+    送货单号: firstMaterial.inId || firstMaterial.InID || '',
+    SampleCount: products.length === 1 ? calculateSampleSize(sp.pCount || sp.orderCount || 0) : calculateSampleSize(totalCount),
+    抽样数量: products.length === 1 ? calculateSampleSize(sp.pCount || sp.orderCount || 0) : calculateSampleSize(totalCount),
+    Standard: groupStandard,
+    依据标准: groupStandard,
+    SpecialInspection: '',
+    特殊检测: '',
     
     // 产品信息（第一个产品，用于单产品模式或顶部字段）
     ProductID: sp.productId || '',
@@ -2367,6 +2570,8 @@ function buildTemplateContext() {
     ReportDate: reportDate,
     日期: reportDate,
     报告日期: reportDate,
+    InspectionGroup: inspectionGroup,
+    检验组别: inspectionGroup,
     
     // 检验人员和日期（底部签名区）
     Inspector: getCurrentUserName(),
@@ -3384,6 +3589,19 @@ function getSelectedTemplate() {
   return templateList.value.find(t => t.id === id) || null
 }
 
+function pickTemplateIdByType(customerId = '', templateType = 'customer_specific') {
+  const normalizedType = normalizeTemplateType(templateType)
+  const enabledTemplates = templateList.value.filter(item => item.enabled)
+  if (normalizedType === 'customer_specific') {
+    const byCustomer = enabledTemplates.find(item => normalizeTemplateType(item.templateType) === 'customer_specific' && item.customerId === customerId)
+    if (byCustomer) return byCustomer.id
+    const byDefault = enabledTemplates.find(item => normalizeTemplateType(item.templateType) === 'customer_specific' && item.customerId === 'DEFAULT')
+    return byDefault?.id || null
+  }
+  const byType = enabledTemplates.find(item => normalizeTemplateType(item.templateType) === normalizedType)
+  return byType?.id || null
+}
+
 /**
  * 执行查询，根据工单/物料条件获取报告所需数据
  */
@@ -3715,9 +3933,9 @@ function handleGenerateReport(row) {
   reportDialogProduct.value = row
   reportDialogProducts.value = [row]  // 单产品数组
   // 优先从工单信息获取客户编码，其次从产品数据获取
+  selectedReportTemplateType.value = 'customer_specific'
   const customerId = result.workOrderInfo?.CustomerID || row.customerId || ''
-  const matched = templateList.value.find(t => t.customerId === customerId && t.enabled)
-  selectedTemplateId.value = matched?.id || templateList.value[0]?.id
+  selectedTemplateId.value = pickTemplateIdByType(customerId, selectedReportTemplateType.value)
   showReportDialog.value = true
 }
 
@@ -3733,9 +3951,9 @@ function handleBatchGenerateReport() {
   reportDialogProduct.value = selectedProducts.value[0]
   reportDialogProducts.value = [...selectedProducts.value]  // 多产品数组
   // 优先从工单信息获取客户编码，其次从产品数据获取
+  selectedReportTemplateType.value = 'customer_specific'
   const customerId = result.workOrderInfo?.CustomerID || selectedProducts.value[0]?.customerId || ''
-  const matched = templateList.value.find(t => t.customerId === customerId && t.enabled)
-  selectedTemplateId.value = matched?.id || templateList.value[0]?.id
+  selectedTemplateId.value = pickTemplateIdByType(customerId, selectedReportTemplateType.value)
   showReportDialog.value = true
 }
 
@@ -3777,6 +3995,10 @@ async function saveReportRecord() {
         reportNo: templateContext.ReportNo || reportPreview.reportNo,
         reportDate: templateContext.ReportDate || reportPreview.date,
         customerID: templateContext.CustomerID || '',
+        templateType: normalizeTemplateType(selectedReportTemplateType.value),
+        templateId: selectedTemplateId.value || null,
+        templateName: getSelectedTemplate()?.templateName || '',
+        inspectionGroup: selectedInspectionGroup.value,
         inspector: templateContext.Inspector || '',
         totalCount: templateContext.TotalCount || 0,
         productCount: templateContext.ProductCount || 0
@@ -3872,6 +4094,7 @@ async function saveReportRecord() {
  */
 async function confirmGenerateReport() {
   if (!selectedTemplateId.value) { ElMessage.warning('请选择报告模板'); return }
+  if (!selectedInspectionGroup.value) { ElMessage.warning('请选择检验组别'); return }
   generatingReport.value = true
   try {
     await new Promise(r => setTimeout(r, 500))
@@ -4041,6 +4264,7 @@ function handleAddTemplate() {
   templateFormMode.value = 'add'
   Object.assign(templateForm, { 
     id: null, 
+    templateType: 'customer_specific',
     customerId: '', 
     customerName: '', 
     templateName: '', 
@@ -4065,6 +4289,7 @@ function handleEditTemplate(row) {
   templateFormMode.value = 'edit'
   Object.assign(templateForm, { 
     ...row, 
+    templateType: normalizeTemplateType(row.templateType),
     fileArrayBuffer: row.fileBase64 ? base64ToArrayBuffer(row.fileBase64) : row.fileArrayBuffer || null,
     // 清空替换文件相关字段
     newFileName: '',
@@ -4129,7 +4354,7 @@ async function fetchTemplates() {
   try {
     const resp = await api.get('/shipment-report/templates')
     const list = Array.isArray(resp?.data) ? resp.data : (Array.isArray(resp) ? resp : [])
-    templateList.value = list
+    templateList.value = list.map(item => ({ ...item, templateType: normalizeTemplateType(item.templateType) }))
   } catch {}
 }
 
@@ -4143,6 +4368,20 @@ async function downloadTemplate(row) {
     saveAs(blob, row.fileName || `template_${row.id}.xlsx`)
   } catch (e) {
     ElMessage.error('下载失败：' + (e.message || '未知错误'))
+  }
+}
+
+function handleTemplateAction(command, row) {
+  if (command === 'edit') {
+    handleEditTemplate(row)
+    return
+  }
+  if (command === 'mapping') {
+    openMappingDialog(row)
+    return
+  }
+  if (command === 'delete') {
+    handleDeleteTemplate(row)
   }
 }
 
@@ -4164,6 +4403,10 @@ async function handleDeleteTemplate(row) {
 async function handleSaveTemplate() {
   try {
     await templateFormRef.value.validate()
+    if (templateForm.templateType !== 'customer_specific') {
+      templateForm.customerId = ''
+      templateForm.customerName = ''
+    }
     if (templateFormMode.value === 'add') {
       // 新增模式：必须有文件
       if (!templateForm.rawFile) {
@@ -4171,6 +4414,7 @@ async function handleSaveTemplate() {
         return
       }
       const fd = new FormData()
+      fd.append('templateType', normalizeTemplateType(templateForm.templateType))
       fd.append('customerId', templateForm.customerId || '')
       fd.append('customerName', templateForm.customerName || '')
       fd.append('templateName', templateForm.templateName || '')
@@ -4178,12 +4422,13 @@ async function handleSaveTemplate() {
       fd.append('enabled', templateForm.enabled ? 'true' : 'false')
       fd.append('file', templateForm.rawFile)
       const resp = await api.post('/shipment-report/templates', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      const item = resp?.data ?? resp
+      const item = { ...(resp?.data ?? resp), templateType: normalizeTemplateType((resp?.data ?? resp)?.templateType || templateForm.templateType) }
       templateList.value.push(item)
       ElMessage.success('模板上传成功')
     } else {
       // 编辑模式：可选替换文件
       const fd = new FormData()
+      fd.append('templateType', normalizeTemplateType(templateForm.templateType))
       fd.append('customerId', templateForm.customerId || '')
       fd.append('customerName', templateForm.customerName || '')
       fd.append('templateName', templateForm.templateName || '')
@@ -4198,7 +4443,7 @@ async function handleSaveTemplate() {
         fd.append('file', blob, templateForm.newFileName)
       }
       const resp = await api.put(`/shipment-report/templates/${templateForm.id}`, fd, { headers: { 'Content-Type': 'multipart/form-data' } })
-      const item = resp?.data ?? resp
+      const item = { ...(resp?.data ?? resp), templateType: normalizeTemplateType((resp?.data ?? resp)?.templateType || templateForm.templateType) }
       const idx = templateList.value.findIndex(t => t.id === item.id)
       if (idx > -1) { 
         templateList.value[idx] = item
@@ -4289,7 +4534,9 @@ onMounted(() => {
 .hint-text li { margin-bottom: 8px; line-height: 1.6; }
 .hint-text strong { color: #667eea; }
 
-.template-toolbar { margin-bottom: 16px; }
+.template-toolbar { margin-bottom: 16px; display: flex; align-items: center; gap: 10px; }
+.template-manager-dialog :deep(.el-dialog__body) { padding-top: 12px; }
+.template-action-btn { padding: 0 4px; }
 
 .history-toolbar {
   display: flex;

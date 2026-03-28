@@ -242,3 +242,71 @@ export function getShipmentReportAuditLogs(id) {
     method: 'get'
   })
 }
+
+export function getFinishedInspectionConfigInit() {
+  return request({
+    url: '/inspection/finished-attributes/init',
+    method: 'get'
+  })
+}
+
+export function getFinishedInspectionTypes() {
+  return request({
+    url: '/inspection/finished-attributes/types',
+    method: 'get'
+  })
+}
+
+export function createFinishedInspectionType(data) {
+  return request({
+    url: '/inspection/finished-attributes/types',
+    method: 'post',
+    data
+  })
+}
+
+export function updateFinishedInspectionType(id, data) {
+  return request({
+    url: `/inspection/finished-attributes/types/${id}`,
+    method: 'put',
+    data
+  })
+}
+
+export function deleteFinishedInspectionType(id) {
+  return request({
+    url: `/inspection/finished-attributes/types/${id}`,
+    method: 'delete'
+  })
+}
+
+export function getFinishedInspectionItems(params) {
+  return request({
+    url: '/inspection/finished-attributes/items',
+    method: 'get',
+    params
+  })
+}
+
+export function createFinishedInspectionItem(data) {
+  return request({
+    url: '/inspection/finished-attributes/items',
+    method: 'post',
+    data
+  })
+}
+
+export function updateFinishedInspectionItem(id, data) {
+  return request({
+    url: `/inspection/finished-attributes/items/${id}`,
+    method: 'put',
+    data
+  })
+}
+
+export function deleteFinishedInspectionItem(id) {
+  return request({
+    url: `/inspection/finished-attributes/items/${id}`,
+    method: 'delete'
+  })
+}

@@ -8,7 +8,7 @@ const express = require('express')
 const router = express.Router()
 const sql = require('mssql')
 const { getConnection } = require('../db')
-const { authenticateToken } = require('../middleware/auth')
+const { authenticateToken, isAdmin } = require('../middleware/auth')
 const multer = require('multer')
 const XLSX = require('xlsx')
 const path = require('path')
@@ -775,7 +775,7 @@ router.get('/:id', async (req, res) => {
  * 创建供应商投诉记录
  * POST /api/supplier-complaints
  */
-router.post('/', async (req, res) => {
+router.post('/', authenticateToken, async (req, res) => {
   try {
     const {
       // PascalCase fields (from frontend)
@@ -786,7 +786,7 @@ router.post('/', async (req, res) => {
       FeedbackUnit, Inspector, IQCResult, AbnormalDisposal, ComplaintDocument,
       ReplyDate, ImprovementEffectEvaluation, ClaimAmount, ActualClaim, QA, Remarks,
       ComplaintType, Description, Quantity, UnitPrice, InitiatedBy, UrgencyLevel,
-      ExpectedSolution, ProcessResult, VerificationResult,
+      ExpectedSolution, ProcessStatus, ProcessResult, VerificationResult,
 
       // camelCase fields (aliased to avoid conflict, used as fallback)
       supplierName: _supplierName, materialName: _materialName, materialCode: _materialCode,
@@ -801,6 +801,7 @@ router.post('/', async (req, res) => {
       claimAmount: _claimAmount, actualClaim: _actualClaim, qa: _qa, remarks: _remarks,
       complaintType: _complaintType, description: _description, quantity: _quantity, unitPrice: _unitPrice,
       initiatedBy: _initiatedBy, urgencyLevel: _urgencyLevel, expectedSolution: _expectedSolution,
+      processStatus: _processStatus,
       processResult: _processResult, verificationResult: _verificationResult
     } = req.body
 
@@ -844,6 +845,7 @@ router.post('/', async (req, res) => {
     const initiatedBy = InitiatedBy || _initiatedBy
     const urgencyLevel = UrgencyLevel || _urgencyLevel || 'medium'
     const expectedSolution = ExpectedSolution || _expectedSolution
+    const requestedProcessStatus = ProcessStatus || _processStatus || ''
     const processResult = ProcessResult || _processResult
     const verificationResult = VerificationResult || _verificationResult
     
@@ -900,6 +902,15 @@ router.post('/', async (req, res) => {
     // 计算总金额
     const totalAmount = quantity && unitPrice ? quantity * unitPrice : 0
     
+    const userId = req.user?.id || 1
+    const userName = req.user?.realName || req.user?.username || initiatedBy || ''
+    const userIsAdmin = isAdmin(req.user)
+    const finalProcessStatus = userIsAdmin ? 'completed' : (requestedProcessStatus || 'pending')
+    const auditStatus = userIsAdmin ? 'approved' : 'draft'
+    const auditBy = userIsAdmin ? userId : null
+    const auditByName = userIsAdmin ? userName : null
+    const auditTime = userIsAdmin ? new Date() : null
+
     // 插入投诉记录
     const result = await pool.request()
       .input('complaintNo', sql.NVarChar(50), complaintNo)
@@ -944,10 +955,14 @@ router.post('/', async (req, res) => {
       .input('urgencyLevel', sql.NVarChar(20), urgencyLevel)
       .input('expectedSolution', sql.NText, expectedSolution || '')
       .input('initiatedBy', sql.NVarChar(100), initiatedBy || '')
-      .input('processStatus', sql.NVarChar(50), 'pending')
+      .input('processStatus', sql.NVarChar(50), finalProcessStatus)
       .input('processResult', sql.NVarChar(50), processResult || '')
       .input('verificationResult', sql.NText, verificationResult || '')
-      .input('createdBy', sql.Int, req.user?.id || 1)
+      .input('auditStatus', sql.NVarChar(20), auditStatus)
+      .input('auditBy', sql.Int, auditBy)
+      .input('auditByName', sql.NVarChar(100), auditByName)
+      .input('auditTime', sql.DateTime, auditTime)
+      .input('createdBy', sql.Int, userId)
       .query(`
         INSERT INTO SupplierComplaints (
           ComplaintNo, ComplaintDate, SupplierName, MaterialName, MaterialCode,
@@ -959,7 +974,7 @@ router.post('/', async (req, res) => {
           ClaimAmount, ActualClaim, QA, Remarks, ComplaintType,
           Description, Quantity, UnitPrice, TotalAmount, UrgencyLevel,
           ExpectedSolution, InitiatedBy, ProcessStatus, ProcessResult,
-          VerificationResult, CreatedBy, CreatedAt
+          VerificationResult, AuditStatus, AuditBy, AuditByName, AuditTime, CreatedBy, CreatedAt
         ) VALUES (
           @complaintNo, @complaintDate, @supplierName, @materialName, @materialCode,
           @materialSpecification, @materialUnit, @purchaseOrderNo, @incomingDate, @batchQuantity,
@@ -970,7 +985,7 @@ router.post('/', async (req, res) => {
           @claimAmount, @actualClaim, @qa, @remarks, @complaintType,
           @description, @quantity, @unitPrice, @totalAmount, @urgencyLevel,
           @expectedSolution, @initiatedBy, @processStatus, @processResult,
-          @verificationResult, @createdBy, GETDATE()
+          @verificationResult, @auditStatus, @auditBy, @auditByName, @auditTime, @createdBy, GETDATE()
         );
         SELECT SCOPE_IDENTITY() as ID;
       `)

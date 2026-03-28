@@ -730,6 +730,12 @@ const routes = [
             meta: { title: '物料分类映射配置', requiresAuth: true }
           },
           {
+            path: 'finished-attributes',
+            name: 'FinishedInspectionAttributeConfig',
+            component: () => import('../views/quality/inspection/FinishedInspectionAttributeConfig.vue'),
+            meta: { title: '成品检验属性设置', requiresAuth: true }
+          },
+          {
             path: 'shipment/template-mapping/:id',
             name: 'TemplateMappingEditor',
             component: () => import('../views/TemplateMappingEditor.vue'),
