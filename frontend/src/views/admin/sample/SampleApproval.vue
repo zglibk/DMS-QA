@@ -1994,11 +1994,16 @@ async function uploadFiles(fileList, fileType) {
     console.log('处理文件项:', fileItem)
     if (fileItem.raw) { // 只上传新选择的文件（有raw属性的是新文件）
       console.log('发现新文件，准备上传:', fileItem.name)
-      const formData = new FormData()
-      formData.append('file', fileItem.raw)
-      formData.append('fileType', fileType)
+      const rawFile = fileItem.raw
+      if (!(rawFile instanceof Blob)) {
+        console.warn('文件对象异常，跳过上传:', fileItem)
+        continue
+      }
+      const uploadForm = new FormData()
+      uploadForm.append('fileType', fileType)
+      uploadForm.append('file', rawFile, fileItem.name || rawFile.name || 'upload-file')
       
-      const uploadPromise = api.post('/upload', formData, {
+      const uploadPromise = api.post('/upload', uploadForm, {
         headers: {
           'Content-Type': 'multipart/form-data'
         }

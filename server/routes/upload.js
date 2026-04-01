@@ -245,10 +245,12 @@ const fileFilter = (req, file, cb) => {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'application/dxf',
     'image/vnd.dwg',
-    'image/vnd.dxf'
+    'image/vnd.dxf',
+    'image/heic',
+    'image/heif'
   ];
   
-  const allowedExts = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.dwg', '.dxf', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.svg'];
+  const allowedExts = ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.dwg', '.dxf', '.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.ico', '.svg', '.heic', '.heif'];
   const ext = path.extname(file.originalname).toLowerCase();
 
   if (file.mimetype.startsWith('image/') || allowedMimeTypes.includes(file.mimetype) || allowedExts.includes(ext)) {
@@ -376,12 +378,23 @@ router.post('/', upload.single('file'), (req, res) => {
       }
       
       // 移动文件到正确的子目录
-      if (req.file.path !== newFilePath) {
-        fs.renameSync(req.file.path, newFilePath);
-        console.log('文件移动:', req.file.path, '->', newFilePath);
+      const sourcePath = path.resolve(req.file.path);
+      const targetPath = path.resolve(newFilePath);
+      if (sourcePath !== targetPath) {
+        try {
+          fs.renameSync(sourcePath, targetPath);
+        } catch (moveErr) {
+          if (moveErr && moveErr.code === 'EXDEV') {
+            fs.copyFileSync(sourcePath, targetPath);
+            fs.unlinkSync(sourcePath);
+          } else {
+            throw moveErr;
+          }
+        }
+        console.log('文件移动:', sourcePath, '->', targetPath);
         
         // 更新文件信息
-        req.file.path = newFilePath;
+        req.file.path = targetPath;
         req.file.destination = targetDir;
       }
     }
@@ -731,6 +744,12 @@ router.use((error, req, res, next) => {
         message: '文件大小超过限制（最大5MB）'
       });
     }
+  }
+  if (error && typeof error.message === 'string' && error.message.includes('不支持的文件类型')) {
+    return res.status(400).json({
+      success: false,
+      message: error.message
+    });
   }
   
   res.status(500).json({

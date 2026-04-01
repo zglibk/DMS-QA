@@ -165,6 +165,7 @@ router.put('/:id', authenticateToken, upload.single('file'), (req, res) => {
       curr.fileType = req.file.mimetype
       curr.filePath = req.file.filename
       curr.fileUrl = `/files/report-templates/${encodeURIComponent(req.file.filename)}`
+      curr.mapping = null
     }
     list[idx] = curr
     writeMeta(list)
@@ -281,6 +282,16 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
       '出货数量': 'Count',
       '依据标准': 'Standard',
       '特殊检测': 'SpecialInspection',
+      '极度CR': 'LimitCR',
+      '极限CR': 'LimitCR',
+      '功能FU': 'LimitFU',
+      '严重MA': 'LimitMA',
+      '轻微MI': 'LimitMI',
+      '结果判定': 'ResultJudge',
+      '制作/日期': 'CreateSign',
+      '制作日期': 'CreateDate',
+      '审核/日期': 'AuditSign',
+      '审核日期': 'AuditDate',
       'CPO': 'CPO',
       '编号': 'ReportNo',
       '报告编号': 'ReportNo',
@@ -550,9 +561,9 @@ router.post('/:id/parse', authenticateToken, async (req, res) => {
       '检测项目': 'InspectItem',
       '检验标准': 'InspectStandard',
       '检测标准': 'InspectStandard',
-      '检验结果': 'InspectResult',
-      '检测结果': 'InspectResult',
-      '结果': 'InspectResult',
+      '检验结果': 'InspectRes',
+      '检测结果': 'InspectRes',
+      '结果': 'InspectRes',
       '备注': 'Remark',
       '判定': 'Judge'
     }

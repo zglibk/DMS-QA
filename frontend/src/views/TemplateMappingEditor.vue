@@ -201,7 +201,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowLeft, Refresh, View, Check, Document, Setting, Grid, List, Plus, Delete, QuestionFilled } from '@element-plus/icons-vue'
@@ -233,6 +233,15 @@ const mappingPreviewHtml = ref('')
 // 当前绑定索引
 const currentBindFieldIndex = ref(-1)
 const currentBindColumnIndex = ref(-1)
+function resetMappingData() {
+  mappingData.fields = []
+  mappingData.placeholders = []
+  mappingData.table = { sheetIndex: 0, headerRow: 1, startRow: 2, columns: [] }
+  mappingData.layout = { merges: [], colWidths: [], columnWidths: [], topRange: { start: 1, end: 1 } }
+  mappingPreviewHtml.value = ''
+  currentBindFieldIndex.value = -1
+  currentBindColumnIndex.value = -1
+}
 const FIELD_ZH_MAP = {
   CustomerID: '客户编码',
   PNum: '工单号',
@@ -249,6 +258,11 @@ const FIELD_ZH_MAP = {
   DeliveryNoteNo: '送货单号',
   Standard: '依据标准',
   SpecialInspection: '特殊检测',
+  LimitCR: '极度CR',
+  LimitFU: '功能FU',
+  LimitMA: '严重MA',
+  LimitMI: '轻微MI',
+  ResultJudge: '结果判定',
   Scale: '规格',
   MeasuredSize: '实测尺寸',
   Count: '出货数量',
@@ -257,6 +271,10 @@ const FIELD_ZH_MAP = {
   ReportDate: '报告日期',
   Inspector: '检验员',
   InspectDate: '检验日期',
+  CreateSign: '制作/日期',
+  CreateDate: '制作日期',
+  AuditSign: '审核/日期',
+  AuditDate: '审核日期',
   InspectItem: '检验项目',
   InspectStandard: '检验标准',
   InspectRes: '检验结果',
@@ -277,6 +295,11 @@ const AVAILABLE_FIELD_OPTIONS = [
   { value: 'DeliveryNoteNo', label: '送货单号' },
   { value: 'Standard', label: '依据标准' },
   { value: 'SpecialInspection', label: '特殊检测' },
+  { value: 'LimitCR', label: '极度CR' },
+  { value: 'LimitFU', label: '功能FU' },
+  { value: 'LimitMA', label: '严重MA' },
+  { value: 'LimitMI', label: '轻微MI' },
+  { value: 'ResultJudge', label: '结果判定' },
   { value: 'Scale', label: '规格' },
   { value: 'MeasuredSize', label: '实测尺寸' },
   { value: 'Count', label: '出货数量' },
@@ -284,7 +307,11 @@ const AVAILABLE_FIELD_OPTIONS = [
   { value: 'ReportNo', label: '报告编号' },
   { value: 'ReportDate', label: '报告日期' },
   { value: 'Inspector', label: '检验员' },
-  { value: 'InspectDate', label: '检验日期' }
+  { value: 'InspectDate', label: '检验日期' },
+  { value: 'CreateSign', label: '制作/日期' },
+  { value: 'CreateDate', label: '制作日期' },
+  { value: 'AuditSign', label: '审核/日期' },
+  { value: 'AuditDate', label: '审核日期' }
 ]
 
 // 表格可选字段选项
@@ -410,6 +437,7 @@ async function loadTemplate() {
       return
     }
     templateId.value = id
+    resetMappingData()
 
     // 获取模板信息
     const infoResp = await api.get(`/shipment-report/templates/${id}`)
@@ -533,6 +561,12 @@ function buildTestContext() {
     检验员: '张三',
     InspectDate: new Date().toISOString().slice(0, 10),
     检验日期: new Date().toISOString().slice(0, 10),
+    CreateSign: `张三/${new Date().toISOString().slice(0, 10)}`,
+    CreateDate: new Date().toISOString().slice(0, 10),
+    制作日期: new Date().toISOString().slice(0, 10),
+    AuditSign: `李四/${new Date().toISOString().slice(0, 10)}`,
+    AuditDate: new Date().toISOString().slice(0, 10),
+    审核日期: new Date().toISOString().slice(0, 10),
     
     tableData: [
       { Index: 1, 序号: 1, CProductID: 'CPROD-001', 客户料号: 'CPROD-001', Product: '测试产品A', 产品名称: '测试产品A', 品名: '测试产品A', Count: 500, 数量: 500, 出货数量: 500, Scale: '110*220mm', 规格: '110*220mm', MeasuredSize: '110.1*220.2', 实测尺寸: '110.1*220.2', 外观: 'OK', 颜色: 'OK', 图文: 'OK', 字体: 'OK', 啤切线: 'OK', 物料编号: 'OK', 模切方式: 'OK', 包装方式: 'OK', 材质: 'OK', 印刷内容: 'OK', 结果判定: '合格' },
@@ -760,6 +794,13 @@ function initColumnWidthsInput() {
 onMounted(() => {
   loadTemplate()
 })
+
+watch(
+  () => `${route.params.id || ''}|${route.query.id || ''}`,
+  () => {
+    loadTemplate()
+  }
+)
 </script>
 
 <style scoped>

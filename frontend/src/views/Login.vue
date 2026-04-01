@@ -384,7 +384,11 @@ watch(() => form.value.rememberMe, (isRemembered) => {
 
 <style scoped>
 .login-container-flex {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background:
+    radial-gradient(circle at 12% 18%, rgba(255, 255, 255, 0.22) 0%, transparent 42%),
+    radial-gradient(circle at 88% 12%, rgba(56, 189, 248, 0.28) 0%, transparent 40%),
+    radial-gradient(circle at 84% 78%, rgba(45, 212, 191, 0.2) 0%, transparent 46%),
+    linear-gradient(135deg, #3658d4 0%, #4b74e6 32%, #5c6ac4 68%, #6f58b2 100%);
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -400,21 +404,33 @@ watch(() => form.value.rememberMe, (isRemembered) => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-  opacity: 0.95;
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.16) 0%, rgba(255, 255, 255, 0.03) 48%, rgba(255, 255, 255, 0.08) 100%),
+    repeating-linear-gradient(
+      -45deg,
+      rgba(255, 255, 255, 0.04) 0px,
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px,
+      transparent 14px
+    );
+  opacity: 0.92;
   z-index: 0;
+  animation: gradientShift 16s ease-in-out infinite alternate;
 }
 
 .login-container-flex::after {
   content: '';
   position: absolute;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
-  background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, transparent 60%);
-  animation: float 8s ease-in-out infinite;
+  top: -35%;
+  left: -35%;
+  width: 170%;
+  height: 170%;
+  background:
+    radial-gradient(circle at 30% 30%, rgba(186, 230, 253, 0.35) 0%, transparent 34%),
+    radial-gradient(circle at 72% 64%, rgba(167, 243, 208, 0.24) 0%, transparent 38%);
+  animation: float 10s ease-in-out infinite;
   z-index: 1;
+  filter: blur(4px);
 }
 .login-center-wrap {
   position: relative;
@@ -953,41 +969,94 @@ watch(() => form.value.rememberMe, (isRemembered) => {
     max-width: 95vw;
     width: 100%;
     font-size: 0.95rem;
-    padding: 1.5rem 1.5rem 2rem 1.5rem; /* 减小上下内边距 */
-    padding-top: 3.5rem; /* 减小顶部内边距 */
-    min-height: 400px; /* 减小最小高度 */
+    padding: 1.35rem 0.95rem 1.9rem 0.95rem;
+    padding-top: 4rem;
+    min-height: 34rem;
     margin: 0 auto !important; /* 确保水平居中，覆盖大屏幕的margin-left */
     margin-left: 0 !important; /* 强制移除左边距 */
+    box-sizing: border-box;
   }
   
   .logo-container {
-    width: 4rem;
-    height: 4rem;
-    top: -2rem;
+    width: 6.53rem;
+    height: 6.53rem;
+    top: -3.27rem;
   }
   
   .logo {
-    width: 2rem;
-    height: 2rem;
+    width: 3.27rem;
+    height: 3.27rem;
   }
   
   /* 手机端登录标题样式 */
   .login-title-row {
-    margin: 4px 0 8px 0;
+    margin: 8px 0 18px 0;
   }
   
   .login-title-text {
     font-size: 1.2rem;
   }
-   
+
+  .login-form {
+    margin-top: 0.4rem;
+  }
+
+  .login-box .el-form {
+    width: 100%;
+    margin: 0;
+    padding: 0 0.15rem;
+    box-sizing: border-box;
+  }
+
+  .login-box .el-form .el-form-item {
+    margin-bottom: 1rem;
+  }
+
+  .login-box .el-form .el-form-item__content {
+    width: 100%;
+    margin: 0 !important;
+    box-sizing: border-box;
+  }
+
+  .form-actions {
+    padding-top: 0.8rem;
+    margin-top: 0.25rem;
+  }
+
+  .remember-me-item {
+    margin-bottom: 1.65rem !important;
+  }
+
+  .captcha-container {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 108px;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .captcha-image {
+    width: 108px;
+    height: 42px;
+    justify-self: end;
+  }
+
   .button-container {
-    gap: 0.8rem;
+    gap: 0.85rem;
     flex-direction: column;
   }
-  
+
+  .button-container .el-button + .el-button {
+    margin-left: 0 !important;
+  }
+
+  .button-container .btn-reset,
+  .button-container .btn-login,
   .btn-reset,
   .btn-login {
+    flex: none;
+    max-width: none;
     width: 100%;
+    height: 2.65rem;
   }
 }
 /* 优化的滑动动画 */
@@ -1064,7 +1133,7 @@ watch(() => form.value.rememberMe, (isRemembered) => {
   bottom: 0;
   left: 0;
   width: 100%;
-  height: 120px;
+  height: 140px;
   overflow: hidden;
   z-index: 2;
   pointer-events: none;
@@ -1075,8 +1144,9 @@ watch(() => form.value.rememberMe, (isRemembered) => {
   position: absolute;
   bottom: 0;
   left: 0;
-  width: 200%;
-  height: 120px;
+  width: 220%;
+  height: 140px;
+  opacity: 0.78;
 }
 
 .wave1 {
@@ -1101,6 +1171,15 @@ watch(() => form.value.rememberMe, (isRemembered) => {
   }
   100% {
     transform: translateX(-50%);
+  }
+}
+
+@keyframes gradientShift {
+  0% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  100% {
+    transform: translate3d(-1.5%, 1.5%, 0) scale(1.03);
   }
 }
 

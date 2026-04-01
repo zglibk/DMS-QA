@@ -415,9 +415,9 @@
               <el-table-column type="index" label="#" width="50" align="center" />
               <el-table-column prop="ReportNo" label="报告编号" width="140" align="center" show-overflow-tooltip />
               <el-table-column prop="CustomerID" label="客户编码" width="90" align="center" />
-              <el-table-column prop="PNum" label="工单号" min-width="140" align="center" show-overflow-tooltip />
-              <el-table-column prop="OrderNum" label="订单号" min-width="140" align="center" show-overflow-tooltip />
-              <el-table-column prop="CPO" label="CPO" min-width="130" align="center" show-overflow-tooltip />
+              <el-table-column prop="PNum" label="工单号" min-width="140" align="left" header-align="center" show-overflow-tooltip />
+              <el-table-column prop="OrderNum" label="订单号" min-width="140" align="left" header-align="center" show-overflow-tooltip />
+              <el-table-column prop="CPO" label="CPO" min-width="130" align="left" header-align="center" show-overflow-tooltip />
               <el-table-column prop="ReportDate" label="报告日期" width="160" align="center">
                 <template #default="{ row }">{{ formatDateTime(row.ReportDate) }}</template>
               </el-table-column>
@@ -913,7 +913,7 @@ function getTemplateTypeText(type) {
 const selectedProduct = ref(null)
 
 // 批量查询相关
-const searchMode = ref('batch')  // 默认批量查询模式
+const searchMode = ref('single')  // 默认单条查询模式
 const batchInputText = ref('')
 const batchQueryList = ref([])  // { cpo: string, productId: string, pNum?: string }[]
 const batchInputRef = ref(null)
@@ -1359,6 +1359,8 @@ function getSelectedProductInspectionData() {
   
   // 兼容旧版数据结构：直接返回全局数据
   console.log('getSelectedProductInspectionData: fallback to global data')
+  const creatorName = getCurrentUserName()
+  const auditorName = creatorName
   return {
     materialList: data.materialList || [],
     inspectionResults: formatInspectionResults(data.inspectionResults),
@@ -1580,6 +1582,10 @@ const parseInspectionData = (jsonStr) => {
  */
 function handleViewHistory(row) {
   try {
+    isReprintMode.value = true
+    reprintReportId.value = row.ID
+    reprintHistoryRow.value = row
+    
     // 恢复产品信息
     let products = []
     if (typeof row.ProductInfo === 'string') {
@@ -1776,13 +1782,16 @@ async function handleExportHistoryReport(row) {
       }
     }
     
+    const fillDate = row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : ''
+    const createBy = inspectionData.reportInfo?.inspector || row.CreatorName || ''
+    const auditBy = inspectionData.reportInfo?.auditor || row.AuditorName || row.ApproverName || row.ReviewerName || createBy
     const fillContext = {
       // 报告信息
       ReportNo: row.ReportNo,
       报告编号: row.ReportNo,
-      ReportDate: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
-      日期: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
-      报告日期: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
+      ReportDate: fillDate,
+      日期: fillDate,
+      报告日期: fillDate,
       
       // 客户信息
       CustomerID: customerId,
@@ -1796,11 +1805,17 @@ async function handleExportHistoryReport(row) {
       CPO: row.CPO || '',
       
       // 检验人员
-      Inspector: inspectionData.reportInfo?.inspector || row.CreatorName || '',
-      检验人员: inspectionData.reportInfo?.inspector || row.CreatorName || '',
-      检验员: inspectionData.reportInfo?.inspector || row.CreatorName || '',
-      InspectDate: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
-      检验日期: row.ReportDate ? new Date(row.ReportDate).toISOString().slice(0, 10) : '',
+      Inspector: createBy,
+      检验人员: createBy,
+      检验员: createBy,
+      InspectDate: fillDate,
+      检验日期: fillDate,
+      CreateSign: createBy && fillDate ? `${createBy}/${fillDate}` : (createBy || fillDate),
+      CreateDate: fillDate,
+      制作日期: fillDate,
+      AuditSign: auditBy && fillDate ? `${auditBy}/${fillDate}` : (auditBy || fillDate),
+      AuditDate: fillDate,
+      审核日期: fillDate,
       
       // 表格数据
       tableData: tableData
@@ -2012,6 +2027,9 @@ const templateRules = {
 
 // 报告生成
 const showReportDialog = ref(false)
+const isReprintMode = ref(false) // 标记是否为重印历史记录模式
+const reprintReportId = ref(null) // 保存重印的历史记录ID
+const reprintHistoryRow = ref(null) // 保存重印的历史记录行数据
 const reportDialogProduct = ref(null)  // 兼容旧代码
 const reportDialogProducts = ref([])   // 支持多产品
 const selectedTemplateId = ref(null)
@@ -2330,206 +2348,200 @@ function getCustomerHandler(customerID) {
  */
 function buildTemplateContext() {
   const wo = result.workOrderInfo || {}
-  // 优先从工单信息获取客户编码，其次从产品数据获取
-  const customerID = wo.CustomerID || 
-                     reportDialogProducts.value?.[0]?.customerId || 
-                     selectedProduct.value?.customerId || 
-                     ''
-  
-  // 获取客户特殊处理器
+  const customerID = wo.CustomerID || reportDialogProducts.value?.[0]?.customerId || selectedProduct.value?.customerId || ''
   const handler = getCustomerHandler(customerID)
-  console.log('buildTemplateContext - customerID:', customerID, 'handler:', handler ? '已获取' : '未找到')
-
-  // 这里可以根据 selectedInspectionGroup.value 动态获取需要检查的项目清单和AQL要求
-  // 目前我们记录下选择的检验组别，并在构造表格数据时使用
   const inspectionGroup = selectedInspectionGroup.value
-  console.log('buildTemplateContext - inspectionGroup:', inspectionGroup)
-
-  // 获取要处理的产品列表（多产品或单产品）
-  const products = reportDialogProducts.value && reportDialogProducts.value.length > 0 
-    ? reportDialogProducts.value 
+  const products = reportDialogProducts.value && reportDialogProducts.value.length > 0
+    ? reportDialogProducts.value
     : (selectedProduct.value ? [selectedProduct.value] : [])
   const firstMaterial = result.materialInList?.[0] || result.materialList?.[0] || {}
-  
-  // 第一个产品用于填充顶部字段（单产品模式时的主要产品）
   const sp = products[0] || {}
-  
-  // 提取对应产品的信息以覆盖物料相关字段
   const targetPNumProduct = wo.PNumProductInfoList?.find(p => p.Product === (sp.product || sp.Product)) || wo.PNumProductInfoList?.[0] || {}
 
-  // 提取所选检验项目组对应的依据标准和明细数据
   let groupStandard = ''
+  let groupCR = ''
+  let groupFU = ''
+  let groupMA = ''
+  let groupMI = ''
   let inspectionDetails = []
   if (inspectionGroup && fullInspectionGroups.value && fullInspectionGroups.value.length > 0) {
     const matchedGroup = fullInspectionGroups.value.find(g => g.templateName === inspectionGroup)
     if (matchedGroup) {
-      if (matchedGroup.standard) groupStandard = matchedGroup.standard
-      if (matchedGroup.details && Array.isArray(matchedGroup.details)) {
-        inspectionDetails = matchedGroup.details
-      }
+      groupStandard = matchedGroup.standard || ''
+      groupCR = matchedGroup.cr || ''
+      groupFU = matchedGroup.fu || ''
+      groupMA = matchedGroup.ma || ''
+      groupMI = matchedGroup.mi || ''
+      inspectionDetails = Array.isArray(matchedGroup.details) ? matchedGroup.details : []
     }
   }
 
-  // 构建表格数据 - 支持多产品或多检验项目明细
   let tableData = []
-  
-  // 模式1：如果是基于检验组别的动态多行数据（如果存在明细，则渲染为检验明细列表）
-  if (inspectionDetails.length > 0) {
-    tableData = inspectionDetails.map((detail, index) => {
-      return {
+  if (isReprintMode.value && reprintHistoryRow.value?.InspectionData) {
+    try {
+      const parsed = typeof reprintHistoryRow.value.InspectionData === 'string'
+        ? JSON.parse(reprintHistoryRow.value.InspectionData)
+        : reprintHistoryRow.value.InspectionData
+      if (Array.isArray(parsed?.tableData) && parsed.tableData.length > 0) {
+        tableData = parsed.tableData
+      } else if (parsed?.products) {
+        for (const key in parsed.products) {
+          const pd = parsed.products[key]
+          tableData.push({
+            Index: pd.index || tableData.length + 1,
+            序号: pd.index || tableData.length + 1,
+            No: pd.index || tableData.length + 1,
+            CProductID: pd.productInfo?.cProductId || key,
+            客户料号: pd.productInfo?.cProductId || key,
+            Product: pd.productInfo?.product || '',
+            产品名称: pd.productInfo?.product || '',
+            Scale: pd.productInfo?.scale || '',
+            规格尺寸: pd.productInfo?.scale || '',
+            Count: pd.productInfo?.count || 0,
+            出货数量: pd.productInfo?.count || 0,
+            SampleCount: pd.productInfo?.sampleCount || 0,
+            抽检数量: pd.productInfo?.sampleCount || 0,
+            MeasuredSize: pd.measuredSize || '',
+            实测尺寸: pd.measuredSize || '',
+            Appearance: pd.firstPieceCheck?.appearance || 'OK',
+            外观: pd.firstPieceCheck?.appearance || 'OK',
+            Color: pd.firstPieceCheck?.color || 'OK',
+            颜色: pd.firstPieceCheck?.color || 'OK',
+            Graphics: pd.firstPieceCheck?.graphics || 'OK',
+            图文: pd.firstPieceCheck?.graphics || 'OK',
+            Font: pd.firstPieceCheck?.font || 'OK',
+            字体: pd.firstPieceCheck?.font || 'OK',
+            DieLine: pd.firstPieceCheck?.dieLine || 'OK',
+            啤切线: pd.firstPieceCheck?.dieLine || 'OK',
+            MaterialNumCheck: pd.workOrderCheck?.materialNum || 'OK',
+            物料编号: pd.workOrderCheck?.materialNum || 'OK',
+            DieCutStyle: pd.workOrderCheck?.dieCutStyle || 'OK',
+            模切方式: pd.workOrderCheck?.dieCutStyle || 'OK',
+            PackingStyle: pd.workOrderCheck?.packingStyle || 'OK',
+            包装方式: pd.workOrderCheck?.packingStyle || 'OK',
+            MaterialCheck: pd.drawingCheck?.material || 'OK',
+            材质: pd.drawingCheck?.material || 'OK',
+            PrintContent: pd.drawingCheck?.printContent || 'OK',
+            印刷内容: pd.drawingCheck?.printContent || 'OK',
+            Result: pd.result || '合格',
+            结果判定: pd.result || '合格'
+          })
+        }
+      }
+    } catch {}
+  }
+
+  if (tableData.length === 0) {
+    if (inspectionDetails.length > 0) {
+      tableData = inspectionDetails.map((detail, index) => ({
         Index: index + 1,
         序号: index + 1,
-        No: index + 1, // 为了兼容部分模板直接用 No
-        
-        // 动态检验项映射
+        No: index + 1,
         InspectItem: detail.itemName || '',
-        InspectIten: detail.itemName || '', // 兼容截图中的 InspectIten 拼写错误
+        InspectIten: detail.itemName || '',
         检验项目: detail.itemName || '',
         InspectStandard: detail.standard || '',
         检验标准: detail.standard || '',
-        InspectStar: detail.standard || '', // 兼容模板图上的别名 InspectStar
-        
-        // 默认结果和备注
+        InspectStar: detail.standard || '',
         InspectRes: 'OK',
         检验结果: 'OK',
         Remark: '',
         备注: ''
-      }
-    })
-  } else {
-    // 模式2：传统的基于多产品的固定项填充模式
-    tableData = products.map((p, index) => {
-    // 只提取我们明确需要的字段，避免原始对象的其他属性干扰
-    const count = p.pCount || p.orderCount || ''
-    
-    // 规格处理：优先使用原有规格，否则尝试用处理器提取
-    let scale = p.scale || ''
-    if (!scale && handler?.extractSpec && p.product) {
-      scale = handler.extractSpec(p.product)
-    }
-    
-    // 实测尺寸：如果处理器配置了生成函数，则自动生成
-    const measuredSize = handler?.generateMeasuredSize ? handler.generateMeasuredSize(scale) : ''
-    console.log(`产品 ${index + 1} - scale: ${scale}, measuredSize: ${measuredSize}`)
-    
-    // 基础字段
-    const baseFields = {
-      // 序号
-      Index: index + 1,
-      序号: index + 1,
-      
-      // 产品编码
-      ProductID: p.productId || '',
-      产品编码: p.productId || '',
-      
-      // 客户料号
-      CProductID: p.cProductId || '',
-      客户料号: p.cProductId || '',
-      
-      // 产品名称
-      Product: p.product || '',
-      产品名称: p.product || '',
-      品名: p.product || '',
-      
-      // 工厂订单号
-      CProduct: p.cProduct || '',
-      工厂订单号: p.cProduct || '',
-      
-      // 规格（可由处理器自动提取）
-      Scale: scale,
-      规格: scale,
-      规格尺寸: scale,
-      
-      // 实测尺寸（可由处理器自动生成）
-      MeasuredSize: measuredSize,
-      实测尺寸: measuredSize,
-      实测: measuredSize,
-      
-      // 数量 - 统一使用同一个值
-      Count: count,
-      数量: count,
-      出货数量: count,
-      OrderCount: count,
-      订单数: count,
-      PCount: count,
-      成品数: count,
-
-      // 检验项目 - 默认值填充（若需要严格按照检验组别映射，可以在这里基于 inspectionGroup 扩展逻辑）
-      // 这里添加检验组别字段供映射模板使用
-      InspectionGroup: inspectionGroup,
-      检验组别: inspectionGroup,
-      
-      Appearance: 'OK',
-      外观: 'OK',
-      Color: 'OK',
-      颜色: 'OK',
-      Graphics: 'OK',
-      图文: 'OK',
-      Font: 'OK',
-      字体: 'OK',
-      DieLine: 'OK',
-      啤切线: 'OK',
-      MaterialNumCheck: 'OK',
-      物料编号: 'OK',
-      DieCutStyle: 'OK',
-      模切方式: 'OK',
-      PackingStyle: 'OK',
-      包装方式: 'OK',
-      MaterialCheck: 'OK',
-      材质: 'OK',
-      PrintContent: 'OK',
-      印刷内容: 'OK',
-      Result: '合格',
-      结果判定: '合格',
-      
-      // 抽检数量 - 计算值
-      SampleCount: calculateSampleSize(count),
-      抽检数量: calculateSampleSize(count)
-    }
-    
-    // 如果处理器有自定义字段函数，合并自定义字段
-    if (handler?.customFields) {
-      const customData = handler.customFields(p, { customerID, wo, index })
-      console.log(`产品 ${index + 1} - customFields:`, customData)
-      Object.assign(baseFields, customData)
+      }))
     } else {
-      console.log(`产品 ${index + 1} - 无customFields函数`)
+      tableData = products.map((p, index) => {
+        const count = p.pCount || p.orderCount || ''
+        let scale = p.scale || ''
+        if (!scale && handler?.extractSpec && p.product) scale = handler.extractSpec(p.product)
+        const measuredSize = handler?.generateMeasuredSize ? handler.generateMeasuredSize(scale) : ''
+        const baseFields = {
+          Index: index + 1,
+          序号: index + 1,
+          ProductID: p.productId || '',
+          产品编码: p.productId || '',
+          CProductID: p.cProductId || '',
+          客户料号: p.cProductId || '',
+          Product: p.product || '',
+          产品名称: p.product || '',
+          品名: p.product || '',
+          CProduct: p.cProduct || '',
+          工厂订单号: p.cProduct || '',
+          Scale: scale,
+          规格: scale,
+          规格尺寸: scale,
+          MeasuredSize: measuredSize,
+          实测尺寸: measuredSize,
+          实测: measuredSize,
+          Count: count,
+          数量: count,
+          出货数量: count,
+          OrderCount: count,
+          订单数: count,
+          PCount: count,
+          成品数: count,
+          InspectionGroup: inspectionGroup,
+          检验组别: inspectionGroup,
+          Appearance: 'OK',
+          外观: 'OK',
+          Color: 'OK',
+          颜色: 'OK',
+          Graphics: 'OK',
+          图文: 'OK',
+          Font: 'OK',
+          字体: 'OK',
+          DieLine: 'OK',
+          啤切线: 'OK',
+          MaterialNumCheck: 'OK',
+          物料编号: 'OK',
+          DieCutStyle: 'OK',
+          模切方式: 'OK',
+          PackingStyle: 'OK',
+          包装方式: 'OK',
+          MaterialCheck: 'OK',
+          材质: 'OK',
+          PrintContent: 'OK',
+          印刷内容: 'OK',
+          Result: '合格',
+          结果判定: '合格',
+          SampleCount: calculateSampleSize(count),
+          抽检数量: calculateSampleSize(count)
+        }
+        if (handler?.customFields) {
+          const customData = handler.customFields(p, { customerID, wo, index })
+          Object.assign(baseFields, customData)
+        }
+        return baseFields
+      })
     }
-    
-    console.log(`产品 ${index + 1} - 最终baseFields包含字段:`, Object.keys(baseFields))
-    
-    return baseFields
-  })
-}
+  }
 
-  // 计算合计数量
   const totalCount = products.reduce((sum, p) => sum + (p.pCount || p.orderCount || 0), 0)
-  
-  // 生成报告编号
   const now = new Date()
   const reportNo = reportPreview.reportNo || `SR${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getHours()).padStart(2, '0')}${String(now.getMinutes()).padStart(2, '0')}`
   const reportDate = reportPreview.date || `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
-  
-  // 第一个产品的规格（可由处理器自动提取）
+  const reprintRow = reprintHistoryRow.value || {}
+  const creatorName = (isReprintMode.value
+    ? (reprintRow.CreatorName || reprintRow.creatorName || '')
+    : '') || getCurrentUserName() || ''
+  const auditorName = (isReprintMode.value
+    ? (reprintRow.AuditorName || reprintRow.ApproverName || reprintRow.ReviewerName || reprintRow.auditorName || '')
+    : '') || creatorName
   let spScale = sp.scale || ''
-  if (!spScale && handler?.extractSpec && sp.product) {
-    spScale = handler.extractSpec(sp.product)
-  }
+  if (!spScale && handler?.extractSpec && sp.product) spScale = handler.extractSpec(sp.product)
 
   return {
-    // 工单信息
     CustomerID: wo.CustomerID || '',
     客户编码: wo.CustomerID || '',
     Customer: wo.Customer || '',
-    客户名称: wo.CustomerID || '', // 修改客户名称为映射CustomerID
+    客户名称: wo.CustomerID || '',
     PNum: wo.PNum || '',
     工单号: wo.PNum || '',
     CPO: wo.CPO || '',
     OrderNum: wo.OrderNum || '',
     订单号: wo.OrderNum || '',
-    MaterialCode: targetPNumProduct.CProductID || sp.CProductID || sp.cProductId || '', // 修改物料编码为CProductID
+    MaterialCode: targetPNumProduct.CProductID || sp.CProductID || sp.cProductId || '',
     物料编码: targetPNumProduct.CProductID || sp.CProductID || sp.cProductId || '',
-    MaterialName: targetPNumProduct.Product || sp.product || sp.Product || '', // 修改物料名称为Product
+    MaterialName: targetPNumProduct.Product || sp.product || sp.Product || '',
     物料名称: targetPNumProduct.Product || sp.product || sp.Product || '',
     BatchNo: wo.PNum || '',
     生产批次: wo.PNum || '',
@@ -2541,8 +2553,16 @@ function buildTemplateContext() {
     依据标准: groupStandard,
     SpecialInspection: '',
     特殊检测: '',
-    
-    // 产品信息（第一个产品，用于单产品模式或顶部字段）
+    LimitCR: groupCR,
+    极度CR: groupCR,
+    LimitFU: groupFU,
+    功能FU: groupFU,
+    LimitMA: groupMA,
+    严重MA: groupMA,
+    LimitMI: groupMI,
+    轻微MI: groupMI,
+    ResultJudge: '合格',
+    结果判定: '合格',
     ProductID: sp.productId || '',
     产品编码: sp.productId || '',
     CProductID: sp.cProductId || '',
@@ -2557,14 +2577,10 @@ function buildTemplateContext() {
     Count: products.length === 1 ? (sp.pCount || sp.orderCount || '') : totalCount,
     数量: products.length === 1 ? (sp.pCount || sp.orderCount || '') : totalCount,
     出货数量: products.length === 1 ? (sp.pCount || sp.orderCount || '') : totalCount,
-    
-    // 合计信息（多产品模式）
     TotalCount: totalCount,
     合计数量: totalCount,
     ProductCount: products.length,
     产品数量: products.length,
-    
-    // 报告信息
     ReportNo: reportNo,
     报告编号: reportNo,
     ReportDate: reportDate,
@@ -2572,15 +2588,17 @@ function buildTemplateContext() {
     报告日期: reportDate,
     InspectionGroup: inspectionGroup,
     检验组别: inspectionGroup,
-    
-    // 检验人员和日期（底部签名区）
-    Inspector: getCurrentUserName(),
-    检验人员: getCurrentUserName(),
-    检验员: getCurrentUserName(),
+    Inspector: creatorName,
+    检验人员: creatorName,
+    检验员: creatorName,
     InspectDate: reportDate,
     检验日期: reportDate,
-    
-    // 表格数据
+    CreateSign: creatorName && reportDate ? `${creatorName}/${reportDate}` : (creatorName || reportDate),
+    CreateDate: reportDate,
+    制作日期: reportDate,
+    AuditSign: auditorName && reportDate ? `${auditorName}/${reportDate}` : (auditorName || reportDate),
+    AuditDate: reportDate,
+    审核日期: reportDate,
     tableData
   }
 }
@@ -2851,6 +2869,12 @@ function applyMappingFill(workbook, mapping, ctx) {
     'MeasuredSize', '实测尺寸', '实测',
     // 数量
     'Count', '数量', '出货数量', 'OrderCount', '订单数', 'PCount', '成品数',
+    // 检验项目组明细（通用模板）
+    'No',
+    'InspectItem', 'InspectIten', '检验项目',
+    'InspectStandard', 'InspectStar', '检验标准',
+    'InspectRes', '检验结果',
+    'Remark', '备注',
     // 检测项（A08客户等）
     '外观', '颜色', '图文', '字体', '啤切线',
     '物料编号', '模切方式', '包装方式',
@@ -3929,6 +3953,9 @@ function handleSelectionChange(selection) {
  * 触发单产品生成报告流程
  */
 function handleGenerateReport(row) {
+  isReprintMode.value = false
+  reprintReportId.value = null
+  reprintHistoryRow.value = null
   selectedProduct.value = row
   reportDialogProduct.value = row
   reportDialogProducts.value = [row]  // 单产品数组
@@ -3947,6 +3974,9 @@ function handleBatchGenerateReport() {
     ElMessage.warning('请至少选择2个产品进行合并生成')
     return
   }
+  isReprintMode.value = false
+  reprintReportId.value = null
+  reprintHistoryRow.value = null
   selectedProduct.value = selectedProducts.value[0]
   reportDialogProduct.value = selectedProducts.value[0]
   reportDialogProducts.value = [...selectedProducts.value]  // 多产品数组
@@ -3968,6 +3998,12 @@ function handleBatchGenerateReport() {
  */
 async function saveReportRecord() {
   try {
+    // 如果是重印历史报告模式，不保存新记录
+    if (isReprintMode.value && reprintReportId.value) {
+      console.log('重印历史报告，跳过新增记录')
+      return
+    }
+
     const products = reportDialogProducts.value && reportDialogProducts.value.length > 0 
       ? reportDialogProducts.value 
       : (selectedProduct.value ? [selectedProduct.value] : [])
