@@ -20,6 +20,14 @@
               style="width: 200px"
             />
           </el-form-item>
+          <el-form-item label="出厂编号">
+            <el-input 
+              v-model="searchForm.instrumentCode" 
+              placeholder="请输入出厂编号"
+              clearable
+              style="width: 200px"
+            />
+          </el-form-item>
           <el-form-item label="仪器类别">
             <el-select 
               v-model="searchForm.category" 
@@ -477,6 +485,7 @@ const generatingCode = ref(false)        // 生成编号的加载状态
 const searchForm = reactive({
   instrumentName: '',
   managementCode: '',
+  instrumentCode: '',
   category: '',
   status: ''
 })
@@ -617,9 +626,9 @@ const validateInstrumentCode = async (rule, value, callback) => {
       const { isDuplicate, duplicates } = response.data.data
       
       if (isDuplicate) {
-        const duplicateInfo = duplicates.find(d => d.field === 'InstrumentCode')
+        const duplicateInfo = duplicates.find(d => d.type === 'instrumentCode')
         if (duplicateInfo) {
-          callback(new Error(`出厂编号"${duplicateInfo.value}"已存在于仪器"${duplicateInfo.instrumentName}"中`))
+          callback(new Error(`出厂编号"${duplicateInfo.value}"已存在于仪器"${duplicateInfo.existingInstrument}"中`))
           return
         }
       }
@@ -677,9 +686,9 @@ const validateManagementCode = async (rule, value, callback) => {
       const { isDuplicate, duplicates } = response.data.data
       
       if (isDuplicate) {
-        const duplicateInfo = duplicates.find(d => d.field === 'ManagementCode')
+        const duplicateInfo = duplicates.find(d => d.type === 'managementCode')
         if (duplicateInfo) {
-          callback(new Error(`管理编号"${duplicateInfo.value}"已存在于仪器"${duplicateInfo.instrumentName}"中`))
+          callback(new Error(`管理编号"${duplicateInfo.value}"已存在于仪器"${duplicateInfo.existingInstrument}"中`))
           return
         }
       }
@@ -1053,6 +1062,7 @@ function handleSearch() {
    Object.assign(searchForm, {
      instrumentName: '',
      managementCode: '',
+     instrumentCode: '',
      category: '',
      status: ''
    })
@@ -1290,6 +1300,9 @@ async function handleExport() {
     if (searchForm.managementCode) {
       params.append('managementCode', searchForm.managementCode)
     }
+    if (searchForm.instrumentCode) {
+      params.append('instrumentCode', searchForm.instrumentCode)
+    }
     if (searchForm.category) {
       params.append('category', searchForm.category)
     }
@@ -1352,6 +1365,8 @@ async function handleSubmit() {
     // 准备提交数据，处理字段映射
     const submitData = {
       ...instrumentForm,
+      InstrumentCode: instrumentForm.InstrumentCode?.trim() || null,
+      ManagementCode: instrumentForm.ManagementCode?.trim() || null,
       ResponsiblePerson: instrumentForm.ResponsiblePerson || null,
       Category: null
     }
@@ -1383,7 +1398,10 @@ async function handleSubmit() {
     }
     
     // 处理其他类型的错误
-    if (error.message) {
+    const serverMsg = error?.response?.data?.message
+    if (serverMsg) {
+      ElMessage.error('操作失败：' + serverMsg)
+    } else if (error.message) {
       ElMessage.error('操作失败：' + error.message)
     } else {
       ElMessage.error('操作失败，请检查输入信息')

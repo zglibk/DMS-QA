@@ -969,9 +969,9 @@ watch(() => form.value.rememberMe, (isRemembered) => {
     max-width: 95vw;
     width: 100%;
     font-size: 0.95rem;
-    padding: 1.35rem 0.95rem 1.9rem 0.95rem;
+    padding: 1.45rem 0.95rem 2.2rem 0.95rem;
     padding-top: 4rem;
-    min-height: 34rem;
+    min-height: 68vh !important;
     margin: 0 auto !important; /* 确保水平居中，覆盖大屏幕的margin-left */
     margin-left: 0 !important; /* 强制移除左边距 */
     box-sizing: border-box;
@@ -999,6 +999,7 @@ watch(() => form.value.rememberMe, (isRemembered) => {
 
   .login-form {
     margin-top: 0.4rem;
+    min-height: 56vh;
   }
 
   .login-box .el-form {

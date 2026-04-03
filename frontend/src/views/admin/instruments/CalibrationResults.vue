@@ -20,6 +20,14 @@
               style="width: 200px"
             />
           </el-form-item>
+          <el-form-item label="仪器编号">
+            <el-input 
+              v-model="searchForm.instrumentCode" 
+              placeholder="请输入仪器编号"
+              clearable
+              style="width: 200px"
+            />
+          </el-form-item>
           <el-form-item label="校准机构">
             <el-input 
               v-model="searchForm.calibrationAgency" 
@@ -56,6 +64,7 @@
             <el-date-picker
               v-model="searchForm.calibrationDateRange"
               type="daterange"
+              value-format="YYYY-MM-DD"
               range-separator="至"
               start-placeholder="开始日期"
               end-placeholder="结束日期"
@@ -577,6 +586,7 @@ const uploadRef = ref()
 const searchForm = reactive({
   instrumentName: '',
   managementCode: '',
+  instrumentCode: '',
   calibrationAgency: '',
   certificateNumber: '',
   calibrationResult: '',
@@ -720,6 +730,7 @@ async function getCalibrationList() {
       size: pagination.size,
       instrumentName: searchForm.instrumentName,
       managementCode: searchForm.managementCode,
+      instrumentCode: searchForm.instrumentCode,
       calibrationAgency: searchForm.calibrationAgency,
       certificateNumber: searchForm.certificateNumber,
       calibrationResult: searchForm.calibrationResult,
@@ -779,8 +790,7 @@ async function getCalibrationList() {
  */
 async function getInstruments(includeAll = false) {
   try {
-    // 始终获取所有仪器，支持仪器重复校准
-    const response = await instrumentApi.getInstruments({ page: 1, size: 1000 })
+    const response = await instrumentApi.getInstruments({ page: 1, pageSize: 1000 })
     if (response.data && response.data.data && Array.isArray(response.data.data.list)) {
       instruments.value = response.data.data.list.filter(item => 
         item && item.ID && (item.InstrumentName || item.ManagementCode)
@@ -810,6 +820,7 @@ function handleReset() {
   Object.assign(searchForm, {
     instrumentName: '',
     managementCode: '',
+    instrumentCode: '',
     calibrationAgency: '',
     certificateNumber: '',
     calibrationResult: '',

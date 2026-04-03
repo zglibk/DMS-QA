@@ -289,8 +289,7 @@ router.post('/check-duplicate', authenticateToken, async (req, res) => {
         InstrumentName,
         ID
       FROM Instruments 
-      WHERE IsActive = 1 
-        AND (${checkConditions.join(' OR ')})
+      WHERE (${checkConditions.join(' OR ')})
         ${excludeCondition}
     `;
     
@@ -358,16 +357,21 @@ router.get('/', authenticateToken, async (req, res) => {
     const {
       page = 1,
       pageSize = 10,
+      size,
       instrumentCode,
       managementCode,
       instrumentName,
       category,
       status,
       departmentID,
-      responsiblePerson
+      responsiblePerson,
+      sortField,
+      sortOrder
     } = req.query;
 
-    const offset = (page - 1) * pageSize;
+    const currentPage = Math.max(parseInt(page) || 1, 1);
+    const resolvedPageSize = Math.max(parseInt(pageSize || size) || 10, 1);
+    const offset = (currentPage - 1) * resolvedPageSize;
     const pool = await getConnection();
 
     // 构建查询条件
@@ -387,12 +391,28 @@ router.get('/', authenticateToken, async (req, res) => {
       request.input('instrumentName', sql.NVarChar, `%${instrumentName}%`);
     }
     if (category) {
-      whereConditions.push('i.Category = @category');
+      whereConditions.push(`(
+        i.Category = @category
+        OR i.Category IN (SELECT CategoryCode FROM InstrumentCategories WHERE CategoryName = @category)
+        OR i.Category IN (SELECT CategoryName FROM InstrumentCategories WHERE CategoryCode = @category)
+      )`);
       request.input('category', sql.NVarChar, category);
     }
     if (status) {
-      whereConditions.push('i.Status = @status');
-      request.input('status', sql.NVarChar, status);
+      const statusTextMap = {
+        normal: ['normal', '正常'],
+        maintenance: ['maintenance', '维修中'],
+        retired: ['retired', '报废', '已报废'],
+        scrapped: ['scrapped', '报废', '已报废']
+      };
+      const mappedStatus = statusTextMap[String(status)] || [status];
+      const statusClauses = [];
+      mappedStatus.forEach((item, idx) => {
+        const key = `status${idx}`;
+        statusClauses.push(`i.Status = @${key}`);
+        request.input(key, sql.NVarChar, item);
+      });
+      whereConditions.push(`(${statusClauses.join(' OR ')})`);
     }
     if (departmentID) {
       whereConditions.push('i.DepartmentID = @departmentID');
@@ -416,7 +436,22 @@ router.get('/', authenticateToken, async (req, res) => {
 
     // 查询数据 - 使用ROW_NUMBER()兼容SQL Server 2008 R2
     request.input('startRow', sql.Int, offset + 1);
-    request.input('endRow', sql.Int, offset + parseInt(pageSize));
+    request.input('endRow', sql.Int, offset + resolvedPageSize);
+
+    const sortableFields = {
+      ID: 'i.ID',
+      InstrumentCode: 'i.InstrumentCode',
+      ManagementCode: 'i.ManagementCode',
+      InstrumentName: 'i.InstrumentName',
+      Category: 'i.Category',
+      Status: 'i.Status',
+      PurchaseDate: 'i.PurchaseDate',
+      CreatedAt: 'i.CreatedAt',
+      UpdatedAt: 'i.UpdatedAt'
+    };
+    const orderByField = sortableFields[String(sortField)] || 'i.CreatedAt';
+    const orderByDirection = String(sortOrder).toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+    const rowOrderBy = `${orderByField} ${orderByDirection}`;
 
     const dataQuery = `
       WITH PaginatedResults AS (
@@ -452,7 +487,7 @@ router.get('/', authenticateToken, async (req, res) => {
           cr.CalibrationDate as LastCalibrationDate,
           cr.ExpiryDate as NextCalibrationDate,
           cr.CalibrationResult as LastCalibrationResult,
-          ROW_NUMBER() OVER (ORDER BY i.CreatedAt DESC) as RowNum
+          ROW_NUMBER() OVER (ORDER BY ${rowOrderBy}) as RowNum
         FROM Instruments i
         LEFT JOIN Person p ON i.ResponsiblePerson = p.ID
         LEFT JOIN Department d ON i.DepartmentID = d.ID
@@ -480,10 +515,10 @@ router.get('/', authenticateToken, async (req, res) => {
       data: {
         list: dataResult.recordset,
         pagination: {
-          current: parseInt(page),
-          pageSize: parseInt(pageSize),
+          current: currentPage,
+          pageSize: resolvedPageSize,
           total: total,
-          pages: Math.ceil(total / pageSize)
+          pages: Math.ceil(total / resolvedPageSize)
         }
       },
       message: '获取仪器台账列表成功'
@@ -1056,6 +1091,7 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
       size = 20,
       instrumentName,
       managementCode,
+      instrumentCode,
       calibrationAgency,
       certificateNumber,
       calibrationResult,
@@ -1116,6 +1152,11 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
       parameters.push({ name: 'managementCode', type: sql.NVarChar, value: `%${managementCode}%` });
     }
 
+    if (instrumentCode) {
+      conditions.push(`i.InstrumentCode LIKE @instrumentCode`);
+      parameters.push({ name: 'instrumentCode', type: sql.NVarChar, value: `%${instrumentCode}%` });
+    }
+
     if (calibrationAgency) {
       conditions.push(`cr.CalibrationAgency LIKE @calibrationAgency`);
       parameters.push({ name: 'calibrationAgency', type: sql.NVarChar, value: `%${calibrationAgency}%` });
@@ -1138,8 +1179,11 @@ router.get('/calibration-results', authenticateToken, async (req, res) => {
     }
 
     if (endDate) {
-      conditions.push(`cr.CalibrationDate <= @endDate`);
-      parameters.push({ name: 'endDate', type: sql.DateTime, value: new Date(endDate) });
+      const endDateObj = new Date(endDate);
+      const endDateExclusive = new Date(endDateObj);
+      endDateExclusive.setDate(endDateExclusive.getDate() + 1);
+      conditions.push(`cr.CalibrationDate < @endDateExclusive`);
+      parameters.push({ name: 'endDateExclusive', type: sql.DateTime, value: endDateExclusive });
     }
 
     // 添加条件到查询
@@ -1611,6 +1655,8 @@ router.post('/', authenticateToken, async (req, res) => {
       MeasurementRange: measurementRange,  // 新增：量程字段
       Accuracy: accuracy          // 新增：准确度字段
     } = req.body;
+    const normalizedInstrumentCode = (instrumentCode || '').trim() || null;
+    const normalizedManagementCode = (managementCode || '').trim() || null;
 
     // 验证必填字段 - 修改验证逻辑：出厂编号和管理编号至少有其一
     if (!instrumentName) {
@@ -1621,7 +1667,7 @@ router.post('/', authenticateToken, async (req, res) => {
     }
 
     // 验证出厂编号和管理编号至少有其一
-    if (!instrumentCode && !managementCode) {
+    if (!normalizedInstrumentCode && !normalizedManagementCode) {
       return res.status(400).json({
         code: 400,
         message: '出厂编号和管理编号至少需要填写其中一个'
@@ -1631,18 +1677,18 @@ router.post('/', authenticateToken, async (req, res) => {
     const pool = await getConnection();
 
     // 检查编号是否重复 - 修改查询逻辑，只检查非空的编号
-    let checkQuery = `SELECT COUNT(*) as count FROM Instruments WHERE IsActive = 1 AND (`;
+    let checkQuery = `SELECT COUNT(*) as count FROM Instruments WHERE (`;
     const checkConditions = [];
     const checkRequest = pool.request();
     
-    if (instrumentCode) {
+    if (normalizedInstrumentCode) {
       checkConditions.push('InstrumentCode = @instrumentCode');
-      checkRequest.input('instrumentCode', sql.NVarChar, instrumentCode);
+      checkRequest.input('instrumentCode', sql.NVarChar, normalizedInstrumentCode);
     }
     
-    if (managementCode) {
+    if (normalizedManagementCode) {
       checkConditions.push('ManagementCode = @managementCode');
-      checkRequest.input('managementCode', sql.NVarChar, managementCode);
+      checkRequest.input('managementCode', sql.NVarChar, normalizedManagementCode);
     }
     
     checkQuery += checkConditions.join(' OR ') + ')';
@@ -1675,8 +1721,8 @@ router.post('/', authenticateToken, async (req, res) => {
     `;
 
     const request = pool.request()
-      .input('instrumentCode', sql.NVarChar, instrumentCode)
-      .input('managementCode', sql.NVarChar, managementCode)
+      .input('instrumentCode', sql.NVarChar, normalizedInstrumentCode)
+      .input('managementCode', sql.NVarChar, normalizedManagementCode)
       .input('instrumentName', sql.NVarChar, instrumentName)
       .input('model', sql.NVarChar, model)
       .input('manufacturer', sql.NVarChar, manufacturer)
@@ -1711,6 +1757,12 @@ router.post('/', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('创建仪器失败:', error);
+    if (error?.number === 2601 || error?.number === 2627) {
+      return res.status(409).json({
+        code: 409,
+        message: '出厂编号或管理编号已存在'
+      });
+    }
     res.status(500).json({
       code: 500,
       message: '创建仪器失败',
@@ -1751,11 +1803,13 @@ router.put('/:id', authenticateToken, async (req, res) => {
       MeasurementRange: measurementRange,  // 新增：量程字段
       Accuracy: accuracy          // 新增：准确度字段
     } = req.body;
+    const normalizedInstrumentCode = instrumentCode === undefined ? undefined : ((instrumentCode || '').trim() || null);
+    const normalizedManagementCode = managementCode === undefined ? undefined : ((managementCode || '').trim() || null);
 
     const pool = await getConnection();
 
     // 验证出厂编号和管理编号至少有其一
-    if (!instrumentCode && !managementCode) {
+    if (!normalizedInstrumentCode && !normalizedManagementCode) {
       return res.status(400).json({
         code: 400,
         message: '出厂编号和管理编号至少需要填写其中一个'
@@ -1776,23 +1830,23 @@ router.put('/:id', authenticateToken, async (req, res) => {
     }
 
     // 检查编号是否重复（排除当前记录）- 修改查询逻辑，只检查非空的编号
-    if (instrumentCode || managementCode) {
+    if (normalizedInstrumentCode || normalizedManagementCode) {
       const duplicateConditions = [];
       const duplicateRequest = pool.request().input('id', sql.Int, id);
       
-      if (instrumentCode) {
+      if (normalizedInstrumentCode) {
         duplicateConditions.push('InstrumentCode = @instrumentCode');
-        duplicateRequest.input('instrumentCode', sql.NVarChar, instrumentCode);
+        duplicateRequest.input('instrumentCode', sql.NVarChar, normalizedInstrumentCode);
       }
       
-      if (managementCode) {
+      if (normalizedManagementCode) {
         duplicateConditions.push('ManagementCode = @managementCode');
-        duplicateRequest.input('managementCode', sql.NVarChar, managementCode);
+        duplicateRequest.input('managementCode', sql.NVarChar, normalizedManagementCode);
       }
       
       // 只有在有条件时才构建查询
       if (duplicateConditions.length > 0) {
-        const duplicateQuery = `SELECT COUNT(*) as count FROM Instruments WHERE ID != @id AND IsActive = 1 AND (${duplicateConditions.join(' OR ')})`;
+        const duplicateQuery = `SELECT COUNT(*) as count FROM Instruments WHERE ID != @id AND (${duplicateConditions.join(' OR ')})`;
         
         const duplicateResult = await duplicateRequest.query(duplicateQuery);
 
@@ -1809,14 +1863,14 @@ router.put('/:id', authenticateToken, async (req, res) => {
     const updateFields = [];
     const updateRequest = pool.request().input('id', sql.Int, id);
     
-    if (instrumentCode !== undefined) {
+    if (normalizedInstrumentCode !== undefined) {
       updateFields.push('InstrumentCode = @instrumentCode');
-      updateRequest.input('instrumentCode', sql.NVarChar, instrumentCode || null);
+      updateRequest.input('instrumentCode', sql.NVarChar, normalizedInstrumentCode);
     }
     
-    if (managementCode !== undefined) {
+    if (normalizedManagementCode !== undefined) {
       updateFields.push('ManagementCode = @managementCode');
-      updateRequest.input('managementCode', sql.NVarChar, managementCode || null);
+      updateRequest.input('managementCode', sql.NVarChar, normalizedManagementCode);
     }
     
     if (instrumentName !== undefined) {
@@ -1944,6 +1998,12 @@ router.put('/:id', authenticateToken, async (req, res) => {
 
   } catch (error) {
     console.error('更新仪器失败:', error);
+    if (error?.number === 2601 || error?.number === 2627) {
+      return res.status(409).json({
+        code: 409,
+        message: '出厂编号或管理编号已存在'
+      });
+    }
     res.status(500).json({
       code: 500,
       message: '更新仪器失败',
