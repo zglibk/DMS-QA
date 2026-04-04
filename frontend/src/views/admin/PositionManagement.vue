@@ -748,4 +748,55 @@ onMounted(async () => {
     font-size: 20px;
   }
 }
+
+@media (max-width: 390px) {
+  .position-management {
+    padding: 8px;
+  }
+
+  .search-section,
+  .action-section {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  :deep(.el-table) {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  :deep(.el-dialog) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+    max-height: calc(100vh - 24px) !important;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__body) {
+    overflow-y: auto;
+  }
+
+  .pagination-wrapper {
+    text-align: left;
+    overflow-x: auto;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    width: 100%;
+  }
+
+  .action-buttons .el-button {
+    width: 100%;
+  }
+}
+
+@media (max-width: 375px) {
+  .page-header h2 {
+    font-size: 18px;
+  }
+}
 </style>

@@ -7116,40 +7116,51 @@ body::-webkit-scrollbar-thumb:hover {
 
   /* 手机设备下统计控制区调整 */
   .stats-control {
-    flex-direction: column;
-    gap: 1rem;
-    padding: 0.75rem;
+    flex-direction: row; 
+    flex-wrap: nowrap; /* 不允许折行 */
+    justify-content: space-between; 
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem;
     margin-bottom: 1rem;
     margin-left: 0;
     margin-right: 0;
+    overflow-x: auto; /* 若屏幕过小，可滑动 */
   }
 
   .stats-control-left {
-    justify-content: center;
-    width: 100%;
+    justify-content: flex-start;
+    width: auto; 
+    flex: 0 0 auto; /* 改为自适应内容宽度 */
   }
 
   .stats-control-left .el-date-picker {
-    width: 100% !important;
-    max-width: 250px;
+    width: 140px !important; /* 固定宽度，防止挤压右侧 */
+    max-width: none; 
   }
 
   .stats-control-right {
-    justify-content: center;
-    width: 100%;
+    justify-content: flex-end;
+    width: auto;
+    flex: 1; /* 占据剩余全部空间 */
+    min-width: 200px; /* 保证有足够宽度显示开关和文字 */
   }
 
   /* 确保开关文字在小屏幕下完整显示 */
   .stats-control-right .el-switch {
     width: 100%;
-    max-width: 280px;
+    justify-content: flex-end; /* 靠右对齐 */
   }
 
   .stats-control-right .el-switch .el-switch__label {
-    font-size: 0.8rem;
+    font-size: 12px; /* 进一步缩小字体 */
     white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    overflow: visible; /* 允许显示完整文字 */
+    text-overflow: clip;
+  }
+  
+  .stats-control-right .el-switch .el-switch__core {
+    min-width: 36px; /* 稍微缩小开关核心 */
   }
 
   .stat-row-flex {
@@ -7165,25 +7176,99 @@ body::-webkit-scrollbar-thumb:hover {
     padding: 1.2rem 0.8rem; /* 增加内边距 */
   }
 
-  .carousel-page .stat-card {
-    max-width: none; /* 轮播图内卡片也移除最大宽度限制 */
+  .carousel-page {
+    gap: 0.5rem; /* 减小卡片之间的间距 */
+    padding: 0; /* 去掉左右内边距，因为箭头已经缩小且靠边 */
   }
 
+  .carousel-page .summary-card {
+    max-width: none; /* 轮播图内卡片也移除最大宽度限制 */
+    margin: 0;
+    padding: 10px; /* 调整内边距 */
+    height: 120px; /* 调整高度确保内容不被截断 */
+    flex-direction: column; /* 图标和内容垂直排列 */
+    align-items: flex-start;
+    justify-content: flex-start; /* 顶部对齐 */
+    overflow: visible; /* 允许内部元素稍微超出（如果需要） */
+    flex: 1; /* 让两个卡片平分空间 */
+  }
+
+  .carousel-page .card-icon {
+    width: 24px;
+    height: 24px;
+    font-size: 12px;
+    margin-bottom: 0; 
+    margin-right: 6px;
+  }
+  
+  .carousel-page .card-left {
+    margin-right: 0; 
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    margin-bottom: 4px;
+    width: 100%;
+  }
+
+  .carousel-page .card-right {
+    width: 100%; /* 占满宽度 */
+    align-items: flex-start; /* 左对齐 */
+  }
+
+  .carousel-page .card-title {
+    font-size: 11px;
+    white-space: normal; /* 允许标题换行 */
+    line-height: 1.2;
+    margin-bottom: 0;
+    flex: 1;
+  }
+
+  .carousel-page .card-value {
+    font-size: 18px; /* 进一步减小数值字体大小以防溢出 */
+    margin-bottom: 2px;
+  }
+
+  .carousel-page .card-subtitle {
+    font-size: 10px;
+    white-space: normal; /* 允许副标题换行 */
+    line-height: 1.2;
+    display: -webkit-box;
+    -webkit-line-clamp: 2; /* 最多显示两行 */
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    color: #999;
+    margin-top: auto; /* 靠底部对齐 */
+  }
+
+  /* 缩小轮播图箭头，避免占据太多空间 */
+  .stats-carousel :deep(.el-carousel__arrow) {
+    width: 24px;
+    height: 24px;
+  }
+  
+  .stats-carousel :deep(.el-carousel__arrow--left) {
+    left: 2px;
+  }
+
+  .stats-carousel :deep(.el-carousel__arrow--right) {
+    right: 2px;
+  }
+  
   /* 小屏幕下统计卡片文字调整 */
   .stat-row-flex .stat-card .stat-title {
-    font-size: 0.9rem; /* 标题文字稍微缩小 */
-    margin-bottom: 0.8rem; /* 增加标题下边距 */
+    font-size: 0.8rem; /* 标题文字稍微缩小 */
+    margin-bottom: 0.6rem; /* 减少标题下边距 */
     line-height: 1.2;
   }
 
   .stat-row-flex .stat-card .stat-value {
-    font-size: 1rem; /* 数字稍微缩小 */
+    font-size: 0.9rem; /* 数字稍微缩小 */
     font-weight: normal;
     line-height: 1.3;
   }
 
   .stat-row-flex .stat-card .stat-value b {
-    font-size: 1.2rem; /* 加粗数字稍大一些 */
+    font-size: 1.1rem; /* 加粗数字稍大一些 */
     font-weight: bold;
   }
 
@@ -7201,13 +7286,36 @@ body::-webkit-scrollbar-thumb:hover {
     font-size: 0.875rem;
   }
 
+  .table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: stretch; /* 让子元素等高 */
+    width: 100%;
+  }
+
   .table-actions .el-input {
-    min-width: 150px;
+    width: 100% !important;
+    margin-bottom: 0; /* 移除底部外边距，使用 gap 控制 */
   }
 
   .table-actions .el-button {
-    padding: 0.5rem 1rem;
-    font-size: 0.875rem;
+    flex: 1; /* 让两个主按钮等宽 */
+    margin-left: 0 !important;
+    padding: 8px 0; /* 上下内边距，左右不设以便文字居中 */
+    font-size: 13px;
+    justify-content: center;
+  }
+  
+  .table-actions .el-button + .el-button {
+    margin-left: 0 !important;
+  }
+  
+  /* 为高级查询按钮（带 plain 属性的 primary 按钮）设置占满整行 */
+  .table-actions .el-button[type="primary"][plain] {
+    flex: 1 1 100%; 
+    margin-top: 0;
+    margin-left: 0 !important;
   }
 
   .table-footer {
@@ -7217,32 +7325,40 @@ body::-webkit-scrollbar-thumb:hover {
     justify-content: center; /* 居中对齐 */
   }
 
-  /* 小屏幕下分页器样式优化 */
+  /* 小屏幕下分页器组件极简化显示 */
   .table-footer .el-pagination {
-    flex-wrap: wrap;
-    justify-content: center;
+    display: flex;
+    flex-wrap: nowrap; /* 强制不换行 */
+    overflow-x: auto; /* 允许横向滚动 */
+    justify-content: flex-start; /* 靠左对齐，自然延伸 */
+    align-items: center;
+    gap: 4px;
     width: 100%;
+    padding-bottom: 5px; /* 为滚动条留出空间 */
+    -webkit-overflow-scrolling: touch;
   }
 
-  /* 确保分页器组件在小屏幕下完整显示 */
-  .table-footer .el-pagination .el-pagination__sizes {
-    margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
+  .table-footer .el-pagination::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  .table-footer .el-pagination::-webkit-scrollbar-thumb {
+    background: #e4e7ed;
+    border-radius: 4px;
   }
 
-  .table-footer .el-pagination .el-pagination__total {
-    margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
-  }
-
-  /* 分页器按钮组在小屏幕下的样式 */
-  .table-footer .el-pagination .el-pager {
-    margin: 0.25rem;
+  .table-footer .el-pagination .el-pagination__total,
+  .table-footer .el-pagination .el-pagination__sizes,
+  .table-footer .el-pagination .el-pagination__jump {
+    display: none !important; /* 在手机端强制隐藏总数、每页条数、跳页输入框 */
   }
 
   .table-footer .el-pagination .btn-prev,
-  .table-footer .el-pagination .btn-next {
-    margin: 0.25rem;
+  .table-footer .el-pagination .btn-next,
+  .table-footer .el-pagination .el-pager li {
+    margin: 0 2px;
+    min-width: 28px; /* 稍微缩小按钮宽度以适应屏幕 */
+    flex-shrink: 0; /* 防止被挤压变形 */
   }
 
   .chart-box {

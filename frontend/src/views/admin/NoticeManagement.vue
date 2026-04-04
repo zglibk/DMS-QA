@@ -2787,4 +2787,51 @@ body.el-popup-parent--hidden {
   overflow: hidden !important;
 }
 
+@media (max-width: 390px) {
+  .notice-detail-dialog :deep(.el-dialog),
+  .notice-edit-dialog :deep(.el-dialog),
+  .notice-create-dialog :deep(.el-dialog) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    top: 12px !important;
+    max-height: calc(100vh - 24px) !important;
+  }
+
+  .notice-detail-dialog :deep(.el-dialog__header),
+  .notice-edit-dialog :deep(.el-dialog__header),
+  .notice-create-dialog :deep(.el-dialog__header),
+  .notice-detail-dialog :deep(.el-dialog__footer),
+  .notice-edit-dialog :deep(.el-dialog__footer),
+  .notice-create-dialog :deep(.el-dialog__footer) {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  .notice-detail-dialog :deep(.el-dialog__body),
+  .notice-edit-dialog :deep(.el-dialog__body),
+  .notice-create-dialog :deep(.el-dialog__body) {
+    padding: 12px !important;
+    max-height: calc(100vh - 130px) !important;
+  }
+}
+
+@media (max-width: 375px) {
+  .notice-detail-dialog :deep(.el-dialog__footer),
+  .notice-edit-dialog :deep(.el-dialog__footer),
+  .notice-create-dialog :deep(.el-dialog__footer) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .notice-detail-dialog :deep(.el-dialog__footer .el-button),
+  .notice-edit-dialog :deep(.el-dialog__footer .el-button),
+  .notice-create-dialog :deep(.el-dialog__footer .el-button) {
+    margin: 0 !important;
+    flex: 1;
+    min-width: 110px;
+  }
+}
+
 </style>

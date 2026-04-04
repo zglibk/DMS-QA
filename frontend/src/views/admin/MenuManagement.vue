@@ -1008,4 +1008,54 @@ onMounted(() => {
     margin-bottom: 10px;
   }
 }
+
+@media (max-width: 390px) {
+  .menu-management {
+    padding: 8px;
+  }
+
+  .action-section,
+  .search-section {
+    width: 100%;
+  }
+
+  :deep(.el-table) {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  :deep(.el-dialog) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+    max-height: calc(100vh - 24px) !important;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__body) {
+    overflow-y: auto;
+  }
+
+  .dialog-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  .dialog-footer .el-button {
+    margin: 0 !important;
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 375px) {
+  .page-header h2 {
+    font-size: 18px;
+  }
+}
 </style>

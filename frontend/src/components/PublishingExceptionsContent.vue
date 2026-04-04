@@ -314,10 +314,13 @@
       </el-tabs>
 
     <!-- 导出选项对话框 -->
-    <el-dialog
+    <PublishingExceptionDialog
       v-model="exportDialogVisible"
       title="出版异常记录 - 导出确认"
-      width="480px"
+      variant="simple"
+      desktop-width="480px"
+      mobile-width="calc(100vw - 32px)"
+      :mobile-breakpoint="992"
       :close-on-click-modal="false"
       class="export-dialog"
     >
@@ -355,13 +358,16 @@
           </el-button>
         </div>
       </template>
-    </el-dialog>
+    </PublishingExceptionDialog>
 
     <!-- 新增/编辑对话框 -->
-    <el-dialog
+    <PublishingExceptionDialog
       v-model="dialogVisible"
       :title="isEdit ? '编辑记录' : '新增记录'"
-      width="900px"
+      variant="form"
+      desktop-width="900px"
+      mobile-width="calc(100vw - 32px)"
+      :mobile-breakpoint="992"
       :close-on-click-modal="false"
       @close="handleDialogClose"
     >
@@ -369,11 +375,11 @@
         ref="formRef"
         :model="formData"
         :rules="formRules"
-        label-width="100px"
-        label-position="left"
+        :label-width="dialogFormLabelWidth"
+        :label-position="dialogFormLabelPosition"
       >
-        <el-row :gutter="20">
-          <el-col :span="8">
+        <el-row :gutter="dialogFormGutter">
+          <el-col :span="dialogFormColSpan">
             <el-form-item label="登记日期" prop="registration_date">
               <el-date-picker
                 v-model="formData.registration_date"
@@ -385,7 +391,7 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormColSpan">
             <el-form-item label="出版日期" prop="publishing_date">
               <el-date-picker
                 v-model="formData.publishing_date"
@@ -397,25 +403,25 @@
               />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormColSpan">
             <el-form-item label="客户代码" prop="customer_code">
               <el-input v-model="formData.customer_code" placeholder="请输入客户代码" />
             </el-form-item>
           </el-col>
         </el-row>
         
-        <el-row :gutter="20">
-          <el-col :span="8">
+        <el-row :gutter="dialogFormGutter">
+          <el-col :span="dialogFormColSpan">
             <el-form-item label="工单号" prop="work_order_number">
               <el-input v-model="formData.work_order_number" placeholder="请输入工单号" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormLongColSpan">
             <el-form-item label="产品名称" prop="product_name">
               <el-input v-model="formData.product_name" placeholder="请输入产品名称" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormColSpan">
             <el-form-item label="版类型" prop="plate_type">
               <el-select v-model="formData.plate_type" placeholder="请选择版类型" style="width: 100%">
                 <el-option label="胶印版" value="胶印版" />
@@ -428,13 +434,13 @@
           </el-col>
         </el-row>
         
-        <el-row :gutter="20">
-          <el-col :span="8">
+        <el-row :gutter="dialogFormGutter">
+          <el-col :span="dialogFormColSpan">
             <el-form-item label="出版张数" prop="publishing_sheets">
               <el-input-number v-model="formData.publishing_sheets" :min="0" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormLongColSpan">
             <el-form-item label="责任单位" prop="responsible_unit">
               <el-select v-model="formData.responsible_unit" placeholder="请选择责任单位" style="width: 100%">
                 <el-option 
@@ -446,51 +452,51 @@
               </el-select>
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormColSpan">
             <el-form-item label="责任人" prop="responsible_person">
               <el-input v-model="formData.responsible_person" placeholder="请输入责任人" />
             </el-form-item>
           </el-col>
         </el-row>
         
-        <el-row :gutter="20">
-          <el-col :span="8">
+        <el-row :gutter="dialogFormGutter">
+          <el-col :span="dialogFormCompactColSpan">
             <el-form-item label="件数">
               <el-input-number v-model="formData.piece_count" :min="0" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormCompactColSpan">
             <el-form-item label="长(cm)">
               <el-input-number v-model="formData.length_cm" :min="0" :precision="2" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormCompactColSpan">
             <el-form-item label="宽(cm)">
               <el-input-number v-model="formData.width_cm" :min="0" :precision="2" style="width: 100%" />
             </el-form-item>
           </el-col>
         </el-row>
         
-        <el-row :gutter="20">
-          <el-col :span="8">
+        <el-row :gutter="dialogFormGutter">
+          <el-col :span="dialogFormCompactColSpan">
             <el-form-item label="数量cm²">
               <el-input-number v-model="formData.area_cm2" :min="0" :precision="2" style="width: 100%" readonly disabled />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormCompactColSpan">
             <el-form-item label="单价">
               <el-input-number v-model="formData.unit_price" :min="0" :precision="4" style="width: 100%" />
             </el-form-item>
           </el-col>
-          <el-col :span="8">
+          <el-col :span="dialogFormCompactColSpan">
             <el-form-item label="金额">
               <el-input-number v-model="formData.amount" :min="0" :precision="2" style="width: 100%" readonly disabled />
             </el-form-item>
           </el-col>
         </el-row>
         
-        <el-row :gutter="20">
-          <el-col :span="8">
+        <el-row :gutter="dialogFormGutter">
+          <el-col :span="dialogFormColSpan">
             <!-- 错误类型选择器：用于分类管理出版异常的错误类型，支持搜索和清空 -->
             <el-form-item label="错误类型" prop="error_type">
               <el-select 
@@ -519,35 +525,43 @@
           </el-col>
         </el-row>
         
-        <el-form-item label="问题描述" prop="exception_description">
-          <el-input
-            v-model="formData.exception_description"
-            type="textarea"
-            :rows="3"
-            placeholder="请详细描述异常情况"
-          />
-        </el-form-item>
+        <el-row :gutter="dialogFormGutter">
+          <el-col :span="24">
+            <el-form-item label="问题描述" prop="exception_description">
+              <el-input
+                v-model="formData.exception_description"
+                type="textarea"
+                :rows="3"
+                placeholder="请详细描述异常情况"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
         
-        <el-form-item>
-          <template #label>
-            <el-text class="mx-1" >选择上传</el-text>
-          </template>
-          <FileUpload
-            ref="uploadRef"
-            :multiple="true"
-            :max-count="4"
-            accept="image/*"
-            tip="支持拖拽上传（最多4张）"
-            upload-mode="custom"
-            :custom-request="handleCustomUpload"
-            :before-upload="beforeUpload"
-            :deferred-upload="true"
-            v-model:fileList="fileList"
-            @change="handleFileChange"
-            @remove="handleFileRemove"
-            @preview="handleFilePreview"
-          />
-        </el-form-item>
+        <el-row :gutter="dialogFormGutter">
+          <el-col :span="24">
+            <el-form-item>
+              <template #label>
+                <el-text class="mx-1" >选择上传</el-text>
+              </template>
+              <FileUpload
+                ref="uploadRef"
+                :multiple="true"
+                :max-count="4"
+                accept="image/*"
+                tip="支持拖拽上传（最多4张）"
+                upload-mode="custom"
+                :custom-request="handleCustomUpload"
+                :before-upload="beforeUpload"
+                :deferred-upload="true"
+                v-model:fileList="fileList"
+                @change="handleFileChange"
+                @remove="handleFileRemove"
+                @preview="handleFilePreview"
+              />
+            </el-form-item>
+          </el-col>
+        </el-row>
       </el-form>
       
       <template #footer>
@@ -562,15 +576,18 @@
           </el-button>
         </span>
       </template>
-    </el-dialog>
+    </PublishingExceptionDialog>
 
     <!-- 查看详情对话框 -->
-    <el-dialog
+    <PublishingExceptionDialog
       v-model="viewDialogVisible"
       title="查看详情"
-      width="800px"
+      variant="simple"
+      desktop-width="800px"
+      mobile-width="calc(100vw - 32px)"
+      :mobile-breakpoint="992"
     >
-      <el-descriptions :column="2" border>
+      <el-descriptions :column="isMobileDialog ? 1 : 2" border>
         <el-descriptions-item label="ID">{{ viewData.id }}</el-descriptions-item>
         <el-descriptions-item label="登记日期">{{ formatDate(viewData.registration_date) }}</el-descriptions-item>
         <el-descriptions-item label="工单号">{{ viewData.work_order_number }}</el-descriptions-item>
@@ -615,7 +632,7 @@
           </el-image>
         </div>
       </div>
-    </el-dialog>
+    </PublishingExceptionDialog>
   </div>
 </template>
 
@@ -639,6 +656,7 @@ import {
 import AppFooter from '@/components/common/AppFooter.vue'
 import FileUpload from '@/components/FileUpload.vue'
 import ImagePreview from '@/components/ImagePreview.vue'
+import PublishingExceptionDialog from '@/components/publishing/PublishingExceptionDialog.vue'
 import apiService from '@/services/apiService'
 import { useUserStore } from '@/store/user'
 import * as echarts from 'echarts'
@@ -756,6 +774,13 @@ let costTrendChart = null
 // 对话框状态
 const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
+const isMobileDialog = ref(typeof window !== 'undefined' ? window.innerWidth <= 992 : false)
+const dialogFormLabelPosition = computed(() => (isMobileDialog.value ? 'top' : 'left'))
+const dialogFormLabelWidth = computed(() => (isMobileDialog.value ? 'auto' : '100px'))
+const dialogFormGutter = computed(() => (isMobileDialog.value ? 12 : 20))
+const dialogFormColSpan = computed(() => (isMobileDialog.value ? 8 : 8))
+const dialogFormLongColSpan = computed(() => (isMobileDialog.value ? 8 : 8))
+const dialogFormCompactColSpan = computed(() => (isMobileDialog.value ? 8 : 8))
 const isEdit = ref(false)
 const currentEditId = ref(null)
 
@@ -2359,6 +2384,7 @@ watch(activeTab, (newTab) => {
  * 确保图表能够自适应容器大小变化
  */
 const handleResize = () => {
+  isMobileDialog.value = window.innerWidth <= 992
   // 延迟执行，确保容器尺寸已更新
   setTimeout(() => {
     if (errorTypeChart) {
@@ -2380,6 +2406,7 @@ onMounted(async () => {
   // 检查权限
   await checkPermissions()
   
+  handleResize()
   // 添加窗口大小变化监听器
   window.addEventListener('resize', handleResize)
 })

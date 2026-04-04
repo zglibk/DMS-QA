@@ -331,25 +331,32 @@
         <el-table-column label="操作" width="180" fixed="right" align="center" header-align="center">
           <template #default="scope">
             <div class="action-buttons">
-              <el-tooltip content="编辑用户" placement="top">
-                <el-button type="primary" :icon="Edit" size="small" circle @click="editUser(scope.row)" :disabled="!userStore.hasPermission('sys:user:edit')" />
-              </el-tooltip>
-              <el-tooltip content="权限设置" placement="top">
-                <el-button type="warning" :icon="Setting" size="small" circle @click="setPermission(scope.row)" :disabled="!userStore.hasPermission('sys:user:role')" />
-              </el-tooltip>
-              <el-tooltip content="查看详情" placement="top">
-                <el-button type="info" :icon="View" size="small" circle @click="viewUser(scope.row)" />
-              </el-tooltip>
-              <el-tooltip content="删除用户" placement="top">
-                <el-button 
-                  type="danger" 
-                  :icon="Delete" 
-                  size="small" 
-                  circle 
-                  @click="deleteUser(scope.row)"
-                  :disabled="(scope.row.Role === 'admin' || (scope.row.RoleNames && scope.row.RoleNames.includes('admin'))) || !userStore.hasPermission('sys:user:delete')"
-                />
-              </el-tooltip>
+              <div class="row-action-main">
+                <el-tooltip content="编辑用户" placement="top">
+                  <el-button type="primary" :icon="Edit" size="small" circle @click="editUser(scope.row)" :disabled="!userStore.hasPermission('sys:user:edit')" />
+                </el-tooltip>
+                <el-tooltip content="权限设置" placement="top">
+                  <el-button type="warning" :icon="Setting" size="small" circle @click="setPermission(scope.row)" :disabled="!userStore.hasPermission('sys:user:role')" />
+                </el-tooltip>
+              </div>
+              <el-dropdown trigger="click" @command="(command) => handleRowMoreAction(command, scope.row)">
+                <el-button size="small" circle type="info" :icon="MoreFilled" />
+                <template #dropdown>
+                  <el-dropdown-menu>
+                    <el-dropdown-item command="view">
+                      <el-icon><View /></el-icon>
+                      查看详情
+                    </el-dropdown-item>
+                    <el-dropdown-item
+                      command="delete"
+                      :disabled="(scope.row.Role === 'admin' || (scope.row.RoleNames && scope.row.RoleNames.includes('admin'))) || !userStore.hasPermission('sys:user:delete')"
+                    >
+                      <el-icon><Delete /></el-icon>
+                      删除用户
+                    </el-dropdown-item>
+                  </el-dropdown-menu>
+                </template>
+              </el-dropdown>
             </div>
           </template>
         </el-table-column>
@@ -1120,7 +1127,7 @@ import {
   Edit, Delete, Setting, Search, Plus, Refresh, User, UserFilled, 
   Star, Phone, Message, OfficeBuilding, Grid, View, Lock, Unlock,
   Select, Download, Close, Check, Key, CaretTop, CaretBottom, Clock, Calendar,
-  Briefcase, Male, Female, Location, CircleCheckFilled
+  Briefcase, Male, Female, Location, CircleCheckFilled, MoreFilled
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Cropper } from 'vue-advanced-cropper'
@@ -1899,6 +1906,16 @@ const deleteUser = async (row) => {
 const viewUser = (row) => {
   currentUser.value = row
   showUserDetail.value = true
+}
+
+const handleRowMoreAction = (command, row) => {
+  if (command === 'view') {
+    viewUser(row)
+    return
+  }
+  if (command === 'delete') {
+    deleteUser(row)
+  }
 }
 
 // ===================== 权限设置相关 =====================
@@ -3264,6 +3281,14 @@ const getUserIdTagStyle = (userId) => {
   gap: 8px;
   justify-content: center;
   flex-wrap: nowrap;
+  align-items: center;
+}
+
+.row-action-main {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: nowrap;
 }
 
 .action-buttons .el-button {
@@ -3973,6 +3998,15 @@ const getUserIdTagStyle = (userId) => {
   .user-management {
     padding: 16px;
   }
+
+  .toolbar-row {
+    row-gap: 12px;
+  }
+
+  .toolbar-row :deep(.el-col) {
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
   
   .page-header {
     padding: 20px;
@@ -4012,6 +4046,7 @@ const getUserIdTagStyle = (userId) => {
   .filter-select {
     min-width: auto;
     width: 100%;
+    max-width: 100%;
   }
   
   .search-actions {
@@ -4032,6 +4067,7 @@ const getUserIdTagStyle = (userId) => {
   .table-tools {
     align-self: stretch;
     justify-content: center;
+    flex-wrap: wrap;
   }
   
   .modern-table {
@@ -4039,10 +4075,34 @@ const getUserIdTagStyle = (userId) => {
   }
   
   .user-info {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     gap: 8px;
-  } 
+  }
+
+  .left-actions,
+  .center-search,
+  .right-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .center-search > * {
+    flex: 1 1 100%;
+  }
+
+  .center-search .el-button {
+    flex: 1 1 calc(50% - 6px);
+  }
+
+  .table-container {
+    overflow-x: auto;
+  }
+
+  .modern-table {
+    min-width: 980px;
+  }
 }
 
 /* 列设置对话框样式 */
@@ -4144,13 +4204,20 @@ const getUserIdTagStyle = (userId) => {
 /* 小屏幕下的操作按钮样式 */
 @media (max-width: 768px) {
   .action-buttons {
-    flex-direction: column;
+    flex-direction: row;
     gap: 4px;
+    align-items: center;
+    justify-content: center;
+    flex-wrap: nowrap;
   }
   
   .action-buttons .el-button {
     font-size: 12px;
-    padding: 8px 12px;
+    padding: 6px 10px;
+  }
+
+  .row-action-main {
+    gap: 4px;
   }
 }
 
@@ -4250,6 +4317,88 @@ const getUserIdTagStyle = (userId) => {
   .page-header {
     background: none;
     color: #000;
+  }
+}
+
+@media (max-width: 390px) {
+  .center-search {
+    gap: 8px;
+  }
+
+  .left-actions .el-button,
+  .right-actions .el-button {
+    width: 100%;
+  }
+
+  .table-tools {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+
+  .table-tools .el-button {
+    flex-shrink: 0;
+  }
+
+  .modern-table {
+    min-width: 920px;
+  }
+
+  :deep(.modern-table .el-table__inner-wrapper) {
+    min-width: 920px;
+  }
+
+  :deep(.modern-table .el-table__body-wrapper) {
+    overflow-x: auto !important;
+  }
+
+  .role-tags-container {
+    justify-content: flex-start;
+  }
+
+  :deep(.el-dialog) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+    max-height: calc(100vh - 24px) !important;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__body) {
+    overflow-y: auto;
+  }
+
+  :deep(.el-dialog__footer) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+  }
+
+  :deep(.el-dialog__footer .el-button) {
+    margin: 0 !important;
+    flex: 1;
+    min-width: 120px;
+  }
+}
+
+@media (max-width: 375px) {
+  .user-management {
+    padding: 8px;
+  }
+
+  .page-header {
+    padding: 12px;
+  }
+
+  .table-tools {
+    gap: 8px;
+  }
+
+  .search-actions {
+    flex-wrap: wrap;
   }
 }
 

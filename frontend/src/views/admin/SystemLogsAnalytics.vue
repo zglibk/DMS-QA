@@ -1705,6 +1705,43 @@ onUnmounted(() => {
   }
 }
 
+@media (max-width: 390px) {
+  .system-logs-analytics {
+    padding: 8px;
+  }
+
+  :deep(.el-table) {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .chart-container,
+  .chart-container-large {
+    height: 220px;
+  }
+
+  :deep(.el-dialog) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+    max-height: calc(100vh - 24px) !important;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__body) {
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 375px) {
+  .card-header span {
+    font-size: 14px;
+    min-width: auto;
+  }
+}
+
 /* 图表容器样式 */
 :deep(.el-card__body) {
   padding: 20px;

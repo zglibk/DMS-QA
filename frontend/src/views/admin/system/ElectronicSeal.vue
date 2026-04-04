@@ -1395,4 +1395,122 @@ function formatDate(cellValue) {
   color: #303133;
   font-weight: 600;
 }
+
+@media (max-width: 768px) {
+  .app-container {
+    padding: 10px 0;
+  }
+
+  .h-full {
+    display: block;
+    overflow: visible;
+  }
+
+  .seal-tree-aside {
+    width: 100% !important;
+    border-right: none;
+    border-bottom: 1px solid #dcdfe6;
+    padding: 12px;
+    height: auto;
+    max-height: 260px;
+  }
+
+  .el-main {
+    padding: 12px;
+    overflow: visible;
+  }
+
+  .el-main > .mb-4 {
+    padding-left: 0 !important;
+    flex-wrap: wrap;
+    gap: 8px !important;
+  }
+
+  .el-main > .mb-4 .el-button {
+    margin-left: 0;
+  }
+
+  .selected-info {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  :deep(.el-table) {
+    width: 100%;
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .pagination-container {
+    justify-content: flex-start;
+    overflow-x: auto;
+  }
+
+  :deep(.pagination-container .el-pagination) {
+    white-space: nowrap;
+  }
+
+  :deep(.el-dialog) {
+    width: calc(100vw - 32px) !important;
+    max-width: calc(100vw - 32px) !important;
+    margin: 16px auto !important;
+    max-height: calc(100vh - 32px) !important;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__body) {
+    overflow-y: auto;
+  }
+
+  :deep(.el-form-item__label) {
+    width: 100% !important;
+    text-align: left !important;
+    margin-bottom: 6px;
+  }
+
+  :deep(.el-form-item__content) {
+    margin-left: 0 !important;
+  }
+
+  .seal-upload-container,
+  .seal-uploader,
+  .seal-uploader :deep(.el-upload),
+  .seal-uploader :deep(.el-upload-dragger) {
+    width: 100%;
+  }
+}
+
+@media (max-width: 390px) {
+  .seal-tree-aside {
+    padding: 10px;
+    max-height: 220px;
+  }
+
+  .el-main {
+    padding: 10px;
+  }
+
+  .el-main > .mb-4 {
+    gap: 6px !important;
+  }
+
+  :deep(.el-dialog) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+    max-height: calc(100vh - 24px) !important;
+  }
+}
+
+@media (max-width: 375px) {
+  .app-container {
+    padding: 8px 0;
+  }
+
+  .selected-info {
+    font-size: 12px;
+  }
+}
 </style>

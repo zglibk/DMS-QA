@@ -67,26 +67,12 @@
     </div>
 
     <!-- Create Dialog -->
-    <el-dialog v-model="createVisible" title="新建报告" width="500px">
-        <el-form :model="createForm" label-width="100px">
-            <el-form-item label="报告编号">
-                <el-input v-model="createForm.ReportNo" placeholder="自动生成" disabled />
-            </el-form-item>
-            <el-form-item label="测试日期">
-                <el-date-picker v-model="createForm.TestDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
-            </el-form-item>
-            <el-form-item label="样品名称">
-                <el-input v-model="createForm.SampleName" />
-            </el-form-item>
-            <el-form-item label="客户编号">
-                <el-input v-model="createForm.CustomerCode" />
-            </el-form-item>
-        </el-form>
-        <template #footer>
-            <el-button @click="createVisible = false">取消</el-button>
-            <el-button type="primary" @click="submitCreate">确定</el-button>
-        </template>
-    </el-dialog>
+    <PerformanceCreateReportDialog
+        v-model="createVisible"
+        title="新建报告"
+        :form-data="createForm"
+        @confirm="submitCreate"
+    />
   </div>
 </template>
 
@@ -98,6 +84,7 @@ import { Search, Plus, Delete, RefreshLeft } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import dayjs from 'dayjs'
 import { useUserStore } from '@/store/user'
+import PerformanceCreateReportDialog from '@/components/performance/PerformanceCreateReportDialog.vue'
 
 const userStore = useUserStore()
 const emit = defineEmits(['select'])

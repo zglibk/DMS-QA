@@ -418,20 +418,22 @@
     <el-dialog
       :title="dialogTitle"
       v-model="dialogVisible"
-      width="50%"
+      :width="isMobileDialogLayout ? '94vw' : '50%'"
+      :align-center="isMobileDialogLayout"
       :before-close="handleDialogClose"
     >
       <el-form
         ref="formRef"
         :model="formData"
         :rules="formRules"
-        label-width="120px"
+        :label-width="isMobileDialogLayout ? 'auto' : '120px'"
+        :label-position="isMobileDialogLayout ? 'top' : 'right'"
         class="complaint-form"
       >
         <!-- 基本信息区域 - 三列布局 -->
         <div class="form-section">
           <h4 class="section-title">基本信息</h4>
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item label="日期" prop="date">
                 <el-date-picker
@@ -464,7 +466,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="24">
               <el-form-item label="品名" prop="productName">
                 <el-input v-model="formData.productName" placeholder="请输入品名" />
@@ -472,7 +474,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item label="规格" prop="specification">
                 <el-input v-model="formData.specification" placeholder="请输入规格" />
@@ -494,7 +496,7 @@
         <!-- 问题信息区域 - 三列布局 -->
         <div class="form-section">
           <h4 class="section-title">问题信息</h4>
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="24">
               <el-form-item label="问题描述" prop="problemDescription">
                 <el-input
@@ -507,7 +509,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="24">
               <el-form-item label="问题图片">
                 <el-upload
@@ -554,7 +556,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item label="不良数" prop="defectQuantity">
                 <el-input-number
@@ -590,7 +592,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item label="处理时限" prop="processingDeadline">
                 <el-date-picker
@@ -649,7 +651,7 @@
               </el-upload>
             </div>
           </div>
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="24">
               <el-form-item label="原因分析">
                 <el-input
@@ -662,7 +664,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="24">
               <el-form-item label="纠正预防措施">
                 <el-input
@@ -675,7 +677,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="24">
               <el-form-item label="处置措施和结果">
                 <el-input
@@ -688,7 +690,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item label="责任部门" prop="responsibleDepartment">
                 <el-select 
@@ -731,7 +733,7 @@
         <!-- 质量成本区域 - 三列布局 -->
         <div class="form-section">
           <h4 class="section-title">质量成本</h4>
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item>
                 <template #label>
@@ -800,7 +802,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item>
                 <template #label>
@@ -869,7 +871,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item>
                 <template #label>
@@ -924,7 +926,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="24">
               <el-form-item>
                 <template #label>
@@ -952,7 +954,7 @@
         <!-- 反馈验证区域 - 三列布局 -->
         <div class="form-section">
           <h4 class="section-title">反馈验证</h4>
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item label="回复日期">
                 <el-date-picker
@@ -991,7 +993,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="8">
               <el-form-item label="处理人">
                 <el-cascader
@@ -1028,7 +1030,7 @@
             </el-col>
           </el-row>
 
-          <el-row :gutter="20">
+          <el-row :gutter="isMobileDialogLayout ? 12 : 20">
             <el-col :span="24">
               <el-form-item label="改善验证">
                 <el-input
@@ -1097,7 +1099,8 @@
     <el-dialog
       title="投诉记录详情"
       v-model="viewDialogVisible"
-      width="50%"
+      :width="isMobileDialogLayout ? '94vw' : '50%'"
+      :align-center="isMobileDialogLayout"
     >
       <div class="detail-content" v-if="viewData">
         <el-descriptions :column="2" border>
@@ -1236,7 +1239,7 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, onMounted, watch } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Plus, Search, Refresh, Upload, Delete, Download, Close, Check, User, Document, Box, Clock, Loading, Setting, Picture, ZoomIn, QuestionFilled } from '@element-plus/icons-vue'
 import apiService from '@/services/apiService'
@@ -1266,6 +1269,7 @@ const processorCascaderOptions = ref([]) // 处理人级联选择器选项
 
 const dialogVisible = ref(false)
 const viewDialogVisible = ref(false)
+const isMobileDialogLayout = ref(typeof window !== 'undefined' ? window.innerWidth <= 768 : false)
 const isEdit = ref(false)
 const viewData = ref(null)
 const removedFiles = ref([]) // 跟踪被删除的图片文件
@@ -2659,6 +2663,13 @@ const hasQualityCostData = (data) => {
 }
 
 /**
+ * 更新弹窗在移动端的布局状态
+ */
+const updateDialogLayoutMode = () => {
+  isMobileDialogLayout.value = window.innerWidth <= 768
+}
+
+/**
  * 监听质量成本字段变化，自动计算总成本
  */
 watch(
@@ -2675,9 +2686,15 @@ watch(
 
 // 组件挂载时加载数据
 onMounted(() => {
+  updateDialogLayoutMode()
   loadData()
   loadComplaintTypes()
   loadDepartments()
+  window.addEventListener('resize', updateDialogLayoutMode)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', updateDialogLayoutMode)
 })
 </script>
 
@@ -3149,6 +3166,89 @@ onMounted(() => {
 }
 
 @media (max-width: 768px) {
+  .customer-complaint-container {
+    padding: 10px;
+  }
+
+  .search-card,
+  .table-card {
+    margin-bottom: 12px;
+  }
+
+  .search-form {
+    padding: 0;
+  }
+
+  .search-buttons {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .search-buttons .el-button {
+    margin-left: 0;
+  }
+
+  .table-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .table-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .pagination-container {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .form-section {
+    padding: 10px;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    margin-bottom: 10px;
+  }
+
+  .complaint-form {
+    max-height: calc(100vh - 180px);
+  }
+
+  :deep(.search-form .el-row),
+  :deep(.advanced-search-area .el-row) {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+
+  :deep(.search-form .el-col),
+  :deep(.advanced-search-area .el-col) {
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+
+  :deep(.pagination-container .el-pagination) {
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  :deep(.el-dialog) {
+    margin: 16px auto !important;
+    max-height: calc(100vh - 32px) !important;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__body) {
+    overflow-y: auto;
+  }
+
   .advanced-search-area {
     padding: 16px;
   }

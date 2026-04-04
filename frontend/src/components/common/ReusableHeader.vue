@@ -2,6 +2,7 @@
   <div class="app-header fixed-header">
     <!-- 左侧logo及系统名 -->
     <div class="header-left">
+      <el-icon class="mobile-menu-btn" @click="drawerVisible = true"><Expand /></el-icon>
       <img v-if="siteConfig?.logoBase64Img" :src="siteConfig.logoBase64Img" alt="logo" class="logo" @error="handleLogoError" />
       <span class="logo-text">{{ siteConfig?.siteName || '质量数据管理系统' }}</span>
     </div>
@@ -39,12 +40,41 @@
         username-click-action="profile"
       />
     </div>
+    
+    <!-- 移动端抽屉菜单 -->
+    <el-drawer
+      v-model="drawerVisible"
+      direction="ltr"
+      size="250px"
+      :with-header="false"
+      class="mobile-nav-drawer"
+    >
+      <div class="drawer-header">
+        <el-icon class="drawer-close-btn" @click="drawerVisible = false"><Close /></el-icon>
+        <div class="drawer-logo">
+          <img v-if="siteConfig?.logoBase64Img" :src="siteConfig.logoBase64Img" alt="logo" class="drawer-logo-img" @error="handleLogoError" />
+          <span class="drawer-logo-text">{{ siteConfig?.siteName || '质量数据管理系统' }}</span>
+        </div>
+      </div>
+      <el-menu mode="vertical" @select="handleMenuSelect" class="drawer-menu" :default-active="activeMenu">
+        <el-menu-item index="home">首页</el-menu-item>
+        <el-menu-item index="stats">数据可视化</el-menu-item>
+        <el-menu-item index="rework">返工分析</el-menu-item>
+        <el-menu-item index="publishing-exceptions">出版异常</el-menu-item>
+        <el-sub-menu index="inspection">
+          <template #title>检验报告</template>
+          <el-menu-item index="incoming-inspection">来料检验报告</el-menu-item>
+          <el-menu-item index="performance-report">性能实验报告</el-menu-item>
+          <el-menu-item index="shipment-report">出货检验报告</el-menu-item>
+        </el-sub-menu>
+      </el-menu>
+    </el-drawer>
   </div>
 </template>
 
 <script setup>
 import { ref, watch } from 'vue'
-import { ArrowDown, User } from '@element-plus/icons-vue'
+import { ArrowDown, User, Expand, Close } from '@element-plus/icons-vue'
 import { useRouter, useRoute } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { useUserStore } from '../../store/user'
@@ -52,6 +82,8 @@ import { storeToRefs } from 'pinia'
 import { useSiteConfig } from '../../composables/useSiteConfig'
 import AdminNotificationBell from './AdminNotificationBell.vue'
 import UserDropdown from './UserDropdown.vue'
+
+const drawerVisible = ref(false)
 
 // 路由和用户状态
 const router = useRouter()
@@ -94,6 +126,7 @@ watch(
 
 // 导航相关方法
 const handleMenuSelect = (index) => {
+  drawerVisible.value = false // 点击菜单后关闭抽屉
   if (index === 'home') {
     router.push('/')
   } else if (index === 'stats') {
@@ -354,47 +387,98 @@ const handleLogoError = (event) => {
 
 /* 用户相关样式已迁移到UserDropdown组件 */
 
+.mobile-menu-btn {
+  display: none;
+  font-size: 24px;
+  color: #606266;
+  margin-right: 12px;
+  cursor: pointer;
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px;
+  border-bottom: 1px solid #ebeef5;
+  position: relative;
+}
+
+.drawer-close-btn {
+  font-size: 20px;
+  color: #909399;
+  cursor: pointer;
+  padding: 4px;
+  position: absolute;
+  top: 15px;
+  left: 15px;
+}
+
+.drawer-logo {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  margin-left: 30px; /* 为左侧的绝对定位关闭按钮留出空间 */
+}
+
+.drawer-close-btn:hover {
+  color: #409EFF;
+}
+
+.drawer-logo-img {
+  height: 24px;
+  margin-right: 10px;
+}
+
+.drawer-logo-text {
+  font-size: 16px;
+  font-weight: bold;
+  color: #303133;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.drawer-menu {
+  border-right: none;
+}
+
 /* 响应式设计 */
 @media (max-width: 768px) {
   .app-header {
-    padding: 0 1rem;
-  }
-
-  .logo-text {
-    display: none;
-  }
-  
-  .header-center {
-    overflow-x: auto;
-    justify-content: flex-start;
-    -webkit-overflow-scrolling: touch;
-  }
-  
-  .header-center::-webkit-scrollbar {
-    display: none;
-  }
-
-  .nav-menu-wrap {
-    justify-content: flex-start;
-    width: max-content;
-  }
-  
-  .nav-menu {
+    height: 60px;
     flex-wrap: nowrap;
+    padding: 0 15px;
+  }
+
+  .mobile-menu-btn {
+    display: block;
+  }
+
+  .header-left {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .logo {
+    height: 1.8rem;
   }
   
-  .nav-menu :deep(.el-menu-item),
-  .nav-menu :deep(.el-sub-menu__title) {
-    padding: 0 12px !important;
-    margin: 0 2px;
-    font-size: 14px;
+  .logo-text {
+    display: inline-block;
+    font-size: 1rem;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
   
   .header-right {
+    flex-shrink: 0;
     gap: 0.375rem;
   }
   
-  /* 用户名响应式隐藏已迁移到UserDropdown组件 */
+  .header-center {
+    display: none; /* 隐藏横向导航，改用抽屉菜单 */
+  }
 }
 </style>

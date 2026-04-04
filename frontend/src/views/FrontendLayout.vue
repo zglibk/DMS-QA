@@ -77,4 +77,15 @@ const currentYear = computed(() => new Date().getFullYear())
 .fade-leave-to {
   opacity: 0;
 }
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .header-wrapper {
+    height: 60px; /* 适配移动端单行导航栏高度 */
+  }
+  
+  .main-content {
+    padding: 15px 10px;
+  }
+}
 </style>

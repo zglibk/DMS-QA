@@ -4680,7 +4680,6 @@ onMounted(() => {
   .right-panel { width: 100%; }
   .preview-card { position: static; }
 }
-@media (max-width: 768px) { .shipment-report-page { padding: 12px; } .page-header { flex-direction: column; gap: 16px; padding: 16px; } }
 
 /* 后台页面特定样式 */
 .shipment-report-page.admin-page {
@@ -4904,6 +4903,120 @@ onMounted(() => {
   .generate-pane-content {
     flex-direction: column;
     overflow-y: auto;
+  }
+  .left-panel, .right-panel { height: auto; overflow: visible; flex: none; }
+  .right-panel { width: 100%; }
+  .preview-card { position: static; }
+}
+
+@media screen and (max-width: 768px) {
+  .shipment-report-page {
+    padding: 10px;
+    height: auto;
+    overflow: auto;
+  }
+  
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 12px;
+  }
+
+  .header-actions {
+    width: 100%;
+  }
+
+  .header-actions .el-button {
+    width: 100%;
+  }
+
+  .main-tabs {
+    height: auto;
+    overflow: visible;
+  }
+
+  .generate-pane-content {
+    overflow: visible;
+  }
+
+  .search-form .el-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  .btn-group {
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  .btn-group .el-button {
+    flex: 1;
+    margin-left: 0 !important;
+  }
+
+  .search-tip {
+    display: block;
+    width: 100%;
+    margin-left: 0;
+    margin-top: 8px;
+  }
+
+  .batch-search-form .el-col {
+    width: 100% !important;
+    max-width: 100% !important;
+    flex: 0 0 100% !important;
+  }
+
+  .history-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .history-toolbar .el-input,
+  .history-toolbar .el-date-editor {
+    width: 100% !important;
+  }
+  
+  .history-toolbar .el-button {
+    width: 100%;
+    margin-left: 0 !important;
+    margin-top: 8px;
+  }
+
+  .history-pane-content {
+    height: auto;
+    overflow: visible;
+  }
+  
+  .history-card {
+    height: auto;
+  }
+
+  /* 简化分页器 */
+  .pagination-container .el-pagination {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-bottom: 5px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .pagination-container .el-pagination::-webkit-scrollbar {
+    height: 4px;
+  }
+  
+  .pagination-container .el-pagination::-webkit-scrollbar-thumb {
+    background: #e4e7ed;
+    border-radius: 4px;
+  }
+
+  .pagination-container .el-pagination .el-pagination__total,
+  .pagination-container .el-pagination .el-pagination__sizes,
+  .pagination-container .el-pagination .el-pagination__jump {
+    display: none !important;
   }
 }
 

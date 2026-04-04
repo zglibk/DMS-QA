@@ -102,4 +102,77 @@ const activeTab = ref('connection')
 :deep(.el-tabs__nav-wrap::after) {
   background-color: #e4e7ed;
 }
+
+@media (max-width: 768px) {
+  .system-config {
+    padding: 12px;
+    border-radius: 6px;
+  }
+
+  .page-header {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+  }
+
+  .page-header h2 {
+    font-size: 20px;
+    margin-bottom: 6px;
+  }
+
+  .page-header p {
+    font-size: 13px;
+    line-height: 1.6;
+  }
+
+  .config-tabs {
+    min-height: auto;
+  }
+
+  .tab-content {
+    padding: 12px 0;
+  }
+
+  :deep(.el-tabs__header) {
+    margin-bottom: 12px;
+  }
+
+  :deep(.el-tabs__nav-wrap) {
+    overflow-x: auto;
+  }
+
+  :deep(.el-tabs__item) {
+    font-size: 14px;
+    padding: 0 12px;
+  }
+}
+
+@media (max-width: 390px) {
+  .system-config {
+    padding: 8px;
+  }
+
+  :deep(.el-tabs__item) {
+    padding: 0 10px;
+    font-size: 13px;
+  }
+
+  :deep(.el-dialog) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+    max-height: calc(100vh - 24px) !important;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__body) {
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 375px) {
+  .page-header h2 {
+    font-size: 18px;
+  }
+}
 </style>

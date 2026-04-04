@@ -1065,4 +1065,47 @@ const exportBatchList = async () => {
 .section-content {
     padding: 0 10px;
 }
+
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .page-header-card {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+    padding: 15px;
+  }
+
+  .header-right {
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .header-right .el-button {
+    flex: 1;
+    margin: 0 !important;
+    min-width: calc(50% - 4px);
+  }
+
+  .filter-container {
+    padding: 10px;
+  }
+
+  .filter-item {
+    width: 100% !important;
+  }
+
+  .el-date-picker {
+    width: 100% !important;
+  }
+
+  .action-buttons {
+    flex-wrap: wrap;
+  }
+
+  /* 批量生成弹窗中的日期选择器在移动端需要换行 */
+  .el-dialog__body .filter-container .el-date-picker {
+    width: 100% !important;
+  }
+}
 </style>

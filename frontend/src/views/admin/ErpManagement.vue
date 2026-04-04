@@ -1231,4 +1231,35 @@ export default {
     gap: 4px;
   }
 }
+
+@media (max-width: 390px) {
+  .erp-management {
+    padding: 8px;
+  }
+
+  :deep(.el-table) {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  :deep(.el-dialog) {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin: 12px auto !important;
+    max-height: calc(100vh - 24px) !important;
+    display: flex;
+    flex-direction: column;
+  }
+
+  :deep(.el-dialog__body) {
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 375px) {
+  .card-header {
+    gap: 8px;
+  }
+}
 </style>

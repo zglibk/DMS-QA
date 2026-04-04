@@ -8,7 +8,7 @@
 
     <!-- 统计卡片 + 快捷操作 -->
     <el-row :gutter="16" style="margin-bottom: 20px;">
-      <el-col :xs="24" :sm="12" :md="8" :lg="6" :xl="6">
+      <el-col :xs="12" :sm="12" :md="8" :lg="6" :xl="6">
         <el-card shadow="never" class="stat-card blue-card">
           <div class="stat-content">
             <div class="stat-icon blue-icon">
@@ -21,7 +21,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :xs="24" :sm="12" :md="8" :lg="6" :xl="6">
+      <el-col :xs="12" :sm="12" :md="8" :lg="6" :xl="6">
         <el-card shadow="never" class="stat-card orange-card">
           <div class="stat-content">
             <div class="stat-icon orange-icon">
@@ -146,29 +146,16 @@
     </div>
 
     <!-- 新建报告对话框 -->
-    <el-dialog v-model="createDialogVisible" title="新建性能实验报告" width="500px">
-      <el-form :model="createForm" label-width="100px">
-        <el-form-item label="报告编号">
-          <el-input v-model="createForm.ReportNo" placeholder="自动生成" disabled />
-        </el-form-item>
-        <el-form-item label="测试日期">
-          <el-date-picker v-model="createForm.TestDate" type="date" value-format="YYYY-MM-DD" style="width: 100%" />
-        </el-form-item>
-        <el-form-item label="样品名称">
-          <el-input v-model="createForm.SampleName" placeholder="请输入样品名称" />
-        </el-form-item>
-        <el-form-item label="客户编号">
-          <el-input v-model="createForm.CustomerCode" placeholder="请输入客户编号" />
-        </el-form-item>
-      </el-form>
-      <template #footer>
-        <el-button @click="createDialogVisible = false">取消</el-button>
-        <el-button type="primary" @click="confirmCreate" :loading="createLoading">确定</el-button>
-      </template>
-    </el-dialog>
+    <PerformanceCreateReportDialog
+      v-model="createDialogVisible"
+      title="新建性能实验报告"
+      :form-data="createForm"
+      :loading="createLoading"
+      @confirm="confirmCreate"
+    />
 
     <!-- 审核对话框 -->
-    <el-dialog v-model="auditDialogVisible" title="审核性能实验报告" width="400px">
+    <el-dialog v-model="auditDialogVisible" title="审核性能实验报告" width="400px" class="mobile-dialog">
       <el-form>
         <el-form-item label="审核结果">
           <el-radio-group v-model="auditForm.action">
@@ -197,6 +184,7 @@ import { submitPerformanceReport, approvePerformanceReport, rejectPerformanceRep
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { useUserStore } from '@/store/user'
 import dayjs from 'dayjs'
+import PerformanceCreateReportDialog from '@/components/performance/PerformanceCreateReportDialog.vue'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -543,6 +531,16 @@ onMounted(() => {
 })
 </script>
 
+<style>
+@media screen and (max-width: 768px) {
+  .mobile-dialog {
+    width: 90% !important;
+    margin: 10vh auto !important;
+    border-radius: 8px !important;
+  }
+}
+</style>
+
 <style scoped>
 .filter-container {
   display: flex;
@@ -566,6 +564,14 @@ onMounted(() => {
   height: 100%;
   margin-bottom: 16px;
   border: none;
+  background: #ffffff !important; /* 统一白色背景 */
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.05) !important; /* 添加柔和的阴影 */
+  transition: all 0.3s ease;
+}
+
+.stat-card:hover {
+  box-shadow: 0 8px 24px 0 rgba(64, 158, 255, 0.15) !important; /* 悬浮时阴影颜色改变并加深（主题蓝调色） */
+  transform: translateY(-2px); /* 增加一点悬浮的物理反馈 */
 }
 
 .stat-card :deep(.el-card__body) {
@@ -620,17 +626,10 @@ onMounted(() => {
   color: #303133;
 }
 
-.blue-card {
-  background: linear-gradient(135deg, #ecf5ff 0%, #f5f9ff 100%);
-}
-
-.orange-card {
-  background: linear-gradient(135deg, #fdf6ec 0%, #fef9f3 100%);
-}
-
-.action-card {
-  background: linear-gradient(135deg, #f0f9eb 0%, #f6fbf3 100%);
-}
+/* 为了保持代码干净，移除掉原来那些五颜六色的渐变背景色 */
+/* .blue-card { background: linear-gradient(135deg, #ecf5ff 0%, #f5f9ff 100%); }
+.orange-card { background: linear-gradient(135deg, #fdf6ec 0%, #fef9f3 100%); }
+.action-card { background: linear-gradient(135deg, #f0f9eb 0%, #f6fbf3 100%); } */
 
 .action-content {
   width: 100%;
@@ -645,19 +644,100 @@ onMounted(() => {
 
 /* 响应式调整 */
 @media screen and (max-width: 768px) {
+  .stat-card {
+    margin-bottom: 8px;
+    height: auto;
+    min-height: 80px;
+  }
+  .stat-card :deep(.el-card__body) {
+    padding: 8px 12px;
+  }
+  .stat-content {
+    gap: 4px;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+  }
   .stat-icon {
-    width: 50px;
-    height: 50px;
+    width: 32px;
+    height: 32px;
+  }
+  .stat-icon .el-icon {
+    font-size: 18px !important;
+  }
+  .stat-label {
+    margin-bottom: 2px;
+    font-size: 11px;
+    color: #909399;
   }
   .stat-value {
-    font-size: 24px;
+    font-size: 18px;
+  }
+  .action-content {
+    flex-direction: column;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .action-content .stat-icon {
+    display: none; /* 隐藏快捷操作的大图标，节省空间 */
+  }
+  .action-content .stat-info {
+    width: 100%;
+    margin-top: 0;
+  }
+  .action-content .stat-label {
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: bold;
+    color: #303133;
   }
   .quick-actions {
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     width: 100%;
+    gap: 16px; /* 增大按钮之间的间距，从 8px 增加到 16px */
+    justify-content: flex-start;
   }
   .quick-actions .el-button {
-    width: 100%;
+    flex: 1; /* 保持原生的自适应宽度 */
+    margin: 0 !important;
+    height: auto; 
+    aspect-ratio: auto;
+    padding: 10px 15px; /* 稍微增加上下内边距，让按钮看起来丰满一些 */
+    font-size: 14px; 
+    display: inline-flex; 
+    flex-direction: row; 
+    justify-content: center;
+    align-items: center;
+    gap: 6px; /* 图标和文字的间距稍微拉开一点点 */
+    border-radius: 4px; 
+  }
+  .quick-actions .el-button .el-icon {
+    font-size: 14px; /* 恢复原生图标大小 */
+    margin-right: 4px !important;
+  }
+  .quick-actions .el-button span {
+    margin-left: 0 !important;
+    line-height: normal;
+    white-space: nowrap; /* 恢复不换行 */
+    text-align: center;
+  }
+
+  .filter-container {
+    padding: 10px;
+  }
+
+  .filter-item {
+    width: 100% !important;
+  }
+
+  .el-date-picker {
+    width: 100% !important;
+  }
+
+  .action-buttons {
+    flex-wrap: wrap;
   }
 }
 
