@@ -356,14 +356,39 @@ const handleLogoError = (event) => {
 
 /* 响应式设计 */
 @media (max-width: 768px) {
+  .app-header {
+    padding: 0 1rem;
+  }
+
   .logo-text {
     display: none;
   }
   
-  .nav-menu :deep(.el-menu-item) {
-    padding: 0 16px !important;
-    margin: 0 4px;
-    font-size: 15px;
+  .header-center {
+    overflow-x: auto;
+    justify-content: flex-start;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  .header-center::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-menu-wrap {
+    justify-content: flex-start;
+    width: max-content;
+  }
+  
+  .nav-menu {
+    flex-wrap: nowrap;
+  }
+  
+  .nav-menu :deep(.el-menu-item),
+  .nav-menu :deep(.el-sub-menu__title) {
+    padding: 0 12px !important;
+    margin: 0 2px;
+    font-size: 14px;
+    white-space: nowrap;
   }
   
   .header-right {

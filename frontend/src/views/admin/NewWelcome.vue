@@ -1755,8 +1755,8 @@ defineExpose({
   gap: 6px;
   opacity: 0.9;
   margin: 8px 0 0 0;
-  width: 550px;
-  min-width: 550px;
+  max-width: 100%;
+  flex-wrap: wrap;
 }
 
 .calendar-icon {
@@ -2908,8 +2908,13 @@ defineExpose({
 
 @media (max-width: 768px) {
   .dashboard-container {
+    padding-bottom: 20px;
   }
   
+  .dashboard-main {
+    gap: 16px;
+  }
+
   .overview-grid {
     grid-template-columns: 1fr;
   }
@@ -2935,7 +2940,14 @@ defineExpose({
   }
   
   .welcome-stats {
-    gap: 20px;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .stat-item {
+    flex: 1 1 calc(50% - 12px);
+    min-width: 130px;
+    padding: 12px 16px;
   }
 }
 
@@ -2958,6 +2970,16 @@ defineExpose({
   
   .action-name {
     font-size: 11px;
+  }
+
+  .welcome-stats {
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .stat-item {
+    width: 100%;
+    flex: 1 1 auto;
   }
 }
 </style>

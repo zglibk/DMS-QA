@@ -281,6 +281,8 @@
                 layout="total, sizes, prev, pager, next, jumper"
                 @size-change="handleTableSizeChange"
                 @current-change="handleTableCurrentChange"
+                :small="true"
+                class="mobile-pagination"
               />
             </div>
           </el-tab-pane>
@@ -288,7 +290,7 @@
           <el-tab-pane label="工时损耗统计" name="statistics">
             <el-row :gutter="20">
               <!-- 统计表格 -->
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="statistics-table">
                   <el-table
                     :data="statisticsData"
@@ -336,7 +338,7 @@
               </el-col>
 
               <!-- 横道图 -->
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="gantt-chart">
                   <!-- 横道图切换按钮 -->
                   <div class="chart-header">
@@ -368,7 +370,7 @@
           <!-- 返工趋势分析 -->
           <el-tab-pane label="返工趋势分析" name="trend">
             <el-row :gutter="20">
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="chart-data-panel">
                   <h4 class="data-panel-title">
                     <el-icon><List /></el-icon>
@@ -386,7 +388,7 @@
                   </el-table>
                 </div>
               </el-col>
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="chart-panel">
                   <div ref="trendChartRef" class="chart-container"></div>
                 </div>
@@ -397,7 +399,7 @@
           <!-- 部门返工分布 -->
           <el-tab-pane label="部门返工分布" name="department">
             <el-row :gutter="20">
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="chart-data-panel">
                   <h4 class="data-panel-title">
                     <el-icon><List /></el-icon>
@@ -415,7 +417,7 @@
                   </el-table>
                 </div>
               </el-col>
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="chart-panel">
                   <div ref="deptChartRef" class="chart-container"></div>
                 </div>
@@ -426,7 +428,7 @@
           <!-- 不良类别分析 -->
           <el-tab-pane label="不良类别分析" name="category">
             <el-row :gutter="20">
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="chart-data-panel">
                   <h4 class="data-panel-title">
                     <el-icon><List /></el-icon>
@@ -444,7 +446,7 @@
                   </el-table>
                 </div>
               </el-col>
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="chart-panel">
                   <div ref="categoryChartRef" class="chart-container"></div>
                 </div>
@@ -455,7 +457,7 @@
           <!-- 返工成本分析 -->
           <el-tab-pane label="返工成本分析" name="cost">
             <el-row :gutter="20">
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="chart-data-panel">
                   <h4 class="data-panel-title">
                     <el-icon><List /></el-icon>
@@ -476,7 +478,7 @@
                   </el-table>
                 </div>
               </el-col>
-              <el-col :span="12">
+              <el-col :xs="24" :sm="24" :md="12">
                 <div class="chart-panel">
                   <div ref="costChartRef" class="chart-container"></div>
                 </div>
@@ -1929,11 +1931,11 @@ const updateGanttChart = () => {
 /* 图表分析卡片样式 */
 .charts-analysis-card {
   margin-bottom: 20px;
-  max-height: 500px;
+  max-height: none; /* 移除 max-height 避免卡片高度被截断 */
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   border-radius: 12px;
   box-shadow: 0 2px 12px rgba(64, 158, 255, 0.08);
-  overflow: hidden;
+  overflow: visible; /* 允许内容溢出撑开 */
   border: 1px solid #e1f5fe;
 }
 
@@ -2087,14 +2089,14 @@ const updateGanttChart = () => {
 }
 
 /* 小屏幕下4个卡片布局优化 */
-@media (min-width: 576px) {
+@media (min-width: 576px) and (max-width: 767px) {
   .summary-cards-row {
     justify-content: space-between !important;
   }
   
   .summary-cards-row .el-col {
     flex: 1 !important;
-    max-width: calc(25% - 15px) !important;
+    max-width: calc(50% - 15px) !important;
     min-width: 200px !important;
   }
 }
@@ -2221,12 +2223,14 @@ const updateGanttChart = () => {
   border: 1px solid #e1f5fe;
   border-radius: 12px;
   padding: 20px;
-  height: calc(100% - 32px);
+  height: auto;
+  min-height: 400px; /* 增加最小高度以避免被挤压 */
   box-sizing: border-box;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 4px 12px rgba(64, 158, 255, 0.1);
   transition: all 0.3s ease;
   position: relative;
+  display: block;
 }
 
 .chart-panel::before {
@@ -2250,9 +2254,8 @@ const updateGanttChart = () => {
   min-width: 100% !important;
   height: 100% !important;
   min-height: 300px !important;
-  max-height: 380px !important;
   box-sizing: border-box !important;
-  overflow: hidden !important;
+  overflow: visible !important;
   background: rgba(255, 255, 255, 0.8);
   border-radius: 8px;
   padding: 12px;
@@ -2293,6 +2296,7 @@ const updateGanttChart = () => {
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
+  display: block;
 }
 
 .data-analysis-card .el-card__body {
@@ -2301,6 +2305,24 @@ const updateGanttChart = () => {
   width: 100% !important;
   max-width: 100% !important;
   box-sizing: border-box !important;
+  display: block;
+}
+
+/* 图表分析卡片专用 */
+.charts-analysis-card {
+  height: auto !important;
+  min-height: 600px;
+  display: block;
+  overflow: visible;
+  padding-bottom: 40px;
+}
+
+.charts-analysis-card .el-card__body {
+  height: auto !important;
+  min-height: 600px;
+  display: block;
+  overflow: visible;
+  padding-bottom: 20px;
 }
 
 /* Tab内容区域样式 */
@@ -2502,4 +2524,203 @@ const updateGanttChart = () => {
 }
 
 
+/* 响应式设计 - 针对返工分析页面的移动端优化 */
+@media (max-width: 768px) {
+  /* 头部过滤表单 */
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .card-header .time-filter-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    width: 100%;
+    margin-top: 12px;
+  }
+  
+  .card-header .time-filter-group .el-select,
+  .card-header .time-filter-group .el-button {
+    width: calc(50% - 4px) !important;
+    margin-right: 0 !important;
+    margin-bottom: 4px !important;
+  }
+  
+  .card-header .time-filter-group .el-button {
+    width: 100% !important;
+    margin-top: 4px;
+  }
+
+  .filter-bar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  
+  .filter-bar .el-select,
+  .filter-bar .el-button {
+    width: 100% !important;
+    margin-right: 0 !important;
+    margin-bottom: 8px;
+  }
+
+  /* 数据分析区域（包含统计表和横道图） */
+  .statistics-layout,
+  .chart-data-panel {
+    margin-bottom: 16px;
+    height: auto !important;
+    min-height: unset !important;
+  }
+  
+  .chart-panel {
+    margin-bottom: 16px;
+    height: auto !important; /* 让图表区域根据内容自适应，不再锁死 */
+    min-height: 400px !important;
+  }
+
+
+
+  /* 顶部总览卡片调整为一行两列或单列 */
+  .summary-cards-row {
+    display: flex !important;
+    flex-wrap: wrap !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    gap: 12px !important;
+  }
+  
+  .summary-cards-row .el-col {
+    margin-bottom: 0 !important;
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    width: calc(50% - 6px) !important;
+    flex: 0 0 calc(50% - 6px) !important;
+    max-width: calc(50% - 6px) !important;
+    min-width: 0 !important;
+  }
+  
+  .summary-item {
+    height: 100% !important;
+    min-height: 100px;
+    padding: 12px 10px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+
+  .summary-icon {
+    width: 36px;
+    height: 36px;
+    font-size: 18px;
+    margin-bottom: 8px;
+  }
+
+  .summary-content {
+    align-items: center;
+    text-align: center;
+  }
+
+  .summary-label {
+    font-size: 12px;
+    margin-bottom: 4px;
+  }
+
+  .summary-value {
+    font-size: 20px;
+  }
+
+  /* 图表内容区高度保护，避免被挤压消失 */
+  .chart-panel,
+  .gantt-chart {
+    height: auto !important;
+    min-height: 360px !important;
+    overflow: visible !important;
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+  
+  .chart-panel .chart-container,
+  .gantt-chart .chart-container {
+    min-height: 350px !important;
+    height: 350px !important;
+    max-height: none !important;
+    overflow: visible !important;
+    position: relative !important;
+  }
+  
+  .charts-analysis-card .el-tabs__content {
+    overflow: visible !important;
+    height: auto !important;
+    display: block !important;
+  }
+  
+  .charts-analysis-card .el-tab-pane {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 0 !important;
+  }
+  
+  /* 确保活动标签页正常显示并撑开高度 */
+  .charts-analysis-card .el-tab-pane {
+    display: none;
+  }
+  .charts-analysis-card .el-tab-pane.el-tab-pane {
+    display: none;
+  }
+  .charts-analysis-card .el-tab-pane[aria-hidden="false"] {
+    display: block !important;
+  }
+  .charts-analysis-card .el-tab-pane.is-active {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+  
+  /* 解除父容器可能存在的高度限制，同时确保flex布局不被破坏 */
+  .chart-tabs {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 0 !important;
+    display: flex !important;
+    flex-direction: column-reverse !important;
+  }
+  
+  /* 为了能包裹住内部绝对定位/溢出的子元素，撑开高度 */
+  .charts-analysis-card {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 10px !important;
+    display: block !important;
+  }
+  
+  .charts-analysis-card .el-card__body {
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+    padding-bottom: 0 !important;
+    display: block !important;
+  }
+  
+  .rework-analysis-container {
+    height: auto !important;
+    min-height: 100vh !important;
+    overflow-y: auto !important;
+    padding-bottom: 80px !important; /* 给底部留出空间 */
+  }
+
+  /* 移动端分页器适配 */
+  .mobile-pagination {
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 8px;
+  }
+  
+  .mobile-pagination :deep(.el-pagination__sizes),
+  .mobile-pagination :deep(.el-pagination__jump) {
+    margin-top: 8px;
+  }
+}
 </style>

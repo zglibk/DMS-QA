@@ -71,6 +71,17 @@ html {
   }
 }
 
+/* 防止 iOS 等移动设备在聚焦输入框时自动放大（需强制设置字体大于等于16px） */
+@media screen and (max-width: 768px) {
+  input, select, textarea,
+  .el-input__inner,
+  .el-textarea__inner,
+  .el-select .el-input__inner,
+  .el-range-input {
+    font-size: 16px !important;
+  }
+}
+
 /**
  * 表格和表单英文字体设置
  * 为所有表格和表单元素设置英文字体族

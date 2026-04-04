@@ -132,7 +132,7 @@
       <!-- 图表和数据表格并排显示 -->
       <el-row :gutter="20">
         <!-- 左侧图表容器 -->
-        <el-col :span="12">
+        <el-col :xs="24" :sm="24" :md="showTable ? 12 : 24">
           <div class="chart-container">
             <h4 class="section-title">
               <el-icon><DataAnalysis /></el-icon>
@@ -143,7 +143,7 @@
         </el-col>
 
         <!-- 右侧数据表格 -->
-        <el-col :span="12" v-if="showTable">
+        <el-col :xs="24" :sm="24" :md="12" v-if="showTable">
           <div class="data-table">
           <h4 class="section-title">
             <el-icon><Grid /></el-icon>
@@ -154,7 +154,7 @@
             size="small"
             stripe
             border
-            height="450"
+            max-height="450"
             @row-click="handleRowClick"
             @row-dblclick="handleRowDoubleClick"
             style="cursor: pointer;"
@@ -1852,6 +1852,18 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .chart {
     height: 300px !important;
+  }
+  .header-controls {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .card-title {
+    margin-bottom: 8px;
+    width: 100%;
+  }
+  .card-header {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
 

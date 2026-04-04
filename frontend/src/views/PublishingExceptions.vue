@@ -40,7 +40,7 @@
           
           <el-form :model="filters" class="filter-form">
             <el-row :gutter="16">
-              <el-col :span="6">
+              <el-col :xs="24" :sm="12" :md="6">
                 <el-form-item label="登记日期">
                   <el-date-picker
                     v-model="filters.dateRange"
@@ -55,7 +55,7 @@
                   />
                 </el-form-item>
               </el-col>
-              <el-col :span="3">
+              <el-col :xs="24" :sm="12" :md="3">
                 <el-form-item label="客户代码">
                   <el-input 
                     v-model="filters.customerCode" 
@@ -66,7 +66,7 @@
                   />
                 </el-form-item>
               </el-col>
-              <el-col :span="4">
+              <el-col :xs="24" :sm="12" :md="4">
                 <el-form-item label="工单号">
                   <el-input 
                     v-model="filterWorkOrderSuffix" 
@@ -83,7 +83,7 @@
                   </el-input>
                 </el-form-item>
               </el-col>
-              <el-col :span="7">
+              <el-col :xs="24" :sm="12" :md="7">
                 <el-form-item label="产品名称">
                   <el-select 
                     v-model="filters.productName" 
@@ -104,7 +104,7 @@
                   </el-select>
                 </el-form-item>
               </el-col>
-              <el-col :span="4">
+              <el-col :xs="24" :sm="12" :md="4">
                 <el-form-item label="责任单位">
                   <el-select 
                     v-model="filters.responsibleUnit" 
@@ -125,7 +125,7 @@
             </el-row>
             <el-row :gutter="16">
               <!-- 错误类型筛选：支持按错误类型筛选出版异常记录 -->
-              <el-col :span="4">
+              <el-col :xs="24" :sm="12" :md="4">
                 <el-form-item label="错误类型">
                   <el-select 
                     v-model="filters.errorType" 
@@ -152,7 +152,7 @@
                   </el-select>
                 </el-form-item>
               </el-col>
-              <el-col :span="2">
+              <el-col :xs="12" :sm="6" :md="2">
                 <el-form-item label=" ">
                   <el-button type="warning" plain @click="resetFilters" style="width: 100%; margin-bottom: 8px;">
                     <el-icon><Refresh /></el-icon>
@@ -160,19 +160,13 @@
                   </el-button>
                 </el-form-item>
               </el-col>
-              <el-col :span="2">
+              <el-col :xs="12" :sm="6" :md="2">
                 <el-form-item label=" ">
                   <el-button type="primary" @click="handleSearch" style="width: 100%; margin-bottom: 8px;">
                     <el-icon><Search /></el-icon>
                     搜索
                   </el-button>
                 </el-form-item>
-              </el-col>
-              <el-col :span="6">
-                <!-- 占位列 -->
-              </el-col>
-              <el-col :span="6">
-                <!-- 占位列 -->
               </el-col>
             </el-row>
           </el-form>
@@ -3096,7 +3090,9 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .el-aside {
     width: 100% !important;
-    margin-bottom: 20px;
+    margin-bottom: 0px;
+    padding: 0 20px;
+    box-sizing: border-box;
   }
   
   .el-container {
@@ -3105,6 +3101,45 @@ onUnmounted(() => {
   
   .stats-cards .el-col {
     margin-bottom: 20px;
+  }
+  
+  /* 移动端顶部表单内边距优化 */
+  .filter-card :deep(.el-card__body) {
+    padding: 12px;
+  }
+  
+  /* 记录清单工具栏在移动端折行并让按钮沾满宽度 */
+  .toolbar {
+    flex-wrap: wrap;
+    margin-left: 0;
+  }
+  
+  .toolbar .el-button {
+    margin-left: 0 !important;
+    flex: 1;
+    min-width: calc(50% - 10px);
+  }
+  
+  .toolbar .el-button:first-child {
+    margin-left: 0 !important;
+  }
+  
+  /* 分页在移动端适配，避免被挤压或溢出 */
+  .pagination-wrapper {
+    overflow-x: auto;
+    justify-content: flex-start;
+    padding-bottom: 10px;
+  }
+  
+  /* 操作列按钮的间距调整 */
+  .action-buttons {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  
+  .action-buttons .el-button {
+    margin-left: 0 !important;
+    margin-bottom: 4px;
   }
 }
 
