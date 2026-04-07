@@ -158,39 +158,33 @@ router.get('/files/certificate/:filename', authenticateToken, (req, res) => {
 
 /**
  * 生成仪器管理编号
- * @param {string} prefix - 前缀类型 ('WSJ' 或 'LAB')
+ * @param {string} categoryCode - 类别编号
  * @returns {string} 生成的管理编号
  */
-async function generateManagementCode(prefix) {
+async function generateManagementCode(categoryCode) {
   try {
     const pool = await getConnection();
     
-    // 查询当前前缀的最大编号
+    const prefix = `CL${categoryCode}`;
+    const pattern = `${prefix}%`;
     const query = `
-      SELECT MAX(ManagementCode) as maxCode
+      SELECT MAX(CAST(RIGHT(ManagementCode, 2) AS INT)) as maxSequence
       FROM Instruments 
-      WHERE ManagementCode LIKE @prefix + '%'
+      WHERE ManagementCode LIKE @pattern
+        AND LEN(ManagementCode) = 7
     `;
     
     const request = pool.request();
-    request.input('prefix', sql.NVarChar, prefix);
+    request.input('pattern', sql.NVarChar, pattern);
     const result = await request.query(query);
     
     let sequence = 1;
-    if (result && result.recordset && result.recordset.length > 0 && result.recordset[0].maxCode) {
-      const maxCode = result.recordset[0].maxCode;
-      // 提取编号中的数字部分并加1
-      const match = maxCode.match(new RegExp(`${prefix}-(\\d+)`));
-      if (match) {
-        sequence = parseInt(match[1]) + 1;
-      }
+    if (result && result.recordset && result.recordset.length > 0 && result.recordset[0].maxSequence !== null) {
+      sequence = Number(result.recordset[0].maxSequence) + 1;
     }
     
-    // 生成流水号：格式化为2位数字
     const sequenceStr = sequence.toString().padStart(2, '0');
-    
-    // 返回格式：前缀-流水号
-    return `${prefix}-${sequenceStr}`;
+    return `${prefix}${sequenceStr}`;
   } catch (error) {
     console.error('生成管理编号失败:', error);
     throw error;
@@ -200,17 +194,26 @@ async function generateManagementCode(prefix) {
 /**
  * 获取下一个管理编号预览
  * GET /api/instruments/next-management-code/:prefix
- * @param {string} prefix - 前缀类型 ('WSJ' 或 'LAB')
+ * @param {string} prefix - 类别编号（001/002/003/004/005/006/007/020）
  */
 router.get('/next-management-code/:prefix', authenticateToken, async (req, res) => {
   try {
     const { prefix } = req.params;
+    const categoryMap = {
+      '001': '长度',
+      '002': '力值',
+      '003': '质量',
+      '004': '光学',
+      '005': '电学',
+      '006': '温湿度',
+      '007': '压力',
+      '020': '其它'
+    };
     
-    // 验证前缀类型
-    if (!['WSJ', 'LAB'].includes(prefix)) {
+    if (!categoryMap[prefix]) {
       return res.status(400).json({
         code: 400,
-        message: '无效的前缀类型，只支持 WSJ 或 LAB'
+        message: '无效的类别编号'
       });
     }
     
@@ -221,7 +224,7 @@ router.get('/next-management-code/:prefix', authenticateToken, async (req, res) 
       data: {
         managementCode: nextCode,
         prefix: prefix,
-        description: prefix === 'WSJ' ? '温湿度计' : '常规仪器'
+        description: categoryMap[prefix]
       }
     });
   } catch (error) {
@@ -707,6 +710,37 @@ router.post('/calibration-results', authenticateToken, async (req, res) => {
       .query(insertQuery);
 
     const newRecordId = result.recordset[0].ID;
+
+    const syncPlanQuery = `
+      ;WITH targetPlan AS (
+        SELECT TOP 1 ap.ID
+        FROM AnnualCalibrationPlan ap
+        WHERE ap.InstrumentID = @instrumentID
+          AND ap.Status IN (N'计划中', N'待校准', N'planned', 'planned', N'进行中', N'in_progress')
+        ORDER BY
+          CASE WHEN ap.PlanYear = YEAR(@calibrationDate) THEN 0 ELSE 1 END,
+          ABS(DATEDIFF(DAY, ap.PlannedDate, @calibrationDate)),
+          ap.PlannedDate ASC
+      )
+      UPDATE ap
+      SET
+        ap.Status = N'已完成',
+        ap.ActualDate = @calibrationDate,
+        ap.ActualCost = COALESCE(@calibrationCost, ap.ActualCost),
+        ap.CalibrationResultID = @calibrationResultID,
+        ap.UpdatedBy = @updatedBy,
+        ap.UpdatedAt = GETDATE()
+      FROM AnnualCalibrationPlan ap
+      INNER JOIN targetPlan tp ON ap.ID = tp.ID
+    `;
+
+    await pool.request()
+      .input('instrumentID', sql.Int, instrumentID)
+      .input('calibrationDate', sql.DateTime, new Date(calibrationDate))
+      .input('calibrationCost', sql.Decimal(10, 2), calibrationCost || null)
+      .input('calibrationResultID', sql.Int, newRecordId)
+      .input('updatedBy', sql.Int, req.user.id)
+      .query(syncPlanQuery);
 
     res.status(201).json({
       code: 201,

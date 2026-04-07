@@ -19,7 +19,7 @@ export const instrumentApi = {
   
   /**
    * 获取下一个管理编号
-   * @param {string} prefix - 前缀类型 ('WSJ' 或 'LAB')
+   * @param {string} prefix - 类别编号（001/002/003/004/005/006/007/020）
    * @returns {Promise} API响应
    */
   getNextManagementCode(prefix) {

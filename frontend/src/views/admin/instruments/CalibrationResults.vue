@@ -216,16 +216,17 @@
             <el-form-item label="选择仪器" prop="instrumentID">
               <el-select 
                 v-model="calibrationForm.instrumentID" 
-                placeholder="请选择仪器"
+                placeholder="请输入管理编号或仪器编号筛选"
                 filterable
+                :filter-method="handleInstrumentFilter"
                 style="width: 100%"
                 :disabled="isEdit"
                 @change="handleInstrumentChange"
               >
                 <el-option 
-                  v-for="instrument in instruments" 
+                  v-for="instrument in filteredInstruments" 
                   :key="instrument.ID" 
-                  :label="`${instrument.ManagementCode} - ${instrument.InstrumentName}`" 
+                  :label="getInstrumentOptionLabel(instrument)" 
                   :value="instrument.ID"
                 />
               </el-select>
@@ -597,6 +598,19 @@ const searchForm = reactive({
 const calibrationList = ref([])
 const instruments = ref([])
 const currentCalibration = ref(null)
+const instrumentFilterKeyword = ref('')
+const filteredInstruments = computed(() => {
+  const keyword = instrumentFilterKeyword.value.trim().toLowerCase()
+  if (!keyword) {
+    return instruments.value
+  }
+  return instruments.value.filter(item => {
+    const managementCode = (item.ManagementCode || '').toLowerCase()
+    const instrumentCode = (item.InstrumentCode || '').toLowerCase()
+    const instrumentName = (item.InstrumentName || '').toLowerCase()
+    return managementCode.includes(keyword) || instrumentCode.includes(keyword) || instrumentName.includes(keyword)
+  })
+})
 
 // 分页数据
 const pagination = reactive({
@@ -835,6 +849,7 @@ function handleReset() {
  */
 async function handleAdd() {
   isEdit.value = false
+  instrumentFilterKeyword.value = ''
   
   // 第一步：完全清空对话框中可能的加载数据
   // 清空仪器列表，避免显示之前的数据
@@ -902,6 +917,7 @@ async function handleAdd() {
  */
 function handleEdit(row) {
   isEdit.value = true
+  instrumentFilterKeyword.value = ''
   getInstruments(true) // 编辑时获取所有仪器
   
   // 获取证书文件名（优先使用 CertificateFile，兼容 Attachments）
@@ -1025,6 +1041,17 @@ async function downloadCertificate(calibration) {
  */
 function handleInstrumentChange(instrumentId) {
   // 可以根据选择的仪器自动填充一些信息
+}
+
+function handleInstrumentFilter(keyword) {
+  instrumentFilterKeyword.value = keyword || ''
+}
+
+function getInstrumentOptionLabel(instrument) {
+  const managementCode = instrument.ManagementCode || '无管理编号'
+  const instrumentCode = instrument.InstrumentCode || '无仪器编号'
+  const instrumentName = instrument.InstrumentName || '未命名仪器'
+  return `${managementCode} / ${instrumentCode} - ${instrumentName}`
 }
 
 /**
@@ -1387,6 +1414,7 @@ function handleDialogClose() {
   resetForm()
   // 清空仪器列表，避免数据残留
   instruments.value = []
+  instrumentFilterKeyword.value = ''
 }
 
 /**

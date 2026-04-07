@@ -236,8 +236,12 @@
                   style="width: 140px; flex-shrink: 0;"
                   @change="onPrefixChange"
                 >
-                  <el-option label="温湿度计" value="WSJ" />
-                  <el-option label="常规仪器" value="LAB" />
+                  <el-option
+                    v-for="option in managementPrefixOptions"
+                    :key="option.value"
+                    :label="option.label"
+                    :value="option.value"
+                  />
                   <el-option label="自定义" value="CUSTOM" />
                 </el-select>
                 <el-input 
@@ -279,7 +283,7 @@
         <el-row :gutter="20">
           <el-col :span="12">
             <el-form-item label="仪器类别" prop="CategoryID">
-              <el-select v-model="instrumentForm.CategoryID" placeholder="请选择仪器类别">
+              <el-select v-model="instrumentForm.CategoryID" placeholder="请选择仪器类别" @change="onCategoryChange">
                 <el-option
                   v-for="category in categories"
                   :key="category.ID"
@@ -463,6 +467,26 @@ import { instrumentApi } from '@/api/instruments'
 // 路由
 const router = useRouter()
 
+const categoryOptionConfig = [
+  { code: '001', name: '长度' },
+  { code: '002', name: '力值' },
+  { code: '003', name: '质量' },
+  { code: '004', name: '光学' },
+  { code: '005', name: '电学' },
+  { code: '006', name: '温湿度' },
+  { code: '007', name: '压力' },
+  { code: '020', name: '其它' }
+]
+const defaultCategoryOptions = categoryOptionConfig.map(item => ({
+  ID: item.code,
+  CategoryCode: item.code,
+  CategoryName: item.name
+}))
+const managementPrefixOptions = categoryOptionConfig.map(item => ({
+  value: item.code,
+  label: `${item.name}（${item.code}）`
+}))
+
 // 响应式数据
 const loading = ref(false)
 const exportLoading = ref(false)
@@ -498,7 +522,7 @@ const sortParams = reactive({
 
 // 仪器列表数据
 const instrumentList = ref([])
-const categories = ref([])
+const categories = ref([...defaultCategoryOptions])
 const persons = ref([])  // 新增人员列表
 const currentInstrument = ref(null)
 
@@ -1010,21 +1034,7 @@ async function ensurePersonsLoaded() {
  * 获取仪器类别列表
  */
 async function getCategories() {
-  try {
-    const response = await instrumentApi.getCategories()    
-    // 根据后端API返回的数据结构解析
-    if (response.data && response.data.code === 200 && Array.isArray(response.data.data)) {
-      categories.value = response.data.data
-    } else if (response.data && Array.isArray(response.data)) {
-      categories.value = response.data
-    } else {
-      categories.value = []
-    }
-  } catch (error) {
-    console.error('获取仪器类别列表失败:', error)
-    ElMessage.error('获取类别列表失败：' + (error.response?.data?.message || error.message))
-    categories.value = []
-  }
+  categories.value = [...defaultCategoryOptions]
 }
 
 /**
@@ -1117,10 +1127,15 @@ async function onPrefixChange() {
   instrumentForm.ManagementCode = ''
   
   if (managementCodePrefix.value === 'CUSTOM') {
-    // 自定义模式，启用输入框，不自动生成
     return
-  } else if (['WSJ', 'LAB'].includes(managementCodePrefix.value)) {
-    // 预设前缀模式，自动生成管理编号
+  }
+
+  const matchedCategory = categories.value.find(item => String(item.ID) === String(managementCodePrefix.value))
+  if (matchedCategory) {
+    instrumentForm.CategoryID = matchedCategory.ID
+  }
+
+  if (managementCodePrefix.value) {
     await generateManagementCode()
   }
 }
@@ -1130,7 +1145,7 @@ async function onPrefixChange() {
  */
 async function generateManagementCode() {
   if (!managementCodePrefix.value) {
-    ElMessage.warning('请先选择前缀类型')
+    ElMessage.warning('请先选择类别编号')
     return
   }
   
@@ -1158,13 +1173,31 @@ async function generateManagementCode() {
  */
 function getManagementCodePlaceholder() {
   if (managementCodePrefix.value === null || managementCodePrefix.value === '') {
-    return '请先选择前缀类型'
+    return '请先选择类别编号'
   } else if (managementCodePrefix.value === 'CUSTOM') {
     return '请输入自定义管理编号'
-  } else if (['WSJ', 'LAB'].includes(managementCodePrefix.value)) {
-    return '选择前缀后将自动生成'
+  } else if (managementCodePrefix.value) {
+    return '选择类别后将自动生成'
   }
   return '请输入管理编号'
+}
+
+function parseManagementCodePrefix(managementCode) {
+  if (!managementCode) {
+    return null
+  }
+  const matched = managementCode.match(/^CL(\d{3})\d{2}$/)
+  return matched ? matched[1] : null
+}
+
+async function onCategoryChange(categoryID) {
+  if (!categoryID) {
+    return
+  }
+  managementCodePrefix.value = String(categoryID)
+  if (!isEdit.value) {
+    await generateManagementCode()
+  }
 }
 
 /**
@@ -1221,7 +1254,8 @@ async function handleEdit(row) {
     ResponsiblePerson: responsiblePersonID,  // 使用找到的责任人ID
     Status: mapStatusToLabel(row.Status),  // 映射状态为中文
     Notes: row.Notes || ''
-  }) 
+  })
+  managementCodePrefix.value = parseManagementCodePrefix(instrumentForm.ManagementCode) || 'CUSTOM'
 
   
   dialogVisible.value = true
@@ -1433,6 +1467,7 @@ function resetForm() {
     Status: '正常',
     Notes: ''
   })
+  managementCodePrefix.value = null
   formRef.value?.resetFields()
 }
 
